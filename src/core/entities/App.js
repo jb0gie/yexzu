@@ -11,7 +11,7 @@ import { ControlPriorities } from '../extras/ControlPriorities'
 import { getRef } from '../nodes/Node'
 
 const hotEventNames = ['fixedUpdate', 'update', 'lateUpdate']
-const internalEvents = ['fixedUpdate', 'updated', 'lateUpdate']
+const internalEvents = ['fixedUpdate', 'updated', 'lateUpdate', 'enter', 'leave', 'chat']
 
 const Modes = {
   ACTIVE: 'active',
@@ -311,8 +311,16 @@ export class App extends Entity {
   }
 
   destroy(local) {
+    if (this.dead) return
+    this.dead = true
+
     this.unbuild()
-    super.destroy(local)
+
+    this.world.entities.remove(this.data.id)
+    // if removed locally we need to broadcast to server/clients
+    if (local) {
+      this.world.network.send('entityRemoved', this.data.id)
+    }
   }
 
   on(name, callback) {

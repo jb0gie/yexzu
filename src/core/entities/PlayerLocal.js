@@ -81,8 +81,8 @@ export class PlayerLocal extends Entity {
     this.base.position.fromArray(this.data.position)
     this.base.quaternion.fromArray(this.data.quaternion)
 
-    this.nametag = createNode({ name: 'nametag', label: this.data.user.name, active: false })
-    this.base.add(this.nametag)
+    // this.nametag = createNode({ name: 'nametag', label: this.data.user.name, active: false })
+    // this.base.add(this.nametag)
 
     this.bubble = createNode({
       name: 'ui',
@@ -97,9 +97,9 @@ export class PlayerLocal extends Entity {
     })
     this.bubbleBox = createNode({
       name: 'uiview',
-      backgroundColor: 'rgba(0, 0, 0, 0.95)',
-      borderRadius: 20,
-      padding: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderRadius: 10,
+      padding: 10,
     })
     this.bubbleText = createNode({
       name: 'uitext',
@@ -141,11 +141,11 @@ export class PlayerLocal extends Entity {
         if (this.avatar) this.avatar.deactivate()
         this.avatar = src.toNodes().get('avatar')
         this.base.add(this.avatar)
-        this.nametag.position.y = this.avatar.height + 0.2
+        // this.nametag.position.y = this.avatar.height + 0.2
         this.bubble.position.y = this.avatar.height + 0.2
-        if (!this.bubble.active) {
-          this.nametag.active = true
-        }
+        // if (!this.bubble.active) {
+        //   this.nametag.active = true
+        // }
         this.avatarUrl = avatarUrl
       })
       .catch(err => {
@@ -219,6 +219,7 @@ export class PlayerLocal extends Entity {
     }
     this.removeCapsule = this.world.physics.addActor(this.capsule, {
       tag: 'player',
+      player: this.getProxy(),
       onInterpolate: position => {
         this.base.position.copy(position)
       },
@@ -600,20 +601,20 @@ export class PlayerLocal extends Entity {
   }
 
   chat(msg) {
-    this.nametag.active = false
+    // this.nametag.active = false
     this.bubbleText.value = msg
     this.bubble.active = true
     clearTimeout(this.chatTimer)
     this.chatTimer = setTimeout(() => {
       this.bubble.active = false
-      this.nametag.active = true
+      // this.nametag.active = true
     }, 5000)
   }
 
   modify(data) {
     if (data.hasOwnProperty('user')) {
       this.data.user = data.user
-      this.nametag.label = data.user.name
+      // this.nametag.label = data.user.name
       this.applyAvatar()
     }
   }
@@ -625,6 +626,9 @@ export class PlayerLocal extends Entity {
       const rotation = new THREE.Euler()
       const quaternion = new THREE.Quaternion()
       this.proxy = {
+        get networkId() {
+          return self.data.owner
+        },
         get entityId() {
           return self.data.id
         },

@@ -78,8 +78,8 @@ function Content({ world, width, height }) {
         />
       )}
       {context && <ContextWheel key={context.id} {...context} />}
-      {inspect && <InspectPane key={inspect.data.id} world={world} entity={inspect} />}
-      {code && <CodePane world={world} entity={code} />}
+      {inspect && <InspectPane key={`inspect-${inspect.data.id}`} world={world} entity={inspect} />}
+      {inspect && code && <CodePane key={`code-${inspect.data.id}`} world={world} entity={inspect} />}
       {avatar && <AvatarPane key={avatar.hash} world={world} info={avatar} />}
       {disconnected && <Disconnected />}
     </>

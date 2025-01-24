@@ -33,9 +33,9 @@ export class PlayerRemote extends Entity {
     })
     this.bubbleBox = createNode({
       name: 'uiview',
-      backgroundColor: 'rgba(0, 0, 0, 0.95)',
-      borderRadius: 20,
-      padding: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderRadius: 10,
+      padding: 10,
     })
     this.bubbleText = createNode({
       name: 'uitext',
@@ -57,7 +57,7 @@ export class PlayerRemote extends Entity {
     this.emote = 'asset://emote-idle.glb'
 
     this.world.setHot(this, true)
-    this.world.events.emit('enter', this.getProxy())
+    this.world.events.emit('enter', { player: this.getProxy() })
   }
 
   applyAvatar() {
@@ -114,12 +114,20 @@ export class PlayerRemote extends Entity {
   }
 
   destroy(local) {
+    if (this.dead) return
+    this.dead = true
+
     clearTimeout(this.chatTimer)
     this.base.deactivate()
     this.avatar = null
     this.world.setHot(this, false)
-    this.world.events.emit('leave', this.getProxy())
-    super.destroy(local)
+    this.world.events.emit('leave', { player: this.getProxy() })
+
+    this.world.entities.remove(this.data.id)
+    // if removed locally we need to broadcast to server/clients
+    if (local) {
+      this.world.network.send('entityRemoved', this.data.id)
+    }
   }
 
   getProxy() {
@@ -129,6 +137,9 @@ export class PlayerRemote extends Entity {
       const rotation = new THREE.Euler()
       const quaternion = new THREE.Quaternion()
       this.proxy = {
+        get networkId() {
+          return self.data.owner
+        },
         get entityId() {
           return self.data.id
         },

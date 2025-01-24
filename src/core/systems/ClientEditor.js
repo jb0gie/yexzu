@@ -152,6 +152,7 @@ export class ClientEditor extends System {
             model: entity.blueprint.model,
             script: entity.blueprint.script,
             config: cloneDeep(entity.blueprint.config),
+            preload: entity.blueprint.preload,
           }
           this.world.blueprints.add(blueprint, true)
           // assign new blueprint
@@ -254,6 +255,7 @@ export class ClientEditor extends System {
       model: url,
       script: null,
       config: {},
+      preload: false,
     }
     // register blueprint
     this.world.blueprints.add(blueprint, true)
@@ -303,6 +305,7 @@ export class ClientEditor extends System {
           model: url,
           script: null,
           config: {},
+          preload: false,
         }
         // register blueprint
         this.world.blueprints.add(blueprint, true)
