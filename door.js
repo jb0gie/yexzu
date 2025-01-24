@@ -13,6 +13,9 @@ const DOOR_TYPES = {
 	SALOON: 'saloon'
 }
 
+// Add timer constants at the top with other configurations
+const DOOR_OPEN_TIME = 3.0  // Time in seconds door stays open
+
 const DOOR_DIRECTIONS = {
 	INWARD: 'inward',
 	OUTWARD: 'outward'
@@ -35,6 +38,8 @@ const doorFrame = app.get('Frame')
 const doorL = app.get('LeftDoor')
 const doorR = app.get('RightDoor')
 
+// Add timer variable with other state variables
+let openTimer = 0
 
 // Create interact action
 const action = app.create('action')
@@ -46,11 +51,11 @@ doorFrame.add(action)
 // Simple toggle action
 action.onTrigger = () => {
 	if (isMoving) return
-
 	isOpen = !isOpen
 	action.label = isOpen ? 'Close' : 'Open'
 	targetPosition = isOpen ? 1 : 0
 	isMoving = true
+	openTimer = 0  // Reset timer when door is manually triggered
 }
 
 // Door config ui
@@ -95,17 +100,29 @@ app.configure(() => {
 			],
 			defaultValue: '2'
 		},
-
-		{
-			key: 'lock',
-			type: 'section',
-			label: 'Lock settings',
-		},
+		//todo: add lock settings
+		// 	{
+		// 		key: 'lock',
+		// 		type: 'section',
+		// 		label: 'Lock settings',
+		// 	},
 	]
 })
 
 // Update animation state
 app.on('update', dt => {
+	// Handle auto-closing timer when door is open
+	if (isOpen && !isMoving) {
+		openTimer += dt
+		if (openTimer >= DOOR_OPEN_TIME) {
+			isOpen = false
+			action.label = 'Open'
+			targetPosition = 0
+			isMoving = true
+			openTimer = 0
+		}
+	}
+
 	if (!isMoving) return
 
 	const movement = doorConfig.speed * dt
@@ -129,18 +146,29 @@ app.on('update', dt => {
 		} else {
 			currentPosition = Math.max(currentPosition - movement, 0)
 		}
-		// Move doors with direction and clamped distance
-		const offset = slideDistance * currentPosition * directionMultiplier
+
+		// Reset any rotation on the pivot
+		doorL.rotation.y = 0
+		doorR.rotation.y = 0
+
+		// Move the doors directly
+		const offset = slideDistance * currentPosition
 		doorL.position.x = -offset
 		doorR.position.x = offset
+
 	} else {
+		// Reset door positions when in swing mode
+		doorL.position.x = 0
+		doorR.position.x = 0
+
 		// Saloon door animation
 		if (isOpen) {
 			currentPosition = Math.min(currentPosition + movement, 1)
 		} else {
 			currentPosition = Math.max(currentPosition - movement, 0)
 		}
-		// Rotate doors with direction and clamped rotation
+
+		// Rotate the pivot points
 		const rotation = maxRotation * currentPosition * directionMultiplier
 		doorL.rotation.y = rotation
 		doorR.rotation.y = -rotation
