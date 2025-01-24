@@ -49,6 +49,7 @@ export class UIView extends Node {
 
   draw(ctx, offsetLeft, offsetTop) {
     if (this._display === 'none') return
+    this.box = {}
     const left = offsetLeft + this.yogaNode.getComputedLeft()
     const top = offsetTop + this.yogaNode.getComputedTop()
     const width = this.yogaNode.getComputedWidth()
@@ -61,6 +62,7 @@ export class UIView extends Node {
         ctx.fillRect(left, top, width, height)
       }
     }
+    this.box = { left, top, width, height }
     this.children.forEach(child => child.draw(ctx, left, top))
   }
 
@@ -96,6 +98,7 @@ export class UIView extends Node {
       this.parent.yogaNode?.removeChild(this.yogaNode)
       this.yogaNode.free()
       this.yogaNode = null
+      this.box = null
     }
   }
 

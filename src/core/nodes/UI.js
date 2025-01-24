@@ -11,6 +11,7 @@ const v2 = new THREE.Vector3()
 const v3 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
 const q2 = new THREE.Quaternion()
+const m1 = new THREE.Matrix4()
 
 const iQuaternion = new THREE.Quaternion(0, 0, 0, 1)
 const iScale = new THREE.Vector3(1, 1, 1)
@@ -88,6 +89,14 @@ export class UI extends Node {
       this.mesh.matrixWorld.copy(this.matrixWorld)
     }
     this.ctx.world.stage.scene.add(this.mesh)
+    this.sItem = {
+      matrix: this.matrixWorld,
+      geometry: this.geometry,
+      material: this.material,
+      getEntity: () => this.ctx.entity,
+      node: this,
+    }
+    this.ctx.world.stage.octree.insert(this.sItem)
     this.needsRebuild = false
   }
 
@@ -98,6 +107,8 @@ export class UI extends Node {
       this.mesh.material.dispose()
       this.mesh.geometry.dispose()
       this.mesh = null
+      this.ctx.world.stage.octree.remove(this.sItem)
+      this.sItem = null
     }
   }
 
@@ -117,6 +128,7 @@ export class UI extends Node {
         ctx.fillRect(left, top, width, height)
       }
     }
+    this.box = { left, top, width, height }
     this.children.forEach(child => child.draw(ctx, left, top))
     this.texture.needsUpdate = true
     this.needsRedraw = false
@@ -165,6 +177,7 @@ export class UI extends Node {
     this.needsRedraw = false
     this.yogaNode?.free()
     this.yogaNode = null
+    this.box = null
   }
 
   rebuild() {
@@ -192,6 +205,43 @@ export class UI extends Node {
     this._alignItems = source._alignItems
     this._alignContent = source._alignContent
     return this
+  }
+
+  resolveHit(hit) {
+    if (!hit || !hit.point) return null
+
+    const inverseMatrix = m1.copy(this.mesh.matrixWorld).invert()
+
+    // Convert world hit point to canvas coordinates
+    v1.copy(hit.point)
+      .applyMatrix4(inverseMatrix)
+      .multiplyScalar(1 / this._size)
+
+    const x = (v1.x + this._width / 2) * this._res
+    const y = (-v1.y + this._height / 2) * this._res
+
+    const findHitNode = (node, offsetX = 0, offsetY = 0) => {
+      if (!node.box || node._display === 'none') return null
+
+      const left = offsetX + node.box.left
+      const top = offsetY + node.box.top
+      const width = node.box.width
+      const height = node.box.height
+
+      if (x < left || x > left + width || y < top || y > top + height) {
+        return null
+      }
+
+      // Check children from front to back
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        const childHit = findHitNode(node.children[i], left, top)
+        if (childHit) return childHit
+      }
+
+      return node
+    }
+
+    return findHitNode(this)
   }
 
   createMaterial(lit, texture, billboard, transparent) {
@@ -415,8 +465,8 @@ export class UI extends Node {
   }
 
   getProxy() {
-    var self = this
     if (!this.proxy) {
+      var self = this
       let proxy = {
         get width() {
           return self.width

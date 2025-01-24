@@ -593,6 +593,13 @@ export class PlayerLocal extends Entity {
       })
       this.lastSendAt = 0
     }
+
+    // handle node hover enter/leave
+    if (!this.pointerState) this.pointerState = new PointerState()
+    // console.time('pointer')
+    const hit = this.control.pointer.locked ? null : this.world.stage.raycastPointer(this.control.pointer.position)[0]
+    this.pointerState.update(hit, this.control.pressed.MouseLeft, this.control.released.MouseLeft)
+    // console.timeEnd('pointer')
   }
 
   lateUpdate(delta) {
@@ -650,5 +657,118 @@ export class PlayerLocal extends Entity {
       }
     }
     return this.proxy
+  }
+}
+
+const PointerEvents = {
+  ENTER: 'pointerenter',
+  LEAVE: 'pointerleave',
+  DOWN: 'pointerdown',
+  UP: 'pointerup',
+}
+
+const CURSOR_DEFAULT = 'default'
+
+class PointerEvent {
+  constructor() {
+    this.type = null
+    this._propagationStopped = false
+  }
+
+  set(type) {
+    this.type = type
+    this._propagationStopped = false
+  }
+
+  stopPropagation() {
+    this._propagationStopped = true
+  }
+}
+
+class PointerState {
+  constructor() {
+    this.activePath = new Set()
+    this.event = new PointerEvent()
+    this.cursor = CURSOR_DEFAULT
+    this.pressedNodes = new Set()
+  }
+
+  update(hit, pointerPressed, pointerReleased) {
+    const newPath = hit ? this.getAncestorPath(hit) : []
+    const oldPath = Array.from(this.activePath)
+
+    // find divergence point
+    let i = 0
+    while (i < newPath.length && i < oldPath.length && newPath[i] === oldPath[i]) i++
+
+    // pointer leave events bubble up from leaf
+    for (let j = oldPath.length - 1; j >= i; j--) {
+      if (oldPath[j].onPointerLeave) {
+        this.event.set(PointerEvents.LEAVE)
+        oldPath[j].onPointerLeave?.(this.event)
+        // if (this.event._propagationStopped) break
+      }
+      this.activePath.delete(oldPath[j])
+    }
+
+    // pointer enter events bubble down from divergence
+    for (let j = i; j < newPath.length; j++) {
+      if (newPath[j].onPointerEnter) {
+        this.event.set(PointerEvents.ENTER)
+        newPath[j].onPointerEnter?.(this.event)
+        if (this.event._propagationStopped) break
+      }
+      this.activePath.add(newPath[j])
+    }
+
+    // set cursor - check from leaf to root for first defined cursor
+    let cursor = CURSOR_DEFAULT
+    if (newPath.length > 0) {
+      for (let i = newPath.length - 1; i >= 0; i--) {
+        if (newPath[i].cursor) {
+          cursor = newPath[i].cursor
+          break
+        }
+      }
+    }
+    if (cursor !== this.cursor) {
+      document.body.style.cursor = cursor
+      this.cursor = cursor
+    }
+
+    // handle pointer down events
+    if (pointerPressed) {
+      for (let i = newPath.length - 1; i >= 0; i--) {
+        const node = newPath[i]
+        if (node.onPointerDown) {
+          this.event.set(PointerEvents.DOWN)
+          node.onPointerDown(this.event)
+          this.pressedNodes.add(node)
+          if (this.event._propagationStopped) break
+        }
+      }
+    }
+
+    // handle pointer up events
+    if (pointerReleased) {
+      for (const node of this.pressedNodes) {
+        if (node.onPointerUp) {
+          this.event.set(PointerEvents.UP)
+          node.onPointerUp(this.event)
+          if (this.event._propagationStopped) break
+        }
+      }
+      this.pressedNodes.clear()
+    }
+  }
+
+  getAncestorPath(hit) {
+    const path = []
+    let node = hit.node?.resolveHit?.(hit) || hit.node
+    while (node) {
+      path.unshift(node)
+      node = node.parent
+    }
+    return path
   }
 }

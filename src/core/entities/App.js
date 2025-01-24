@@ -468,7 +468,7 @@ export class App extends Entity {
   getAppProxy() {
     const entity = this
     const world = this.world
-    return {
+    let proxy = {
       get instanceId() {
         return entity.data.id
       },
@@ -521,7 +521,8 @@ export class App extends Entity {
       get config() {
         return entity.blueprint.config
       },
-      ...this.root.getProxy(),
     }
+    proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(this.root.getProxy())) // inherit root Node properties
+    return proxy
   }
 }

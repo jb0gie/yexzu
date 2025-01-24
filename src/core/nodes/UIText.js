@@ -43,7 +43,7 @@ export class UIText extends Node {
     const left = offsetLeft + this.yogaNode.getComputedLeft()
     const top = offsetTop + this.yogaNode.getComputedTop()
     const width = this.yogaNode.getComputedWidth()
-    // const height = this.yogaNode.getComputedHeight()
+    const height = this.yogaNode.getComputedHeight()
     ctx.font = `${this._fontWeight} ${this._fontSize * this.ui._res}px ${this._fontFamily}`
     ctx.textBaseline = 'alphabetic'
     // ctx.textBaseline = 'top'
@@ -72,6 +72,7 @@ export class UIText extends Node {
       ctx.fillText(line, innerX, currentBaselineY)
       currentBaselineY += baselineGap
     })
+    this.box = { left, top, width, height }
   }
 
   mount() {
@@ -94,6 +95,7 @@ export class UIText extends Node {
       this.parent.yogaNode?.removeChild(this.yogaNode)
       this.yogaNode.free()
       this.yogaNode = null
+      this.box = null
     }
   }
 
