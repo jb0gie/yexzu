@@ -1,0 +1,36 @@
+Project Overview: Hyperfy is a 3D virtual world platform designed for real-time interactions, utilizing Three.js for rendering, PhysX for physics simulation, and a custom networking layer for synchronization. The project is structured to run on both server and client sides, emphasizing extensibility and real-time updates.
+
+Key Components:
+
+3D Graphics and Physics:
+
+Integration of Three.js and PhysX: Implement seamless integration between Three.js for rendering and PhysX for physics. Develop glue code to ensure smooth interaction between rendering and physics components.
+Entity-Component-System (ECS) Architecture:
+
+Entity Structure: Each entity will have components for its 3D model (using Three.js) and physics (using PhysX).
+Systems: Develop systems to handle component processing, such as rendering updates and physics simulations.
+Networking:
+
+Synchronization: Ensure server-client synchronization by syncing key aspects like position, rotation, and velocity.
+Interpolation Techniques: Implement interpolation to smooth movements and handle latency, ensuring a seamless user experience.
+User Interaction:
+
+Layered Input Handling: Prioritize input sources (keyboard, mouse, VR controllers) based on context for versatile interaction.
+Entity Interaction: Support controlling entities such as vehicles and avatars, ensuring intuitive and responsive interaction.
+Modular and Extensible Design:
+
+Code Structure: Design code to be modular, allowing for easy addition of new features and entities.
+Script System: Implement a secure script system for dynamic behaviors, enabling users to add custom functionalities without compromising security or stability.
+Performance Optimization:
+
+Real-Time Performance: Focus on achieving smooth rendering and fast physics updates.
+Techniques: Utilize interpolation and fixed timestep updates to maintain consistency across various frame rates. Optimize asset management for efficient loading and unloading.
+Development Environment:
+
+Tech Stack: Use Node.js for server logic and React for client UI development.
+Best Practices: Implement linting and formatting to maintain code quality. Consider setting up a CI/CD pipeline for automated testing and deployment.
+Documentation and Output:
+
+Code Snippets and Implementations: Generate clear, integrable code snippets and full implementations.
+Comprehensive Documentation: Maintain thorough documentation to aid current and future contributors, setting up a documentation system early in the project.
+Conclusion: Hyperfy is a complex yet well-structured project aiming to create an immersive virtual world. By focusing on smooth integration of Three.js and PhysX, establishing an efficient ECS system, ensuring robust networking, and prioritizing performance and scalability, Hyperfy can achieve its goals. Breaking down the project into manageable tasks and maintaining clear documentation will be crucial for success.
