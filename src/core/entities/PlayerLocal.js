@@ -8,6 +8,8 @@ import { bindRotations } from '../extras/bindRotations'
 import { simpleCamLerp } from '../extras/simpleCamLerp'
 import { Emotes, emotes } from '../extras/playerEmotes'
 import { ControlPriorities } from '../extras/ControlPriorities'
+import { createPlayerProxy } from '../extras/createPlayerProxy'
+import { isNumber } from 'lodash-es'
 
 const UP = new THREE.Vector3(0, 1, 0)
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -217,7 +219,7 @@ export class PlayerLocal extends Entity {
       shape2.setLocalPose(pose)
       this.capsule.attachShape(shape2)
     }
-    this.removeCapsule = this.world.physics.addActor(this.capsule, {
+    this.capsuleHandle = this.world.physics.addActor(this.capsule, {
       tag: 'player',
       player: this.getProxy(),
       onInterpolate: position => {
@@ -594,6 +596,7 @@ export class PlayerLocal extends Entity {
       this.lastSendAt = 0
     }
 
+    // TODO: this feels like ClientEditor stuff not PlayerLocal
     // handle node hover enter/leave
     if (!this.pointerState) this.pointerState = new PointerState()
     // console.time('pointer')
@@ -603,8 +606,32 @@ export class PlayerLocal extends Entity {
   }
 
   lateUpdate(delta) {
-    // interpolate camera towards target
+    // interpolate camera towards target (snaps if just teleported)
     simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+  }
+
+  teleport({ position, rotationY }) {
+    position = position.isVector3 ? position : new THREE.Vector3().fromArray(position)
+    const hasRotation = isNumber(rotationY)
+    // snap to position
+    const pose = this.capsule.getGlobalPose()
+    position.toPxTransform(pose)
+    this.capsuleHandle.snap(pose)
+    this.base.position.copy(position)
+    if (hasRotation) this.base.rotation.y = rotationY
+    // send network update
+    this.world.network.send('entityModified', {
+      id: this.data.id,
+      p: this.base.position.toArray(),
+      q: this.base.quaternion.toArray(),
+      t: true,
+    })
+    // snap camera
+    this.cam.position.copy(this.base.position)
+    this.cam.position.y += 1.6
+    if (hasRotation) this.cam.rotation.y = rotationY
+    this.control.camera.position.copy(this.cam.position)
+    this.control.camera.quaternion.copy(this.cam.quaternion)
   }
 
   chat(msg) {
@@ -628,33 +655,7 @@ export class PlayerLocal extends Entity {
 
   getProxy() {
     if (!this.proxy) {
-      const self = this
-      const position = new THREE.Vector3()
-      const rotation = new THREE.Euler()
-      const quaternion = new THREE.Quaternion()
-      this.proxy = {
-        get networkId() {
-          return self.data.owner
-        },
-        get entityId() {
-          return self.data.id
-        },
-        get id() {
-          return self.data.user.id
-        },
-        get name() {
-          return self.data.user.name
-        },
-        get position() {
-          return position.copy(self.base.position)
-        },
-        get rotation() {
-          return rotation.copy(self.base.rotation)
-        },
-        get quaternion() {
-          return quaternion.copy(self.base.quaternion)
-        },
-      }
+      this.proxy = createPlayerProxy(this)
     }
     return this.proxy
   }

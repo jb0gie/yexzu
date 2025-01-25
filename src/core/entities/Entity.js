@@ -14,7 +14,7 @@ export class Entity {
     // or applying local changes
   }
 
-  onEvent(name, data, clientId) {
+  onEvent(version, name, data, networkId) {
     // ...
   }
 

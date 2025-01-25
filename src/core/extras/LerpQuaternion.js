@@ -36,12 +36,6 @@ export class LerpQuaternion {
     this.time = 0
   }
 
-  snap() {
-    this.previous.copy(this.value)
-    this.current.copy(this.value)
-    this.time = 0
-  }
-
   update(delta) {
     this.time += delta
     let alpha = this.time / this.rate

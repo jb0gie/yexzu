@@ -25,7 +25,6 @@ export class App extends Entity {
     super(world, data, local)
     this.isApp = true
     this.n = 0
-    this.nodes = new Map()
     this.worldNodes = new Set()
     this.hotEvents = 0
     this.worldListeners = new Map()
@@ -36,11 +35,6 @@ export class App extends Entity {
 
   createNode(name) {
     const node = createNode({ name })
-    if (this.nodes.has(node.id)) {
-      console.error('node with id already exists: ', node.id)
-      return
-    }
-    this.nodes.set(node.id, node)
     return node
   }
 
@@ -100,10 +94,6 @@ export class App extends Entity {
     this.root = root
     this.root.position.fromArray(this.data.position)
     this.root.quaternion.fromArray(this.data.quaternion)
-    // collect all nodes
-    this.root.traverse(node => {
-      this.nodes.set(node.id, node)
-    })
     // activate
     this.root.activate({ world: this.world, entity: this, physics: !this.data.mover })
     // execute script
@@ -138,7 +128,7 @@ export class App extends Entity {
       const event = this.eventQueue[0]
       if (event.version > this.blueprint.version) break // ignore future versions
       this.eventQueue.shift()
-      this.emit(event.name, event.data, event.clientId)
+      this.emit(event.name, event.data, event.networkId)
     }
     // finished!
     this.building = false
@@ -151,7 +141,6 @@ export class App extends Entity {
     for (const node of this.worldNodes) {
       node.deactivate()
     }
-    this.nodes.clear()
     this.worldNodes.clear()
     // clear script event listeners
     this.clearEventListeners()
@@ -370,11 +359,11 @@ export class App extends Entity {
     this.worldListeners.clear()
   }
 
-  onEvent(version, name, data, socketId) {
+  onEvent(version, name, data, networkId) {
     if (this.building || version > this.blueprint.version) {
-      this.eventQueue.push({ version, name, data, socketId })
+      this.eventQueue.push({ version, name, data, networkId })
     } else {
-      this.emit(name, data, socketId)
+      this.emit(name, data, networkId)
     }
   }
 

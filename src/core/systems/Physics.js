@@ -258,29 +258,41 @@ export class Physics extends System {
     }
     this.handles.set(actor.ptr, handle)
     this.scene.addActor(actor)
-    return () => {
-      // end any contacts
-      if (handle.contactedHandles.size) {
-        this.contactEvent.clear()
-        const e = this.contactEvent.get()
-        for (const otherHandle of handle.contactedHandles) {
-          e.tag = handle.tag
-          e.player = handle.player
-          otherHandle.onContactEnd?.(e)
-          otherHandle.contactedHandles.delete(handle)
+    return {
+      snap: pose => {
+        actor.setGlobalPose(pose)
+        handle.interpolation.prev.position.copy(pose.p)
+        handle.interpolation.prev.quaternion.copy(pose.q)
+        handle.interpolation.next.position.copy(pose.p)
+        handle.interpolation.next.quaternion.copy(pose.q)
+        handle.interpolation.curr.position.copy(pose.p)
+        handle.interpolation.curr.quaternion.copy(pose.q)
+        handle.interpolation.skip = true
+      },
+      destroy: () => {
+        // end any contacts
+        if (handle.contactedHandles.size) {
+          this.contactEvent.clear()
+          const e = this.contactEvent.get()
+          for (const otherHandle of handle.contactedHandles) {
+            e.tag = handle.tag
+            e.player = handle.player
+            otherHandle.onContactEnd?.(e)
+            otherHandle.contactedHandles.delete(handle)
+          }
         }
-      }
-      // end any triggers
-      if (handle.triggeredHandles.size) {
-        for (const triggerHandle of handle.triggeredHandles) {
-          triggerResult.tag = handle.tag
-          triggerHandle.onTriggerLeave?.(triggerResult)
+        // end any triggers
+        if (handle.triggeredHandles.size) {
+          for (const triggerHandle of handle.triggeredHandles) {
+            triggerResult.tag = handle.tag
+            triggerHandle.onTriggerLeave?.(triggerResult)
+          }
         }
-      }
-      // remove from scene
-      this.scene.removeActor(actor)
-      // delete data
-      this.handles.delete(actor.ptr)
+        // remove from scene
+        this.scene.removeActor(actor)
+        // delete data
+        this.handles.delete(actor.ptr)
+      },
     }
   }
 
@@ -317,6 +329,10 @@ export class Physics extends System {
   preUpdate(alpha) {
     for (const handle of this.active) {
       const lerp = handle.interpolation
+      if (lerp.skip) {
+        lerp.skip = false
+        continue
+      }
       lerp.curr.position.lerpVectors(lerp.prev.position, lerp.next.position, alpha)
       lerp.curr.quaternion.slerpQuaternions(lerp.prev.quaternion, lerp.next.quaternion, alpha)
       handle.onInterpolate(lerp.curr.position, lerp.curr.quaternion)

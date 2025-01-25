@@ -66,7 +66,7 @@ export class RigidBody extends Node {
       this.actor.attachShape(shape)
     }
     const self = this
-    this.removeActor = this.ctx.world.physics.addActor(this.actor, {
+    this.actorHandle = this.ctx.world.physics.addActor(this.actor, {
       onInterpolate: this.type === 'kinematic' || this.type === 'dynamic' ? this.onInterpolate : null,
       get tag() {
         return self.tag
@@ -124,8 +124,8 @@ export class RigidBody extends Node {
     if (this.actor) {
       // this.untrack?.()
       // this.untrack = null
-      this.removeActor?.()
-      this.removeActor = null
+      this.actorHandle?.destroy()
+      this.actorHandle = null
       this.actor.release()
       this.actor = null
     }

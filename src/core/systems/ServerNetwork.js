@@ -27,6 +27,7 @@ export class ServerNetwork extends System {
     this.dirtyBlueprints = new Set()
     this.dirtyApps = new Set()
     this.isServer = true
+    this.queue = []
   }
 
   init({ db }) {
@@ -53,6 +54,10 @@ export class ServerNetwork extends System {
     }
   }
 
+  preFixedUpdate() {
+    this.flush()
+  }
+
   send(name, data, ignoreSocketId) {
     // console.log('->>>', name, data)
     const packet = writePacket(name, data)
@@ -60,6 +65,11 @@ export class ServerNetwork extends System {
       if (socket.id === ignoreSocketId) return
       socket.sendPacket(packet)
     })
+  }
+
+  sendTo(socketId, name, data) {
+    const socket = this.sockets.get(socketId)
+    socket?.send(name, data)
   }
 
   checkSockets() {
@@ -73,6 +83,21 @@ export class ServerNetwork extends System {
       }
     })
     dead.forEach(socket => socket.disconnect())
+  }
+
+  enqueue(socket, method, data) {
+    this.queue.push([socket, method, data])
+  }
+
+  flush() {
+    while (this.queue.length) {
+      try {
+        const [socket, method, data] = this.queue.shift()
+        this[method]?.(socket, data)
+      } catch (err) {
+        console.error(err)
+      }
+    }
   }
 
   save = async () => {
@@ -317,6 +342,10 @@ export class ServerNetwork extends System {
     this.world.entities.remove(id)
     this.send('entityRemoved', id, socket.id)
     if (entity.isApp) this.dirtyApps.add(id)
+  }
+
+  onPlayerTeleport = (socket, data) => {
+    this.sendTo(data.networkId, 'playerTeleport', data)
   }
 
   onDisconnect = (socket, code) => {

@@ -336,6 +336,9 @@ export class Node {
         set id(value) {
           throw new Error('Setting ID not currently supported')
         },
+        get name() {
+          return self.name
+        },
         get position() {
           return self.position
         },

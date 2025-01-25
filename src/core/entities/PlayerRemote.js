@@ -4,6 +4,7 @@ import { createNode } from '../extras/createNode'
 import { LerpQuaternion } from '../extras/LerpQuaternion'
 import { LerpVector3 } from '../extras/LerpVector3'
 import { emotes } from '../extras/playerEmotes'
+import { createPlayerProxy } from '../extras/createPlayerProxy'
 
 export class PlayerRemote extends Entity {
   constructor(world, data, local) {
@@ -55,6 +56,7 @@ export class PlayerRemote extends Entity {
     this.position = new LerpVector3(this.base.position, this.world.networkRate)
     this.quaternion = new LerpQuaternion(this.base.quaternion, this.world.networkRate)
     this.emote = 'asset://emote-idle.glb'
+    this.teleport = 0
 
     this.world.setHot(this, true)
     this.world.events.emit('enter', { player: this.getProxy() })
@@ -83,13 +85,16 @@ export class PlayerRemote extends Entity {
   }
 
   modify(data) {
+    if (data.hasOwnProperty('t')) {
+      this.teleport++
+    }
     if (data.hasOwnProperty('p')) {
       this.data.position = data.p
-      this.position.pushArray(data.p)
+      this.position.pushArray(data.p, this.teleport)
     }
     if (data.hasOwnProperty('q')) {
       this.data.quaternion = data.q
-      this.quaternion.pushArray(data.q)
+      this.quaternion.pushArray(data.q, this.teleport)
     }
     if (data.hasOwnProperty('e')) {
       this.data.emote = data.e
@@ -132,33 +137,7 @@ export class PlayerRemote extends Entity {
 
   getProxy() {
     if (!this.proxy) {
-      const self = this
-      const position = new THREE.Vector3()
-      const rotation = new THREE.Euler()
-      const quaternion = new THREE.Quaternion()
-      this.proxy = {
-        get networkId() {
-          return self.data.owner
-        },
-        get entityId() {
-          return self.data.id
-        },
-        get id() {
-          return self.data.user.id
-        },
-        get name() {
-          return self.data.user.name
-        },
-        get position() {
-          return position.copy(self.base.position)
-        },
-        get rotation() {
-          return rotation.copy(self.base.rotation)
-        },
-        get quaternion() {
-          return quaternion.copy(self.base.quaternion)
-        },
-      }
+      this.proxy = createPlayerProxy(this)
     }
     return this.proxy
   }
