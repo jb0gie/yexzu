@@ -123,6 +123,31 @@ fastify.get('/health', async (request, reply) => {
   }
 })
 
+fastify.get('/status', async (request, reply) => {
+  try {
+    const status = {
+      uptime: Math.round(world.time),
+      protected: process.env.ADMIN_CODE !== undefined ? true : false,
+      connectedUsers: []
+    }
+    for (const socket of world.network.sockets.values()) {  
+      status.connectedUsers.push({
+        id: socket.player.data.user.id,
+        position: socket.player.position.current.toArray(),
+        name: socket.player.data.user.name
+      })
+    }
+    
+    return reply.code(200).send(status)
+  } catch (error) {
+    console.error('Status failed:', error)
+    return reply.code(503).send({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+    })
+  }
+})
+
 fastify.setErrorHandler((err, req, reply) => {
   console.error(err)
   reply.status(500).send()

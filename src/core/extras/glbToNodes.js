@@ -7,13 +7,6 @@ export function glbToNodes(glb, world) {
     const node = createNode(data)
     return node
   }
-  const materials = {}
-  function getMaterial(threeMaterial) {
-    if (!materials[threeMaterial.uuid]) {
-      materials[threeMaterial.uuid] = world.stage.createMaterial({ internal: threeMaterial })
-    }
-    return materials[threeMaterial.uuid]
-  }
 
   function parse(object3ds, parentNode) {
     for (const object3d of object3ds) {
@@ -68,14 +61,13 @@ export function glbToNodes(glb, world) {
           addWind(object3d, world)
         }
         const hasMorphTargets = object3d.morphTargetDictionary || object3d.morphTargetInfluences?.length > 0
-        const material = getMaterial(object3d.material)
         const node = registerNode({
           id: object3d.name,
           name: 'mesh',
           type: 'geometry',
           geometry: object3d.geometry,
-          material,
-          instance: !hasMorphTargets,
+          material: object3d.material,
+          linked: !hasMorphTargets,
           visible: props.visible,
           position: object3d.position.toArray(),
           quaternion: object3d.quaternion.toArray(),

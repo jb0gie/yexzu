@@ -132,6 +132,7 @@ export class RigidBody extends Node {
   }
 
   addShape(shape) {
+    if (!shape) return
     this.shapes.add(shape)
     if (this.actor) {
       this.actor.attachShape(shape)
@@ -139,6 +140,7 @@ export class RigidBody extends Node {
   }
 
   removeShape(shape) {
+    if (!shape) return
     this.shapes.delete(shape)
     if (this.actor) {
       this.actor.detachShape(shape)
