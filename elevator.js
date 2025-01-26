@@ -40,7 +40,7 @@ action.onTrigger = () => {
 }
 
 // Update movement
-app.on('update', dt => {
+app.on('fixedUpdate', dt => {
 	if (!isMoving) return
 
 	// Get config values or use defaults

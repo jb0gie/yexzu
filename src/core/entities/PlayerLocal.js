@@ -50,6 +50,14 @@ export class PlayerLocal extends Entity {
     this.gravity = 20
     this.effectiveGravity = this.gravity * this.mass
     this.jumpHeight = 1.5
+    this.jumpCount = 0  // Track number of jumps
+    this.doubleJumpForce = 9.75  // 1.5x the base jump force
+
+    // Connect to the DoubleJump system
+    this.doubleJumpSystem = this.world.doubleJump
+
+    // Preload the flip animation
+    await this.world.loader.load('emote', emotes[Emotes.DOUBLE_JUMP])
 
     this.capsuleRadius = 0.3
     this.capsuleHeight = 1.6
@@ -180,11 +188,11 @@ export class PlayerLocal extends Entity {
       Layers.player.group,
       Layers.player.mask,
       PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
-        PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
-        PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
-        PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
+      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
+      PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
+      PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
+      PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
+      PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
       0
     )
     shape.setContactOffset(0.08) // just enough to fire contacts (because we muck with velocity sometimes standing on a thing doesn't contact)
@@ -390,6 +398,9 @@ export class PlayerLocal extends Entity {
     if (this.jumped && !this.grounded) {
       this.jumped = false
       this.jumping = true
+      this.falling = false
+      // Don't reset jumpCount here - we need it for double jump
+      console.log('[PlayerLocal] Left ground after jump - jumpCount:', this.jumpCount)
     }
 
     // if not grounded and our velocity is downward, start timing our falling
@@ -398,21 +409,31 @@ export class PlayerLocal extends Entity {
     } else {
       this.fallTimer = 0
     }
+
     // if we've been falling for a bit then progress to actual falling
-    // this is to prevent animation jitter when only falling for a very small amount of time
     if (this.fallTimer > 0.1) {
-      this.jumping = false
-      this.falling = true
+      // Only transition to falling if we're not in a double jump
+      if (this.jumpCount !== 2 || this.capsule.getLinearVelocity().y < -5) {
+        this.jumping = false
+        this.falling = true
+        // Don't reset jumpCount here - we might still want to double jump
+      }
     }
 
     // if falling and we're now on the ground, clear it
     if (this.falling && this.grounded) {
       this.falling = false
+      this.jumping = false
+      this.jumpCount = 0  // Reset jump count only when landing
+      console.log('[PlayerLocal] Landed from fall - resetting jumpCount')
     }
 
     // if jumping and we're now on the ground, clear it
     if (this.jumping && this.grounded) {
       this.jumping = false
+      this.falling = false
+      this.jumpCount = 0  // Reset jump count only when landing
+      console.log('[PlayerLocal] Landed from jump - resetting jumpCount')
     }
 
     // if we're grounded we don't need gravity.
@@ -484,16 +505,34 @@ export class PlayerLocal extends Entity {
     }
 
     // apply jump
-    if (this.grounded && !this.jumping && this.control.buttons.Space) {
-      // calc velocity needed to reach jump height
-      let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
-      jumpVelocity = jumpVelocity * (1 / Math.sqrt(this.mass))
-      // update velocity
-      const velocity = this.capsule.getLinearVelocity()
-      velocity.y = jumpVelocity
-      this.capsule.setLinearVelocity(velocity)
-      // set jumped (we haven't left the ground yet)
-      this.jumped = true
+    if (this.control.buttons.Space) {
+      if (this.grounded && !this.jumping) {
+        // First jump - normal jump
+        let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
+        jumpVelocity = jumpVelocity * (1 / Math.sqrt(this.mass))
+        const velocity = this.capsule.getLinearVelocity()
+        velocity.y = jumpVelocity
+        this.capsule.setLinearVelocity(velocity)
+        this.jumped = true
+        this.emote = Emotes.FLOAT
+        console.log('[PlayerLocal] First jump - starting float animation')
+      }
+      // Double jump is handled by DoubleJump system
+    }
+
+    // Update emote based on state
+    if (this.grounded) {
+      if (this.moving) {
+        this.emote = this.running ? Emotes.RUN : Emotes.WALK
+      } else {
+        this.emote = Emotes.IDLE
+      }
+    } else if (this.jumping || this.falling) {
+      // Only set FLOAT if we're not in a double jump
+      // DoubleJump system will handle its own emote
+      if (!this.world.doubleJump?.isDoubleJumping) {
+        this.emote = Emotes.FLOAT
+      }
     }
   }
 
@@ -573,15 +612,6 @@ export class PlayerLocal extends Entity {
     this.cam.position.y += 1.6
 
     // emote
-    if (this.jumping) {
-      this.emote = Emotes.FLOAT
-    } else if (this.falling) {
-      this.emote = Emotes.FLOAT
-    } else if (this.moving) {
-      this.emote = this.running ? Emotes.RUN : Emotes.WALK
-    } else {
-      this.emote = Emotes.IDLE
-    }
     this.avatar?.setEmote(emotes[this.emote])
 
     // send network updates

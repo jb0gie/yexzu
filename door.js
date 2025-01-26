@@ -24,7 +24,7 @@ const DOOR_DIRECTIONS = {
 const doorConfig = {
 	type: DOOR_TYPES.SLIDING,
 	direction: DOOR_DIRECTIONS.OUTWARD, // Change to INWARD for inward-opening doors
-	slideDistance: 1.8,
+	slideDistance: 0.65,
 	speed: 2,
 	rotationSpeed: Math.PI,
 	maxRotation: Math.PI / 4
@@ -153,8 +153,8 @@ app.on('update', dt => {
 
 		// Move the doors directly
 		const offset = slideDistance * currentPosition
-		doorL.position.x = -offset
-		doorR.position.x = offset
+		doorL.position.x = offset
+		doorR.position.x = -offset
 
 	} else {
 		// Reset door positions when in swing mode
