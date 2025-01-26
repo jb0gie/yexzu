@@ -457,6 +457,12 @@ const kinds = {
     exts: ['vrm'],
     placeholder: '.vrm',
   },
+  emote: {
+    type: 'emote',
+    accept: '.glb',
+    exts: ['glb'],
+    placeholder: '.glb',
+  },
   model: {
     type: 'model',
     accept: '.glb',
@@ -481,6 +487,7 @@ function FieldFile({ world, field, value, modify }) {
   const update = useUpdate()
   const [loading, setLoading] = useState(null)
   const kind = kinds[field.kind]
+  if (!kind) return null
   const set = async e => {
     // trigger input rebuild
     const n = ++nRef.current
