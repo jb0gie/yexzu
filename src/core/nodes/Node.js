@@ -56,6 +56,9 @@ export class Node {
       this.rotation.setFromQuaternion(this.quaternion, undefined, false)
       this.setTransformed()
     })
+    this.scale._onChange(() => {
+      this.setTransformed()
+    })
     this._onPointerEnter = data.onPointerEnter
     this._onPointerLeave = data.onPointerLeave
     this._onPointerDown = data.onPointerDown
