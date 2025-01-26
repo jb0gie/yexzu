@@ -34,7 +34,7 @@ Some nodes can also be created and used on the fly using `app.create(nodeName)`.
 - [Group](/docs/ref/Group.md)
 - [Mesh](/docs/ref/Mesh.md)
 - [LOD](/docs/ref/LOD.md)
-- [VRM](/docs/ref/VRM.md)
+- [Avatar](/docs/ref/Avatar.md)
 - [Action](/docs/ref/Action.md)
 - [Controller](/docs/ref/Controller.md)
 - [RigidBody](/docs/ref/RigidBody.md)

@@ -10,7 +10,7 @@ const defaults = {
   depth: 1,
   radius: 0.5,
   geometry: null,
-  instance: true,
+  linked: true,
   castShadow: true,
   receiveShadow: true,
   visible: true,
@@ -47,7 +47,7 @@ export class Mesh extends Node {
     this.radius = isNumber(data.radius) ? data.radius : defaults.radius
     this.geometry = data.geometry || defaults.geometry
     this.material = data.material || null
-    this.instance = isBoolean(data.instance) ? data.instance : defaults.instance
+    this.linked = isBoolean(data.linked) ? data.linked : defaults.linked
     this.castShadow = isBoolean(data.castShadow) ? data.castShadow : defaults.castShadow
     this.receiveShadow = isBoolean(data.receiveShadow) ? data.receiveShadow : defaults.receiveShadow
     this.visible = isBoolean(data.visible) ? data.visible : defaults.visible
@@ -63,22 +63,15 @@ export class Mesh extends Node {
     } else if (this.type === 'geometry') {
       geometry = this.geometry
     }
-
-    if (!this.material) {
-      this.material = this.ctx.world.stage.getDefaultMaterial()
-    }
-    const material = this.material.internal
-
     this.handle = this.ctx.world.stage.insert({
       geometry,
-      material,
-      instance: this.instance,
+      material: this.material,
+      linked: this.linked,
       castShadow: this.castShadow,
       receiveShadow: this.receiveShadow,
       matrix: this.matrixWorld,
       node: this,
     })
-
     this.needsRebuild = false
   }
 
@@ -118,7 +111,7 @@ export class Mesh extends Node {
     this.radius = source.radius
     this.geometry = source.geometry
     this.material = source.material
-    this.instance = source.instance
+    this.linked = source.linked
     this.castShadow = source.castShadow
     this.receiveShadow = source.receiveShadow
     this.visible = source.visible
@@ -196,13 +189,21 @@ export class Mesh extends Node {
           throw new Error('[mesh] cannot set geometry')
         },
         get material() {
-          return self.material.proxy
+          return self.handle.material
         },
         set material(value) {
-          if (!value) throw new Error('[mesh] material cannot be unset')
-          self.ctx.world._allowMaterial = true
-          self.material = value._ref
-          self.ctx.world._allowMaterial = false
+          // if (!value) throw new Error('[mesh] material cannot be unset')
+          // self.ctx.world._allowMaterial = true
+          // self.material = value._ref
+          // self.ctx.world._allowMaterial = false
+          // self.needsRebuild = true
+          // self.setDirty()
+        },
+        get linked() {
+          return self.linked
+        },
+        set linked(value) {
+          self.linked = value
           self.needsRebuild = true
           self.setDirty()
         },

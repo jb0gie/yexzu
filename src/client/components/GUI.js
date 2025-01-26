@@ -5,7 +5,7 @@ import { MessageCircleMoreIcon, UnplugIcon, WifiOffIcon } from 'lucide-react'
 import { ContextWheel } from './ContextWheel'
 import { InspectPane } from './InspectPane'
 import { CodePane } from './CodePane'
-import { VRMPane } from './VRMPane'
+import { AvatarPane } from './AvatarPane'
 import { ChatBox } from './ChatBox'
 import { useElemSize } from './useElemSize'
 
@@ -31,19 +31,19 @@ function Content({ world, width, height }) {
   const [inspect, setInspect] = useState(null)
   const [code, setCode] = useState(false)
   const [chat, setChat] = useState(() => !touch)
-  const [vrm, setVRM] = useState(null)
+  const [avatar, setAvatar] = useState(null)
   const [disconnected, setDisconnected] = useState(false)
   useEffect(() => {
     world.on('context', setContext)
     world.on('inspect', setInspect)
     world.on('code', setCode)
-    world.on('vrm', setVRM)
+    world.on('avatar', setAvatar)
     world.on('disconnect', setDisconnected)
     return () => {
       world.off('context', setContext)
       world.off('inspect', setInspect)
       world.off('code', setCode)
-      world.off('vrm', setVRM)
+      world.off('avatar', setAvatar)
       world.off('disconnect', setDisconnected)
     }
   }, [])
@@ -78,9 +78,9 @@ function Content({ world, width, height }) {
         />
       )}
       {context && <ContextWheel key={context.id} {...context} />}
-      {inspect && <InspectPane world={world} entity={inspect} />}
-      {code && <CodePane world={world} entity={code} />}
-      {vrm && <VRMPane key={vrm.hash} world={world} info={vrm} />}
+      {inspect && <InspectPane key={`inspect-${inspect.data.id}`} world={world} entity={inspect} />}
+      {inspect && code && <CodePane key={`code-${inspect.data.id}`} world={world} entity={inspect} />}
+      {avatar && <AvatarPane key={avatar.hash} world={world} info={avatar} />}
       {disconnected && <Disconnected />}
     </>
   )

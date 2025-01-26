@@ -66,15 +66,14 @@ export class RigidBody extends Node {
       this.actor.attachShape(shape)
     }
     const self = this
-    this.removeActor = this.ctx.world.physics.addActor(this.actor, {
+    this.actorHandle = this.ctx.world.physics.addActor(this.actor, {
       onInterpolate: this.type === 'kinematic' || this.type === 'dynamic' ? this.onInterpolate : null,
-
       get tag() {
         return self.tag
       },
-      get isAuthority() {
-        return self.ctx.entity.isAuthority()
-      },
+      // get isAuthority() {
+      //   return self.ctx.entity.isAuthority()
+      // },
       get onContactStart() {
         return self.onContactStart
       },
@@ -125,14 +124,15 @@ export class RigidBody extends Node {
     if (this.actor) {
       // this.untrack?.()
       // this.untrack = null
-      this.removeActor?.()
-      this.removeActor = null
+      this.actorHandle?.destroy()
+      this.actorHandle = null
       this.actor.release()
       this.actor = null
     }
   }
 
   addShape(shape) {
+    if (!shape) return
     this.shapes.add(shape)
     if (this.actor) {
       this.actor.attachShape(shape)
@@ -140,6 +140,7 @@ export class RigidBody extends Node {
   }
 
   removeShape(shape) {
+    if (!shape) return
     this.shapes.delete(shape)
     if (this.actor) {
       this.actor.detachShape(shape)
@@ -222,6 +223,10 @@ export class RigidBody extends Node {
         },
         set onTriggerLeave(value) {
           self.onTriggerLeave = value
+        },
+        get sleeping() {
+          if (!self.actor) return false
+          return self.actor.isSleeping()
         },
         addForce(force, mode) {
           // TODO: modes + enums injected into script

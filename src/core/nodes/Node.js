@@ -1,8 +1,5 @@
+import { isBoolean } from 'lodash-es'
 import * as THREE from '../extras/three'
-
-const DEFAULT_POSITION = [0, 0, 0]
-const DEFAULT_QUATERNION = [0, 0, 0, 1]
-const DEFAULT_SCALE = [1, 1, 1]
 
 const _v1 = new THREE.Vector3()
 const _v2 = new THREE.Vector3()
@@ -12,6 +9,13 @@ const _m2 = new THREE.Matrix4()
 const _m3 = new THREE.Matrix4()
 
 const defaultScale = new THREE.Vector3(1, 1, 1)
+
+const defaults = {
+  active: true,
+  position: [0, 0, 0],
+  quaternion: [0, 0, 0, 1],
+  scale: [1, 1, 1],
+}
 
 let nodeIds = -1
 
@@ -32,13 +36,13 @@ export class Node {
     this.children = []
     this.ctx = null
     this.position = new THREE.Vector3()
-    this.position.fromArray(data.position || DEFAULT_POSITION)
+    this.position.fromArray(data.position || defaults.position)
     this.quaternion = new THREE.Quaternion()
-    this.quaternion.fromArray(data.quaternion || DEFAULT_QUATERNION)
+    this.quaternion.fromArray(data.quaternion || defaults.quaternion)
     this.rotation = new THREE.Euler().setFromQuaternion(this.quaternion)
     this.rotation.reorder('YXZ')
     this.scale = new THREE.Vector3()
-    this.scale.fromArray(data.scale || DEFAULT_SCALE)
+    this.scale.fromArray(data.scale || defaults.scale)
     this.matrix = new THREE.Matrix4()
     this.matrixWorld = new THREE.Matrix4()
     this.position._onChange(() => {
@@ -52,6 +56,14 @@ export class Node {
       this.rotation.setFromQuaternion(this.quaternion, undefined, false)
       this.setTransformed()
     })
+    this.scale._onChange(() => {
+      this.setTransformed()
+    })
+    this._onPointerEnter = data.onPointerEnter
+    this._onPointerLeave = data.onPointerLeave
+    this._onPointerDown = data.onPointerDown
+    this._onPointerUp = data.onPointerUp
+    this._active = isBoolean(data.active) ? data.active : defaults.active
     // this.scale._onChange?
     this.isDirty = false
     this.isTransformed = true
@@ -60,6 +72,7 @@ export class Node {
 
   activate(ctx) {
     if (ctx) this.ctx = ctx
+    if (!this._active) return
     // top down mount
     if (this.mounted) return
     this.updateTransform()
@@ -148,6 +161,20 @@ export class Node {
     this.ctx.world.stage.dirtyNodes.add(this)
   }
 
+  get active() {
+    return this._active
+  }
+
+  set active(value) {
+    if (this._active === value) return
+    this._active = value
+    if (!this._active && this.mounted) {
+      this.deactivate()
+    } else if (this._active && this.parent?.mounted) {
+      this.activate(this.ctx)
+    }
+  }
+
   clean() {
     if (!this.isDirty) return
     let didTransform
@@ -158,7 +185,9 @@ export class Node {
       if (didTransform) {
         node.updateTransform()
       }
-      node.commit(didTransform)
+      if (node.mounted) {
+        node.commit(didTransform)
+      }
       node.isDirty = false
     })
   }
@@ -209,6 +238,11 @@ export class Node {
     this.position.copy(source.position)
     this.quaternion.copy(source.quaternion)
     this.scale.copy(source.scale)
+    this._onPointerEnter = source._onPointerEnter
+    this._onPointerLeave = source._onPointerLeave
+    this._onPointerDown = source._onPointerDown
+    this._onPointerUp = source._onPointerUp
+    this._cursor = source._cursor
     if (recursive) {
       for (let i = 0; i < source.children.length; i++) {
         const child = source.children[i]
@@ -255,6 +289,46 @@ export class Node {
     return null
   }
 
+  get onPointerEnter() {
+    return this._onPointerEnter
+  }
+
+  set onPointerEnter(value) {
+    this._onPointerEnter = value
+  }
+
+  get onPointerLeave() {
+    return this._onPointerLeave
+  }
+
+  set onPointerLeave(value) {
+    this._onPointerLeave = value
+  }
+
+  get onPointerDown() {
+    return this._onPointerDown
+  }
+
+  set onPointerDown(value) {
+    this._onPointerDown = value
+  }
+
+  get onPointerUp() {
+    return this._onPointerUp
+  }
+
+  set onPointerUp(value) {
+    this._onPointerUp = value
+  }
+
+  get cursor() {
+    return this._cursor
+  }
+
+  set cursor(value) {
+    this._cursor = value
+  }
+
   getProxy() {
     if (!this.proxy) {
       const self = this
@@ -264,6 +338,9 @@ export class Node {
         },
         set id(value) {
           throw new Error('Setting ID not currently supported')
+        },
+        get name() {
+          return self.name
         },
         get position() {
           return self.position
@@ -292,6 +369,12 @@ export class Node {
         get matrixWorld() {
           return self.matrixWorld
         },
+        get active() {
+          return self.active
+        },
+        set active(value) {
+          self.active = value
+        },
         get parent() {
           return self.parent?.getProxy()
         },
@@ -319,6 +402,36 @@ export class Node {
         get _ref() {
           if (!secure.allowRef) return null
           return self
+        },
+        get onPointerEnter() {
+          return self.onPointerEnter
+        },
+        set onPointerEnter(value) {
+          self.onPointerEnter = value
+        },
+        get onPointerLeave() {
+          return self.onPointerLeave
+        },
+        set onPointerLeave(value) {
+          self.onPointerLeave = value
+        },
+        get onPointerDown() {
+          return self.onPointerDown
+        },
+        set onPointerDown(value) {
+          self.onPointerDown = value
+        },
+        get onPointerUp() {
+          return self.onPointerUp
+        },
+        set onPointerUp(value) {
+          self.onPointerUp = value
+        },
+        get cursor() {
+          return self.cursor
+        },
+        set cursor(value) {
+          self.cursor = value
         },
       }
       this.proxy = proxy

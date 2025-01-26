@@ -32,7 +32,7 @@ async function migrate(db) {
   let version = parseInt(versionRow.value)
   // run missing migrations
   for (let i = version; i < migrations.length; i++) {
-    console.log(`running migration ${i + 1}`)
+    console.log(`running migration #${i + 1}...`)
     await migrations[i](db)
     await db('config')
       .where('key', 'version')
@@ -99,6 +99,27 @@ const migrations = [
       const data = JSON.parse(blueprint.data)
       if (data.config === undefined) {
         data.config = {}
+        await db('blueprints')
+          .where('id', blueprint.id)
+          .update({
+            data: JSON.stringify(data),
+          })
+      }
+    }
+  },
+  // rename user.vrm -> user.avatar
+  async db => {
+    await db.schema.alterTable('users', table => {
+      table.renameColumn('vrm', 'avatar')
+    })
+  },
+  // add blueprint.preload field
+  async db => {
+    const blueprints = await db('blueprints')
+    for (const blueprint of blueprints) {
+      const data = JSON.parse(blueprint.data)
+      if (data.preload === undefined) {
+        data.preload = false
         await db('blueprints')
           .where('id', blueprint.id)
           .update({

@@ -152,6 +152,7 @@ export class ClientEditor extends System {
             model: entity.blueprint.model,
             script: entity.blueprint.script,
             config: cloneDeep(entity.blueprint.config),
+            preload: entity.blueprint.preload,
           }
           this.world.blueprints.add(blueprint, true)
           // assign new blueprint
@@ -231,14 +232,14 @@ export class ClientEditor extends System {
     }
     const ext = file.name.split('.').pop().toLowerCase()
     if (ext === 'glb') {
-      this.addGLB(file)
+      this.addModel(file)
     }
     if (ext === 'vrm') {
-      this.addVRM(file)
+      this.addAvatar(file)
     }
   }
 
-  async addGLB(file) {
+  async addModel(file) {
     // immutable hash the file
     const hash = await hashFile(file)
     // use hash as glb filename
@@ -246,7 +247,7 @@ export class ClientEditor extends System {
     // canonical url to this file
     const url = `asset://${filename}`
     // cache file locally so this client can insta-load it
-    this.world.loader.insert('glb', url, file)
+    this.world.loader.insert('model', url, file)
     // make blueprint
     const blueprint = {
       id: uuid(),
@@ -254,6 +255,7 @@ export class ClientEditor extends System {
       model: url,
       script: null,
       config: {},
+      preload: false,
     }
     // register blueprint
     this.world.blueprints.add(blueprint, true)
@@ -280,7 +282,7 @@ export class ClientEditor extends System {
     app.onUploaded()
   }
 
-  async addVRM(file) {
+  async addAvatar(file) {
     // immutable hash the file
     const hash = await hashFile(file)
     // use hash as vrm filename
@@ -288,14 +290,14 @@ export class ClientEditor extends System {
     // canonical url to this file
     const url = `asset://${filename}`
     // cache file locally so this client can insta-load it
-    this.world.loader.insert('vrm', url, file)
-    this.world.emit('vrm', {
+    this.world.loader.insert('avatar', url, file)
+    this.world.emit('avatar', {
       file,
       url,
       hash,
       onPlace: async () => {
         // close pane
-        this.world.emit('vrm', null)
+        this.world.emit('avatar', null)
         // make blueprint
         const blueprint = {
           id: uuid(),
@@ -303,6 +305,7 @@ export class ClientEditor extends System {
           model: url,
           script: null,
           config: {},
+          preload: false,
         }
         // register blueprint
         this.world.blueprints.add(blueprint, true)
@@ -330,12 +333,12 @@ export class ClientEditor extends System {
       },
       onEquip: async () => {
         // close pane
-        this.world.emit('vrm', null)
+        this.world.emit('avatar', null)
         // prep new user data
         const player = this.world.entities.player
         const prevUser = player.data.user
         const newUser = cloneDeep(player.data.user)
-        newUser.vrm = url
+        newUser.avatar = url
         // update locally
         player.modify({ user: newUser })
         // upload

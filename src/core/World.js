@@ -174,7 +174,7 @@ export class World extends EventEmitter {
     }
   }
 
-  setupMaterial(material) {
+  setupMaterial = material => {
     this.environment?.csm.setupMaterial(material)
   }
 

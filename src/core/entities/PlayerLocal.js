@@ -1,12 +1,15 @@
-import * as THREE from './three'
-import { Layers } from './Layers'
-import { DEG2RAD, RAD2DEG } from './general'
-import { createNode } from './createNode'
+import { Entity } from './Entity'
 import { clamp } from '../utils'
-import { bindRotations } from './bindRotations'
-import { simpleCamLerp } from './simpleCamLerp'
-import { Emotes, emotes } from './playerEmotes'
-import { ControlPriorities } from './ControlPriorities'
+import * as THREE from '../extras/three'
+import { Layers } from '../extras/Layers'
+import { DEG2RAD, RAD2DEG } from '../extras/general'
+import { createNode } from '../extras/createNode'
+import { bindRotations } from '../extras/bindRotations'
+import { simpleCamLerp } from '../extras/simpleCamLerp'
+import { Emotes, emotes } from '../extras/playerEmotes'
+import { ControlPriorities } from '../extras/ControlPriorities'
+import { createPlayerProxy } from '../extras/createPlayerProxy'
+import { isNumber } from 'lodash-es'
 
 const UP = new THREE.Vector3(0, 1, 0)
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -35,11 +38,10 @@ const m1 = new THREE.Matrix4()
 const m2 = new THREE.Matrix4()
 const m3 = new THREE.Matrix4()
 
-export class PlayerLocal {
-  constructor(entity) {
-    this.entity = entity
-    this.data = entity.data
-    this.world = entity.world
+export class PlayerLocal extends Entity {
+  constructor(world, data, local) {
+    super(world, data, local)
+    this.isPlayer = true
     this.init()
   }
 
@@ -48,6 +50,14 @@ export class PlayerLocal {
     this.gravity = 20
     this.effectiveGravity = this.gravity * this.mass
     this.jumpHeight = 1.5
+    this.jumpCount = 0  // Track number of jumps
+    this.doubleJumpForce = 9.75  // 1.5x the base jump force
+
+    // Connect to the DoubleJump system
+    this.doubleJumpSystem = this.world.doubleJump
+
+    // Preload the flip animation
+    await this.world.loader.load('emote', emotes[Emotes.DOUBLE_JUMP])
 
     this.capsuleRadius = 0.3
     this.capsuleHeight = 1.6
@@ -81,9 +91,40 @@ export class PlayerLocal {
     this.base.position.fromArray(this.data.position)
     this.base.quaternion.fromArray(this.data.quaternion)
 
-    this.applyVRM()
+    // this.nametag = createNode({ name: 'nametag', label: this.data.user.name, active: false })
+    // this.base.add(this.nametag)
+
+    this.bubble = createNode({
+      name: 'ui',
+      width: 300,
+      height: 512,
+      size: 0.005,
+      pivot: 'bottom-center',
+      billboard: 'full',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      active: false,
+    })
+    this.bubbleBox = createNode({
+      name: 'uiview',
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderRadius: 10,
+      padding: 10,
+    })
+    this.bubbleText = createNode({
+      name: 'uitext',
+      color: 'white',
+      fontWeight: 100,
+      lineHeight: 1.4,
+      fontSize: 16,
+    })
+    this.bubble.add(this.bubbleBox)
+    this.bubbleBox.add(this.bubbleText)
+    this.base.add(this.bubble)
 
     this.base.activate({ world: this.world, physics: true, entity: this.entity })
+
+    this.applyAvatar()
 
     this.cam = {}
     this.cam.position = new THREE.Vector3().copy(this.base.position)
@@ -101,15 +142,25 @@ export class PlayerLocal {
     this.world.setHot(this, true)
   }
 
-  applyVRM() {
-    const vrmUrl = this.data.user.vrm || 'asset://avatar.vrm'
-    if (this.vrmUrl === vrmUrl) return
-    this.world.loader.load('vrm', vrmUrl).then(glb => {
-      if (this.vrm) this.vrm.deactivate()
-      this.vrm = glb.toNodes().get('vrm')
-      this.base.add(this.vrm)
-      this.vrmUrl = vrmUrl
-    })
+  applyAvatar() {
+    const avatarUrl = this.data.user.avatar || 'asset://avatar.vrm'
+    if (this.avatarUrl === avatarUrl) return
+    this.world.loader
+      .load('avatar', avatarUrl)
+      .then(src => {
+        if (this.avatar) this.avatar.deactivate()
+        this.avatar = src.toNodes().get('avatar')
+        this.base.add(this.avatar)
+        // this.nametag.position.y = this.avatar.height + 0.2
+        this.bubble.position.y = this.avatar.height + 0.2
+        // if (!this.bubble.active) {
+        //   this.nametag.active = true
+        // }
+        this.avatarUrl = avatarUrl
+      })
+      .catch(err => {
+        console.error(err)
+      })
   }
 
   initCapsule() {
@@ -137,11 +188,11 @@ export class PlayerLocal {
       Layers.player.group,
       Layers.player.mask,
       PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
-        PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
-        PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
-        PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
+      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
+      PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
+      PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
+      PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
+      PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
       0
     )
     shape.setContactOffset(0.08) // just enough to fire contacts (because we muck with velocity sometimes standing on a thing doesn't contact)
@@ -176,8 +227,9 @@ export class PlayerLocal {
       shape2.setLocalPose(pose)
       this.capsule.attachShape(shape2)
     }
-    this.removeCapsule = this.world.physics.addActor(this.capsule, {
+    this.capsuleHandle = this.world.physics.addActor(this.capsule, {
       tag: 'player',
+      player: this.getProxy(),
       onInterpolate: position => {
         this.base.position.copy(position)
       },
@@ -346,6 +398,9 @@ export class PlayerLocal {
     if (this.jumped && !this.grounded) {
       this.jumped = false
       this.jumping = true
+      this.falling = false
+      // Don't reset jumpCount here - we need it for double jump
+      console.log('[PlayerLocal] Left ground after jump - jumpCount:', this.jumpCount)
     }
 
     // if not grounded and our velocity is downward, start timing our falling
@@ -354,21 +409,31 @@ export class PlayerLocal {
     } else {
       this.fallTimer = 0
     }
+
     // if we've been falling for a bit then progress to actual falling
-    // this is to prevent animation jitter when only falling for a very small amount of time
     if (this.fallTimer > 0.1) {
-      this.jumping = false
-      this.falling = true
+      // Only transition to falling if we're not in a double jump
+      if (this.jumpCount !== 2 || this.capsule.getLinearVelocity().y < -5) {
+        this.jumping = false
+        this.falling = true
+        // Don't reset jumpCount here - we might still want to double jump
+      }
     }
 
     // if falling and we're now on the ground, clear it
     if (this.falling && this.grounded) {
       this.falling = false
+      this.jumping = false
+      this.jumpCount = 0  // Reset jump count only when landing
+      console.log('[PlayerLocal] Landed from fall - resetting jumpCount')
     }
 
     // if jumping and we're now on the ground, clear it
     if (this.jumping && this.grounded) {
       this.jumping = false
+      this.falling = false
+      this.jumpCount = 0  // Reset jump count only when landing
+      console.log('[PlayerLocal] Landed from jump - resetting jumpCount')
     }
 
     // if we're grounded we don't need gravity.
@@ -440,16 +505,34 @@ export class PlayerLocal {
     }
 
     // apply jump
-    if (this.grounded && !this.jumping && this.control.buttons.Space) {
-      // calc velocity needed to reach jump height
-      let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
-      jumpVelocity = jumpVelocity * (1 / Math.sqrt(this.mass))
-      // update velocity
-      const velocity = this.capsule.getLinearVelocity()
-      velocity.y = jumpVelocity
-      this.capsule.setLinearVelocity(velocity)
-      // set jumped (we haven't left the ground yet)
-      this.jumped = true
+    if (this.control.buttons.Space) {
+      if (this.grounded && !this.jumping) {
+        // First jump - normal jump
+        let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
+        jumpVelocity = jumpVelocity * (1 / Math.sqrt(this.mass))
+        const velocity = this.capsule.getLinearVelocity()
+        velocity.y = jumpVelocity
+        this.capsule.setLinearVelocity(velocity)
+        this.jumped = true
+        this.emote = Emotes.FLOAT
+        console.log('[PlayerLocal] First jump - starting float animation')
+      }
+      // Double jump is handled by DoubleJump system
+    }
+
+    // Update emote based on state
+    if (this.grounded) {
+      if (this.moving) {
+        this.emote = this.running ? Emotes.RUN : Emotes.WALK
+      } else {
+        this.emote = Emotes.IDLE
+      }
+    } else if (this.jumping || this.falling) {
+      // Only set FLOAT if we're not in a double jump
+      // DoubleJump system will handle its own emote
+      if (!this.world.doubleJump?.isDoubleJumping) {
+        this.emote = Emotes.FLOAT
+      }
     }
   }
 
@@ -529,16 +612,7 @@ export class PlayerLocal {
     this.cam.position.y += 1.6
 
     // emote
-    if (this.jumping) {
-      this.emote = Emotes.FLOAT
-    } else if (this.falling) {
-      this.emote = Emotes.FLOAT
-    } else if (this.moving) {
-      this.emote = this.running ? Emotes.RUN : Emotes.WALK
-    } else {
-      this.emote = Emotes.IDLE
-    }
-    this.vrm?.vrm.setEmote(emotes[this.emote])
+    this.avatar?.setEmote(emotes[this.emote])
 
     // send network updates
     this.lastSendAt += delta
@@ -551,17 +625,181 @@ export class PlayerLocal {
       })
       this.lastSendAt = 0
     }
+
+    // TODO: this feels like ClientEditor stuff not PlayerLocal
+    // handle node hover enter/leave
+    if (!this.pointerState) this.pointerState = new PointerState()
+    // console.time('pointer')
+    const hit = this.control.pointer.locked ? null : this.world.stage.raycastPointer(this.control.pointer.position)[0]
+    this.pointerState.update(hit, this.control.pressed.MouseLeft, this.control.released.MouseLeft)
+    // console.timeEnd('pointer')
   }
 
   lateUpdate(delta) {
-    // interpolate camera towards target
+    // interpolate camera towards target (snaps if just teleported)
     simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+  }
+
+  teleport({ position, rotationY }) {
+    position = position.isVector3 ? position : new THREE.Vector3().fromArray(position)
+    const hasRotation = isNumber(rotationY)
+    // snap to position
+    const pose = this.capsule.getGlobalPose()
+    position.toPxTransform(pose)
+    this.capsuleHandle.snap(pose)
+    this.base.position.copy(position)
+    if (hasRotation) this.base.rotation.y = rotationY
+    // send network update
+    this.world.network.send('entityModified', {
+      id: this.data.id,
+      p: this.base.position.toArray(),
+      q: this.base.quaternion.toArray(),
+      t: true,
+    })
+    // snap camera
+    this.cam.position.copy(this.base.position)
+    this.cam.position.y += 1.6
+    if (hasRotation) this.cam.rotation.y = rotationY
+    this.control.camera.position.copy(this.cam.position)
+    this.control.camera.quaternion.copy(this.cam.quaternion)
+  }
+
+  chat(msg) {
+    // this.nametag.active = false
+    this.bubbleText.value = msg
+    this.bubble.active = true
+    clearTimeout(this.chatTimer)
+    this.chatTimer = setTimeout(() => {
+      this.bubble.active = false
+      // this.nametag.active = true
+    }, 5000)
   }
 
   modify(data) {
     if (data.hasOwnProperty('user')) {
       this.data.user = data.user
-      this.applyVRM()
+      // this.nametag.label = data.user.name
+      this.applyAvatar()
     }
+  }
+
+  getProxy() {
+    if (!this.proxy) {
+      this.proxy = createPlayerProxy(this)
+    }
+    return this.proxy
+  }
+}
+
+const PointerEvents = {
+  ENTER: 'pointerenter',
+  LEAVE: 'pointerleave',
+  DOWN: 'pointerdown',
+  UP: 'pointerup',
+}
+
+const CURSOR_DEFAULT = 'default'
+
+class PointerEvent {
+  constructor() {
+    this.type = null
+    this._propagationStopped = false
+  }
+
+  set(type) {
+    this.type = type
+    this._propagationStopped = false
+  }
+
+  stopPropagation() {
+    this._propagationStopped = true
+  }
+}
+
+class PointerState {
+  constructor() {
+    this.activePath = new Set()
+    this.event = new PointerEvent()
+    this.cursor = CURSOR_DEFAULT
+    this.pressedNodes = new Set()
+  }
+
+  update(hit, pointerPressed, pointerReleased) {
+    const newPath = hit ? this.getAncestorPath(hit) : []
+    const oldPath = Array.from(this.activePath)
+
+    // find divergence point
+    let i = 0
+    while (i < newPath.length && i < oldPath.length && newPath[i] === oldPath[i]) i++
+
+    // pointer leave events bubble up from leaf
+    for (let j = oldPath.length - 1; j >= i; j--) {
+      if (oldPath[j].onPointerLeave) {
+        this.event.set(PointerEvents.LEAVE)
+        oldPath[j].onPointerLeave?.(this.event)
+        // if (this.event._propagationStopped) break
+      }
+      this.activePath.delete(oldPath[j])
+    }
+
+    // pointer enter events bubble down from divergence
+    for (let j = i; j < newPath.length; j++) {
+      if (newPath[j].onPointerEnter) {
+        this.event.set(PointerEvents.ENTER)
+        newPath[j].onPointerEnter?.(this.event)
+        if (this.event._propagationStopped) break
+      }
+      this.activePath.add(newPath[j])
+    }
+
+    // set cursor - check from leaf to root for first defined cursor
+    let cursor = CURSOR_DEFAULT
+    if (newPath.length > 0) {
+      for (let i = newPath.length - 1; i >= 0; i--) {
+        if (newPath[i].cursor) {
+          cursor = newPath[i].cursor
+          break
+        }
+      }
+    }
+    if (cursor !== this.cursor) {
+      document.body.style.cursor = cursor
+      this.cursor = cursor
+    }
+
+    // handle pointer down events
+    if (pointerPressed) {
+      for (let i = newPath.length - 1; i >= 0; i--) {
+        const node = newPath[i]
+        if (node.onPointerDown) {
+          this.event.set(PointerEvents.DOWN)
+          node.onPointerDown(this.event)
+          this.pressedNodes.add(node)
+          if (this.event._propagationStopped) break
+        }
+      }
+    }
+
+    // handle pointer up events
+    if (pointerReleased) {
+      for (const node of this.pressedNodes) {
+        if (node.onPointerUp) {
+          this.event.set(PointerEvents.UP)
+          node.onPointerUp(this.event)
+          if (this.event._propagationStopped) break
+        }
+      }
+      this.pressedNodes.clear()
+    }
+  }
+
+  getAncestorPath(hit) {
+    const path = []
+    let node = hit.node?.resolveHit?.(hit) || hit.node
+    while (node) {
+      path.unshift(node)
+      node = node.parent
+    }
+    return path
   }
 }

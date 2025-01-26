@@ -27,14 +27,6 @@ const _q1 = new THREE.Quaternion()
 
 const types = ['box', 'sphere', 'geometry']
 
-const pxMeshes = {}
-function getPxMesh(world, geometry, convex) {
-  if (!pxMeshes[geometry.uuid]) {
-    pxMeshes[geometry.uuid] = geometryToPxMesh(world, geometry, convex)
-  }
-  return pxMeshes[geometry.uuid]
-}
-
 export class Collider extends Node {
   constructor(data = {}) {
     super(data)
@@ -56,18 +48,22 @@ export class Collider extends Node {
 
   mount() {
     let geometry
+    let pmesh
     if (this.type === 'box') {
       geometry = new PHYSX.PxBoxGeometry(this.width / 2, this.height / 2, this.depth / 2)
     } else if (this.type === 'sphere') {
       geometry = new PHYSX.PxSphereGeometry(this.radius)
     } else if (this.type === 'geometry') {
-      const mesh = getPxMesh(this.ctx.world, this.geometry, this.convex)
+      pmesh = geometryToPxMesh(this.ctx.world, this.geometry, this.convex)
+      if (!pmesh) return console.error('failed to generate collider pmesh')
       this.matrixWorld.decompose(_v1, _q1, _v2)
       const scale = new PHYSX.PxMeshScale(new PHYSX.PxVec3(_v2.x, _v2.y, _v2.z), new PHYSX.PxQuat(0, 0, 0, 1))
       if (this.convex) {
-        geometry = new PHYSX.PxConvexMeshGeometry(mesh, scale)
+        geometry = new PHYSX.PxConvexMeshGeometry(pmesh.value, scale)
       } else {
-        geometry = new PHYSX.PxTriangleMeshGeometry(mesh, scale)
+        // const flags = new PHYSX.PxMeshGeometryFlags()
+        // flags.raise(PHYSX.PxMeshGeometryFlagEnum.eDOUBLE_SIDED)
+        geometry = new PHYSX.PxTriangleMeshGeometry(pmesh.value, scale)
       }
       PHYSX.destroy(scale)
     }
@@ -79,14 +75,12 @@ export class Collider extends Node {
       flags.raise(PHYSX.PxShapeFlagEnum.eSCENE_QUERY_SHAPE | PHYSX.PxShapeFlagEnum.eSIMULATION_SHAPE)
     }
     const layer = Layers[this.layer]
-    const filterData = new PHYSX.PxFilterData(
-      layer.group,
-      layer.mask,
-      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS,
-      0
-    )
+    let pairFlags = PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND | PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST
+    if (!this.trigger) {
+      pairFlags |= PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS
+    }
+    this.pmesh = pmesh
+    const filterData = new PHYSX.PxFilterData(layer.group, layer.mask, pairFlags, 0)
     this.shape = this.ctx.world.physics.physics.createShape(geometry, material, true, flags)
     this.shape.setQueryFilterData(filterData)
     this.shape.setSimulationFilterData(filterData)
@@ -98,6 +92,8 @@ export class Collider extends Node {
     this.quaternion.toPxTransform(pose)
     this.shape.setLocalPose(pose)
     this.parent?.addShape?.(this.shape)
+    // console.log('geometry', geometry)
+    // this._geometry = geometry
     PHYSX.destroy(geometry)
     this.needsRebuild = false
   }
@@ -114,9 +110,14 @@ export class Collider extends Node {
   }
 
   unmount() {
+    // if (this.type === 'geometry' && pxMeshes[this.geometry.uuid]) {
+    //   pxMeshes[this.geometry.uuid].release()
+    //   delete pxMeshes[this.geometry.uuid]
+    // }
     this.parent?.removeShape?.(this.shape)
-    this.shape.release()
+    this.shape?.release()
     this.shape = null
+    this.pmesh?.release()
   }
 
   copy(source, recursive) {
