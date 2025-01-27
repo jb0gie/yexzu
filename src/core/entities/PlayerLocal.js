@@ -42,6 +42,35 @@ export class PlayerLocal extends Entity {
   constructor(world, data, local) {
     super(world, data, local)
     this.isPlayer = true
+    this.isFirstPerson = false
+    this.normalZoom = 4
+
+    // Separate camera configurations
+    this.firstPersonCam = {
+      position: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+      rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
+      offset: new THREE.Vector3(0, 1.65, -0.7),
+      targetPosition: new THREE.Vector3(),
+      targetQuaternion: new THREE.Quaternion(),
+      lerpSpeed: 15
+    }
+
+    this.thirdPersonCam = {
+      position: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+      rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
+      zoom: 4
+    }
+
+    // Main camera reference will point to active configuration
+    this.cam = this.thirdPersonCam
+
+    bindRotations(this.firstPersonCam.quaternion, this.firstPersonCam.rotation)
+    bindRotations(this.thirdPersonCam.quaternion, this.thirdPersonCam.rotation)
+
+    this.jumpCameraOffset = 0  // Track jump camera offset
+    this.targetJumpOffset = 0  // Target offset for smooth transitions
     this.init()
   }
 
@@ -126,15 +155,8 @@ export class PlayerLocal extends Entity {
 
     this.applyAvatar()
 
-    this.cam = {}
-    this.cam.position = new THREE.Vector3().copy(this.base.position)
-    this.cam.position.y += 1.6
-    this.cam.quaternion = new THREE.Quaternion()
-    this.cam.rotation = new THREE.Euler(0, 0, 0, 'YXZ')
-    bindRotations(this.cam.quaternion, this.cam.rotation)
-    this.cam.quaternion.copy(this.base.quaternion)
-    this.cam.rotation.x += -15 * DEG2RAD
-    this.cam.zoom = 4
+    this.firstPersonRotationLimit = 60 * DEG2RAD  // Head rotation limit
+    this.thirdPersonRotationLimit = 90 * DEG2RAD  // Original third person limit
 
     this.initCapsule()
     this.initControl()
@@ -151,11 +173,20 @@ export class PlayerLocal extends Entity {
         if (this.avatar) this.avatar.deactivate()
         this.avatar = src.toNodes().get('avatar')
         this.base.add(this.avatar)
-        // this.nametag.position.y = this.avatar.height + 0.2
+
+        // Set up VRM first person and store head bone reference
+        if (this.avatar.vrm?.firstPerson) {
+          this.headBone = this.avatar.vrm.humanoid?.getNormalizedBoneNode('head')
+          const neck = this.avatar.vrm.humanoid?.getNormalizedBoneNode('neck')
+
+          if (this.headBone) {
+            // Position camera at eye level
+            this.firstPersonCam.offset.y = this.headBone.position.y + this.firstPersonCam.offset.y
+            console.log('[PlayerLocal] Using VRM head position for camera:', this.firstPersonCam.offset.y)
+          }
+        }
+
         this.bubble.position.y = this.avatar.height + 0.2
-        // if (!this.bubble.active) {
-        //   this.nametag.active = true
-        // }
         this.avatarUrl = avatarUrl
       })
       .catch(err => {
@@ -242,6 +273,19 @@ export class PlayerLocal extends Entity {
       onPress: code => {
         if (code === 'MouseRight') {
           this.control.pointer.lock()
+        }
+        if (code === 'KeyC') {
+          this.isFirstPerson = !this.isFirstPerson
+          console.log('[PlayerLocal] Toggling first person mode:', this.isFirstPerson)
+          if (this.isFirstPerson) {
+            this.normalZoom = this.cam.zoom
+            this.cam.zoom = 0
+            this.control.camera.zoom = 0
+            // Don't hide avatar, let VRM first person handle it
+          } else {
+            this.cam.zoom = this.normalZoom
+            this.control.camera.zoom = this.normalZoom
+          }
         }
       },
       onRelease: code => {
@@ -537,23 +581,137 @@ export class PlayerLocal extends Entity {
   }
 
   update(delta) {
+    const activeCam = this.isFirstPerson ? this.firstPersonCam : this.thirdPersonCam
+
+    if (this.isFirstPerson) {
+      // Simple position update without bobbing
+      activeCam.targetPosition.copy(this.base.position)
+      activeCam.targetPosition.y += this.firstPersonCam.offset.y
+
+      const forward = new THREE.Vector3(0, 0, this.firstPersonCam.offset.z)
+      forward.applyQuaternion(this.base.quaternion)
+      activeCam.targetPosition.add(forward)
+
+      // Smooth position transition
+      const positionLerpFactor = Math.min(1, activeCam.lerpSpeed * delta)
+      activeCam.position.lerp(activeCam.targetPosition, positionLerpFactor)
+
+      // Set rotation directly
+      activeCam.targetQuaternion.setFromEuler(activeCam.rotation)
+      const rotationLerpFactor = Math.min(1, activeCam.lerpSpeed * delta)
+      activeCam.quaternion.slerp(activeCam.targetQuaternion, rotationLerpFactor)
+    }
+
+    // Handle camera rotation based on active mode
+    if (this.isFirstPerson) {
+      /*
+      console.log('[PlayerLocal] First Person Camera State:', {
+        position: activeCam.position.toArray(),
+        rotation: {
+          x: activeCam.rotation.x * RAD2DEG,
+          y: activeCam.rotation.y * RAD2DEG
+        },
+        basePosition: this.base.position.toArray(),
+        baseRotation: this.base.rotation.toArray()
+      })
+      */
+    }
+
     // rotate camera when looking (holding right mouse + dragging)
     if (this.control.pointer.locked) {
-      this.cam.rotation.y += -this.control.pointer.delta.x * POINTER_LOOK_SPEED * delta
-      this.cam.rotation.x += -this.control.pointer.delta.y * POINTER_LOOK_SPEED * delta
+      activeCam.rotation.y += -this.control.pointer.delta.x * POINTER_LOOK_SPEED * delta
+      activeCam.rotation.x += -this.control.pointer.delta.y * POINTER_LOOK_SPEED * delta
     }
     // or when touch panning
     if (this.pan) {
-      this.cam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * delta
-      this.cam.rotation.x += -this.pan.delta.y * PAN_LOOK_SPEED * delta
+      activeCam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * delta
+      activeCam.rotation.x += -this.pan.delta.y * PAN_LOOK_SPEED * delta
     }
 
-    // ensure we can't look too far up/down
-    this.cam.rotation.x = clamp(this.cam.rotation.x, -90 * DEG2RAD, 90 * DEG2RAD)
+    // Apply rotation limits based on mode
+    if (this.isFirstPerson) {
+      activeCam.rotation.x = clamp(activeCam.rotation.x, -this.firstPersonRotationLimit, this.firstPersonRotationLimit)
 
-    // zoom camera if scrolling wheel (and not moving an object)
-    this.cam.zoom += -this.control.scroll.delta * ZOOM_SPEED * delta
-    this.cam.zoom = clamp(this.cam.zoom, MIN_ZOOM, MAX_ZOOM)
+      // Calculate target position for smooth transition
+      activeCam.targetPosition.copy(this.base.position)
+      activeCam.targetPosition.y += this.firstPersonCam.offset.y
+
+      const forward = new THREE.Vector3(0, 0, this.firstPersonCam.offset.z)
+      forward.applyQuaternion(this.base.quaternion)
+      activeCam.targetPosition.add(forward)
+
+      // Add slight tilt when running
+      if (this.running && this.moving && this.grounded) {
+        const tiltAmount = 0.03
+        const tiltRotation = new THREE.Euler(0, 0, Math.sin(activeCam.bobTimer * 2) * tiltAmount)
+        activeCam.targetQuaternion.setFromEuler(activeCam.rotation)
+        const tiltQuaternion = new THREE.Quaternion().setFromEuler(tiltRotation)
+        activeCam.targetQuaternion.multiply(tiltQuaternion)
+      } else {
+        activeCam.targetQuaternion.setFromEuler(activeCam.rotation)
+      }
+
+      // Smooth position transition
+      const positionDelta = activeCam.position.distanceTo(activeCam.targetPosition)
+      /*
+      if (positionDelta > 0.01) {
+        console.log('[PlayerLocal] Camera Position Delta:', {
+          delta: positionDelta,
+          current: activeCam.position.toArray(),
+          target: activeCam.targetPosition.toArray()
+        })
+      }
+      */
+
+      // Update head bone
+      if (this.headBone) {
+        this.headBone.rotation.set(0, 0, 0)
+        this.headBone.rotation.x = activeCam.rotation.x
+      }
+
+      // Only rotate base for left/right movement
+      const baseRotation = new THREE.Euler(0, activeCam.rotation.y, 0, 'YXZ')
+      this.base.quaternion.setFromEuler(baseRotation)
+
+    } else {
+      // Third-person camera handling
+      activeCam.rotation.x = clamp(activeCam.rotation.x, -this.thirdPersonRotationLimit, 0)
+
+      // Handle zoom
+      activeCam.zoom += -this.control.scroll.delta * ZOOM_SPEED * delta
+      activeCam.zoom = clamp(activeCam.zoom, MIN_ZOOM, MAX_ZOOM)
+
+      // Position third-person camera
+      activeCam.position.copy(this.base.position)
+      activeCam.position.y += 1.6
+
+      const offset = new THREE.Vector3(0, 0, activeCam.zoom)
+      offset.applyEuler(activeCam.rotation)
+
+      // Check for collisions
+      const origin = activeCam.position.clone()
+      const direction = offset.clone().normalize()
+      const distance = offset.length()
+      const hitMask = Layers.environment.group | Layers.prop.group | Layers.tool.group
+      const hit = this.world.physics.raycast(origin, direction, distance, hitMask)
+
+      if (hit) {
+        const hitDistance = hit.distance - 0.1
+        offset.normalize().multiplyScalar(hitDistance)
+      }
+
+      activeCam.position.add(offset)
+    }
+
+    // Update control camera
+    if (this.isFirstPerson) {
+      // Direct copy but maintain smoothing
+      this.control.camera.position.copy(activeCam.position)
+      this.control.camera.quaternion.copy(activeCam.quaternion)
+    } else {
+      // Will be interpolated in lateUpdate for third person
+      this.cam = activeCam
+    }
 
     // get our movement direction
     this.moveDir.set(0, 0, 0)
@@ -596,7 +754,7 @@ export class PlayerLocal extends Entity {
     this.moveDir.normalize()
 
     // rotate direction to face camera Y direction
-    const yQuaternion = q1.setFromAxisAngle(UP, this.cam.rotation.y)
+    const yQuaternion = q1.setFromAxisAngle(UP, activeCam.rotation.y)
     this.moveDir.applyQuaternion(yQuaternion)
 
     // if we're moving continually rotate ourselves toward the direction we are moving
@@ -605,11 +763,6 @@ export class PlayerLocal extends Entity {
       q1.setFromUnitVectors(FORWARD, this.moveDir)
       this.base.quaternion.slerp(q1, alpha)
     }
-
-    // make camera follow our position horizontally
-    // and vertically at our vrm model height
-    this.cam.position.copy(this.base.position)
-    this.cam.position.y += 1.6
 
     // emote
     this.avatar?.setEmote(emotes[this.emote])
@@ -636,8 +789,10 @@ export class PlayerLocal extends Entity {
   }
 
   lateUpdate(delta) {
-    // interpolate camera towards target (snaps if just teleported)
-    simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+    if (!this.isFirstPerson) {
+      // Only interpolate in third person mode
+      simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+    }
   }
 
   teleport({ position, rotationY }) {

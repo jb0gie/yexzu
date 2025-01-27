@@ -92,21 +92,21 @@ export class DoubleJump extends System {
 
 		// Track when the first jump starts
 		if (localPlayer.jumped && !this.lastJumpTime) {
-			console.log('[DoubleJump System] First jump detected, setting lastJumpTime')
+			// console.log('[DoubleJump System] First jump detected, setting lastJumpTime')
 			this.lastJumpTime = performance.now()
 		}
 
 		// Log player state in fixed update
-		if (localPlayer.jumped || localPlayer.jumping) {
-			console.log('[DoubleJump System] Player jump state:', {
-				jumped: localPlayer.jumped,
-				jumping: localPlayer.jumping,
-				grounded: localPlayer.grounded,
-				jumpCount: this.jumpCount,
-				isDoubleJumping: this.isDoubleJumping,
-				timeSinceLastJump: performance.now() - this.lastJumpTime
-			})
-		}
+		// if (localPlayer.jumped || localPlayer.jumping) {
+		// 	console.log('[DoubleJump System] Player jump state:', {
+		// 		jumped: localPlayer.jumped,
+		// 		jumping: localPlayer.jumping,
+		// 		grounded: localPlayer.grounded,
+		// 		jumpCount: this.jumpCount,
+		// 		isDoubleJumping: this.isDoubleJumping,
+		// 		timeSinceLastJump: performance.now() - this.lastJumpTime
+		// 	})
+		// }
 
 		// Reset jump tracking when landing
 		if (localPlayer.grounded) {
@@ -121,7 +121,7 @@ export class DoubleJump extends System {
 
 		const localPlayer = this.getLocalPlayer()
 		if (!localPlayer) {
-			console.log('[DoubleJump System] No local player found')
+			// console.log('[DoubleJump System] No local player found')
 			return false
 		}
 
@@ -130,7 +130,7 @@ export class DoubleJump extends System {
 		// 2. Not already double jumping
 		// 3. Not grounded
 		if (!localPlayer.grounded && !this.isDoubleJumping && (localPlayer.jumping || localPlayer.falling)) {
-			console.log('[DoubleJump System] Performing double jump')
+			// console.log('[DoubleJump System] Performing double jump')
 			const currentVel = localPlayer.capsule.getLinearVelocity()
 			v1.copy(currentVel)
 			v1.y = this.DOUBLE_JUMP_FORCE
