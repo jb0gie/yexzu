@@ -228,7 +228,7 @@ export class PlayerLocal extends Entity {
       this.capsule.attachShape(shape2)
     }
     this.capsuleHandle = this.world.physics.addActor(this.capsule, {
-      tag: 'player',
+      tag: null,
       player: this.getProxy(),
       onInterpolate: position => {
         this.base.position.copy(position)

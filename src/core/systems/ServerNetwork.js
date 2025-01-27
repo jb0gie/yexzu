@@ -5,9 +5,11 @@ import { addRole, hasRole, serializeRoles, uuid } from '../utils'
 import { System } from './System'
 import { createJWT, readJWT } from '../utils-server'
 import { cloneDeep } from 'lodash-es'
+import * as THREE from '../extras/three'
 
 const SAVE_INTERVAL = parseInt(process.env.SAVE_INTERVAL || '60') // seconds
 const PING_RATE = 1 // seconds
+const defaultSpawn = '{ "position": [0, 0, 0], "quaternion": [0, 0, 0, 1] }'
 
 /**
  * Server Network System
@@ -35,6 +37,9 @@ export class ServerNetwork extends System {
   }
 
   async start() {
+    // get spawn
+    const spawnRow = await this.db('config').where('key', 'spawn').first()
+    this.spawn = JSON.parse(spawnRow?.value || defaultSpawn)
     // hydrate blueprints
     const blueprints = await this.db('blueprints')
     for (const blueprint of blueprints) {
@@ -204,8 +209,8 @@ export class ServerNetwork extends System {
         {
           id: uuid(),
           type: 'player',
-          position: [0, 0, 0],
-          quaternion: [0, 0, 0, 1],
+          position: this.spawn.position.slice(),
+          quaternion: this.spawn.quaternion.slice(),
           owner: socket.id,
           user,
         },
@@ -279,6 +284,29 @@ export class ServerNetwork extends System {
           createdAt: moment().toISOString(),
         })
         await this.db('users').where('id', user.id).update({ name })
+      }
+      if (cmd === 'spawn') {
+        const player = socket.player
+        const user = player.data.user
+        if (!hasRole(user.roles, 'admin')) return
+        const action = arg1
+        if (action === 'set') {
+          this.spawn = { position: player.data.position.slice(), quaternion: player.data.quaternion.slice() }
+        } else if (action === 'clear') {
+          this.spawn = { position: [0, 0, 0], quaternion: [0, 0, 0, 1] }
+        } else {
+          return
+        }
+        const data = JSON.stringify(this.spawn)
+        await this.db('config')
+          .insert({
+            key: 'spawn',
+            value: data,
+          })
+          .onConflict('key')
+          .merge({
+            value: data,
+          })
       }
       return
     }

@@ -54,11 +54,13 @@ export class Collider extends Node {
     } else if (this.type === 'sphere') {
       geometry = new PHYSX.PxSphereGeometry(this.radius)
     } else if (this.type === 'geometry') {
-      pmesh = geometryToPxMesh(this.ctx.world, this.geometry, this.convex)
+      // note: triggers MUST be convex according to PhysX/Unity
+      const isConvex = this.trigger || this.convex
+      pmesh = geometryToPxMesh(this.ctx.world, this.geometry, isConvex)
       if (!pmesh) return console.error('failed to generate collider pmesh')
       this.matrixWorld.decompose(_v1, _q1, _v2)
       const scale = new PHYSX.PxMeshScale(new PHYSX.PxVec3(_v2.x, _v2.y, _v2.z), new PHYSX.PxQuat(0, 0, 0, 1))
-      if (this.convex) {
+      if (isConvex) {
         geometry = new PHYSX.PxConvexMeshGeometry(pmesh.value, scale)
       } else {
         // const flags = new PHYSX.PxMeshGeometryFlags()

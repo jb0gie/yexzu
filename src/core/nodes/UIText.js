@@ -1,4 +1,4 @@
-import { isNumber } from 'lodash-es'
+import { isNumber, isString } from 'lodash-es'
 
 import { Node } from './Node'
 import { Display } from '../extras/yoga'
@@ -46,7 +46,6 @@ export class UIText extends Node {
     const height = this.yogaNode.getComputedHeight()
     ctx.font = `${this._fontWeight} ${this._fontSize * this.ui._res}px ${this._fontFamily}`
     ctx.textBaseline = 'alphabetic'
-    // ctx.textBaseline = 'top'
     ctx.textAlign = this._textAlign
     ctx.fillStyle = this._color
     ctx.fillStyle = this._color
@@ -60,18 +59,20 @@ export class UIText extends Node {
     } else if (this._textAlign === 'right') {
       innerX = left + width - paddingRight
     }
-    const innerY = top + paddingTop
     const lines = wrapText(ctx, this._value, innerWidth)
-    const metrics = ctx.measureText('Mg')
-    const ascent = metrics.actualBoundingBoxAscent
-    const descent = metrics.actualBoundingBoxDescent
-    const naturalLineHeight = ascent + descent
-    const baselineGap = naturalLineHeight * this._lineHeight
-    let currentBaselineY = innerY + ascent // first line's baseline
-    lines.forEach((line, i) => {
+    let currentBaselineY = 0
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const isFirst = i === 0
+      const metrics = ctx.measureText(line)
+      const ascent = metrics.actualBoundingBoxAscent
+      const descent = metrics.actualBoundingBoxDescent
+      const naturalLineHeight = ascent + descent
+      const baselineGap = naturalLineHeight * this._lineHeight
+      if (isFirst) currentBaselineY += top + paddingTop + metrics.actualBoundingBoxAscent
       ctx.fillText(line, innerX, currentBaselineY)
       currentBaselineY += baselineGap
-    })
+    }
     this.box = { left, top, width, height }
   }
 
@@ -114,44 +115,35 @@ export class UIText extends Node {
     return (width, widthMode, height, heightMode) => {
       ctx.font = `${this._fontWeight} ${this._fontSize * this.ui._res}px ${this._fontFamily}`
       ctx.textBaseline = 'alphabetic'
-      // ctx.textBaseline = 'top'
-      // We'll use a dummy string to measure ascenders+descenders.
-      // ("Mg" has both tall ascender & long descender in many fonts)
-      const metrics = ctx.measureText('Mg')
-      const ascent = metrics.actualBoundingBoxAscent
-      const descent = metrics.actualBoundingBoxDescent
-      const naturalLineHeight = ascent + descent
-      // The distance from one line's baseline to the next line's baseline
-      // can be bigger or smaller than the natural lineHeight if desired.
-      const baselineGap = naturalLineHeight * this._lineHeight
-      // Figure out how many lines we need, based on the available width.
       let lines
       if (widthMode === Yoga.MEASURE_MODE_EXACTLY || widthMode === Yoga.MEASURE_MODE_AT_MOST) {
         lines = wrapText(ctx, this._value, width)
       } else {
         lines = [this._value]
       }
-      // For the measured width, find the longest line.
-      let measuredWidth = 0
-      for (const line of lines) {
-        const w = ctx.measureText(line).width
-        if (w > measuredWidth) {
-          measuredWidth = w
+      let finalHeight = 0
+      let finalWidth = 0
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        const isFirst = i === 0
+        const isLast = i === lines.length - 1
+        const metrics = ctx.measureText(line)
+        const ascent = metrics.actualBoundingBoxAscent
+        const descent = metrics.actualBoundingBoxDescent
+        const naturalLineHeight = ascent + descent
+        if (metrics.width > finalWidth) {
+          finalWidth = metrics.width
+        }
+        if (isLast) {
+          finalHeight += naturalLineHeight
+        } else {
+          finalHeight += naturalLineHeight * this._lineHeight
         }
       }
       if (widthMode === Yoga.MEASURE_MODE_AT_MOST) {
-        measuredWidth = Math.min(measuredWidth, width)
+        finalWidth = Math.min(finalWidth, width)
       }
-      // Height logic:
-      //  - If we have at least one line, the first line's full bounding box is: (ascent+descent).
-      //  - For each additional line, add the "baselineGap."
-      //    i.e. totalHeight = naturalLineHeight + (lines.length - 1)* baselineGap
-      let measuredHeight = 0
-      if (lines.length > 0) {
-        measuredHeight = naturalLineHeight + (lines.length - 1) * baselineGap
-      }
-
-      return { width: measuredWidth, height: measuredHeight }
+      return { width: finalWidth, height: finalHeight }
     }
   }
 
@@ -173,7 +165,7 @@ export class UIText extends Node {
 
   set value(val) {
     if (this._value === val) return
-    this._value = val || defaults.value
+    this._value = isString(val) ? val : defaults.value
     this.yogaNode?.markDirty()
     this.ui?.redraw()
   }

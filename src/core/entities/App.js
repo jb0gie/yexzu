@@ -468,6 +468,12 @@ export class App extends Entity {
       off(name, callback) {
         entity.offWorldEvent(name, callback)
       },
+      emit(name, data) {
+        if (internalEvents.includes(name)) {
+          return console.error(`apps cannot emit internal events (${name})`)
+        }
+        world.events.emit(name, data)
+      },
       getTime() {
         return performance.now()
       },
@@ -480,7 +486,7 @@ export class App extends Entity {
         world.chat.add(msg, broadcast)
       },
       getPlayer(playerId) {
-        const player = world.entities.getPlayer(playerId)
+        const player = world.entities.getPlayer(playerId || world.entities.player?.data.id)
         return player?.getProxy()
       },
     }
@@ -510,7 +516,7 @@ export class App extends Entity {
       },
       send(name, data, ignoreSocketId) {
         if (internalEvents.includes(name)) {
-          return console.error(`apps cannot emit internal events (${name})`)
+          return console.error(`apps cannot send internal events (${name})`)
         }
         // NOTE: on the client ignoreSocketId is a no-op because it can only send events to the server
         const event = [entity.data.id, entity.blueprint.version, name, data]
