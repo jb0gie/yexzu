@@ -9,7 +9,10 @@ import {
   LoaderIcon,
   PackageCheckIcon,
   XIcon,
+  LockIcon,
+  UnlockIcon
 } from 'lucide-react'
+import * as THREE from 'three'
 
 import { hashFile } from '../../core/utils-client'
 import { usePane } from './usePane'
@@ -282,15 +285,123 @@ function PlayerPane({ world, player }) {
 function Fields({ app, blueprint }) {
   const world = app.world
   const [fields, setFields] = useState(app.getConfig?.() || [])
-  const config = blueprint.config
+  const [position, setPosition] = useState(app.root?.position || new THREE.Vector3())
+  const [rotation, setRotation] = useState(app.root?.rotation || new THREE.Euler())
+  const [frozen, setFrozen] = useState(app.frozen || false)
+  const config = blueprint.config || {}
+
+  // Update state when app changes
+  useEffect(() => {
+    const onUpdate = () => {
+      if (app.root) {
+        setPosition(app.root.position.clone())
+        setRotation(app.root.rotation.clone())
+      }
+      setFrozen(app.frozen)
+    }
+
+    // Initial update
+    onUpdate()
+
+    // Subscribe to updates
+    app.on('update', onUpdate)
+    return () => app.off('update', onUpdate)
+  }, [app])
+
+  // Add transform fields
+  const transformFields = [
+    {
+      type: 'section',
+      key: 'transform',
+      label: 'Transform',
+    },
+    {
+      type: 'vector3',
+      key: 'position',
+      label: 'Position',
+      value: position,
+    },
+    {
+      type: 'euler',
+      key: 'rotation',
+      label: 'Rotation',
+      value: rotation,
+    },
+    {
+      type: 'switch',
+      key: 'frozen',
+      label: 'Freeze',
+      value: frozen,
+      options: [
+        { value: true, label: 'Frozen' },
+        { value: false, label: 'Unfrozen' }
+      ]
+    },
+    ...fields
+  ]
+
   useEffect(() => {
     app.onConfigure = fn => setFields(fn?.() || [])
     return () => {
       app.onConfigure = null
     }
   }, [])
+
   const modify = (key, value) => {
     if (config[key] === value) return
+
+    // Handle transform updates
+    if (key === 'position' && app.root) {
+      // Update the root position
+      app.root.position.copy(value)
+
+      // Update the data and send network update
+      app.data.position = value.toArray()
+      world.network.send('entityModified', {
+        id: app.data.id,
+        position: app.data.position
+      })
+
+      // If we're in moving mode, also update the network position
+      if (app.networkPos) {
+        app.networkPos.pushArray(app.data.position)
+      }
+
+      setPosition(value.clone())
+      return
+    }
+    if (key === 'rotation' && app.root) {
+      // Update the root rotation
+      app.root.rotation.copy(value)
+
+      // Convert to quaternion and update data
+      const quaternion = new THREE.Quaternion().setFromEuler(value)
+      app.data.quaternion = quaternion.toArray()
+
+      // Send network update
+      world.network.send('entityModified', {
+        id: app.data.id,
+        quaternion: app.data.quaternion
+      })
+
+      // If we're in moving mode, also update the network quaternion
+      if (app.networkQuat) {
+        app.networkQuat.pushArray(app.data.quaternion)
+      }
+
+      setRotation(value.clone())
+      return
+    }
+    if (key === 'frozen') {
+      app.frozen = value
+      world.network.send('entityModified', {
+        id: app.data.id,
+        frozen: value
+      })
+      setFrozen(value)
+      return
+    }
+
     config[key] = value
     // update blueprint locally (also rebuilds apps)
     const id = blueprint.id
@@ -299,8 +410,9 @@ function Fields({ app, blueprint }) {
     // broadcast blueprint change to server + other clients
     world.network.send('blueprintModified', { id, version, config })
   }
-  return fields.map(field => (
-    <Field key={field.key} world={world} config={config} field={field} value={config[field.key]} modify={modify} />
+
+  return transformFields.map(field => (
+    <Field key={field.key} world={world} config={config} field={field} value={field.value} modify={modify} />
   ))
 }
 
@@ -310,6 +422,8 @@ const fieldTypes = {
   textarea: FieldTextArea,
   file: FieldFile,
   switch: FieldSwitch,
+  vector3: FieldVector3,
+  euler: FieldEuler,
   empty: () => null,
 }
 
@@ -649,6 +763,159 @@ function FieldSwitch({ world, field, value, modify }) {
             <span>{option.label}</span>
           </div>
         ))}
+      </div>
+    </FieldWithLabel>
+  )
+}
+
+function FieldVector3({ world, field, value, modify }) {
+  const [localValue, setLocalValue] = useState(value)
+
+  useEffect(() => {
+    if (localValue !== value) setLocalValue(value)
+  }, [value])
+
+  return (
+    <FieldWithLabel label={field.label}>
+      <div
+        css={css`
+          display: flex;
+          gap: 8px;
+          label {
+            flex: 1;
+            display: block;
+            background-color: #252630;
+            border-radius: 10px;
+            padding: 0 8px;
+            cursor: text;
+            input {
+              height: 34px;
+              font-size: 14px;
+              width: 100%;
+            }
+          }
+        `}
+      >
+        <label>
+          <input
+            type='number'
+            value={localValue.x || 0}
+            onChange={e => {
+              const newValue = new THREE.Vector3(parseFloat(e.target.value), localValue.y, localValue.z)
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={0.1}
+          />
+        </label>
+        <label>
+          <input
+            type='number'
+            value={localValue.y || 0}
+            onChange={e => {
+              const newValue = new THREE.Vector3(localValue.x, parseFloat(e.target.value), localValue.z)
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={0.1}
+          />
+        </label>
+        <label>
+          <input
+            type='number'
+            value={localValue.z || 0}
+            onChange={e => {
+              const newValue = new THREE.Vector3(localValue.x, localValue.y, parseFloat(e.target.value))
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={0.1}
+          />
+        </label>
+      </div>
+    </FieldWithLabel>
+  )
+}
+
+function FieldEuler({ world, field, value, modify }) {
+  const [localValue, setLocalValue] = useState(value)
+
+  useEffect(() => {
+    if (localValue !== value) setLocalValue(value)
+  }, [value])
+
+  return (
+    <FieldWithLabel label={field.label}>
+      <div
+        css={css`
+          display: flex;
+          gap: 8px;
+          label {
+            flex: 1;
+            display: block;
+            background-color: #252630;
+            border-radius: 10px;
+            padding: 0 8px;
+            cursor: text;
+            input {
+              height: 34px;
+              font-size: 14px;
+              width: 100%;
+            }
+          }
+        `}
+      >
+        <label>
+          <input
+            type='number'
+            value={(localValue.x * 180 / Math.PI) || 0}
+            onChange={e => {
+              const newValue = new THREE.Euler(
+                parseFloat(e.target.value) * Math.PI / 180,
+                localValue.y,
+                localValue.z,
+                'YXZ'
+              )
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={1}
+          />
+        </label>
+        <label>
+          <input
+            type='number'
+            value={(localValue.y * 180 / Math.PI) || 0}
+            onChange={e => {
+              const newValue = new THREE.Euler(
+                localValue.x,
+                parseFloat(e.target.value) * Math.PI / 180,
+                localValue.z,
+                'YXZ'
+              )
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={1}
+          />
+        </label>
+        <label>
+          <input
+            type='number'
+            value={(localValue.z * 180 / Math.PI) || 0}
+            onChange={e => {
+              const newValue = new THREE.Euler(
+                localValue.x,
+                localValue.y,
+                parseFloat(e.target.value) * Math.PI / 180,
+                'YXZ'
+              )
+              setLocalValue(newValue)
+              modify(field.key, newValue)
+            }}
+            step={1}
+          />
+        </label>
       </div>
     </FieldWithLabel>
   )
