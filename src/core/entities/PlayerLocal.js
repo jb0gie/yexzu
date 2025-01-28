@@ -708,9 +708,13 @@ export class PlayerLocal extends Entity {
       // Direct copy but maintain smoothing
       this.control.camera.position.copy(activeCam.position)
       this.control.camera.quaternion.copy(activeCam.quaternion)
+      // Update rig position to match base position for consistent interaction checks
+      this.world.rig.position.copy(this.base.position)
     } else {
       // Will be interpolated in lateUpdate for third person
       this.cam = activeCam
+      // Update rig position to match base position for consistent interaction checks
+      this.world.rig.position.copy(this.base.position)
     }
 
     // get our movement direction
