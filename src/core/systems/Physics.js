@@ -141,12 +141,20 @@ export class Physics extends System {
         triggerResult.player = otherHandle.player
         if (pair.status === PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND) {
           if (!otherHandle.triggeredHandles.has(triggerHandle)) {
-            triggerHandle.onTriggerEnter?.(triggerResult)
+            try {
+              triggerHandle.onTriggerEnter?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.triggeredHandles.add(triggerHandle)
           }
         } else if (pair.status === PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST) {
           if (otherHandle.triggeredHandles.has(triggerHandle)) {
-            triggerHandle.onTriggerLeave?.(triggerResult)
+            try {
+              triggerHandle.onTriggerLeave?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.triggeredHandles.delete(triggerHandle)
           }
         }
@@ -278,7 +286,11 @@ export class Physics extends System {
           for (const otherHandle of handle.contactedHandles) {
             e.tag = handle.tag
             e.player = handle.player
-            otherHandle.onContactEnd?.(e)
+            try {
+              otherHandle.onContactEnd?.(e)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.contactedHandles.delete(handle)
           }
         }
@@ -287,7 +299,11 @@ export class Physics extends System {
           for (const triggerHandle of handle.triggeredHandles) {
             triggerResult.tag = handle.tag
             triggerResult.player = handle.player
-            triggerHandle.onTriggerLeave?.(triggerResult)
+            try {
+              triggerHandle.onTriggerLeave?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
           }
         }
         // remove from scene

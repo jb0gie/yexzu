@@ -250,6 +250,7 @@ export class RigidBody extends Node {
           const pose = self.actor.getGlobalPose()
           vec3.toPxTransform(pose)
           self.actor.setGlobalPose(pose)
+          self.position.copy(vec3)
         },
         getQuaternion(quat = _q1) {
           if (!self.actor) return quat.set(0, 0, 0)
@@ -262,6 +263,7 @@ export class RigidBody extends Node {
           const pose = self.actor.getGlobalPose()
           quat.toPxTransform(pose)
           self.actor.setGlobalPose(pose)
+          self.quaternion.copy(quat)
         },
         getLinearVelocity(vec3 = _v1) {
           if (!self.actor) return vec3.set(0, 0, 0)

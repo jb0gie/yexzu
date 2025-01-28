@@ -472,10 +472,11 @@ export class App extends Entity {
         if (internalEvents.includes(name)) {
           return console.error(`apps cannot emit internal events (${name})`)
         }
+        warn('world.emit() is deprecated, use app.emit() instead')
         world.events.emit(name, data)
       },
       getTime() {
-        return performance.now()
+        return world.network.getTime()
       },
       getTimestamp(format) {
         if (!format) return moment().toISOString()
@@ -522,6 +523,12 @@ export class App extends Entity {
         const event = [entity.data.id, entity.blueprint.version, name, data]
         world.network.send('entityEvent', event, ignoreSocketId)
       },
+      emit(name, data) {
+        if (internalEvents.includes(name)) {
+          return console.error(`apps cannot emit internal events (${name})`)
+        }
+        world.events.emit(name, data)
+      },
       get(id) {
         const node = entity.root.get(id)
         if (!node) return null
@@ -552,4 +559,11 @@ export class App extends Entity {
     proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(this.root.getProxy())) // inherit root Node properties
     return proxy
   }
+}
+
+const warned = new Set()
+function warn(str) {
+  if (warned.has(str)) return
+  console.warn(str)
+  warned.add(str)
 }

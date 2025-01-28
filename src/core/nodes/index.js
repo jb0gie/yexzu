@@ -7,7 +7,6 @@ export { Action as action } from './Action.js'
 export { Nametag as nametag } from './Nametag.js'
 
 export { Sky as sky } from './Sky.js'
-export { HDR as hdr } from './HDR.js'
 
 export { UI as ui } from './UI.js'
 export { UIView as uiview } from './UIView.js'

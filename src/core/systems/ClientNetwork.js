@@ -63,6 +63,10 @@ export class ClientNetwork extends System {
     }
   }
 
+  getTime() {
+    return (performance.now() + this.serverTimeOffset) / 1000 // seconds
+  }
+
   onPacket = e => {
     const [method, data] = readPacket(e.data)
     this.enqueue(method, data)
@@ -71,6 +75,7 @@ export class ClientNetwork extends System {
 
   onSnapshot(data) {
     this.id = data.id
+    this.serverTimeOffset = data.serverTime - performance.now()
     this.world.chat.deserialize(data.chat)
     this.world.blueprints.deserialize(data.blueprints)
     this.world.entities.deserialize(data.entities)

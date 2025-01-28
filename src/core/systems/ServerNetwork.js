@@ -105,6 +105,10 @@ export class ServerNetwork extends System {
     }
   }
 
+  getTime() {
+    return performance.now() / 1000 // seconds
+  }
+
   save = async () => {
     const counts = {
       upsertedBlueprints: 0,
@@ -220,6 +224,7 @@ export class ServerNetwork extends System {
       // send snapshot
       socket.send('snapshot', {
         id: socket.id,
+        serverTime: performance.now(),
         chat: this.world.chat.serialize(),
         blueprints: this.world.blueprints.serialize(),
         entities: this.world.entities.serialize(),

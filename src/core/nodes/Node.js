@@ -399,6 +399,10 @@ export class Node {
         // detach(node) {
         //   self.detach(node)
         // },
+        clone(recursive) {
+          const node = self.clone(recursive)
+          return node.getProxy()
+        },
         get _ref() {
           if (!secure.allowRef) return null
           return self

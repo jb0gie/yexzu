@@ -78,7 +78,7 @@ export class UI extends Node {
     this.geometry = new THREE.PlaneGeometry(this._width, this._height)
     this.geometry.scale(this._size, this._size, this._size)
     applyPivot(this._pivot, this.geometry, this._width * this._size, this._height * this._size)
-    this.material = this.createMaterial(this._lit, this.texture, this._billboard, this._transparent)
+    this.material = this.createMaterial(this._lit, this.texture, this._billboard, this._transparent, this._doubleside)
     this.mesh = new THREE.Mesh(this.geometry, this.material)
     this.mesh.matrixAutoUpdate = false
     this.mesh.matrixWorldAutoUpdate = false
@@ -244,7 +244,7 @@ export class UI extends Node {
     return findHitNode(this)
   }
 
-  createMaterial(lit, texture, billboard, transparent) {
+  createMaterial(lit, texture, billboard, transparent, doubleside) {
     if (!billboard) {
       const material = lit
         ? new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 })
@@ -252,7 +252,7 @@ export class UI extends Node {
       material.color.set('white')
       material.transparent = transparent
       material.map = texture
-      material.side = THREE.DoubleSide
+      material.side = doubleside ? THREE.DoubleSide : THREE.FrontSide
       this.ctx.world.setupMaterial(material)
       return material
     }
