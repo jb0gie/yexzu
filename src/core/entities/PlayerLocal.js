@@ -444,7 +444,6 @@ export class PlayerLocal extends Entity {
       this.jumping = true
       this.falling = false
       // Don't reset jumpCount here - we need it for double jump
-      console.log('[PlayerLocal] Left ground after jump - jumpCount:', this.jumpCount)
     }
 
     // if not grounded and our velocity is downward, start timing our falling
@@ -469,7 +468,6 @@ export class PlayerLocal extends Entity {
       this.falling = false
       this.jumping = false
       this.jumpCount = 0  // Reset jump count only when landing
-      console.log('[PlayerLocal] Landed from fall - resetting jumpCount')
     }
 
     // if jumping and we're now on the ground, clear it
@@ -477,7 +475,6 @@ export class PlayerLocal extends Entity {
       this.jumping = false
       this.falling = false
       this.jumpCount = 0  // Reset jump count only when landing
-      console.log('[PlayerLocal] Landed from jump - resetting jumpCount')
     }
 
     // if we're grounded we don't need gravity.
@@ -559,7 +556,6 @@ export class PlayerLocal extends Entity {
         this.capsule.setLinearVelocity(velocity)
         this.jumped = true
         this.emote = Emotes.FLOAT
-        console.log('[PlayerLocal] First jump - starting float animation')
       }
       // Double jump is handled by DoubleJump system
     }
@@ -675,7 +671,7 @@ export class PlayerLocal extends Entity {
 
     } else {
       // Third-person camera handling
-      activeCam.rotation.x = clamp(activeCam.rotation.x, -this.thirdPersonRotationLimit, 0)
+      activeCam.rotation.x = clamp(activeCam.rotation.x, -this.thirdPersonRotationLimit, this.thirdPersonRotationLimit)
 
       // Handle zoom
       activeCam.zoom += -this.control.scroll.delta * ZOOM_SPEED * delta
