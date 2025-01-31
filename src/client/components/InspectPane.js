@@ -12,7 +12,8 @@ import {
   LockIcon,
   UnlockIcon,
   CopyIcon,
-  ClipboardIcon
+  ClipboardIcon,
+  HandIcon
 } from 'lucide-react'
 import * as THREE from 'three'
 
@@ -233,6 +234,7 @@ export function AppPane({ world, app }) {
             flex-direction: column;
             align-items: center;
             cursor: pointer;
+            position: relative;
             svg {
               margin: 0 0 4px;
               opacity: 0.3;
@@ -249,7 +251,57 @@ export function AppPane({ world, app }) {
                 opacity: 1;
               }
             }
+
+            .hypertip {
+              position: absolute;
+              bottom: calc(100% + 10px);
+              left: 50%;
+              transform: translateX(-50%);
+              background: linear-gradient(
+                90deg,
+                #D90479,
+                #A61C81,
+                #8E37A6,
+                #2975D9,
+                #D90479
+              );
+              background-size: 500% 100%;
+              animation: gradient 10s linear infinite;
+              border-radius: 4px;
+              padding: 4px 8px;
+              font-size: 14px;
+              line-height: 1.3;
+              color: rgba(255, 255, 255, 0.9);
+              pointer-events: none;
+              z-index: 1000;
+              text-align: left;
+              opacity: 0;
+              visibility: hidden;
+              transition: opacity 0.15s ease, visibility 0.15s ease;
+              width: max-content;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+              text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+              &.right {
+                bottom: auto;
+                left: calc(100% + 15px);
+                top: 50%;
+                transform: translateY(-50%);
+                z-index: 1001;
+              }
+            }
+
+            &:hover .hypertip {
+              opacity: 1;
+              visibility: visible;
+            }
           }
+        }
+
+        @keyframes gradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
       `}
     >
@@ -260,7 +312,52 @@ export function AppPane({ world, app }) {
           <XIcon size={20} />
         </div>
       </div>
-      <div className='apane-content noscrollbar'>
+      <div className='apane-content noscrollbar' css={css`
+        .hypertip {
+          position: absolute;
+          bottom: calc(100% + 10px);
+          left: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(
+            90deg,
+            #D90479,
+            #A61C81,
+            #8E37A6,
+            #2975D9,
+            #D90479
+          );
+          background-size: 500% 100%;
+          animation: gradient 10s linear infinite;
+          border-radius: 4px;
+          padding: 4px 8px;
+          font-size: 14px;
+          line-height: 1.3;
+          color: rgba(255, 255, 255, 0.9);
+          pointer-events: none;
+          z-index: 1000;
+          text-align: left;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.15s ease, visibility 0.15s ease;
+          width: max-content;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes gradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        .apane-lilbtns-btn {
+          position: relative;
+          &:hover .hypertip {
+            opacity: 1;
+            visibility: visible;
+          }
+        }
+      `}>
         <div className='apane-top'>
           <label className='apane-top-item model'>
             <input type='file' accept='.glb,.vrm' onChange={changeModel} />
@@ -280,10 +377,16 @@ export function AppPane({ world, app }) {
           <div className={cls('apane-lilbtns-btn', { active: blueprint.preload })} onClick={togglePreload}>
             <CircleCheckIcon size={16} />
             <span>Preload</span>
+            <div className="hypertip right">
+              Load this object<br />before the world loads.
+            </div>
           </div>
           <div className={cls('apane-lilbtns-btn', { active: frozen })} onClick={toggleLock}>
             {frozen ? <LockIcon size={16} /> : <UnlockIcon size={16} />}
             <span>Lock</span>
+            <div className="hypertip">
+              Lock position, rotation and scale.<br />Prevents accidental changes.
+            </div>
           </div>
           <div className='apane-lilbtns-btn'></div>
           <div className='apane-lilbtns-btn'></div>
@@ -375,6 +478,9 @@ function Fields({ app, blueprint }) {
   const modify = (key, value) => {
     if (config[key] === value) return
 
+    // Don't allow transform changes if frozen
+    if ((key === 'position' || key === 'rotation' || key === 'scale') && app.frozen) return
+
     // Handle transform updates
     if (key === 'position' && app.root) {
       app.root.position.copy(value)
@@ -413,9 +519,6 @@ function Fields({ app, blueprint }) {
     }
 
     if (key === 'scale' && app.root) {
-      // Don't allow scale changes if frozen
-      if (app.frozen) return
-
       app.root.scale.copy(value)
       app.data.scale = value.toArray()
       world.network.send('entityModified', {
@@ -522,6 +625,16 @@ function FieldWithLabel({ label, field, value, modify, children }) {
     <div
       className='fieldwlabel'
       css={css`
+        margin: 0 0 10px;
+        position: relative;
+        
+        .fieldwlabel-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 6px;
+          height: 24px;
+        }
         margin: 0 0 10px;
         position: relative;
         
@@ -1012,17 +1125,27 @@ function FieldSwitch({ world, field, value, modify }) {
 
 function DraggableNumberInput({ value, onChange, step = 0.1, className = '' }) {
   const [isDragging, setIsDragging] = useState(false)
-  const [localValue, setLocalValue] = useState(value)
+  const [localValue, setLocalValue] = useState(value?.toString())
   const startY = useRef(0)
   const startValue = useRef(0)
 
   useEffect(() => {
-    setLocalValue(value)
+    setLocalValue(value?.toString())
   }, [value])
 
+  const evaluateExpression = (expr) => {
+    try {
+      // Replace common math functions with Math equivalents
+      const sanitized = expr.replace(/[^0-9+\-*/().]/g, '')
+      // eslint-disable-next-line no-new-func
+      return Function(`return ${sanitized}`)()
+    } catch (err) {
+      return value // Return original value if evaluation fails
+    }
+  }
+
   const handleMouseDown = (e) => {
-    // Only enable dragging when Ctrl is held
-    if (e.target.type === 'number' && e.ctrlKey) {
+    if (e.target.type === 'text' && e.ctrlKey) {
       e.preventDefault()
       setIsDragging(true)
       startY.current = e.clientY
@@ -1047,24 +1170,37 @@ function DraggableNumberInput({ value, onChange, step = 0.1, className = '' }) {
   }
 
   const handleChange = (e) => {
-    const val = e.target.value === '' ? 0 : parseFloat(e.target.value)
-    setLocalValue(val)
+    setLocalValue(e.target.value)
   }
 
   const handleBlur = () => {
-    onChange(localValue)
+    const evaluated = evaluateExpression(localValue)
+    if (!isNaN(evaluated)) {
+      onChange(Number(evaluated))
+    }
   }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
-      onChange(localValue)
-      e.target.blur()
+      const evaluated = evaluateExpression(localValue)
+      if (!isNaN(evaluated)) {
+        onChange(Number(evaluated))
+        e.target.blur()
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      const increment = e.shiftKey ? step * 10 : step
+      const currentValue = parseFloat(value) || 0
+      const newValue = e.key === 'ArrowUp'
+        ? currentValue + increment
+        : currentValue - increment
+      onChange(Number(newValue.toFixed(3)))
     }
   }
 
   return (
     <input
-      type="number"
+      type="text"
       value={isDragging ? Number(value).toFixed(3) : localValue}
       onChange={handleChange}
       onBlur={handleBlur}
