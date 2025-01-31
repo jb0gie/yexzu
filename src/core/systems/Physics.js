@@ -99,7 +99,7 @@ export class Physics extends System {
           const e = this.contactEvent.get()
           if (handle0.contactedHandles.has(handle1)) {
             e.tag = handle1.tag
-            e.tag = handle1.player
+            e.player = handle1.player
             // e.isAuthority = handle1.isAuthority
             try {
               handle0.onContactEnd?.(e)
@@ -138,14 +138,23 @@ export class Physics extends System {
         const otherHandle = this.handles.get(pair.otherShape.getActor().ptr)
         if (!triggerHandle || !otherHandle) continue
         triggerResult.tag = otherHandle.tag
+        triggerResult.player = otherHandle.player
         if (pair.status === PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND) {
           if (!otherHandle.triggeredHandles.has(triggerHandle)) {
-            triggerHandle.onTriggerEnter?.(triggerResult)
+            try {
+              triggerHandle.onTriggerEnter?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.triggeredHandles.add(triggerHandle)
           }
         } else if (pair.status === PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST) {
           if (otherHandle.triggeredHandles.has(triggerHandle)) {
-            triggerHandle.onTriggerLeave?.(triggerResult)
+            try {
+              triggerHandle.onTriggerLeave?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.triggeredHandles.delete(triggerHandle)
           }
         }
@@ -277,7 +286,11 @@ export class Physics extends System {
           for (const otherHandle of handle.contactedHandles) {
             e.tag = handle.tag
             e.player = handle.player
-            otherHandle.onContactEnd?.(e)
+            try {
+              otherHandle.onContactEnd?.(e)
+            } catch (err) {
+              console.error(err)
+            }
             otherHandle.contactedHandles.delete(handle)
           }
         }
@@ -285,7 +298,12 @@ export class Physics extends System {
         if (handle.triggeredHandles.size) {
           for (const triggerHandle of handle.triggeredHandles) {
             triggerResult.tag = handle.tag
-            triggerHandle.onTriggerLeave?.(triggerResult)
+            triggerResult.player = handle.player
+            try {
+              triggerHandle.onTriggerLeave?.(triggerResult)
+            } catch (err) {
+              console.error(err)
+            }
           }
         }
         // remove from scene

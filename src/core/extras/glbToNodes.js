@@ -7,7 +7,6 @@ export function glbToNodes(glb, world) {
     const node = createNode(data)
     return node
   }
-
   function parse(object3ds, parentNode) {
     for (const object3d of object3ds) {
       const props = object3d.userData || {}
@@ -38,7 +37,10 @@ export function glbToNodes(glb, world) {
         parse(object3d.children, node)
       }
       // Collider (custom node)
-      else if (props.node === 'collider') {
+      else if (props.node === 'collider' && object3d.isMesh) {
+        // NOTE: in blender if you export a single object with node:collider but it has multiple materials, it converts this into a Group with one Mesh for each material.
+        // but since the Group is the one that has the collider custom property, it won't work as expected. we could hack to fix this, but i think it adds a layer of indirection.
+        // colliders should not have materials on them.
         // console.error('TODO: glbToNodes collider for box/sphere in blender?')
         const node = registerNode({
           id: object3d.name,

@@ -46,6 +46,9 @@ export class PlayerLocal extends Entity {
   }
 
   async init() {
+    if (this.world.loader.preloader) {
+      await this.world.loader.preloader
+    }
     this.mass = 1
     this.gravity = 20
     this.effectiveGravity = this.gravity * this.mass
@@ -228,7 +231,7 @@ export class PlayerLocal extends Entity {
       this.capsule.attachShape(shape2)
     }
     this.capsuleHandle = this.world.physics.addActor(this.capsule, {
-      tag: 'player',
+      tag: null,
       player: this.getProxy(),
       onInterpolate: position => {
         this.base.position.copy(position)

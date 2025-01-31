@@ -13,6 +13,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.5.0]
+
+### Added
+- apps: world.getPlayer(id)
+- apps: avatar.height property
+- apps: new `nametag` node 
+- core: player nametags
+- core: app preload option + overlay
+- apps: sky node for controlling skybox image, hdr, sunDirection and sunIntensity
+- apps: rigidbody.sleeping property
+- apps: all nodes including ui now suppot onPointerEnter, onPointerLeave, onPointerDown, onPointerUp events
+- apps: player.teleport(position, rotationY)
+- core: /status endpoint
+- apps: uiimage node
+- apps: uv scrolling via mesh.material.textureX|textureY values
+- apps: emitting events to other apps via app.emit(name, data)
+- core: `/spawn set` and `/spawn clear` commands for admins to change spawn
+- core: generate player colliders on the server to track contacts/triggers
+- apps: world.getTime() returns server time, even on client
+- apps: support node.clone(recursive)
+- core: display loading overlay while preloading apps when entering world
+
+### Changed
+- core: `vrm` node refactored to `avatar` node, to match types instead of files
+- core: improved memory efficient for garbage collecting glbs
+
+### Fixed
+- core: fixed server tick rate
+- core: cache bust env.js file so browsers don't fetch stale envs
+- core: inspecting something while already inspecting properly updates pane
+- core: general ui node improvements
+- core: prevent setting player name to empty string
+- core: physics kinematic movement
+- core: trigger colliders crashing world
+- core: trimesh colliders crashing world
+- apps: scaling nodes not being tracked
+- apps: uitext.value crash when not a string
+- apps: uitext height layout incorrect for lineHeight
+- core: shadow colors and weird artifacts
+
 ## [0.4.0]
 
 ### Added

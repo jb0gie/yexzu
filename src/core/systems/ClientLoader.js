@@ -48,10 +48,10 @@ export class ClientLoader extends System {
   }
 
   preload(items) {
-    // console.log('preload', items)
     const promises = items.map(item => this.load(item.type, item.url))
     this.preloader = Promise.allSettled(promises).then(() => {
       this.preloader = null
+      this.world.emit('ready', true)
     })
   }
 

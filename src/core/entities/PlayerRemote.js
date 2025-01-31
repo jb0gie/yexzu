@@ -6,6 +6,8 @@ import { LerpVector3 } from '../extras/LerpVector3'
 import { emotes } from '../extras/playerEmotes'
 import { createPlayerProxy } from '../extras/createPlayerProxy'
 
+const colliderGeometry = new THREE.BoxGeometry(0.6, 2.2, 0.6).translate(0, 1.1, 0) // matches PlayerLocal capsule size
+
 export class PlayerRemote extends Entity {
   constructor(world, data, local) {
     super(world, data, local)
@@ -17,6 +19,13 @@ export class PlayerRemote extends Entity {
     this.base = createNode({ name: 'group' })
     this.base.position.fromArray(this.data.position)
     this.base.quaternion.fromArray(this.data.quaternion)
+
+    if (this.world.network.isServer) {
+      this.body = createNode({ name: 'rigidbody', type: 'kinematic' })
+      this.collider = createNode({ name: 'collider', convex: true, geometry: colliderGeometry })
+      this.body.add(this.collider)
+      this.base.add(this.body)
+    }
 
     this.nametag = createNode({ name: 'nametag', label: this.data.user.name, active: false })
     this.base.add(this.nametag)
@@ -49,7 +58,7 @@ export class PlayerRemote extends Entity {
     this.bubbleBox.add(this.bubbleText)
     this.base.add(this.bubble)
 
-    this.base.activate({ world: this.world, entity: this.entity, physics: true })
+    this.base.activate({ world: this.world, entity: this, physics: true })
 
     this.applyAvatar()
 
