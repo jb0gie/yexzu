@@ -44,18 +44,9 @@ export class App extends Entity {
     const n = ++this.n
     // fetch blueprint
     const blueprint = this.world.blueprints.get(this.data.blueprint)
-    // fetch script (if any)
-    let script
-    if (blueprint.script) {
-      try {
-        script = this.world.loader.get('script', blueprint.script)
-        if (!script) script = await this.world.loader.load('script', blueprint.script)
-      } catch (err) {
-        console.error(err)
-        crashed = true
-      }
-    }
+
     let root
+    let script
     // if someone else is uploading glb, show a loading indicator
     if (this.data.uploader && this.data.uploader !== this.world.network.id) {
       root = createNode('mesh')
@@ -64,7 +55,7 @@ export class App extends Entity {
       root.height = 1
       root.depth = 1
     }
-    // otherwise we can load the actual glb
+    // otherwise we can load the model and script
     else {
       try {
         const type = blueprint.model.endsWith('vrm') ? 'avatar' : 'model'
@@ -74,6 +65,16 @@ export class App extends Entity {
       } catch (err) {
         console.error(err)
         // no model, will use crash block below
+      }
+      // fetch script (if any)
+      if (blueprint.script) {
+        try {
+          script = this.world.loader.get('script', blueprint.script)
+          if (!script) script = await this.world.loader.load('script', blueprint.script)
+        } catch (err) {
+          console.error(err)
+          crashed = true
+        }
       }
     }
     // if script crashed (or failed to load model), show crash-block
@@ -116,6 +117,20 @@ export class App extends Entity {
       this.lastMoveSendTime = 0
       this.control = this.world.controls.bind({
         priority: ControlPriorities.ENTITY,
+        onPress: code => {
+          if (code === 'ShiftLeft') {
+            this.control._lifting = true
+            this.control.pointer.lock()
+            return true
+          }
+        },
+        onRelease: code => {
+          if (code === 'ShiftLeft') {
+            this.control._lifting = false
+            this.control.pointer.unlock()
+            return true
+          }
+        },
         onScroll: () => {
           return true
         },
@@ -148,6 +163,9 @@ export class App extends Entity {
     this.hotEvents = 0
     // release control
     if (this.control) {
+      if (this.control._lifting) {
+        this.control.pointer.unlock()
+      }
       this.control?.release()
       this.control = null
     }
@@ -177,7 +195,7 @@ export class App extends Entity {
   update(delta) {
     // if we're moving the app, handle that
     if (this.data.mover === this.world.network.id) {
-      if (this.control.buttons.ShiftLeft) {
+      if (this.control._lifting) {
         // if shift is down we're raising and lowering the app
         this.root.position.y -= this.world.controls.pointer.delta.y * delta * 0.5
       } else {

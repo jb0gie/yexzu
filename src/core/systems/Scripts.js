@@ -24,6 +24,9 @@ export class Scripts extends System {
         time: (...args) => console.time(...args),
         timeEnd: (...args) => console.timeEnd(...args),
       },
+      Date: {
+        now: () => Date.now(),
+      },
       eval: undefined,
       harden: undefined,
       lockdown: undefined,

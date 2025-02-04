@@ -22,7 +22,7 @@ const ZOOM_SPEED = 2
 const MIN_ZOOM = 2
 const MAX_ZOOM = 100 // 16
 const STICK_MAX_DISTANCE = 50
-const CAM_HEIGHT = 1.2
+const DEFAULT_CAM_HEIGHT = 1.2
 
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
@@ -117,11 +117,13 @@ export class PlayerLocal extends Entity {
 
     this.base.activate({ world: this.world, physics: true, entity: this.entity })
 
+    this.camHeight = DEFAULT_CAM_HEIGHT
+
     this.applyAvatar()
 
     this.cam = {}
     this.cam.position = new THREE.Vector3().copy(this.base.position)
-    this.cam.position.y += CAM_HEIGHT
+    this.cam.position.y += this.camHeight
     this.cam.quaternion = new THREE.Quaternion()
     this.cam.rotation = new THREE.Euler(0, 0, 0, 'YXZ')
     bindRotations(this.cam.quaternion, this.cam.rotation)
@@ -150,6 +152,7 @@ export class PlayerLocal extends Entity {
         //   this.nametag.active = true
         // }
         this.avatarUrl = avatarUrl
+        this.camHeight = this.avatar.height * 0.7
       })
       .catch(err => {
         console.error(err)
@@ -234,11 +237,13 @@ export class PlayerLocal extends Entity {
       priority: ControlPriorities.PLAYER,
       onPress: code => {
         if (code === 'MouseRight') {
+          this.control._looking = true
           this.control.pointer.lock()
         }
       },
       onRelease: code => {
         if (code === 'MouseRight') {
+          this.control._looking = false
           this.control.pointer.unlock()
         }
       },
@@ -500,7 +505,7 @@ export class PlayerLocal extends Entity {
 
   update(delta) {
     // rotate camera when looking (holding right mouse + dragging)
-    if (this.control.pointer.locked) {
+    if (this.control._looking) {
       this.cam.rotation.y += -this.control.pointer.delta.x * POINTER_LOOK_SPEED * delta
       this.cam.rotation.x += -this.control.pointer.delta.y * POINTER_LOOK_SPEED * delta
     }
@@ -571,7 +576,7 @@ export class PlayerLocal extends Entity {
     // make camera follow our position horizontally
     // and vertically at our vrm model height
     this.cam.position.copy(this.base.position)
-    this.cam.position.y += CAM_HEIGHT
+    this.cam.position.y += this.camHeight
 
     // emote
     if (this.jumping) {
@@ -629,7 +634,7 @@ export class PlayerLocal extends Entity {
     })
     // snap camera
     this.cam.position.copy(this.base.position)
-    this.cam.position.y += CAM_HEIGHT
+    this.cam.position.y += this.camHeight
     if (hasRotation) this.cam.rotation.y = rotationY
     this.control.camera.position.copy(this.cam.position)
     this.control.camera.quaternion.copy(this.cam.quaternion)

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   BoxIcon,
   CircleCheckIcon,
+  DownloadIcon,
   EyeIcon,
   FileCode2Icon,
   FileIcon,
@@ -15,6 +16,8 @@ import { hashFile } from '../../core/utils-client'
 import { usePane } from './usePane'
 import { useUpdate } from './useUpdate'
 import { cls } from './cls'
+import { exportApp, isDevBuild } from '../../core/extras/appTools'
+import { downloadFile } from '../../core/extras/downloadFile'
 
 export function InspectPane({ world, entity }) {
   if (entity.isApp) {
@@ -76,6 +79,14 @@ export function AppPane({ world, app }) {
     world.blueprints.modify({ id: blueprint.id, version, preload })
     world.network.send('blueprintModified', { id: blueprint.id, version, preload })
   }
+  const download = async () => {
+    try {
+      const file = await exportApp(app.blueprint, world.loader.loadFile)
+      downloadFile(file)
+    } catch (err) {
+      console.error(err)
+    }
+  }
   return (
     <div
       ref={paneRef}
@@ -97,19 +108,22 @@ export function AppPane({ world, app }) {
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           display: flex;
           align-items: center;
-          padding: 0 0 0 10px;
+          padding: 0 5px 0 10px;
           &-title {
             padding-left: 7px;
             font-weight: 500;
             flex: 1;
           }
-          &-close {
-            width: 40px;
+          &-btn {
+            width: 30px;
             height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            &.download {
+              color: ${isDevBuild() ? '#ff6161' : 'white'};
+            }
           }
         }
         .apane-content {
@@ -229,7 +243,10 @@ export function AppPane({ world, app }) {
       <div className='apane-head' ref={headRef}>
         <EyeIcon size={20} />
         <div className='apane-head-title'>Inspect</div>
-        <div className='apane-head-close' onClick={() => world.emit('inspect', null)}>
+        <div className='apane-head-btn download' onClick={download}>
+          <DownloadIcon size={18} />
+        </div>
+        <div className='apane-head-btn' onClick={() => world.emit('inspect', null)}>
           <XIcon size={20} />
         </div>
       </div>
