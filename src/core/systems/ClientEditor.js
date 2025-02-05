@@ -8,7 +8,7 @@ import { ControlPriorities } from '../extras/ControlPriorities'
 import { CopyIcon, EyeIcon, HandIcon, Trash2Icon, UnlinkIcon } from 'lucide-react'
 import { cloneDeep } from 'lodash-es'
 import moment from 'moment'
-import { importApp, isAppCompatible } from '../extras/appTools'
+import { importApp } from '../extras/appTools'
 
 contextBreakers = ['MouseLeft', 'Escape']
 
@@ -259,16 +259,6 @@ export class ClientEditor extends System {
 
   async addApp(file) {
     const info = await importApp(file)
-    if (!isAppCompatible(info.version)) {
-      this.world.chat.add({
-        id: uuid(),
-        from: null,
-        fromId: null,
-        body: `That app is not compatible (${info.version} > ${process.env.PUBLIC_VERSION})`,
-        createdAt: moment().toISOString(),
-      })
-      return
-    }
     for (const asset of info.assets) {
       this.world.loader.insert(asset.type, asset.url, asset.file)
     }

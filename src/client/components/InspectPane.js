@@ -19,7 +19,7 @@ import { hashFile } from '../../core/utils-client'
 import { usePane } from './usePane'
 import { useUpdate } from './useUpdate'
 import { cls } from './cls'
-import { exportApp, isDevBuild } from '../../core/extras/appTools'
+import { exportApp } from '../../core/extras/appTools'
 import { downloadFile } from '../../core/extras/downloadFile'
 import { hasRole } from '../../core/utils'
 

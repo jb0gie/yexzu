@@ -38,7 +38,6 @@ export async function exportApp(blueprint, resolveFile) {
 
   // create header
   const header = {
-    version: process.env.PUBLIC_VERSION,
     blueprint,
     assets: assets.map(asset => {
       return {
@@ -116,25 +115,4 @@ function str2ab(str) {
 function ab2str(buf) {
   // convert Uint8Array to string
   return String.fromCharCode.apply(null, buf)
-}
-
-export function isAppCompatible(appVersion) {
-  let currentVersion = process.env.PUBLIC_VERSION
-  // strip any -dev suffix
-  currentVersion = currentVersion.replace('-dev', '')
-  appVersion = appVersion.replace('-dev', '')
-  // split versions into numeric parts
-  const current = currentVersion.split('.').map(Number)
-  const required = appVersion.split('.').map(Number)
-  // compare each part
-  for (let i = 0; i < 3; i++) {
-    if (current[i] > required[i]) return true
-    if (current[i] < required[i]) return false
-  }
-  // if we get here, versions are equal
-  return true
-}
-
-export function isDevBuild() {
-  return process.env.PUBLIC_VERSION.endsWith('-dev')
 }
