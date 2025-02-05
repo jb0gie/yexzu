@@ -27,7 +27,7 @@ app.configure([
 ])
 
 // Add debug logging
-console.log('Starting speaker setup...')
+// console.log('Starting speaker setup...')
 
 const audio = app.create('audio', {
 	src: props.audio?.url,
@@ -38,14 +38,10 @@ const audio = app.create('audio', {
 
 // Get reference to Mesh2 and its material for animation
 const speakerBox = app.get('Mesh')
-console.log('Speaker object:', speakerBox)
+// console.log('Speaker object:', speakerBox)
 const speakerMaterial = speakerBox?.material
-console.log('Speaker material:', speakerMaterial)
+// console.log('Speaker material:', speakerMaterial)
 const speaker = app.get('Mesh2')
-
-if (!speaker) {
-	console.log('Mesh2 not found - speaker animation disabled')
-}
 
 // More careful initialization of original position
 let originalPosition = 0
@@ -60,13 +56,16 @@ const body = app.get('Body')
 body.add(audio)
 
 const ui = app.create('ui', {
-	backgroundColor: 'black',
+	width: 150,
+	height: 150,
+	backgroundColor: 'rgba(0, 0, 0, 0.85)',
 	borderRadius: 10,
 	padding: 8,
 })
-ui.position.set(0, 2, 2)
+ui.position.set(1, .5, 2)
 body.add(ui)
 
+// Playback controls
 const btn1 = app.create('uitext', {
 	padding: 4,
 	textAlign: 'center',
@@ -103,12 +102,71 @@ const btn3 = app.create('uitext', {
 })
 ui.add(btn3)
 
+// Volume controls
+const volumeLabel = app.create('uitext', {
+	padding: 4,
+	textAlign: 'center',
+	value: 'Volume:',
+	color: 'white',
+	fontSize: 12
+})
+ui.add(volumeLabel)
+
+// Create a horizontal container for volume controls
+const volumeControls = app.create('ui', {
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	gap: 8,
+	padding: 4
+})
+ui.add(volumeControls)
+
+const volumeDown = app.create('uitext', {
+	padding: 4,
+	textAlign: 'center',
+	value: '🔉',
+	color: 'white',
+	onPointerDown: () => {
+		audio.volume = Math.max(0, audio.volume - 0.1)
+		volumeText.value = `${Math.round(audio.volume * 100)}%`
+	},
+	onPointerEnter: () => volumeDown.color = 'purple',
+	onPointerLeave: () => volumeDown.color = 'white',
+	cursor: 'pointer'
+})
+volumeControls.add(volumeDown)
+
+const volumeText = app.create('uitext', {
+	padding: 4,
+	textAlign: 'center',
+	value: '60%',
+	color: 'white',
+	fontSize: 12,
+	width: 40  // Fixed width for percentage
+})
+volumeControls.add(volumeText)
+
+const volumeUp = app.create('uitext', {
+	padding: 4,
+	textAlign: 'center',
+	value: '🔊',
+	color: 'white',
+	onPointerDown: () => {
+		audio.volume = Math.min(1, audio.volume + 0.1)
+		volumeText.value = `${Math.round(audio.volume * 100)}%`
+	},
+	onPointerEnter: () => volumeUp.color = 'purple',
+	onPointerLeave: () => volumeUp.color = 'white',
+	cursor: 'pointer'
+})
+volumeControls.add(volumeUp)
+
 const time = app.create('uitext', {
 	padding: 5,
 	textAlign: 'center',
 	value: '',
 	color: 'white',
-	onPointerDown: () => audio.stop(),
 	fontSize: 12,
 })
 ui.add(time)

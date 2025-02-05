@@ -3,19 +3,20 @@ app.configure(() => {
 		{
 			key: 'emotes',
 			type: 'section',
-			label: 'Emotes',
+			label: 'VRM Emotes',
 		},
 		{
 			key: 'emote0',
 			type: 'file',
 			kind: 'emote',
-			label: 'Idle',
+			label: 'emote',
 		}
 	]
 })
 
 const config = app.config
 const vrm = app.get('avatar')
+console.log('vrm', vrm)
 
 if (world.isClient) {
 	const idleEmoteUrl = config.emote0?.url
