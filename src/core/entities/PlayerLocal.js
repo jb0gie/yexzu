@@ -115,7 +115,7 @@ export class PlayerLocal extends Entity {
     this.bubbleBox.add(this.bubbleText)
     this.base.add(this.bubble)
 
-    this.base.activate({ world: this.world, physics: true, entity: this.entity })
+    this.base.activate({ world: this.world, entity: this.entity })
 
     this.camHeight = DEFAULT_CAM_HEIGHT
 

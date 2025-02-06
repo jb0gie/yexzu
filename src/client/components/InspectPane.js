@@ -21,7 +21,8 @@ import { useUpdate } from './useUpdate'
 import { cls } from './cls'
 import { exportApp } from '../../core/extras/appTools'
 import { downloadFile } from '../../core/extras/downloadFile'
-import { hasRole } from '../../core/utils'
+import { clamp, hasRole } from '../../core/utils'
+import { isNumber } from 'lodash-es'
 
 export function InspectPane({ world, entity }) {
   if (entity.isApp) {
@@ -41,8 +42,9 @@ const allowedModels = ['glb', 'vrm']
 export function AppPane({ world, app }) {
   const paneRef = useRef()
   const headRef = useRef()
-  const [tab, setTab] = useState('overview')
   const [blueprint, setBlueprint] = useState(app.blueprint)
+  const canEdit = !blueprint.frozen && hasRole(world.entities.player.data.user.roles, 'admin', 'builder')
+  const [tab, setTab] = useState(canEdit ? 'edit' : 'overview')
   usePane('inspect', paneRef, headRef)
   useEffect(() => {
     window.app = app
@@ -65,7 +67,7 @@ export function AppPane({ world, app }) {
       console.error(err)
     }
   }
-  const canEdit = !blueprint.frozen && hasRole(world.entities.player.data.user.roles, 'admin', 'builder')
+
   return (
     <div
       ref={paneRef}
@@ -442,6 +444,7 @@ const fieldTypes = {
   section: FieldSection,
   text: FieldText,
   textarea: FieldTextArea,
+  number: FieldNumber,
   file: FieldFile,
   switch: FieldSwitch,
 }
@@ -515,6 +518,21 @@ function FieldTextArea({ world, field, value, modify }) {
   return (
     <FieldWithLabel label={field.label}>
       <InputTextarea value={value} onChange={value => modify(field.key, value)} placeholder={field.placeholder} />
+    </FieldWithLabel>
+  )
+}
+
+function FieldNumber({ world, field, value, modify }) {
+  return (
+    <FieldWithLabel label={field.label}>
+      <InputNumber
+        value={value}
+        onChange={value => modify(field.key, value)}
+        dp={field.dp}
+        min={field.min}
+        max={field.max}
+        step={field.step}
+      />
     </FieldWithLabel>
   )
 }
@@ -649,6 +667,81 @@ function InputTextarea({ value, onChange, placeholder }) {
           onChange(localValue)
         }}
         placeholder={placeholder}
+      />
+    </label>
+  )
+}
+
+function InputNumber({ value, onChange, dp = 0, min = -Infinity, max = Infinity, step = 1 }) {
+  if (value === undefined || value === null) {
+    value = 0
+  }
+  const [local, setLocal] = useState(value.toFixed(dp))
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (!focused && local !== value.toFixed(dp)) setLocal(value.toFixed(dp))
+  }, [focused, value])
+  const setTo = str => {
+    // try parse math
+    let num
+    try {
+      num = (0, eval)(str)
+      if (typeof num !== 'number') {
+        throw new Error('input number parse fail')
+      }
+    } catch (err) {
+      console.error(err)
+      num = value // revert back to original
+    }
+    if (num < min || num > max) {
+      num = value
+    }
+    setLocal(num.toFixed(dp))
+    onChange(+num.toFixed(dp))
+  }
+  return (
+    <label
+      css={css`
+        display: block;
+        background-color: #252630;
+        border-radius: 10px;
+        padding: 0 8px;
+        cursor: text;
+        input {
+          height: 34px;
+          font-size: 14px;
+        }
+      `}
+    >
+      <input
+        type='text'
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onKeyDown={e => {
+          if (e.code === 'Enter') {
+            e.target.blur()
+          }
+          if (e.code === 'ArrowUp') {
+            setTo(value + step)
+          }
+          if (e.code === 'ArrowDown') {
+            setTo(value - step)
+          }
+        }}
+        onFocus={e => {
+          setFocused(true)
+          e.target.select()
+        }}
+        onBlur={e => {
+          setFocused(false)
+          // if blank, set back to original
+          if (local === '') {
+            setLocal(value.toFixed(dp))
+            return
+          }
+          // otherwise run through pipeline
+          setTo(local)
+        }}
       />
     </label>
   )

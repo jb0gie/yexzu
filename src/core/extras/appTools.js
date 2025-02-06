@@ -97,7 +97,6 @@ export async function importApp(file) {
   }
 
   return {
-    version: header.version,
     blueprint: header.blueprint,
     assets,
   }

@@ -71,5 +71,8 @@
     "npm": ">=10.0.0",
     "node": "22.11.0"
   },
+  "overrides": {
+    "three": "^0.173.0"
+  },
   "license": "GPL-3.0-only"
 }
