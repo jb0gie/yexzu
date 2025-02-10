@@ -208,7 +208,7 @@ export class ClientEditor extends System {
     }
   }
 
-  onDrop = e => {
+  onDrop = async e => {
     e.preventDefault()
     this.dropping = false
     // ensure we have admin/builder role
@@ -231,8 +231,16 @@ export class ClientEditor extends System {
       if (item.kind === 'file') {
         file = item.getAsFile()
       }
-      if (item.type === 'text/uri-list') {
-        // ...
+      // Handle multiple MIME types for URLs
+      if (item.type === 'text/uri-list' || item.type === 'text/plain' || item.type === 'text/html') {
+        const text = await getAsString(item)
+        // Extract URL from the text (especially important for text/html type)
+        const url = text.trim().split('\n')[0] // Take first line in case of multiple
+        if (url.startsWith('http')) { // Basic URL validation
+          const resp = await fetch(url)
+          const blob = await resp.blob()
+          file = new File([blob], new URL(url).pathname.split('/').pop(), { type: resp.headers.get('content-type') })
+        }
       }
     } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       file = e.dataTransfer.files[0]
@@ -443,4 +451,10 @@ export class ClientEditor extends System {
       },
     })
   }
+}
+
+function getAsString(item) {
+  return new Promise(resolve => {
+    item.getAsString(resolve)
+  })
 }

@@ -13,6 +13,16 @@ import {
   PackageCheckIcon,
   ShuffleIcon,
   XIcon,
+  LayersIcon,
+  AtomIcon,
+  FolderIcon,
+  BlendIcon,
+  CircleIcon,
+  AnchorIcon,
+  PersonStandingIcon,
+  MagnetIcon,
+  DumbbellIcon,
+  ChevronDown,
 } from 'lucide-react'
 
 import { hashFile } from '../../core/utils-client'
@@ -77,6 +87,7 @@ export function AppPane({ world, app }) {
         top: 20px;
         left: 20px;
         width: 320px;
+        max-height: calc(100vh - 40px);
         background: rgba(22, 22, 28, 1);
         border: 1px solid rgba(255, 255, 255, 0.03);
         border-radius: 10px;
@@ -150,6 +161,9 @@ export function AppPane({ world, app }) {
             <span>Edit</span>
           </div>
         )}
+        <div className={cls('apane-head-tab', { selected: tab === 'hierarchy' })} onClick={() => setTab('hierarchy')}>
+          <span>Hierarchy</span>
+        </div>
         <div className='apane-head-gap' />
         <div className='apane-head-close' onClick={() => world.emit('inspect', null)}>
           <XIcon size={20} />
@@ -165,6 +179,7 @@ export function AppPane({ world, app }) {
         </>
       )}
       {tab === 'edit' && <AppPaneEdit world={world} app={app} blueprint={blueprint} />}
+      {tab === 'hierarchy' && <AppPaneHierarchy app={app} />}
     </div>
   )
 }
@@ -411,6 +426,231 @@ function AppPaneEdit({ world, app, blueprint }) {
   )
 }
 
+function AppPaneHierarchy({ app }) {
+  const [selectedNode, setSelectedNode] = useState(null)
+
+  // Get the scene root node
+  const rootNode = app?.scene?.root || app?.root
+
+  useEffect(() => {
+    if (rootNode && !selectedNode) {
+      setSelectedNode(rootNode)
+    }
+  }, [rootNode])
+
+  // Helper function to safely get vector string
+  const getVectorString = vec => {
+    if (!vec || typeof vec.x !== 'number') return null
+    return `${vec.x.toFixed(2)}, ${vec.y.toFixed(2)}, ${vec.z.toFixed(2)}`
+  }
+
+  // Helper function to safely check if a property exists
+  const hasProperty = (obj, prop) => {
+    try {
+      return obj && typeof obj[prop] !== 'undefined'
+    } catch (err) {
+      return false
+    }
+  }
+
+  return (
+    <div
+      className='ahierarchy noscrollbar'
+      css={css`
+        flex: 1;
+        padding: 20px;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        .ahierarchy-tree {
+          flex: 1;
+          overflow-y: auto;
+          margin-bottom: 20px;
+          padding-right: 10px;
+        }
+        .ahierarchy-item {
+          display: flex;
+          align-items: center;
+          padding: 4px 6px;
+          border-radius: 10px;
+          font-size: 14px;
+          cursor: pointer;
+          &:hover {
+            color: #00a7ff;
+          }
+          &.selected {
+            color: #00a7ff;
+            background: rgba(0, 167, 255, 0.1);
+          }
+          svg {
+            margin-right: 8px;
+            opacity: 0.5;
+            flex-shrink: 0;
+          }
+          span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          &-indent {
+            margin-left: 20px;
+          }
+        }
+        .ahierarchy-empty {
+          color: rgba(255, 255, 255, 0.5);
+          text-align: center;
+          padding: 20px;
+        }
+        .ahierarchy-details {
+          flex-shrink: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          padding-top: 20px;
+          max-height: 40vh;
+          overflow-y: auto;
+          padding-right: 10px;
+        }
+        .ahierarchy-detail {
+          display: flex;
+          margin-bottom: 8px;
+          font-size: 14px;
+          &-label {
+            width: 100px;
+            color: rgba(255, 255, 255, 0.5);
+            flex-shrink: 0;
+          }
+          &-value {
+            flex: 1;
+            word-break: break-word;
+            &.copy {
+              cursor: pointer;
+            }
+          }
+        }
+      `}
+    >
+      <div className='ahierarchy-tree'>
+        {rootNode ? (
+          renderHierarchy([rootNode], 0, selectedNode, setSelectedNode)
+        ) : (
+          <div className='ahierarchy-empty'>
+            <LayersIcon size={24} />
+            <div>No objects found</div>
+          </div>
+        )}
+      </div>
+
+      {selectedNode && (
+        <div className='ahierarchy-details'>
+          <HierarchyDetail label='Name' value={selectedNode.id || selectedNode.name || 'Unnamed'} copy />
+          <HierarchyDetail label='Type' value={selectedNode.type || 'Node'} />
+
+          {/* Position */}
+          {hasProperty(selectedNode, 'position') && getVectorString(selectedNode.position) && (
+            <HierarchyDetail label='Position' value={getVectorString(selectedNode.position)} />
+          )}
+
+          {/* Rotation */}
+          {hasProperty(selectedNode, 'rotation') && getVectorString(selectedNode.rotation) && (
+            <HierarchyDetail label='Rotation' value={getVectorString(selectedNode.rotation)} />
+          )}
+
+          {/* Scale */}
+          {hasProperty(selectedNode, 'scale') && getVectorString(selectedNode.scale) && (
+            <HierarchyDetail label='Scale' value={getVectorString(selectedNode.scale)} />
+          )}
+
+          {/* Visibility */}
+          {hasProperty(selectedNode, 'visible') && (
+            <HierarchyDetail label='Visible' value={selectedNode.visible.toString()} />
+          )}
+
+          {/* Material */}
+          {hasProperty(selectedNode, 'material') && selectedNode.material && (
+            <>
+              <HierarchyDetail label='Material' value={selectedNode.material.type || 'Standard'} />
+              {hasProperty(selectedNode.material, 'color') && selectedNode.material.color && (
+                <HierarchyDetail
+                  label='Color'
+                  value={
+                    selectedNode.material.color.getHexString
+                      ? `#${selectedNode.material.color.getHexString()}`
+                      : 'Unknown'
+                  }
+                />
+              )}
+            </>
+          )}
+
+          {/* Geometry */}
+          {hasProperty(selectedNode, 'geometry') && selectedNode.geometry && (
+            <HierarchyDetail label='Geometry' value={selectedNode.geometry.type || 'Custom'} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HierarchyDetail({ label, value, copy }) {
+  let handleCopy = copy ? () => navigator.clipboard.writeText(value) : null
+  return (
+    <div className='ahierarchy-detail'>
+      <div className='ahierarchy-detail-label'>{label}</div>
+      <div className={cls('ahierarchy-detail-value', { copy })} onClick={handleCopy}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+const nodeIcons = {
+  default: CircleIcon,
+  group: FolderIcon,
+  mesh: BoxIcon,
+  rigidbody: DumbbellIcon,
+  collider: BlendIcon,
+  lod: EyeIcon,
+  avatar: PersonStandingIcon,
+  snap: MagnetIcon,
+}
+
+function renderHierarchy(nodes, depth = 0, selectedNode, setSelectedNode) {
+  if (!Array.isArray(nodes)) return null
+
+  return nodes.map(node => {
+    if (!node) return null
+
+    // Skip the root node but show its children
+    if (depth === 0 && (node.id === '$root' || node.name === '$root')) {
+      return renderHierarchy(node.children || [], depth, selectedNode, setSelectedNode)
+    }
+
+    // Safely get children
+    const children = node.children || []
+    const hasChildren = Array.isArray(children) && children.length > 0
+    const isSelected = selectedNode?.id === node.id
+    const Icon = nodeIcons[node.name] || nodeIcons.default
+
+    return (
+      <div key={node.id || node.uuid || Math.random()}>
+        <div
+          className={cls('ahierarchy-item', {
+            'ahierarchy-item-indent': depth > 0,
+            selected: isSelected,
+          })}
+          style={{ marginLeft: depth * 20 }}
+          onClick={() => setSelectedNode(node)}
+        >
+          <Icon size={14} />
+          <span>{node.id || node.name || 'Unnamed'}</span>
+        </div>
+        {hasChildren && renderHierarchy(children, depth + 1, selectedNode, setSelectedNode)}
+      </div>
+    )
+  })
+}
+
 function PlayerPane({ world, player }) {
   return <div>PLAYER INSPECT</div>
 }
@@ -447,6 +687,7 @@ const fieldTypes = {
   number: FieldNumber,
   file: FieldFile,
   switch: FieldSwitch,
+  dropdown: FieldDropdown,
 }
 
 function Field({ world, props, field, value, modify }) {
@@ -590,6 +831,14 @@ function FieldSwitch({ world, field, value, modify }) {
   return (
     <FieldWithLabel label={field.label}>
       <InputSwitch options={field.options} value={value} onChange={value => modify(field.key, value)} />
+    </FieldWithLabel>
+  )
+}
+
+function FieldDropdown({ world, field, value, modify }) {
+  return (
+    <FieldWithLabel label={field.label}>
+      <InputDropdown options={field.options} value={value} onChange={value => modify(field.key, value)} />
     </FieldWithLabel>
   )
 }
@@ -784,6 +1033,73 @@ function InputSwitch({ options, value, onChange }) {
           <span>{option.label}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+function InputDropdown({ options, value, onChange }) {
+  const current = options.find(o => o.value === value)
+  const [open, setOpen] = useState(false)
+  const toggle = () => setOpen(!open)
+  return (
+    <div
+      className='inputdropdown'
+      css={css`
+        position: relative;
+        .inputdropdown-current {
+          display: flex;
+          align-items: center;
+          background: #252630;
+          border-radius: 10px;
+          height: 34px;
+          padding: 0 8px;
+          cursor: pointer;
+          span {
+            font-size: 14px;
+            flex: 1;
+          }
+        }
+        .inputdropdown-menu {
+          z-index: 1;
+          margin: 3px 0 20px;
+          position: absolute;
+          left: 0;
+          right: 0;
+          background: #252630;
+          border-radius: 10px;
+          overflow: hidden;
+          padding: 4px 0;
+        }
+        .inputdropdown-option {
+          font-size: 14px;
+          padding: 8px;
+          &:hover {
+            cursor: pointer;
+            background: rgb(46, 47, 59);
+          }
+        }
+      `}
+    >
+      <div className='inputdropdown-current' onClick={toggle}>
+        <span>{current?.label || ''}</span>
+        <ChevronDown size={12} />
+      </div>
+      {open && (
+        <div className='inputdropdown-menu'>
+          {options.map(option => (
+            <div
+              key={option.value}
+              className={cls('inputdropdown-option', { selected: value === option.value })}
+              onClick={() => {
+                setOpen(false)
+                onChange(option.value)
+              }}
+            >
+              <span>{option.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

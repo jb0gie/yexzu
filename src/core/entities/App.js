@@ -9,6 +9,7 @@ import { LerpVector3 } from '../extras/LerpVector3'
 import { LerpQuaternion } from '../extras/LerpQuaternion'
 import { ControlPriorities } from '../extras/ControlPriorities'
 import { getRef } from '../nodes/Node'
+import { DEG2RAD } from '../extras/general'
 
 const hotEventNames = ['fixedUpdate', 'update', 'lateUpdate']
 const internalEvents = ['fixedUpdate', 'updated', 'lateUpdate', 'enter', 'leave', 'chat']
@@ -16,6 +17,7 @@ const internalEvents = ['fixedUpdate', 'updated', 'lateUpdate', 'enter', 'leave'
 const v1 = new THREE.Vector3()
 
 const SNAP_DISTANCE = 0.5
+const SNAP_DEGREES = 5
 
 const Modes = {
   ACTIVE: 'active',
@@ -208,9 +210,18 @@ export class App extends Entity {
   update(delta) {
     // if we're moving the app, handle that
     if (this.data.mover === this.world.network.id) {
+      // we cant just update the root directly and must track where it
+      // should be theoretically, and then apply snap points on top of that.
+      if (!this.target) {
+        this.target = new THREE.Object3D()
+        this.target.position.copy(this.root.position)
+        this.target.quaternion.copy(this.root.quaternion)
+        this.target.rotation.reorder('YXZ')
+        document.body.style.cursor = 'grabbing'
+      }
       if (this.control._lifting) {
         // if shift is down we're raising and lowering the app
-        this.root.position.y -= this.world.controls.pointer.delta.y * delta * 0.5
+        this.target.position.y -= this.world.controls.pointer.delta.y * delta * 0.5
       } else {
         // otherwise move with the cursor
         const position = this.world.controls.pointer.position
@@ -224,12 +235,23 @@ export class App extends Entity {
           break
         }
         if (hit) {
-          this.root.position.copy(hit.point)
+          this.target.position.copy(hit.point)
         }
         // and rotate with the mouse wheel
-        this.root.rotation.y += this.control.scroll.delta * 0.1 * delta
-        this.root.clean()
-        // and snap to any nearby points
+        this.target.rotation.y += this.control.scroll.delta * 0.1 * delta
+      }
+      // apply movement
+      this.root.position.copy(this.target.position)
+      this.root.quaternion.copy(this.target.quaternion)
+      // snap rotation to degrees
+      const newY = this.target.rotation.y
+      const degrees = newY / DEG2RAD
+      const snappedDegrees = Math.round(degrees / SNAP_DEGREES) * SNAP_DEGREES
+      this.root.rotation.y = snappedDegrees * DEG2RAD
+      // update matrix
+      this.root.clean()
+      // and snap to any nearby points
+      if (!this.control.buttons.ControlLeft) {
         for (const pos of this.snaps) {
           const result = this.world.snaps.octree.query(pos, SNAP_DISTANCE)[0]
           if (result) {
@@ -264,6 +286,8 @@ export class App extends Entity {
           state: this.data.state,
         })
         this.build()
+        this.target = null
+        document.body.style.cursor = 'default'
       }
     }
     // if someone else is moving the app, interpolate updates
