@@ -5,28 +5,27 @@ app.configure([
 		kind: 'audio',
 		label: 'Audio'
 	},
-	{
-		key: 'volume',
-		type: 'switch',
-		label: 'Volume Level',
-		options: [
-			{ label: 'Low', value: 0.3 },
-			{ label: 'Medium', value: 0.6 },
-			{ label: 'High', value: 1.0 }
-		]
-	},
-	{
-		key: 'audioType',
-		type: 'switch',
-		label: 'Audio Type',
-		options: [
-			{ label: 'Music', value: 'music' },
-			{ label: 'Sound Effect', value: 'sfx' }
-		]
-	}
+	// {
+	// 	key: 'volume',
+	// 	type: 'switch',
+	// 	label: 'Volume Level',
+	// 	options: [
+	// 		{ label: 'Low', value: 0.3 },
+	// 		{ label: 'Medium', value: 0.6 },
+	// 		{ label: 'High', value: 1.0 }
+	// 	]
+	// },
+	// {
+	// 	key: 'audioType',
+	// 	type: 'switch',
+	// 	label: 'Audio Type',
+	// 	options: [
+	// 		{ label: 'Music', value: 'music' },
+	// 		{ label: 'Sound Effect', value: 'sfx' }
+	// 	]
+	// }
 ])
 
-// Add debug logging
 // console.log('Starting speaker setup...')
 
 const audio = app.create('audio', {
@@ -36,12 +35,14 @@ const audio = app.create('audio', {
 	spatial: true
 })
 
+// Log initial audio setup
+// console.log('Audio created with initial volume:', audio.volume)
+
 // Get reference to Mesh2 and its material for animation
-const speakerBox = app.get('Mesh')
-// console.log('Speaker object:', speakerBox)
-const speakerMaterial = speakerBox?.material
-// console.log('Speaker material:', speakerMaterial)
 const speaker = app.get('Mesh2')
+const speakerMaterial = speaker?.material
+// console.log('Speaker object:', speaker)
+// console.log('Speaker material:', speakerMaterial.emissiveIntensity)
 
 // More careful initialization of original position
 let originalPosition = 0
@@ -49,127 +50,233 @@ try {
 	originalPosition = speaker?.position?.z ?? 0
 	// console.log('Original position:', originalPosition)
 } catch (err) {
-	console.log('Error getting speaker position:', err)
+	console.warn('Error getting speaker position:', err)
 }
 
 const body = app.get('Body')
 body.add(audio)
 
-const ui = app.create('ui', {
-	width: 150,
-	height: 150,
-	backgroundColor: 'rgba(0, 0, 0, 0.85)',
-	borderRadius: 10,
-	padding: 8,
+// Create an action for the speaker
+const action = app.create('action', {
+	label: 'Show Controls',
+	distance: 3,
+	duration: 0.5,
+	onTrigger: () => {
+		ui.display = ui.display === 'none' ? 'flex' : 'none'
+	}
 })
-ui.position.set(1, .5, 2)
+body.add(action)
+
+// Create UI with initial visibility
+const ui = app.create('ui', {
+	lit: true,
+	doubleside: false,
+	width: 170,
+	height: 200,
+	backgroundColor: 'rgba(0, 0, 0, 0.95)',
+	borderRadius: 10,
+	padding: 10,
+	display: 'none'  // Start hidden until user interacts
+})
+ui.position.set(2, 0.1, 1.5)
 body.add(ui)
 
-// Playback controls
-const btn1 = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: 'Play',
-	color: 'white',
-	onPointerDown: () => audio.play(),
-	onPointerEnter: () => btn1.color = 'purple',
-	onPointerLeave: () => btn1.color = 'white',
-	cursor: 'pointer'
-})
-ui.add(btn1)
-
-const btn2 = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: 'Pause',
-	color: 'white',
-	onPointerDown: () => audio.pause(),
-	onPointerEnter: () => btn2.color = 'purple',
-	onPointerLeave: () => btn2.color = 'white',
-	cursor: 'pointer'
-})
-ui.add(btn2)
-
-const btn3 = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: 'Stop',
-	color: 'white',
-	onPointerDown: () => audio.stop(),
-	onPointerEnter: () => btn3.color = 'purple',
-	onPointerLeave: () => btn3.color = 'white',
-	cursor: 'pointer'
-})
-ui.add(btn3)
-
-// Volume controls
-const volumeLabel = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: 'Volume:',
-	color: 'white',
-	fontSize: 12
-})
-ui.add(volumeLabel)
-
-// Create a horizontal container for volume controls
-const volumeControls = app.create('ui', {
+// #region Playback controls view
+const playView = app.create('uiview', {
+	display: 'flex',
+	padding: 20,
 	flexDirection: 'row',
 	justifyContent: 'center',
 	alignItems: 'center',
-	gap: 8,
+	alignContent: 'stretch',
+	width: 150,
+	height: 100,
 	padding: 4
 })
-ui.add(volumeControls)
-
-const volumeDown = app.create('uitext', {
+const playBtn = app.create('uitext', {
 	padding: 4,
-	textAlign: 'center',
-	value: '🔉',
+	fontSize: 24,
+	value: '▶️',
 	color: 'white',
-	onPointerDown: () => {
-		audio.volume = Math.max(0, audio.volume - 0.1)
-		volumeText.value = `${Math.round(audio.volume * 100)}%`
-	},
-	onPointerEnter: () => volumeDown.color = 'purple',
-	onPointerLeave: () => volumeDown.color = 'white',
+	onPointerDown: () => audio.play(),
 	cursor: 'pointer'
 })
-volumeControls.add(volumeDown)
+const pauseBtn = app.create('uitext', {
+	padding: 4,
+	fontSize: 24,
+	value: '⏸️',
+	color: 'white',
+	onPointerDown: () => audio.pause(),
+	cursor: 'pointer'
+})
+const stopBtn = app.create('uitext', {
+	padding: 4,
+	fontSize: 24,
+	textAlign: 'center',
+	value: '🛑',
+	color: 'white',
+	onPointerDown: () => audio.stop(),
+	cursor: 'pointer'
+})
+ui.add(playView)
+playView.add(playBtn)
+playView.add(pauseBtn)
+playView.add(stopBtn)
+// #endregion
+
+// #region Status section
+const statusView = app.create('uiview', {
+	display: 'flex',
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	width: 150,
+	height: 30,
+	backgroundColor: 'rgba(20, 20, 20, 0.5)',
+	borderRadius: 5,
+	marginTop: 4,
+	marginBottom: 4
+})
+
+const statusText = app.create('uitext', {
+	padding: 4,
+	textAlign: 'center',
+	value: 'Stopped',
+	color: 'rgba(255, 255, 255, 0.7)',
+	fontSize: 14
+})
+
+ui.add(statusView)
+statusView.add(statusText)
+// #endregion
+
+// #region Volume controls view 
+const volView = app.create('uiview', {
+	display: 'flex',
+	flexDirection: 'column',
+	padding: 5,
+	justifyContent: 'center',
+	alignItems: 'center',
+	alignContent: 'stretch',
+	width: 150,
+	height: 70,
+})
+
+// #region Volume label
+const volLabelView = app.create('uiview', {
+	display: 'flex',
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	width: 150,
+	height: 30,
+})
+
+const volumeLabel = app.create('uitext', {
+	padding: 1,
+	textAlign: 'left',
+	value: 'Volume:',
+	color: 'white',
+	fontSize: 14
+})
 
 const volumeText = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: '60%',
+	padding: 1,
+	textAlign: 'right',
+	value: `${Math.round((audio?.getVolume?.() || audio?.volume || 0.6) * 100)}%`,
 	color: 'white',
-	fontSize: 12,
-	width: 40  // Fixed width for percentage
+	fontSize: 14,
 })
-volumeControls.add(volumeText)
-
-const volumeUp = app.create('uitext', {
-	padding: 4,
-	textAlign: 'center',
-	value: '🔊',
-	color: 'white',
-	onPointerDown: () => {
-		audio.volume = Math.min(1, audio.volume + 0.1)
-		volumeText.value = `${Math.round(audio.volume * 100)}%`
-	},
-	onPointerEnter: () => volumeUp.color = 'purple',
-	onPointerLeave: () => volumeUp.color = 'white',
-	cursor: 'pointer'
+ui.add(volView)
+volView.add(volLabelView)
+volLabelView.add(volumeLabel)
+volLabelView.add(volumeText)
+// #endregion
+// #region Timecode view
+const timeView = app.create('uiview', {
+	display: 'flex',
+	padding: 20,
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	alignContent: 'stretch',
+	width: 150,
+	height: 100,
+	padding: 4
 })
-volumeControls.add(volumeUp)
-
 const time = app.create('uitext', {
 	padding: 5,
 	textAlign: 'center',
 	value: '',
 	color: 'white',
-	fontSize: 12,
+	onPointerDown: () => audio.stop(),
+	fontSize: 32,
 })
-ui.add(time)
+
+ui.add(timeView)
+timeView.add(time)
+// #endregion
+// Volume buttons in one row
+const volButtonsView = app.create('uiview', {
+	display: 'flex',
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	width: 150,
+	height: 40,
+	marginTop: 4
+})
+
+const volumeDown = app.create('uitext', {
+	padding: 10,
+	textAlign: 'center',
+	value: '🔉',
+	color: 'white',
+	fontSize: 20,
+	backgroundColor: 'rgba(40, 40, 40, 0.6)',
+	borderRadius: 5,
+	onPointerDown: () => {
+		const newVolume = Math.max(0, audio.volume - 0.2)
+		audio.volume = newVolume
+	},
+	onPointerEnter: () => {
+		volumeDown.color = 'purple'
+		volumeDown.backgroundColor = 'rgba(60, 60, 60, 0.8)'
+	},
+	onPointerLeave: () => {
+		volumeDown.color = 'white'
+		volumeDown.backgroundColor = 'rgba(40, 40, 40, 0.6)'
+	},
+	cursor: 'pointer'
+})
+
+const volumeUp = app.create('uitext', {
+	padding: 10,
+	textAlign: 'center',
+	value: '🔊',
+	color: 'white',
+	fontSize: 20,
+	backgroundColor: 'rgba(40, 40, 40, 0.6)',
+	borderRadius: 5,
+	onPointerDown: () => {
+		const newVolume = Math.min(1, audio.volume + 0.2)
+		audio.volume = newVolume
+	},
+	onPointerEnter: () => {
+		volumeUp.color = 'purple'
+		volumeUp.backgroundColor = 'rgba(60, 60, 60, 0.8)'
+	},
+	onPointerLeave: () => {
+		volumeUp.color = 'white'
+		volumeUp.backgroundColor = 'rgba(40, 40, 40, 0.6)'
+	},
+	cursor: 'pointer'
+})
+
+ui.add(volumeDown)
+ui.add(volButtonsView)
+ui.add(volumeUp)
+// #endregion
 
 let frameCount = 0
 
@@ -178,6 +285,21 @@ app.on('update', () => {
 		frameCount++
 		time.value = audio.currentTime.toFixed(2)
 		time.color = audio.isPlaying ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.1)'
+
+		// Update volume text
+		volumeText.value = `${Math.round(audio.volume * 100)}%`
+
+		// Update status text
+		if (audio.isPlaying) {
+			statusText.value = '▶️ Playing'
+			statusText.color = 'rgba(100, 255, 100, 0.8)'  // Green for playing
+		} else if (audio.currentTime > 0) {
+			statusText.value = '⏸️ Paused'
+			statusText.color = 'rgba(255, 255, 100, 0.8)'  // Yellow for paused
+		} else {
+			statusText.value = '⏹️ Stopped'
+			statusText.color = 'rgba(255, 100, 100, 0.8)'  // Red for stopped
+		}
 
 		// Animate speaker mesh and material when audio is playing
 		if (speaker && speaker.position && audio.isPlaying) {
