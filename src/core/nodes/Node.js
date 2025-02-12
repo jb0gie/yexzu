@@ -3,10 +3,14 @@ import * as THREE from '../extras/three'
 
 const _v1 = new THREE.Vector3()
 const _v2 = new THREE.Vector3()
+const _v3 = new THREE.Vector3()
 const _q1 = new THREE.Quaternion()
 const _m1 = new THREE.Matrix4()
 const _m2 = new THREE.Matrix4()
 const _m3 = new THREE.Matrix4()
+const _box3 = new THREE.Box3()
+const _sphere = new THREE.Sphere()
+const _points = []
 
 const defaults = {
   active: true,

@@ -3,6 +3,9 @@ import { isBoolean, isNumber } from 'lodash-es'
 
 import { Node } from './Node'
 
+const _v1 = new THREE.Vector3()
+const _v2 = new THREE.Vector3()
+
 const defaults = {
   type: 'box',
   width: 1,
