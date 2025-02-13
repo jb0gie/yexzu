@@ -306,6 +306,7 @@ export class ClientControls extends System {
   }
 
   onKeyDown = e => {
+    if (e.defaultPrevented) return
     if (e.repeat) return
     if (this.isInputFocused()) return
     const code = e.code

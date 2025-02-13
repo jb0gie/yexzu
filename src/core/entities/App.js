@@ -228,6 +228,9 @@ export class App extends Entity {
       this.data.quaternion = data.quaternion
       this.networkQuat.pushArray(data.quaternion)
     }
+    if (data.hasOwnProperty('pinned')) {
+      this.data.pinned = data.pinned
+    }
     if (data.hasOwnProperty('state')) {
       this.data.state = data.state
       rebuild = true
@@ -329,6 +332,16 @@ export class App extends Entity {
       console.error(err)
       // this.crash()
     }
+  }
+
+  getNodes() {
+    // note: this is currently just used in the nodes tab in the app inspector
+    // to get a clean hierarchy
+    if (!this.blueprint) return
+    const type = this.blueprint.model.endsWith('vrm') ? 'avatar' : 'model'
+    let glb = this.world.loader.get(type, this.blueprint.model)
+    if (!glb) return
+    return glb.toNodes()
   }
 
   getWorldProxy() {

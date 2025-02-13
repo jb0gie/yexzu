@@ -174,7 +174,7 @@ export class Node {
     if (!this._active && this.mounted) {
       this.deactivate()
     } else if (this._active && this.parent?.mounted) {
-      this.activate(this.ctx)
+      this.activate(this.parent.ctx)
     }
   }
 
@@ -246,6 +246,7 @@ export class Node {
     this._onPointerDown = source._onPointerDown
     this._onPointerUp = source._onPointerUp
     this._cursor = source._cursor
+    this._active = source._active
     if (recursive) {
       for (let i = 0; i < source.children.length; i++) {
         const child = source.children[i]

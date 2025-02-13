@@ -1,6 +1,6 @@
 import moment from 'moment'
 import * as THREE from '../extras/three'
-import { cloneDeep } from 'lodash-es'
+import { cloneDeep, isBoolean } from 'lodash-es'
 
 import { System } from './System'
 
@@ -19,6 +19,8 @@ const PROJECT_MIN = 3
 const PROJECT_MAX = 50
 
 const v1 = new THREE.Vector3()
+const q1 = new THREE.Quaternion()
+const e1 = new THREE.Euler()
 
 /**
  * Builder System
@@ -76,6 +78,7 @@ export class ClientBuilder extends System {
       actions.push({ type: 'space', label: 'Jump / Fly (Double-Tap)' })
       actions.push({ type: 'keyR', label: 'Inspect' })
       actions.push({ type: 'keyU', label: 'Unlink' })
+      actions.push({ type: 'keyP', label: 'Pin' })
       actions.push({ type: 'mouseLeft', label: 'Grab' })
       actions.push({ type: 'mouseRight', label: 'Duplicate' })
       actions.push({ type: 'keyX', label: 'Destroy' })
@@ -85,6 +88,7 @@ export class ClientBuilder extends System {
       actions.push({ type: 'space', label: 'Jump / Fly (Double-Tap)' })
       actions.push({ type: 'keyR', label: 'Inspect' })
       actions.push({ type: 'keyU', label: 'Unlink' })
+      actions.push({ type: 'keyP', label: 'Pin' })
       actions.push({ type: 'mouseLeft', label: 'Place' })
       actions.push({ type: 'mouseWheel', label: 'Rotate' })
       actions.push({ type: 'mouseRight', label: 'Duplicate' })
@@ -143,17 +147,32 @@ export class ClientBuilder extends System {
           public: entity.blueprint.public,
           locked: entity.blueprint.locked,
           frozen: entity.blueprint.frozen,
+          unique: entity.blueprint.unique,
         }
         this.world.blueprints.add(blueprint, true)
         // assign new blueprint
         entity.modify({ blueprint: blueprint.id })
         this.world.network.send('entityModified', { id: entity.data.id, blueprint: blueprint.id })
+        // toast
+        this.world.emit('toast', 'Unlinked')
+      }
+    }
+    // pin/unpin
+    if (this.control.keyP.pressed) {
+      const entity = this.getEntityAtReticle()
+      if (entity?.isApp) {
+        entity.data.pinned = !entity.data.pinned
+        this.world.network.send('entityModified', {
+          id: entity.data.id,
+          pinned: entity.data.pinned,
+        })
+        this.world.emit('toast', entity.data.pinned ? 'Pinned' : 'Un-pinned')
       }
     }
     // grab
     if (this.control.pointer.locked && this.control.mouseLeft.pressed && !this.selected) {
       const entity = this.getEntityAtReticle()
-      if (entity?.isApp) {
+      if (entity?.isApp && !entity.data.pinned) {
         this.select(entity)
       }
     }
@@ -165,14 +184,38 @@ export class ClientBuilder extends System {
     if (this.control.pointer.locked && this.control.mouseRight.pressed) {
       const entity = this.selected || this.getEntityAtReticle()
       if (entity?.isApp) {
+        let blueprintId = entity.data.blueprint
+        // if unique, we also duplicate the blueprint
+        if (entity.blueprint.unique) {
+          const blueprint = {
+            id: uuid(),
+            version: 0,
+            name: entity.blueprint.name,
+            image: entity.blueprint.image,
+            author: entity.blueprint.author,
+            url: entity.blueprint.url,
+            desc: entity.blueprint.desc,
+            model: entity.blueprint.model,
+            script: entity.blueprint.script,
+            props: cloneDeep(entity.blueprint.props),
+            preload: entity.blueprint.preload,
+            public: entity.blueprint.public,
+            locked: entity.blueprint.locked,
+            frozen: entity.blueprint.frozen,
+            unique: entity.blueprint.unique,
+          }
+          this.world.blueprints.add(blueprint, true)
+          blueprintId = blueprint.id
+        }
         const data = {
           id: uuid(),
           type: 'app',
-          blueprint: entity.data.blueprint,
+          blueprint: blueprintId,
           position: entity.root.position.toArray(),
           quaternion: entity.root.quaternion.toArray(),
           mover: this.world.network.id,
           uploader: null,
+          pinned: false,
           state: {},
         }
         const dup = this.world.entities.add(data, true)
@@ -182,7 +225,7 @@ export class ClientBuilder extends System {
     // destroy
     if (this.control.keyX.pressed) {
       const entity = this.selected || this.getEntityAtReticle()
-      if (entity?.isApp) {
+      if (entity?.isApp && !entity.data.pinned) {
         this.select(null)
         entity?.destroy(true)
       }
@@ -204,9 +247,10 @@ export class ClientBuilder extends System {
         this.target.position.copy(camPos).add(camDir.multiplyScalar(this.target.limit))
       }
       // if holding F/C then push or pull
-      const project = this.control.keyF.down ? 1 : this.control.keyC.down ? -1 : null
+      let project = this.control.keyF.down ? 1 : this.control.keyC.down ? -1 : null
       if (project) {
-        this.target.limit += project * PROJECT_SPEED * delta
+        const multiplier = this.control.shiftLeft.down ? 4 : 1
+        this.target.limit += project * PROJECT_SPEED * delta * multiplier
         if (this.target.limit < PROJECT_MIN) this.target.limit = PROJECT_MIN
         if (hitDistance && this.target.limit > hitDistance) this.target.limit = hitDistance
       }
@@ -249,9 +293,11 @@ export class ClientBuilder extends System {
     }
   }
 
-  toggle() {
+  toggle(enabled) {
     if (!this.canBuild()) return
-    this.enabled = !this.enabled
+    enabled = isBoolean(enabled) ? enabled : !this.enabled
+    if (this.enabled === enabled) return
+    this.enabled = enabled
     if (!this.enabled) this.select(null)
     this.updateActions()
   }
@@ -370,6 +416,11 @@ export class ClientBuilder extends System {
       file = e.dataTransfer.files[0]
     }
     if (!file) return
+    // slight delay to ensure we get updated pointer position from window focus
+    await new Promise(resolve => setTimeout(resolve, 20))
+    // ensure we in build mode
+    this.toggle(true)
+    // add it!
     const maxSize = MAX_UPLOAD_SIZE * 1024 * 1024
     if (file.size > maxSize) {
       this.world.chat.add({
@@ -382,19 +433,20 @@ export class ClientBuilder extends System {
       console.error(`File too large. Maximum size is ${maxSize / (1024 * 1024)}MB`)
       return
     }
+    const transform = this.getSpawnTransform()
     const ext = file.name.split('.').pop().toLowerCase()
     if (ext === 'hyp') {
-      this.addApp(file)
+      this.addApp(file, transform)
     }
     if (ext === 'glb') {
-      this.addModel(file)
+      this.addModel(file, transform)
     }
     if (ext === 'vrm') {
-      this.addAvatar(file)
+      this.addAvatar(file, transform)
     }
   }
 
-  async addApp(file) {
+  async addApp(file, transform) {
     const info = await importApp(file)
     for (const asset of info.assets) {
       this.world.loader.insert(asset.type, asset.url, asset.file)
@@ -414,18 +466,18 @@ export class ClientBuilder extends System {
       public: info.blueprint.public,
       locked: info.blueprint.locked,
       frozen: info.blueprint.frozen,
+      unique: info.blueprint.unique,
     }
     this.world.blueprints.add(blueprint, true)
-    const hit = this.world.stage.raycastPointer(this.control.pointer.position)[0]
-    const position = hit ? hit.point.toArray() : [0, 0, 0]
     const data = {
       id: uuid(),
       type: 'app',
       blueprint: blueprint.id,
-      position,
-      quaternion: [0, 0, 0, 1],
+      position: transform.position,
+      quaternion: transform.quaternion,
       mover: null,
       uploader: this.world.network.id,
+      pinned: false,
       state: {},
     }
     const app = this.world.entities.add(data, true)
@@ -442,7 +494,7 @@ export class ClientBuilder extends System {
     }
   }
 
-  async addModel(file) {
+  async addModel(file, transform) {
     // immutable hash the file
     const hash = await hashFile(file)
     // use hash as glb filename
@@ -455,7 +507,7 @@ export class ClientBuilder extends System {
     const blueprint = {
       id: uuid(),
       version: 0,
-      name: null,
+      name: file.name,
       image: null,
       author: null,
       url: null,
@@ -466,12 +518,10 @@ export class ClientBuilder extends System {
       preload: false,
       public: false,
       locked: false,
+      unique: false,
     }
     // register blueprint
     this.world.blueprints.add(blueprint, true)
-    // get spawn point
-    const hit = this.world.stage.raycastPointer(this.control.pointer.position)[0]
-    const position = hit ? hit.point.toArray() : [0, 0, 0]
     // spawn the app moving
     // - mover: follows this clients cursor until placed
     // - uploader: other clients see a loading indicator until its fully uploaded
@@ -479,10 +529,11 @@ export class ClientBuilder extends System {
       id: uuid(),
       type: 'app',
       blueprint: blueprint.id,
-      position,
-      quaternion: [0, 0, 0, 1],
+      position: transform.position,
+      quaternion: transform.quaternion,
       mover: null,
       uploader: this.world.network.id,
+      pinned: false,
       state: {},
     }
     const app = this.world.entities.add(data, true)
@@ -492,7 +543,7 @@ export class ClientBuilder extends System {
     app.onUploaded()
   }
 
-  async addAvatar(file) {
+  async addAvatar(file, transform) {
     // immutable hash the file
     const hash = await hashFile(file)
     // use hash as vrm filename
@@ -512,7 +563,7 @@ export class ClientBuilder extends System {
         const blueprint = {
           id: uuid(),
           version: 0,
-          name: null,
+          name: file.name,
           image: null,
           author: null,
           url: null,
@@ -523,12 +574,10 @@ export class ClientBuilder extends System {
           preload: false,
           public: false,
           locked: false,
+          unique: false,
         }
         // register blueprint
         this.world.blueprints.add(blueprint, true)
-        // get spawn point
-        const hit = this.world.stage.raycastPointer(this.control.pointer.position)[0]
-        const position = hit ? hit.point.toArray() : [0, 0, 0]
         // spawn the app moving
         // - mover: follows this clients cursor until placed
         // - uploader: other clients see a loading indicator until its fully uploaded
@@ -536,10 +585,11 @@ export class ClientBuilder extends System {
           id: uuid(),
           type: 'app',
           blueprint: blueprint.id,
-          position,
-          quaternion: [0, 0, 0, 1],
+          position: transform.position,
+          quaternion: transform.quaternion,
           mover: null,
           uploader: this.world.network.id,
+          pinned: false,
           state: {},
         }
         const app = this.world.entities.add(data, true)
@@ -574,6 +624,23 @@ export class ClientBuilder extends System {
         })
       },
     })
+  }
+
+  getSpawnTransform() {
+    const hit = this.world.stage.raycastPointer(this.control.pointer.position)[0]
+    const position = hit ? hit.point.toArray() : [0, 0, 0]
+    let quaternion
+    if (hit) {
+      e1.copy(this.world.rig.rotation).reorder('YXZ')
+      e1.x = 0
+      e1.z = 0
+      e1.y += 180 * DEG2RAD
+      q1.setFromEuler(e1)
+      quaternion = q1.toArray()
+    } else {
+      quaternion = [0, 0, 0, 1]
+    }
+    return { position, quaternion }
   }
 }
 

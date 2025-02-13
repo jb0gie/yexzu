@@ -75,6 +75,7 @@ function Content({ world, width, height }) {
       {!ready && <LoadingOverlay />}
       <Reticle world={world} />
       {ready && <Side world={world} />}
+      {<Toast world={world} />}
     </div>
   )
 }
@@ -555,4 +556,68 @@ function Reticle({ world }) {
       <div className='reticle-item' />
     </div>
   )
+}
+
+function Toast({ world }) {
+  const [msg, setMsg] = useState(null)
+  useEffect(() => {
+    let ids = 0
+    const onToast = text => {
+      setMsg({ text, id: ++ids })
+    }
+    world.on('toast', onToast)
+    return () => world.off('toast', onToast)
+  }, [])
+  if (!msg) return null
+  return (
+    <div
+      className='toast'
+      css={css`
+        position: absolute;
+        top: calc(50% - 70px);
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        @keyframes toastIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .toast-msg {
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          background: rgba(22, 22, 28, 0.4);
+          backdrop-filter: blur(3px);
+          border-radius: 25px;
+          opacity: 0;
+          transform: translateY(10px) scale(0.9);
+          transition: all 0.1s ease-in-out;
+          &.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: toastIn 0.1s ease-in-out;
+          }
+        }
+      `}
+    >
+      {msg && <ToastMsg key={msg.id} text={msg.text} />}
+    </div>
+  )
+}
+
+function ToastMsg({ text }) {
+  const [visible, setVisible] = useState(true)
+  useEffect(() => {
+    setTimeout(() => setVisible(false), 1000)
+  }, [])
+  return <div className={cls('toast-msg', { visible })}>{text}</div>
 }

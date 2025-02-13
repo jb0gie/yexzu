@@ -579,7 +579,6 @@ export class PlayerLocal extends Entity {
     // double jump in build, mode toggle flying
     if (this.jumpPressed && this.world.builder.enabled) {
       if (this.world.time - this.lastJumpAt < 0.4) {
-        console.log('togleFlying')
         this.toggleFlying()
       }
       this.lastJumpAt = this.world.time
