@@ -5,25 +5,6 @@ app.configure([
 		kind: 'audio',
 		label: 'Audio'
 	},
-	// {
-	// 	key: 'volume',
-	// 	type: 'switch',
-	// 	label: 'Volume Level',
-	// 	options: [
-	// 		{ label: 'Low', value: 0.3 },
-	// 		{ label: 'Medium', value: 0.6 },
-	// 		{ label: 'High', value: 1.0 }
-	// 	]
-	// },
-	// {
-	// 	key: 'audioType',
-	// 	type: 'switch',
-	// 	label: 'Audio Type',
-	// 	options: [
-	// 		{ label: 'Music', value: 'music' },
-	// 		{ label: 'Sound Effect', value: 'sfx' }
-	// 	]
-	// }
 ])
 
 // console.log('Starting speaker setup...')
@@ -56,16 +37,16 @@ try {
 const body = app.get('Body')
 body.add(audio)
 
-// Create an action for the speaker
-const action = app.create('action', {
-	label: 'Show Controls',
-	distance: 3,
-	duration: 0.5,
-	onTrigger: () => {
-		ui.display = ui.display === 'none' ? 'flex' : 'none'
-	}
-})
-body.add(action)
+// Create an action for the speaker (not working yet)
+// const action = app.create('action', {
+// 	label: 'Show Controls',
+// 	distance: 3,
+// 	duration: 0.5,
+// 	onTrigger: () => {
+// 		ui.display = ui.display === 'none' ? 'flex' : 'none'
+// 	}
+// })
+// body.add(action)
 
 // Create UI with initial visibility
 const ui = app.create('ui', {
@@ -73,12 +54,13 @@ const ui = app.create('ui', {
 	doubleside: false,
 	width: 170,
 	height: 200,
+	billboard: 'y',
 	backgroundColor: 'rgba(0, 0, 0, 0.95)',
 	borderRadius: 10,
 	padding: 10,
 	display: 'none'  // Start hidden until user interacts
 })
-ui.position.set(2, 0.1, 1.5)
+ui.position.set(2, .2, 0)
 body.add(ui)
 
 // #region Playback controls view
@@ -124,6 +106,31 @@ playView.add(pauseBtn)
 playView.add(stopBtn)
 // #endregion
 
+// #region Timecode
+const timeView = app.create('uiview', {
+	display: 'flex',
+	padding: 20,
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	alignContent: 'stretch',
+	width: 150,
+	height: 100,
+	padding: 4
+})
+const time = app.create('uitext', {
+	padding: 5,
+	textAlign: 'center',
+	value: '',
+	color: 'white',
+	onPointerDown: () => audio.stop(),
+	fontSize: 32,
+})
+
+ui.add(timeView)
+timeView.add(time)
+// #endregion
+
 // #region Status section
 const statusView = app.create('uiview', {
 	display: 'flex',
@@ -132,10 +139,7 @@ const statusView = app.create('uiview', {
 	alignItems: 'center',
 	width: 150,
 	height: 30,
-	backgroundColor: 'rgba(20, 20, 20, 0.5)',
 	borderRadius: 5,
-	marginTop: 4,
-	marginBottom: 4
 })
 
 const statusText = app.create('uitext', {
@@ -150,7 +154,7 @@ ui.add(statusView)
 statusView.add(statusText)
 // #endregion
 
-// #region Volume controls view 
+// #region Volume display 
 const volView = app.create('uiview', {
 	display: 'flex',
 	flexDirection: 'column',
@@ -162,7 +166,6 @@ const volView = app.create('uiview', {
 	height: 70,
 })
 
-// #region Volume label
 const volLabelView = app.create('uiview', {
 	display: 'flex',
 	flexDirection: 'row',
@@ -192,41 +195,8 @@ volView.add(volLabelView)
 volLabelView.add(volumeLabel)
 volLabelView.add(volumeText)
 // #endregion
-// #region Timecode view
-const timeView = app.create('uiview', {
-	display: 'flex',
-	padding: 20,
-	flexDirection: 'row',
-	justifyContent: 'center',
-	alignItems: 'center',
-	alignContent: 'stretch',
-	width: 150,
-	height: 100,
-	padding: 4
-})
-const time = app.create('uitext', {
-	padding: 5,
-	textAlign: 'center',
-	value: '',
-	color: 'white',
-	onPointerDown: () => audio.stop(),
-	fontSize: 32,
-})
 
-ui.add(timeView)
-timeView.add(time)
-// #endregion
-// Volume buttons in one row
-const volButtonsView = app.create('uiview', {
-	display: 'flex',
-	flexDirection: 'row',
-	justifyContent: 'center',
-	alignItems: 'center',
-	width: 150,
-	height: 40,
-	marginTop: 4
-})
-
+// #region Volume buttons
 const volumeDown = app.create('uitext', {
 	padding: 10,
 	textAlign: 'center',
@@ -248,6 +218,16 @@ const volumeDown = app.create('uitext', {
 		volumeDown.backgroundColor = 'rgba(40, 40, 40, 0.6)'
 	},
 	cursor: 'pointer'
+})
+
+const volButtonsView = app.create('uiview', {
+	display: 'flex',
+	flexDirection: 'row',
+	justifyContent: 'center',
+	alignItems: 'center',
+	width: 150,
+	height: 40,
+	marginTop: 4
 })
 
 const volumeUp = app.create('uitext', {

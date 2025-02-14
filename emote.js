@@ -14,7 +14,6 @@ app.configure(() => {
 	]
 })
 
-const config = app.config
 const vrm = app.get('avatar')
 console.log('vrm', vrm)
 
