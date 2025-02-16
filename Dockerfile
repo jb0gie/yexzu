@@ -1,5 +1,4 @@
-FROM node:22-alpine
-RUN apk add --no-cache curl
+FROM node:22 AS build
 
 # Set the working directory
 WORKDIR /app
@@ -7,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --force
 
 # Copy the rest of the application code
 COPY . .
