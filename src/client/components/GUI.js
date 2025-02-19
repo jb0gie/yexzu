@@ -12,6 +12,7 @@ import {
   UnplugIcon,
   WifiOffIcon,
   ZapIcon,
+  Phone,
 } from 'lucide-react'
 import moment from 'moment'
 
@@ -28,6 +29,7 @@ import { hasRole, uuid } from '../../core/utils'
 import { ControlPriorities } from '../../core/extras/ControlPriorities'
 import { AppsPane } from './AppsPane'
 import { SettingsPane } from './SettingsPane'
+import { HyperFone } from '../happle-core/HyperFone.jsx'
 
 export function GUI({ world }) {
   const [ref, width, height] = useElemSize()
@@ -46,10 +48,13 @@ export function GUI({ world }) {
 
 function Content({ world, width, height }) {
   const small = width < 600
+  const touch = useMemo(() => navigator.userAgent.match(/OculusBrowser|iPhone|iPad|iPod|Android/i), [])
   const [ready, setReady] = useState(false)
   const [player, setPlayer] = useState(() => world.entities.player)
+  const [context, setContext] = useState(null)
   const [inspect, setInspect] = useState(null)
   const [code, setCode] = useState(false)
+  const [chat, setChat] = useState(() => !touch)
   const [avatar, setAvatar] = useState(null)
   const [disconnected, setDisconnected] = useState(false)
   const [settings, setSettings] = useState(false)
@@ -95,6 +100,17 @@ function Content({ world, width, height }) {
       {settings && <SettingsPane world={world} player={player} close={() => setSettings(false)} />}
       {apps && <AppsPane world={world} close={() => setApps(false)} />}
       {!ready && <LoadingOverlay />}
+      <div css={css`
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        display: flex;
+        gap: 8px;
+        z-index: 100;
+        pointer-events: none;
+      `}>
+        <HyperFone world={world} />
+      </div>
     </div>
   )
 }
@@ -104,6 +120,7 @@ function Side({ world, player, toggleSettings, toggleApps }) {
   const inputRef = useRef()
   const [msg, setMsg] = useState('')
   const [chat, setChat] = useState(false)
+  const [isPhoneOpen, setIsPhoneOpen] = useState(false)
   const canBuild = useMemo(() => {
     return player && hasRole(player.data.user.roles, 'admin', 'builder')
   }, [player])
@@ -259,12 +276,9 @@ function Side({ world, player, toggleSettings, toggleApps }) {
               <div className='bar-btn-vr'>VR</div>
             </div>
           )}
-          {/* <div className='bar-btn' onClick={null}>
-            <MicIcon size={20} />
-          </div> */}
-          {/* <div className='bar-btn' onClick={null}>
-            <StoreIcon size={20} />
-          </div> */}
+          <div className='bar-btn' onClick={() => setIsPhoneOpen(!isPhoneOpen)}>
+            <Phone size={20} />
+          </div>
           <div className='bar-btn' onClick={toggleSettings}>
             <SettingsIcon size={20} />
           </div>
@@ -297,6 +311,7 @@ function Side({ world, player, toggleSettings, toggleApps }) {
           </div>
         </label>
       </div>
+      <HyperFone world={world} isOpen={isPhoneOpen} onClose={() => setIsPhoneOpen(false)} />
     </div>
   )
 }
