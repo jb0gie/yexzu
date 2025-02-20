@@ -22,6 +22,64 @@ const v1 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
 const e1 = new THREE.Euler()
 
+let gizmo;
+
+class Gizmo {
+  constructor(world) {
+    this.world = world;
+
+    // Create a group to hold all parts of the gizmo
+    this.gizmoGroup = new THREE.Group();
+
+    // X-axis arrow (red)
+    const xArrow = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 1),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    xArrow.rotation.z = -Math.PI / 2; // Rotate to align with X-axis
+    xArrow.position.x = 0.5; // Position along X-axis
+    this.gizmoGroup.add(xArrow);
+
+    // Y-axis arrow (green)
+    const yArrow = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 1),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+    );
+    yArrow.position.y = 0.5; // Position along Y-axis
+    this.gizmoGroup.add(yArrow);
+
+    // Z-axis arrow (blue)
+    const zArrow = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 1),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff })
+    );
+    zArrow.rotation.x = Math.PI / 2; // Rotate to align with Z-axis
+    zArrow.position.z = 0.5; // Position along Z-axis
+    this.gizmoGroup.add(zArrow);
+
+    // Add the gizmo group to the scene
+    this.world.stage.scene.add(this.gizmoGroup);
+    this.gizmoGroup.visible = false;
+  }
+
+  update(position) {
+    this.gizmoGroup.position.copy(position);
+    this.gizmoGroup.visible = true;
+  }
+
+  hide() {
+    this.gizmoGroup.visible = false;
+  }
+
+  dispose() {
+    this.world.stage.scene.remove(this.gizmoGroup);
+    this.gizmoGroup.children.forEach(child => {
+      child.geometry.dispose();
+      child.material.dispose();
+    });
+  }
+}
+
 /**
  * Builder System
  *
@@ -34,6 +92,8 @@ export class ClientBuilder extends System {
   constructor(world) {
     super(world)
     this.enabled = false
+    this.gizmoMode = false; // Track whether we're in gizmo mode
+    this.selectedAxis = null; // Track the selected axis
 
     this.selected = null
     this.target = new THREE.Object3D()
@@ -42,6 +102,10 @@ export class ClientBuilder extends System {
 
     this.dropTarget = null
     this.file = null
+
+    if (!gizmo) {
+      gizmo = new Gizmo(this.world);
+    }
   }
 
   async init({ viewport }) {
@@ -101,10 +165,70 @@ export class ClientBuilder extends System {
   }
 
   update(delta) {
-    // toggle build
     if (this.control.tab.pressed) {
       this.toggle()
     }
+
+    if (!this.enabled) return
+
+    // Toggle gizmo mode with G key
+    if (this.control.keyG.pressed) {
+      this.gizmoMode = !this.gizmoMode;
+      this.world.emit('gizmo-mode', this.gizmoMode);
+      console.log(`Gizmo mode: ${this.gizmoMode}`);
+    }
+
+    if (!gizmo) {
+      gizmo = new Gizmo(this.world);
+    }
+
+    const mouse = new THREE.Vector2()
+    mouse.x = (this.control.mouseX / window.innerWidth) * 2 - 1
+    mouse.y = -(this.control.mouseY / window.innerHeight) * 2 + 1
+
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(mouse, this.world.camera)
+
+    const intersects = raycaster.intersectObjects(this.world.stage.scene.children, true)
+
+    if (intersects.length > 0) {
+      const entityAtReticle = intersects[0].object
+      console.log("Entity detected:", entityAtReticle)
+    }
+
+    if (this.control.mouseLeft.pressed) {
+      if (intersects.length > 0) {
+        this.select(intersects[0].object)
+        console.log("Picked up entity:", intersects[0].object)
+      }
+    }
+
+    // Gizmo management
+    if (this.gizmoMode && this.selected) {
+      if (this.selected.root) {
+        gizmo.update(this.selected.root.position)
+        gizmo.gizmoGroup.visible = true;
+
+        // Detect axis selection
+        if (this.control.mouseLeft.pressed) {
+          const gizmoIntersects = raycaster.intersectObjects(gizmo.gizmoGroup.children, true);
+          if (gizmoIntersects.length > 0) {
+            this.selectedAxis = gizmoIntersects[0].object;
+            console.log("Selected axis:", this.selectedAxis);
+          }
+        }
+
+        // Move along the selected axis
+        if (this.selectedAxis) {
+          const movement = this.calculateMovementAlongAxis(this.selectedAxis);
+          this.selected.root.position.add(movement);
+        }
+      }
+    } else {
+      gizmo.hide()
+      this.selectedAxis = null; // Reset selected axis when not in gizmo mode
+    }
+
     // deselect if dead
     if (this.selected?.dead) {
       this.select(null)
@@ -112,10 +236,6 @@ export class ClientBuilder extends System {
     // deselect if stolen
     if (this.selected?.data.mover !== this.world.network.id) {
       this.select(null)
-    }
-    // stop here if build mode not enabled
-    if (!this.enabled) {
-      return
     }
     // inspect
     if (this.control.keyR.pressed) {
@@ -293,13 +413,35 @@ export class ClientBuilder extends System {
     }
   }
 
+  calculateMovementAlongAxis(axis) {
+    const movementVector = new THREE.Vector3();
+    const movementAmount = this.control.mouseDelta.x * 0.01; // Example movement amount
+
+    if (axis === gizmo.gizmoGroup.children[0]) { // X-axis
+      movementVector.set(movementAmount, 0, 0);
+    } else if (axis === gizmo.gizmoGroup.children[1]) { // Y-axis
+      movementVector.set(0, movementAmount, 0);
+    } else if (axis === gizmo.gizmoGroup.children[2]) { // Z-axis
+      movementVector.set(0, 0, movementAmount);
+    }
+
+    return movementVector;
+  }
+
   toggle(enabled) {
-    if (!this.canBuild()) return
-    enabled = isBoolean(enabled) ? enabled : !this.enabled
-    if (this.enabled === enabled) return
-    this.enabled = enabled
-    if (!this.enabled) this.select(null)
-    this.updateActions()
+    if (!this.canBuild()) return;
+    enabled = typeof enabled === 'boolean' ? enabled : !this.enabled;
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+
+    if (!this.enabled) {
+      this.select(null); // Deselect any selected entity
+      if (gizmo) {
+        gizmo.hide(); // Hide the gizmo when exiting build mode
+      }
+    }
+
+    this.updateActions();
   }
 
   select(app) {

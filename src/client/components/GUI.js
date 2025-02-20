@@ -576,11 +576,24 @@ function ActionIcon({ icon: Icon }) {
 
 function Reticle({ world }) {
   const [visible, setVisible] = useState(world.controls.pointer.locked)
+
   useEffect(() => {
     world.on('pointer-lock', setVisible)
     return () => world.off('pointer-lock', setVisible)
   }, [])
+
+  // Listen for gizmo mode changes
+  useEffect(() => {
+    const handleGizmoModeChange = (gizmoMode) => {
+      setVisible(!gizmoMode) // Hide crosshair in gizmo mode
+    }
+
+    world.on('gizmo-mode', handleGizmoModeChange)
+    return () => world.off('gizmo-mode', handleGizmoModeChange)
+  }, [])
+
   if (!visible) return null
+
   return (
     <div
       className='reticle'
