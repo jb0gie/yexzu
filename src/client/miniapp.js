@@ -15,81 +15,115 @@ async function initMiniApp() {
 		const user = context.user
 		console.log('Farcaster user context:', user)
 
-		// Try the full miniapp client first
-		try {
-			const { MiniAppClient } = await import('./miniapp-client')
-
-			// Simple WebSocket URL for Mini App
-			const wsUrl = (() => {
-				const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-				const host = window.location.host
-				return `${protocol}//${host}/ws`
-			})()
-
-			function App() {
-				return <MiniAppClient wsUrl={wsUrl} />
-			}
-
-			const root = createRoot(document.getElementById('root'))
-			root.render(<App />)
-
-		} catch (clientError) {
-			console.error('MiniAppClient failed, using simple fallback:', clientError)
-
-			// Ultra-simple fallback for Farcaster context
-			function SimpleFallback() {
-				return (
+		// For now, always show the simple interface that works on mobile
+		// TODO: Re-enable 3D world when mobile webview issues are resolved
+		function YexzuMiniApp() {
+			return (
+				<div style={{
+					position: 'absolute',
+					top: 0,
+					left: 0,
+					right: 0,
+					bottom: 0,
+					background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+					display: 'flex',
+					flexDirection: 'column',
+					alignItems: 'center',
+					justifyContent: 'center',
+					color: 'white',
+					fontFamily: 'system-ui, -apple-system, sans-serif',
+					textAlign: 'center',
+					padding: '20px',
+					minHeight: '100vh'
+				}}>
 					<div style={{
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-						display: 'flex',
-						flexDirection: 'column',
-						alignItems: 'center',
-						justifyContent: 'center',
-						color: 'white',
-						fontFamily: 'Arial, sans-serif',
-						textAlign: 'center',
-						padding: '20px'
+						background: 'rgba(255,255,255,0.1)',
+						borderRadius: '20px',
+						padding: '40px',
+						maxWidth: '400px',
+						width: '100%',
+						backdropFilter: 'blur(10px)',
+						border: '1px solid rgba(255,255,255,0.2)'
 					}}>
-						<h1 style={{ fontSize: '24px', marginBottom: '16px' }}>🎮 farcasterfy</h1>
-						<p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.8 }}>
-							Welcome to the 3D social metaverse!
+						<div style={{ fontSize: '48px', marginBottom: '20px' }}>🌍</div>
+						<h1 style={{
+							fontSize: '28px',
+							marginBottom: '16px',
+							fontWeight: 'bold',
+							margin: '0 0 16px 0'
+						}}>
+							Yexzu World
+						</h1>
+						<p style={{
+							fontSize: '16px',
+							marginBottom: '20px',
+							opacity: 0.9,
+							lineHeight: '1.5',
+							margin: '0 0 20px 0'
+						}}>
+							Welcome to the 3D social metaverse! Explore, build, and connect with others.
 						</p>
-						<p style={{ fontSize: '14px', marginBottom: '20px', opacity: 0.6 }}>
-							Connected as: {user?.displayName || user?.username || 'Farcaster User'}
-						</p>
+
+						{user && (
+							<p style={{
+								fontSize: '14px',
+								marginBottom: '24px',
+								opacity: 0.7,
+								background: 'rgba(255,255,255,0.1)',
+								padding: '8px 16px',
+								borderRadius: '12px',
+								margin: '0 0 24px 0'
+							}}>
+								Welcome, {user.displayName || user.username || 'Farcaster User'}! 👋
+							</p>
+						)}
+
 						<a
 							href="https://miniappworld.255242621.xyz"
 							target="_blank"
 							rel="noopener noreferrer"
 							style={{
-								background: 'rgba(255,255,255,0.2)',
-								border: '2px solid rgba(255,255,255,0.3)',
-								borderRadius: '8px',
-								padding: '12px 24px',
-								color: 'white',
+								display: 'inline-block',
+								background: 'rgba(255,255,255,0.9)',
+								color: '#4c1d95',
+								border: 'none',
+								borderRadius: '12px',
+								padding: '16px 32px',
 								textDecoration: 'none',
 								fontSize: '16px',
 								fontWeight: 'bold',
-								transition: 'all 0.3s ease'
+								cursor: 'pointer',
+								transition: 'all 0.3s ease',
+								boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+							}}
+							onMouseOver={(e) => {
+								e.target.style.background = 'white'
+								e.target.style.transform = 'translateY(-2px)'
+							}}
+							onMouseOut={(e) => {
+								e.target.style.background = 'rgba(255,255,255,0.9)'
+								e.target.style.transform = 'translateY(0)'
 							}}
 						>
-							🚀 Open Full World
+							🚀 Enter Full World
 						</a>
-						<p style={{ fontSize: '12px', marginTop: '20px', opacity: 0.5 }}>
-							For the full 3D experience, open in your browser
+
+						<p style={{
+							fontSize: '12px',
+							marginTop: '20px',
+							opacity: 0.6,
+							lineHeight: '1.4',
+							margin: '20px 0 0 0'
+						}}>
+							Full 3D experience available in your browser
 						</p>
 					</div>
-				)
-			}
-
-			const root = createRoot(document.getElementById('root'))
-			root.render(<SimpleFallback />)
+				</div>
+			)
 		}
+
+		const root = createRoot(document.getElementById('root'))
+		root.render(<YexzuMiniApp />)
 
 	} catch (error) {
 		console.error('Failed to initialize Farcaster Mini App:', error)
@@ -102,8 +136,8 @@ async function initMiniApp() {
 			console.error('Failed to call ready() in fallback:', readyError)
 		}
 
-		// Ultimate fallback - just a simple message
-		function UltimateFallback() {
+		// Ultimate fallback - super simple
+		function ErrorFallback() {
 			return (
 				<div style={{
 					position: 'absolute',
@@ -117,13 +151,16 @@ async function initMiniApp() {
 					alignItems: 'center',
 					justifyContent: 'center',
 					color: 'white',
-					fontFamily: 'Arial, sans-serif',
+					fontFamily: 'system-ui, sans-serif',
 					textAlign: 'center',
 					padding: '20px'
 				}}>
-					<h1 style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️ Loading Issue</h1>
-					<p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.8 }}>
-						The Mini App is having trouble loading in this context.
+					<div style={{ fontSize: '32px', marginBottom: '16px' }}>⚠️</div>
+					<h1 style={{ fontSize: '24px', marginBottom: '16px', margin: '0 0 16px 0' }}>
+						Loading Issue
+					</h1>
+					<p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.8, margin: '0 0 20px 0' }}>
+						Having trouble loading the app.
 					</p>
 					<a
 						href="https://miniappworld.255242621.xyz"
@@ -131,10 +168,10 @@ async function initMiniApp() {
 						rel="noopener noreferrer"
 						style={{
 							background: '#4f46e5',
+							color: 'white',
 							border: 'none',
 							borderRadius: '8px',
 							padding: '12px 24px',
-							color: 'white',
 							textDecoration: 'none',
 							fontSize: '16px',
 							fontWeight: 'bold'
@@ -147,7 +184,7 @@ async function initMiniApp() {
 		}
 
 		const root = createRoot(document.getElementById('root'))
-		root.render(<UltimateFallback />)
+		root.render(<ErrorFallback />)
 	}
 }
 
