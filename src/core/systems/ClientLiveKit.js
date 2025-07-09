@@ -3,7 +3,6 @@ import * as THREE from '../extras/three'
 
 import { System } from './System'
 import { isBoolean } from 'lodash-es'
-import { TrackSource } from 'livekit-server-sdk'
 
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
