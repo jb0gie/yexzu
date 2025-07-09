@@ -6,9 +6,14 @@ import { sdk } from '@farcaster/miniapp-sdk'
 
 async function initMiniApp() {
 	try {
+		// Call ready() immediately to hide splash screen
+		await sdk.actions.ready()
+		console.log('Farcaster Mini App ready() called')
+
 		// Get Farcaster context and user info
 		const context = await sdk.context
 		const user = context.user
+		console.log('Farcaster user context:', user)
 
 		// Use the simple world client instead of FarcasterClient
 		const { Client } = await import('./world-client')
@@ -27,16 +32,28 @@ async function initMiniApp() {
 		const root = createRoot(document.getElementById('root'))
 		root.render(<App />)
 
-		// Notify Farcaster that the Mini App is ready
-		await sdk.actions.ready()
-
 	} catch (error) {
 		console.error('Failed to initialize Farcaster Mini App:', error)
+
+		// Try to call ready() even if initialization failed
+		try {
+			await sdk.actions.ready()
+			console.log('Farcaster ready() called in fallback')
+		} catch (readyError) {
+			console.error('Failed to call ready() in fallback:', readyError)
+		}
+
 		// Fallback to regular client
 		const { Client } = await import('./world-client')
 
+		const wsUrl = (() => {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+			const host = window.location.host
+			return `${protocol}//${host}/ws`
+		})()
+
 		function FallbackApp() {
-			return <Client wsUrl={window.env?.PUBLIC_WS_URL || 'ws://localhost:3000/ws'} />
+			return <Client wsUrl={wsUrl} />
 		}
 
 		const root = createRoot(document.getElementById('root'))
