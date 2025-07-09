@@ -5,7 +5,7 @@
 		"signature": "MHhkNWMyZmYyMGIwYjQwODU5ODIwZTU0YjA1MzdlNGY0YzhlNTlkNzMxM2U4NzQwM2Q4NDUwOWQ2MzM0ZjAyZTZmMTA5OTk4ODljZWVhNGVjOWU5MmIxOGY4YWU5Mzg4YTY0YWRjZjQyNTZlZDliMWIzYmE3ZjBmMjQ1M2ZlMjM4NjFj"
 	},
 	"miniApp": {
-		"name": "Yexzu World",
+		"name": "farcasterfy",
 		"description": "Interactive 3D virtual world. Explore, build, and socialize in an immersive environment.",
 		"icon": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
@@ -16,7 +16,7 @@
 		"version": "1"
 	},
 	"frame": {
-		"name": "Yexzu World",
+		"name": "farcasterfy",
 		"version": "1",
 		"iconUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
@@ -39,7 +39,7 @@
 			"world"
 		],
 		"tagline": "Jump In, Play, Socialize",
-		"ogTitle": "Yexzu World - 3D Social Metaverse",
+		"ogTitle": "farcasterfy",
 		"ogImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"ogDescription": "Interactive 3D virtual world for exploration and socializing"
 	}
