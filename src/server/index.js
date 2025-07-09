@@ -58,15 +58,19 @@ fastify.get('/manifest.json', async (req, reply) => {
   const manifest = fs.readFileSync(filePath, 'utf-8')
   reply.type('application/json').send(manifest)
 })
-// Serve PhysX files from build root
-fastify.register(statics, {
-  root: path.join(__dirname, '../'),
-  prefix: '/',
-  decorateReply: false,
-  include: ['physx-js-webidl.js', 'physx-js-webidl.wasm'],
-  setHeaders: res => {
-    res.setHeader('Cache-Control', 'public, max-age=3600') // Cache PhysX files for 1 hour
-  },
+// Serve PhysX files directly
+fastify.get('/physx-js-webidl.js', async (req, reply) => {
+  const filePath = path.join(__dirname, '../physx-js-webidl.js')
+  reply.type('application/javascript')
+  reply.header('Cache-Control', 'public, max-age=3600')
+  return reply.sendFile('physx-js-webidl.js', path.join(__dirname, '../'))
+})
+
+fastify.get('/physx-js-webidl.wasm', async (req, reply) => {
+  const filePath = path.join(__dirname, '../physx-js-webidl.wasm')
+  reply.type('application/wasm')
+  reply.header('Cache-Control', 'public, max-age=3600')
+  return reply.sendFile('physx-js-webidl.wasm', path.join(__dirname, '../'))
 })
 
 // Serve Mini App files from client build directory
