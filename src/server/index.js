@@ -108,9 +108,9 @@ fastify.get('/physx-js-webidl.wasm', async (req, reply) => {
   }
 })
 
-// Serve Mini App files from client build directory
+// Serve static files from public directory (unified for both regular and miniapp modes)
 fastify.register(statics, {
-  root: path.join(__dirname, 'client'),
+  root: path.join(__dirname, 'public'),
   prefix: '/',
   decorateReply: false,
   setHeaders: res => {
