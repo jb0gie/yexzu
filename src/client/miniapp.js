@@ -15,8 +15,8 @@ async function initMiniApp() {
 		const user = context.user
 		console.log('Farcaster user context:', user)
 
-		// Use the simple world client instead of FarcasterClient
-		const { Client } = await import('./world-client')
+		// Use the miniapp-specific client
+		const { MiniAppClient } = await import('./miniapp-client')
 
 		// Simple WebSocket URL for Mini App
 		const wsUrl = (() => {
@@ -26,7 +26,7 @@ async function initMiniApp() {
 		})()
 
 		function App() {
-			return <Client wsUrl={wsUrl} />
+			return <MiniAppClient wsUrl={wsUrl} />
 		}
 
 		const root = createRoot(document.getElementById('root'))
@@ -43,8 +43,8 @@ async function initMiniApp() {
 			console.error('Failed to call ready() in fallback:', readyError)
 		}
 
-		// Fallback to regular client
-		const { Client } = await import('./world-client')
+		// Fallback to miniapp client
+		const { MiniAppClient } = await import('./miniapp-client')
 
 		const wsUrl = (() => {
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -53,7 +53,7 @@ async function initMiniApp() {
 		})()
 
 		function FallbackApp() {
-			return <Client wsUrl={wsUrl} />
+			return <MiniAppClient wsUrl={wsUrl} />
 		}
 
 		const root = createRoot(document.getElementById('root'))

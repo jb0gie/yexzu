@@ -1,3 +1,5 @@
+// import 'ses'
+// import '../core/lockdown'
 import * as THREE from 'three'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { css } from '@firebolt-dev/css'
@@ -5,61 +7,47 @@ import { css } from '@firebolt-dev/css'
 import { createMiniAppWorld } from '../core/createMiniAppWorld'
 import { CoreUI } from './components/CoreUI'
 
-export function MiniAppClient({ wsUrl, farcasterUser, miniAppMode }) {
+export { System } from '../core/systems/System'
+
+export function MiniAppClient({ wsUrl, onSetup }) {
 	const viewportRef = useRef()
 	const uiRef = useRef()
 	const world = useMemo(() => createMiniAppWorld(), [])
 	const [ui, setUI] = useState(world.ui.state)
-
 	useEffect(() => {
 		world.on('ui', setUI)
 		return () => {
 			world.off('ui', setUI)
 		}
 	}, [])
-
 	useEffect(() => {
 		const init = async () => {
 			const viewport = viewportRef.current
 			const ui = uiRef.current
-
-			// Optimized environment for Mini App
 			const baseEnvironment = {
 				model: '/base-environment.glb',
 				bg: '/day2-2k.jpg',
 				hdr: '/day2.hdr',
 				sunDirection: new THREE.Vector3(-1, -2, -2).normalize(),
-				sunIntensity: 0.8, // Reduced for embedded mode
+				sunIntensity: 1,
 				sunColor: 0xffffff,
 				fogNear: null,
 				fogFar: null,
 				fogColor: null,
 			}
-
 			if (typeof wsUrl === 'function') {
 				wsUrl = wsUrl()
 				if (wsUrl instanceof Promise) wsUrl = await wsUrl
 			}
-
-			const config = {
-				viewport,
-				ui,
-				wsUrl,
-				baseEnvironment,
-				// Mini App specific config
-				farcasterUser,
-				miniAppMode: true,
-				performanceProfile: 'balanced'
-			}
-
+			const config = { viewport, ui, wsUrl, baseEnvironment }
+			onSetup?.(world, config)
 			world.init(config)
 		}
 		init()
-	}, [wsUrl, farcasterUser, miniAppMode])
-
+	}, [])
 	return (
 		<div
-			className='MiniApp'
+			className='App'
 			css={css`
         position: absolute;
         top: 0;
@@ -67,11 +55,11 @@ export function MiniAppClient({ wsUrl, farcasterUser, miniAppMode }) {
         right: 0;
         height: 100vh;
         height: 100dvh;
-        .MiniApp__viewport {
+        .App__viewport {
           position: absolute;
           inset: 0;
         }
-        .MiniApp__ui {
+        .App__ui {
           position: absolute;
           inset: 0;
           pointer-events: none;
@@ -80,8 +68,8 @@ export function MiniAppClient({ wsUrl, farcasterUser, miniAppMode }) {
         }
       `}
 		>
-			<div className='MiniApp__viewport' ref={viewportRef}>
-				<div className='MiniApp__ui' ref={uiRef}>
+			<div className='App__viewport' ref={viewportRef}>
+				<div className='App__ui' ref={uiRef}>
 					<CoreUI world={world} />
 				</div>
 			</div>
