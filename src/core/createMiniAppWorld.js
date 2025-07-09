@@ -19,6 +19,8 @@ import { Nametags } from './systems/Nametags'
 import { Particles } from './systems/Particles'
 import { Snaps } from './systems/Snaps'
 import { Wind } from './systems/Wind'
+import { FarcasterAuth } from './systems/FarcasterAuth'
+import { FarcasterSocial } from './systems/FarcasterSocial'
 
 // Minimal LiveKit stub for Mini Apps
 class MiniAppLiveKit {
@@ -70,6 +72,8 @@ export function createMiniAppWorld() {
 	world.register('particles', Particles)
 	world.register('snaps', Snaps)
 	world.register('wind', Wind)
+	world.register('farcasterAuth', FarcasterAuth)
+	world.register('farcasterSocial', FarcasterSocial)
 	// Note: Excluding XR for Mini Apps to avoid complexity
 	return world
 } 

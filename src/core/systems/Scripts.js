@@ -82,6 +82,34 @@ function wrapRawCode(code) {
     const shared = {}
     return (world, app, fetch, props, setTimeout) => {
       const config = props // deprecated
+      
+      // Farcaster API helpers
+      const farcaster = {
+        // Authentication
+        getUser: () => world.getSystem('farcasterAuth')?.getUser(),
+        isAuthenticated: () => world.getSystem('farcasterAuth')?.isAuth(),
+        
+        // Sharing
+        shareScreenshot: (message, includeLocation = true) => 
+          world.getSystem('farcasterSocial')?.shareScreenshot(message, includeLocation),
+        shareToFarcaster: (message, imageUrl) => 
+          world.getSystem('farcasterAuth')?.shareToFarcaster(message, imageUrl),
+        shareAchievement: (achievement) => 
+          world.getSystem('farcasterSocial')?.shareAchievement(achievement),
+        shareToChannel: (channelId, message, imageUrl) => 
+          world.getSystem('farcasterSocial')?.shareToChannel(channelId, message, imageUrl),
+        
+        // Group Sessions
+        createGroupSession: (options) => 
+          world.getSystem('farcasterSocial')?.createGroupSession(options),
+        joinGroupSession: (sessionId) => 
+          world.getSystem('farcasterSocial')?.joinGroupSession(sessionId),
+        
+        // Social Stats
+        getSocialStats: () => 
+          world.getSystem('farcasterSocial')?.getSocialStats(),
+      }
+      
       ${code}
     }
   })()
