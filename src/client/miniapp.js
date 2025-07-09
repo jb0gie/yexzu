@@ -17,15 +17,8 @@ async function initMiniApp() {
 		// Load the full Hyperfy client
 		const { Client } = await import('./world-client')
 
-		// Simple WebSocket URL for Mini App
-		const wsUrl = (() => {
-			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-			const host = window.location.host
-			return `${protocol}//${host}/ws`
-		})()
-
 		function HyperfyMiniApp() {
-			return <Client wsUrl={wsUrl} />
+			return <Client wsUrl={env.PUBLIC_WS_URL} />
 		}
 
 		const root = createRoot(document.getElementById('root'))
