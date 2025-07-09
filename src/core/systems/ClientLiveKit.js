@@ -21,10 +21,19 @@ export class ClientLiveKit extends System {
     this.voices = new Map() // playerId -> PlayerVoice
     this.screens = []
     this.screenNodes = new Set() // Video
+    this.miniAppMode = false
   }
 
   async deserialize(opts) {
     if (!opts) return
+
+    // Check if we're in Mini App mode - if so, disable LiveKit
+    if (typeof window !== 'undefined' && window.env?.MINIAPP_MODE) {
+      console.log('[ClientLiveKit] Mini App mode detected - disabling LiveKit')
+      this.miniAppMode = true
+      return
+    }
+
     this.status.available = true
     // console.log(opts)
     this.room = new Room({
@@ -53,12 +62,14 @@ export class ClientLiveKit extends System {
   }
 
   lateUpdate(delta) {
+    if (this.miniAppMode) return
     this.voices.forEach(voice => {
       voice.lateUpdate(delta)
     })
   }
 
   setMicrophoneEnabled(value) {
+    if (this.miniAppMode) return
     if (!this.room) return console.error('[livekit] setMicrophoneEnabled failed (not connected)')
     value = isBoolean(value) ? value : !this.room.localParticipant.isMicrophoneEnabled
     if (this.status.mic === value) return
@@ -66,6 +77,7 @@ export class ClientLiveKit extends System {
   }
 
   setScreenShareTarget(targetId = null) {
+    if (this.miniAppMode) return
     if (!this.room) return console.error('[livekit] setScreenShareTarget failed (not connected)')
     if (this.status.screenshare === targetId) return
     const metadata = JSON.stringify({
@@ -79,6 +91,7 @@ export class ClientLiveKit extends System {
   }
 
   onTrackMuted = track => {
+    if (!track) return
     // console.log('onTrackMuted', track)
     if (track.isLocal && track.source === 'microphone') {
       this.status.mic = false
@@ -87,6 +100,7 @@ export class ClientLiveKit extends System {
   }
 
   onTrackUnmuted = track => {
+    if (!track) return
     // console.log('onTrackUnmuted', track)
     if (track.isLocal && track.source === 'microphone') {
       this.status.mic = true
@@ -95,6 +109,7 @@ export class ClientLiveKit extends System {
   }
 
   onLocalTrackPublished = publication => {
+    if (!publication) return
     const world = this.world
     const track = publication.track
     const playerId = this.world.network.id
@@ -114,6 +129,7 @@ export class ClientLiveKit extends System {
   }
 
   onLocalTrackUnpublished = publication => {
+    if (!publication) return
     const playerId = this.world.network.id
     // console.log('onLocalTrackUnpublished', pub)
     if (publication.source === 'microphone') {
@@ -129,6 +145,7 @@ export class ClientLiveKit extends System {
   }
 
   onTrackSubscribed = (track, publication, participant) => {
+    if (!track || !publication || !participant) return
     // console.log('onTrackSubscribed', track, publication, participant)
     const playerId = participant.identity
     const player = this.world.entities.getPlayer(playerId)
@@ -147,6 +164,7 @@ export class ClientLiveKit extends System {
   }
 
   onTrackUnsubscribed = (track, publication, participant) => {
+    if (!track || !publication || !participant) return
     // console.log('onTrackUnsubscribed todo')
     const playerId = participant.identity
     if (track.source === 'microphone') {
