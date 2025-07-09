@@ -4,32 +4,24 @@
 import { createRoot } from 'react-dom/client'
 import { sdk } from '@farcaster/miniapp-sdk'
 
-import { FarcasterClient } from './farcaster-client'
-
 async function initMiniApp() {
 	try {
 		// Get Farcaster context and user info
 		const context = await sdk.context
 		const user = context.user
 
-		// Configure the Mini App for embedded mode
-		const config = {
-			// Use relative WebSocket URL since Mini Apps run in embedded context
-			wsUrl: () => {
-				const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-				const host = window.location.host
-				return `${protocol}//${host}/ws`
-			},
-			// Pass Farcaster user context
-			farcasterUser: user,
-			// Enable Mini App optimizations
-			miniAppMode: true,
-			// Reduced quality for embedded context
-			performanceProfile: 'balanced'
-		}
+		// Use the simple world client instead of FarcasterClient
+		const { Client } = await import('./world-client')
+
+		// Simple WebSocket URL for Mini App
+		const wsUrl = (() => {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+			const host = window.location.host
+			return `${protocol}//${host}/ws`
+		})()
 
 		function App() {
-			return <FarcasterClient config={config} />
+			return <Client wsUrl={wsUrl} />
 		}
 
 		const root = createRoot(document.getElementById('root'))
@@ -40,11 +32,11 @@ async function initMiniApp() {
 
 	} catch (error) {
 		console.error('Failed to initialize Farcaster Mini App:', error)
-		// Fallback to regular client if Farcaster context unavailable
+		// Fallback to regular client
 		const { Client } = await import('./world-client')
 
 		function FallbackApp() {
-			return <Client wsUrl={env.PUBLIC_WS_URL} />
+			return <Client wsUrl={window.env?.PUBLIC_WS_URL || 'ws://localhost:3000/ws'} />
 		}
 
 		const root = createRoot(document.getElementById('root'))

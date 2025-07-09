@@ -52,12 +52,6 @@ const fastify = Fastify({ logger: { level: 'error' } })
 
 fastify.register(cors)
 fastify.register(compress)
-fastify.get('/', async (req, reply) => {
-  // Serve Mini App as the main entry point
-  const filePath = path.join(__dirname, 'client', 'miniapp.html')
-  const html = fs.readFileSync(filePath, 'utf-8')
-  reply.type('text/html').send(html)
-})
 fastify.get('/manifest.json', async (req, reply) => {
   // Serve Farcaster Mini App manifest
   const filePath = path.join(__dirname, 'manifest.json')

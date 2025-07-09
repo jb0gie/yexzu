@@ -12,8 +12,13 @@ await fs.remove('build/client')
 await fs.ensureDir('build')
 await fs.ensureDir('build/client')
 
-// Copy the Mini App HTML file
-await fs.copy('src/client/public/miniapp.html', 'build/client/miniapp.html')
+// Copy the unified HTML file (handles both regular and Mini App)
+await fs.copy('build/public/index.html', 'build/client/index.html')
+
+// Copy the main app JavaScript and CSS files
+await fs.copy('build/public/index-P5CTV26W.js', 'build/client/index-P5CTV26W.js')
+await fs.copy('build/public/particles-QM3BZSIW.js', 'build/client/particles-QM3BZSIW.js')
+await fs.copy('build/public/index.css', 'build/client/index.css')
 
 // Copy essential assets
 await fs.copy('src/client/public/rubik.woff2', 'build/client/rubik.woff2')
@@ -47,7 +52,7 @@ const buildConfig = {
     '.ts': 'tsx',
     '.tsx': 'tsx',
     '.png': 'dataurl',
-    '.jpg': 'dataurl', 
+    '.jpg': 'dataurl',
     '.jpeg': 'dataurl',
     '.svg': 'dataurl',
     '.woff': 'dataurl',
@@ -94,24 +99,24 @@ const buildConfig = {
 }
 
 try {
-	if (isWatch) {
-		const ctx = await esbuild.context(buildConfig)
-		await ctx.watch()
-		console.log('👀 Watching for changes...')
-	} else {
-		const result = await esbuild.build(buildConfig)
+  if (isWatch) {
+    const ctx = await esbuild.context(buildConfig)
+    await ctx.watch()
+    console.log('👀 Watching for changes...')
+  } else {
+    const result = await esbuild.build(buildConfig)
 
-		// Log bundle size
-		const stats = await fs.stat('build/client/miniapp.js')
-		const sizeKB = Math.round(stats.size / 1024)
-		console.log(`✅ Mini App built successfully! Bundle size: ${sizeKB}KB`)
+    // Log bundle size
+    const stats = await fs.stat('build/client/miniapp.js')
+    const sizeKB = Math.round(stats.size / 1024)
+    console.log(`✅ Mini App built successfully! Bundle size: ${sizeKB}KB`)
 
-		if (result.warnings.length > 0) {
-			console.warn('⚠️  Build warnings:')
-			result.warnings.forEach(warning => console.warn(warning))
-		}
-	}
+    if (result.warnings.length > 0) {
+      console.warn('⚠️  Build warnings:')
+      result.warnings.forEach(warning => console.warn(warning))
+    }
+  }
 } catch (error) {
-	console.error('❌ Build failed:', error)
-	process.exit(1)
+  console.error('❌ Build failed:', error)
+  process.exit(1)
 } 
