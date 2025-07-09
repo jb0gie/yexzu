@@ -53,17 +53,16 @@ const fastify = Fastify({ logger: { level: 'error' } })
 fastify.register(cors)
 fastify.register(compress)
 fastify.get('/', async (req, reply) => {
-  const title = world.settings.title || 'World'
-  const desc = world.settings.desc || ''
-  const image = world.resolveURL(world.settings.image?.url) || ''
-  const url = process.env.PUBLIC_ASSETS_URL
-  const filePath = path.join(__dirname, 'public', 'index.html')
-  let html = fs.readFileSync(filePath, 'utf-8')
-  html = html.replaceAll('{url}', url)
-  html = html.replaceAll('{title}', title)
-  html = html.replaceAll('{desc}', desc)
-  html = html.replaceAll('{image}', image)
+  // Serve Mini App as the main entry point
+  const filePath = path.join(__dirname, 'client', 'miniapp.html')
+  const html = fs.readFileSync(filePath, 'utf-8')
   reply.type('text/html').send(html)
+})
+fastify.get('/manifest.json', async (req, reply) => {
+  // Serve Farcaster Mini App manifest
+  const filePath = path.join(__dirname, 'manifest.json')
+  const manifest = fs.readFileSync(filePath, 'utf-8')
+  reply.type('application/json').send(manifest)
 })
 fastify.register(statics, {
   root: path.join(__dirname, 'public'),
@@ -77,7 +76,7 @@ fastify.register(statics, {
 })
 // Serve Mini App files from client build directory
 fastify.register(statics, {
-  root: path.join(__dirname, '../client'),
+  root: path.join(__dirname, 'client'),
   prefix: '/',
   decorateReply: false,
   setHeaders: res => {

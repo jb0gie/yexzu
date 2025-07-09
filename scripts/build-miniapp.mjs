@@ -7,8 +7,8 @@ import path from 'path'
 const isDev = process.argv.includes('--dev')
 const isWatch = process.argv.includes('--watch')
 
-// Clean and create build directory
-await fs.remove('build')
+// Clean and create client build directory (preserve server build)
+await fs.remove('build/client')
 await fs.ensureDir('build')
 await fs.ensureDir('build/client')
 
