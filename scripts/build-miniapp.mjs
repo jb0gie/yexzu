@@ -15,9 +15,26 @@ await fs.ensureDir('build/client')
 // Copy the unified HTML file (handles both regular and Mini App)
 await fs.copy('build/public/index.html', 'build/client/index.html')
 
-// Copy the main app JavaScript and CSS files
-await fs.copy('build/public/index-P5CTV26W.js', 'build/client/index-P5CTV26W.js')
-await fs.copy('build/public/particles-QM3BZSIW.js', 'build/client/particles-QM3BZSIW.js')
+// Dynamically find and copy the main app JavaScript files
+const publicFiles = await fs.readdir('build/public')
+const indexJs = publicFiles.find(file => file.startsWith('index-') && file.endsWith('.js'))
+const particlesJs = publicFiles.find(file => file.startsWith('particles-') && file.endsWith('.js'))
+
+if (indexJs) {
+  await fs.copy(`build/public/${indexJs}`, `build/client/${indexJs}`)
+  console.log(`✅ Copied ${indexJs}`)
+} else {
+  console.warn('⚠️  Could not find index-*.js file')
+}
+
+if (particlesJs) {
+  await fs.copy(`build/public/${particlesJs}`, `build/client/${particlesJs}`)
+  console.log(`✅ Copied ${particlesJs}`)
+} else {
+  console.warn('⚠️  Could not find particles-*.js file')
+}
+
+// Copy CSS file
 await fs.copy('build/public/index.css', 'build/client/index.css')
 
 // Copy essential assets
