@@ -61,7 +61,7 @@ fastify.get('/manifest.json', async (req, reply) => {
 
 fastify.get('/.well-known/farcaster.json', async (req, reply) => {
   // Serve Farcaster Mini App manifest at the correct location for discovery
-  const filePath = path.join(rootDir, 'manifest.json')
+  const filePath = path.join(__dirname, 'manifest.json')
   try {
     const manifest = await fs.readFile(filePath, 'utf-8')
     reply.type('application/json')
