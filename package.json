@@ -26,6 +26,8 @@
     "viewer:build": "node scripts/build-viewer.mjs",
     "client:dev": "node scripts/build-client.mjs --dev",
     "client:build": "node scripts/build-client.mjs",
+    "miniapp:dev": "node scripts/build-miniapp.mjs --dev --watch",
+    "miniapp:build": "node scripts/build-miniapp.mjs",
     "node-client:dev": "node scripts/build-node-client.mjs --dev",
     "node-client:build": "node scripts/build-node-client.mjs",
     "lint": "eslint . --ext .js,.jsx",
@@ -34,6 +36,7 @@
     "check": "npm run lint && npm run format"
   },
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.1.6",
     "@fastify/compress": "^8.0.1",
     "@fastify/cors": "^10.0.1",
     "@fastify/multipart": "^9.0.1",

@@ -1,0 +1,28 @@
+{
+	"accountAssociation": {
+		"header": "eyJmaWQiOjEyMzQ1LCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCJ9",
+		"payload": "eyJkb21haW4iOiJoeXBlcmZ5LmlvIn0",
+		"signature": "MHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
+	},
+	"miniApp": {
+		"name": "Hyperfy",
+		"description": "Interactive 3D virtual worlds with real-time collaboration. Build, explore, and socialize in immersive environments.",
+		"icon": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMjIgOEwxMiAxNEwyIDhMMTIgMloiIGZpbGw9IiM4ODY2RkYiLz4KPHBhdGggZD0iTTIgOEwxMiAxNEwyMiA4VjE2TDEyIDIyTDIgMTZWOFoiIGZpbGw9IiM2NjQ0RkYiLz4KPC9zdmc+",
+		"homeUrl": "https://hyperfy.io/miniapp",
+		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"buttonTitle": "Enter World",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
+		"splashBackgroundColor": "#000000",
+		"version": "0.1.0"
+	},
+	"frame": {
+		"version": "1.0.0",
+		"name": "Hyperfy",
+		"iconUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"homeUrl": "https://hyperfy.io/miniapp",
+		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"buttonTitle": "Enter World",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
+		"splashBackgroundColor": "#000000"
+	}
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="farcaster:miniapp" content="v0.1.0" />
+    <meta name="farcaster:frame" content="vNext" />
+    
+    <title>Hyperfy - Interactive 3D Virtual Worlds</title>
+    <meta name="description" content="Join interactive 3D virtual worlds with real-time collaboration. Build, explore, and socialize in immersive environments." />
+    
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Hyperfy - Interactive 3D Virtual Worlds" />
+    <meta property="og:description" content="Join interactive 3D virtual worlds with real-time collaboration. Build, explore, and socialize in immersive environments." />
+    <meta property="og:image" content="/assets/miniapp-preview.png" />
+    
+    <!-- Farcaster Frame Meta -->
+    <meta property="fc:frame" content="vNext" />
+    <meta property="fc:frame:image" content="/assets/miniapp-preview.png" />
+    <meta property="fc:frame:button:1" content="Enter World" />
+    <meta property="fc:frame:button:1:action" content="link" />
+    <meta property="fc:frame:button:1:target" content="/miniapp" />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/rubik.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/base-environment.glb" as="fetch" crossorigin />
+    <link rel="preload" href="/day2-2k.jpg" as="image" />
+    
+    <!-- Critical CSS inlined for faster loading -->
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: Rubik, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #000;
+        color: #fff;
+      }
+      
+      #root {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 9999;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top: 3px solid #8866ff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        font-size: 14px;
+        opacity: 0.7;
+      }
+      
+      @media (max-width: 768px) {
+        .loading-text {
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Hyperfy...</div>
+      </div>
+    </div>
+    
+    <!-- Mini App Script -->
+    <script type="module">
+      // Set global environment for Mini App mode
+      window.env = {
+        PUBLIC_WS_URL: (() => {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+          const host = window.location.host
+          return `${protocol}//${host}`
+        })(),
+        MINIAPP_MODE: true
+      }
+      
+      // Load the Mini App client
+      import('/miniapp.js').catch(error => {
+        console.error('Failed to load Mini App:', error)
+        // Show error message
+        const root = document.getElementById('root')
+        root.innerHTML = `
+          <div class="loading">
+            <div style="color: #ff6666;">Failed to load Hyperfy</div>
+            <div class="loading-text">Please try refreshing the page</div>
+          </div>
+        `
+      })
+    </script>
+  </body>
+</html> 

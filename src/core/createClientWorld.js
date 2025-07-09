@@ -21,10 +21,16 @@ import { Particles } from './systems/Particles'
 import { Snaps } from './systems/Snaps'
 import { Wind } from './systems/Wind'
 import { XR } from './systems/XR'
+import { FarcasterAuth } from './systems/FarcasterAuth'
+import { FarcasterSocial } from './systems/FarcasterSocial'
+import { MiniAppOptimizer } from './systems/MiniAppOptimizer'
 
 export function createClientWorld() {
   const world = new World()
   world.register('client', Client)
+  world.register('miniAppOptimizer', MiniAppOptimizer)
+  world.register('farcasterAuth', FarcasterAuth)
+  world.register('farcasterSocial', FarcasterSocial)
   world.register('livekit', ClientLiveKit)
   world.register('pointer', ClientPointer)
   world.register('prefs', ClientPrefs)
