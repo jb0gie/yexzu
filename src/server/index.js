@@ -58,6 +58,20 @@ fastify.get('/manifest.json', async (req, reply) => {
   const manifest = fs.readFileSync(filePath, 'utf-8')
   reply.type('application/json').send(manifest)
 })
+
+fastify.get('/.well-known/farcaster.json', async (req, reply) => {
+  // Serve Farcaster Mini App manifest at the correct location for discovery
+  const filePath = path.join(rootDir, 'manifest.json')
+  try {
+    const manifest = await fs.readFile(filePath, 'utf-8')
+    reply.type('application/json')
+    reply.header('Access-Control-Allow-Origin', '*')
+    reply.send(manifest)
+  } catch (err) {
+    console.error('Error serving .well-known/farcaster.json:', err)
+    reply.code(404).send('Manifest not found')
+  }
+})
 // Serve PhysX files directly
 fastify.get('/physx-js-webidl.js', async (req, reply) => {
   const filePath = path.join(__dirname, 'physx-js-webidl.js')
@@ -136,6 +150,12 @@ const envsCode = `
 `
 fastify.get('/env.js', async (req, reply) => {
   reply.type('application/javascript').send(envsCode)
+})
+
+fastify.post('/api/webhook', async (req, reply) => {
+  // Farcaster Mini App webhook endpoint
+  console.log('Webhook received:', req.body)
+  reply.code(200).send({ success: true })
 })
 
 fastify.post('/api/upload', async (req, reply) => {
