@@ -7,53 +7,16 @@ import path from 'path'
 const isDev = process.argv.includes('--dev')
 const isWatch = process.argv.includes('--watch')
 
-// Clean and create client build directory (preserve server build)
-await fs.remove('build/client')
-await fs.ensureDir('build')
-await fs.ensureDir('build/client')
-
-// Copy the unified HTML file (handles both regular and Mini App)
-await fs.copy('build/public/index.html', 'build/client/index.html')
-
-// Dynamically find and copy the main app JavaScript files
-const publicFiles = await fs.readdir('build/public')
-const indexJs = publicFiles.find(file => file.startsWith('index-') && file.endsWith('.js'))
-const particlesJs = publicFiles.find(file => file.startsWith('particles-') && file.endsWith('.js'))
-
-if (indexJs) {
-  await fs.copy(`build/public/${indexJs}`, `build/client/${indexJs}`)
-  console.log(`✅ Copied ${indexJs}`)
-} else {
-  console.warn('⚠️  Could not find index-*.js file')
-}
-
-if (particlesJs) {
-  await fs.copy(`build/public/${particlesJs}`, `build/client/${particlesJs}`)
-  console.log(`✅ Copied ${particlesJs}`)
-} else {
-  console.warn('⚠️  Could not find particles-*.js file')
-}
-
-// Copy CSS file
-await fs.copy('build/public/index.css', 'build/client/index.css')
-
-// Copy essential assets
-await fs.copy('src/client/public/rubik.woff2', 'build/client/rubik.woff2')
-await fs.copy('src/client/public/base-environment.glb', 'build/client/base-environment.glb')
-await fs.copy('src/client/public/day2-2k.jpg', 'build/client/day2-2k.jpg')
-await fs.copy('src/client/public/day2.hdr', 'build/client/day2.hdr')
-await fs.copy('src/client/public/particle.png', 'build/client/particle.png')
-
-// Copy manifest to root for discovery
+// Copy manifest to root for discovery (only file we need to copy)
 await fs.copy('manifest.json', 'build/manifest.json')
 
 console.log('📦 Building Farcaster Mini App...')
 
-// Build configuration optimized for Mini Apps
+// Build configuration optimized for Mini Apps - only build miniapp.js
 const buildConfig = {
   entryPoints: ['src/client/miniapp.js'],
   bundle: true,
-  outfile: 'build/client/miniapp.js',
+  outfile: 'build/public/miniapp.js', // Put in public directory with other assets
   format: 'esm',
   target: 'es2022',
   platform: 'browser',
@@ -124,7 +87,7 @@ try {
     const result = await esbuild.build(buildConfig)
 
     // Log bundle size
-    const stats = await fs.stat('build/client/miniapp.js')
+    const stats = await fs.stat('build/public/miniapp.js')
     const sizeKB = Math.round(stats.size / 1024)
     console.log(`✅ Mini App built successfully! Bundle size: ${sizeKB}KB`)
 
