@@ -11,7 +11,7 @@
 		"homeUrl": "https://miniappworld.255242621.xyz",
 		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter World",
-		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
+		"splashImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"splashBackgroundColor": "#000000",
 		"version": "1"
 	},
@@ -20,7 +20,7 @@
 		"version": "1",
 		"iconUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
-		"imageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
+		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter world",
 		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
@@ -40,7 +40,7 @@
 		],
 		"tagline": "Jump In, Play, Socialize",
 		"ogTitle": "farcasterfy - Jump In ",
-		"ogImageUrl": "https://hyperfy.xyz/static/art-core-pillars.webp",
+		"ogImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"ogDescription": "miniapp wrapper for hyperfy"
 	}
 }
