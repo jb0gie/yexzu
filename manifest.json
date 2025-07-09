@@ -7,7 +7,7 @@
 	"miniApp": {
 		"name": "farcasterfy",
 		"description": "Interactive 3D virtual world. Explore, build, and socialize in an immersive environment.",
-		"icon": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"icon": "https://hyperfy.xyz/icon.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
 		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter World",
@@ -18,7 +18,7 @@
 	"frame": {
 		"name": "farcasterfy",
 		"version": "1",
-		"iconUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"iconUrl": "https://hyperfy.xyz/icon.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
 		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter world",
