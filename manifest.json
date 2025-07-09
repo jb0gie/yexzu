@@ -1,8 +1,8 @@
 {
 	"accountAssociation": {
-		"header": "eyJmaWQiOjEyMzQ1LCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCJ9",
-		"payload": "eyJkb21haW4iOiJoeXBlcmZ5LmlvIn0",
-		"signature": "MHgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA"
+		"header": "eyJmaWQiOjE4ODE0MCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDYxZTI3NDZkZTNiRTUzNGViOTIxOTY2NzkxRTc1M0NDNjM4NmFiZDEifQ",
+		"payload": "eyJkb21haW4iOiJtaW5pYXBwd29ybGQuMjU1MjQyNjIxLnh5eiJ9",
+		"signature": "MHhkNWMyZmYyMGIwYjQwODU5ODIwZTU0YjA1MzdlNGY0YzhlNTlkNzMxM2U4NzQwM2Q4NDUwOWQ2MzM0ZjAyZTZmMTA5OTk4ODljZWVhNGVjOWU5MmIxOGY4YWU5Mzg4YTY0YWRjZjQyNTZlZDliMWIzYmE3ZjBmMjQ1M2ZlMjM4NjFj"
 	},
 	"miniApp": {
 		"name": "farcasterfy",
@@ -29,7 +29,7 @@
 			"https://hyperfy.xyz/static/art-explorers.webp"
 		],
 		"primaryCategory": "games",
-		"subtitle": "Interactive 3D virtual world built with Hyperfy. Explore",
+		"subtitle": "Interactive world built with hyperfy",
 		"description": "miniapp wrapper for hyperfy",
 		"tags": [
 			"gaming",
