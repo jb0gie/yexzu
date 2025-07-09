@@ -9,6 +9,7 @@ RUN npm install
 # Copy all source files and build
 COPY . .
 RUN npm run build
+RUN npm run miniapp:build
 
 # Production stage
 FROM node:22.11.0-alpine AS production
