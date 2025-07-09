@@ -60,26 +60,37 @@ fastify.get('/manifest.json', async (req, reply) => {
 })
 // Serve PhysX files directly
 fastify.get('/physx-js-webidl.js', async (req, reply) => {
-  const filePath = path.join(__dirname, '../physx-js-webidl.js')
+  const filePath = path.join(__dirname, 'physx-js-webidl.js')
   try {
+    console.log('Serving PhysX JS from:', filePath)
     const fileContent = await fs.readFile(filePath)
     reply.type('application/javascript')
     reply.header('Cache-Control', 'public, max-age=3600')
     return reply.send(fileContent)
   } catch (err) {
+    console.error('Error serving PhysX JS:', err)
     reply.code(404).send('File not found')
   }
 })
 
 fastify.get('/physx-js-webidl.wasm', async (req, reply) => {
-  const filePath = path.join(__dirname, '../physx-js-webidl.wasm')
+  const filePath = path.join(__dirname, 'physx-js-webidl.wasm')
   try {
+    console.log('Serving PhysX WASM from:', filePath)
+    const exists = await fs.exists(filePath)
+    console.log('File exists:', exists)
+    if (!exists) {
+      console.error('WASM file does not exist at:', filePath)
+      return reply.code(404).send('WASM file not found')
+    }
     const fileContent = await fs.readFile(filePath)
+    console.log('WASM file size:', fileContent.length)
     reply.type('application/wasm')
     reply.header('Cache-Control', 'public, max-age=3600')
     return reply.send(fileContent)
   } catch (err) {
-    reply.code(404).send('File not found')
+    console.error('Error serving PhysX WASM:', err)
+    reply.code(500).send('Error loading WASM file: ' + err.message)
   }
 })
 
