@@ -125,16 +125,28 @@
       // Detect if we're in Farcaster context, but allow override for full experience
       const urlParams = new URLSearchParams(window.location.search)
       const forceFullApp = urlParams.has('full') || urlParams.has('desktop') || 
-                          window.location.hash.includes('full')
+                          window.location.hash.includes('full') ||
+                          urlParams.has('browser') || urlParams.has('force')
       
+      // If user explicitly wants full app, don't check Farcaster context at all
       const isFarcaster = !forceFullApp && (
-        window.navigator.userAgent.includes('farcaster') || 
-        window.location.search.includes('farcaster') ||
-        (window.parent !== window && !forceFullApp) // embedded iframe
+        window.navigator.userAgent.toLowerCase().includes('farcaster') || 
+        window.location.search.includes('farcaster')
+        // Removed iframe check as it can be too aggressive for new tabs
       )
       
       async function loadApp() {
         try {
+          // Debug logging
+          console.log('Detection results:', {
+            userAgent: window.navigator.userAgent,
+            search: window.location.search,
+            urlParams: Object.fromEntries(urlParams),
+            forceFullApp,
+            isFarcaster,
+            parentWindow: window.parent !== window
+          })
+          
           if (isFarcaster) {
             // Load Farcaster Mini App
             window.env.MINIAPP_MODE = true
@@ -143,7 +155,7 @@
             // miniapp.js handles its own initialization
           } else {
             // Load regular Hyperfy app
-            console.log('Loading full Hyperfy app')
+            console.log('Loading full Hyperfy app from:', '{jsPath}')
             const { default: initApp } = await import('{jsPath}')
             // Regular app handles its own initialization
           }

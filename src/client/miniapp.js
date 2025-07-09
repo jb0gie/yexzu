@@ -91,10 +91,35 @@ async function initMiniApp() {
 								</p>
 							)}
 
-							<a
-								href="https://miniappworld.255242621.xyz?full=true"
-								target="_blank"
-								rel="noopener noreferrer"
+							<button
+								onClick={() => {
+									// Multiple strategies to break out of iframe
+									const url = 'https://miniappworld.255242621.xyz?full=true'
+
+									// Strategy 1: Try to open in parent window (breaks out of iframe)
+									try {
+										if (window.top && window.top !== window) {
+											window.top.location.href = url
+											return
+										}
+									} catch (e) {
+										console.log('Cannot access parent window, trying other methods')
+									}
+
+									// Strategy 2: Force new window with specific features
+									try {
+										const newWindow = window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')
+										if (newWindow) {
+											newWindow.focus()
+											return
+										}
+									} catch (e) {
+										console.log('window.open failed, using fallback')
+									}
+
+									// Strategy 3: Direct navigation as fallback
+									window.location.href = url
+								}}
 								style={{
 									display: 'inline-block',
 									background: 'rgba(255,255,255,0.9)',
@@ -102,7 +127,6 @@ async function initMiniApp() {
 									border: 'none',
 									borderRadius: '12px',
 									padding: '16px 32px',
-									textDecoration: 'none',
 									fontSize: '16px',
 									fontWeight: 'bold',
 									cursor: 'pointer',
@@ -112,7 +136,7 @@ async function initMiniApp() {
 								}}
 							>
 								🚀 Enter Full World
-							</a>
+							</button>
 
 							<p style={{
 								fontSize: '12px',
@@ -182,23 +206,37 @@ async function initMiniApp() {
 					<p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.8, margin: '0 0 20px 0' }}>
 						Having trouble loading the app.
 					</p>
-					<a
-						href="https://miniappworld.255242621.xyz?full=true"
-						target="_blank"
-						rel="noopener noreferrer"
+					<button
+						onClick={() => {
+							const url = 'https://miniappworld.255242621.xyz?full=true'
+							try {
+								if (window.top && window.top !== window) {
+									window.top.location.href = url
+									return
+								}
+							} catch (e) { }
+							try {
+								const newWindow = window.open(url, '_blank', 'noopener,noreferrer,width=1200,height=800')
+								if (newWindow) {
+									newWindow.focus()
+									return
+								}
+							} catch (e) { }
+							window.location.href = url
+						}}
 						style={{
 							background: '#4f46e5',
 							color: 'white',
 							border: 'none',
 							borderRadius: '8px',
 							padding: '12px 24px',
-							textDecoration: 'none',
 							fontSize: '16px',
-							fontWeight: 'bold'
+							fontWeight: 'bold',
+							cursor: 'pointer'
 						}}
 					>
 						🌐 Open in Browser
-					</a>
+					</button>
 				</div>
 			)
 		}
