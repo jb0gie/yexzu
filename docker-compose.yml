@@ -6,29 +6,31 @@ services:
       dockerfile: Dockerfile
       args:
         COMMIT_HASH: ${COMMIT_HASH:-local}
-    ports:
-      - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - DOMAIN=${DOMAIN:-localhost}
-      - PORT=3000
-      - WORLD=world
-      - ASSETS_DIR=/app/world/assets
-      - PUBLIC_WS_URL=${PUBLIC_WS_URL}
-      - PUBLIC_API_URL=${PUBLIC_API_URL}
-      - PUBLIC_ASSETS_URL=${PUBLIC_ASSETS_URL}
-      - PUBLIC_MAX_UPLOAD_SIZE=${PUBLIC_MAX_UPLOAD_SIZE:-100}
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-here-change-this-in-production}
+      - SERVICE_FQDN_HYPERFY_3000
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT:-your-secret-key-here-change-this-in-production}
+      - ADMIN_CODE=${SERVICE_PASSWORD_ADMIN:-}
+      - PUBLIC_WS_URL=${SERVICE_FQDN_HYPERFY}/ws
+      - PUBLIC_API_URL=${SERVICE_FQDN_HYPERFY}/api
+      - PUBLIC_ASSETS_URL=${SERVICE_FQDN_HYPERFY}/assets
       - SAVE_INTERVAL=${SAVE_INTERVAL:-60}
-      - ADMIN_CODE=${ADMIN_CODE:-}
+      - WORLD=${WORLD:-world}
+      - PUBLIC_MAX_UPLOAD_SIZE=${PUBLIC_MAX_UPLOAD_SIZE:-32}
+      - PUBLIC_PLAYER_COLLISION=${PUBLIC_PLAYER_COLLISION:-true}
+      - LIVEKIT_WS_URL=${LIVEKIT_URL:-wss://yexzu-1y4pqj8q.livekit.cloud}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-APIGLg6M4ra938h}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-UubtBvWzgUmrVXgPtt2FNWefD0RLfpBIZXwpDcCHeevC}
+      - PORT=3000
+      - NODE_ENV=production
       - COMMIT_HASH=${COMMIT_HASH:-miniapp}
     volumes:
-      - ./world:/app/world
-      - ./.env:/app/.env:ro
+      - type: bind
+        source: '/home/ubuntu/${WORLD:-world}'
+        target: '/app/${WORLD:-world}'
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/status"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s 
+      start_period: 40s

@@ -58,6 +58,17 @@ fastify.get('/manifest.json', async (req, reply) => {
   const manifest = fs.readFileSync(filePath, 'utf-8')
   reply.type('application/json').send(manifest)
 })
+// Serve PhysX files from build root
+fastify.register(statics, {
+  root: path.join(__dirname, '../'),
+  prefix: '/',
+  decorateReply: false,
+  include: ['physx-js-webidl.js', 'physx-js-webidl.wasm'],
+  setHeaders: res => {
+    res.setHeader('Cache-Control', 'public, max-age=3600') // Cache PhysX files for 1 hour
+  },
+})
+
 // Serve Mini App files from client build directory
 fastify.register(statics, {
   root: path.join(__dirname, 'client'),
