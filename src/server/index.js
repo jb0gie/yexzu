@@ -64,16 +64,6 @@ fastify.get('/manifest.json', async (req, reply) => {
   const manifest = fs.readFileSync(filePath, 'utf-8')
   reply.type('application/json').send(manifest)
 })
-fastify.register(statics, {
-  root: path.join(__dirname, 'public'),
-  prefix: '/',
-  decorateReply: false,
-  setHeaders: res => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-    res.setHeader('Pragma', 'no-cache')
-    res.setHeader('Expires', '0')
-  },
-})
 // Serve Mini App files from client build directory
 fastify.register(statics, {
   root: path.join(__dirname, 'client'),
