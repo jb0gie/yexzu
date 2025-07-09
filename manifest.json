@@ -24,7 +24,6 @@
 		"buttonTitle": "Enter world",
 		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
-		"webhookUrl": "https://miniappworld.255242621.xyz/api/webhook",
 		"heroImageUrl": "https://hyperfy.xyz/static/art-creators.webp",
 		"screenshotUrls": [
 			"https://hyperfy.xyz/static/art-explorers.webp"

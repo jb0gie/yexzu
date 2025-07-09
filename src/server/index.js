@@ -152,11 +152,6 @@ fastify.get('/env.js', async (req, reply) => {
   reply.type('application/javascript').send(envsCode)
 })
 
-fastify.post('/api/webhook', async (req, reply) => {
-  // Farcaster Mini App webhook endpoint
-  console.log('Webhook received:', req.body)
-  reply.code(200).send({ success: true })
-})
 
 fastify.post('/api/upload', async (req, reply) => {
   // console.log('DEBUG: slow uploads')
