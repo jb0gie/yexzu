@@ -7,26 +7,26 @@
 	"miniApp": {
 		"name": "Yexzu World",
 		"description": "Interactive 3D virtual world. Explore, build, and socialize in an immersive environment.",
-		"icon": "https://miniappworld.255242621.xyz/particle.png",
+		"icon": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
-		"imageUrl": "https://miniappworld.255242621.xyz/particle.png",
+		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter World",
-		"splashImageUrl": "https://miniappworld.255242621.xyz/day2-2k.jpg",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
 		"version": "1"
 	},
 	"frame": {
 		"name": "Yexzu World",
 		"version": "1",
-		"iconUrl": "https://miniappworld.255242621.xyz/particle.png",
+		"iconUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"homeUrl": "https://miniappworld.255242621.xyz",
-		"imageUrl": "https://miniappworld.255242621.xyz/day2-2k.jpg",
+		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter world",
-		"splashImageUrl": "https://miniappworld.255242621.xyz/day2-2k.jpg",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
-		"heroImageUrl": "https://miniappworld.255242621.xyz/day2-2k.jpg",
+		"heroImageUrl": "https://hyperfy.xyz/static/art-creators.webp",
 		"screenshotUrls": [
-			"https://miniappworld.255242621.xyz/day2-2k.jpg"
+			"https://hyperfy.xyz/static/art-explorers.webp"
 		],
 		"primaryCategory": "games",
 		"subtitle": "3D Social Metaverse",
@@ -40,7 +40,7 @@
 		],
 		"tagline": "Jump In, Play, Socialize",
 		"ogTitle": "Yexzu World - 3D Social Metaverse",
-		"ogImageUrl": "https://miniappworld.255242621.xyz/day2-2k.jpg",
+		"ogImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"ogDescription": "Interactive 3D virtual world for exploration and socializing"
 	}
 }
