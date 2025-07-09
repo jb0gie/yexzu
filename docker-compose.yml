@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  hyperfy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        COMMIT_HASH: ${COMMIT_HASH:-local}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DOMAIN=${DOMAIN:-localhost}
+      - PORT=3000
+      - ASSETS_DIR=/app/world/assets
+      - PUBLIC_WS_URL=${PUBLIC_WS_URL:-ws://localhost:3000/ws}
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:3000/api}
+      - PUBLIC_ASSETS_URL=${PUBLIC_ASSETS_URL:-http://localhost:3000/assets}
+    volumes:
+      - ./world:/app/world
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 
