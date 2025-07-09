@@ -55,7 +55,7 @@ async function initMiniApp() {
 						textAlign: 'center',
 						padding: '20px'
 					}}>
-						<h1 style={{ fontSize: '24px', marginBottom: '16px' }}>🎮 Yexzu World</h1>
+						<h1 style={{ fontSize: '24px', marginBottom: '16px' }}>🎮 farcasterfy</h1>
 						<p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.8 }}>
 							Welcome to the 3D social metaverse!
 						</p>
