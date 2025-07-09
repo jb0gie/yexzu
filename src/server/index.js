@@ -75,6 +75,17 @@ fastify.register(statics, {
     res.setHeader('Expires', '0')
   },
 })
+// Serve Mini App files from client build directory
+fastify.register(statics, {
+  root: path.join(__dirname, '../client'),
+  prefix: '/',
+  decorateReply: false,
+  setHeaders: res => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+  },
+})
 fastify.register(statics, {
   root: assetsDir,
   prefix: '/assets/',
