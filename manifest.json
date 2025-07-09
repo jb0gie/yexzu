@@ -11,7 +11,7 @@
 		"homeUrl": "https://miniappworld.255242621.xyz",
 		"imageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
 		"buttonTitle": "Enter World",
-		"splashImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
 		"version": "1"
 	},
@@ -22,7 +22,7 @@
 		"homeUrl": "https://miniappworld.255242621.xyz",
 		"imageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"buttonTitle": "Enter world",
-		"splashImageUrl": "https://hyperfy.xyz/static/logo-icon-echo.svg",
+		"splashImageUrl": "https://hyperfy.xyz/static/art-bg2.webp",
 		"splashBackgroundColor": "#000000",
 		"heroImageUrl": "https://hyperfy.xyz/static/art-creators.webp",
 		"screenshotUrls": [
