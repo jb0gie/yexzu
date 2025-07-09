@@ -122,20 +122,28 @@
         return `${protocol}//${hostname}/ws`
       })()
       
-      // Detect if we're in Farcaster context
-      const isFarcaster = window.navigator.userAgent.includes('farcaster') || 
-                         window.location.search.includes('farcaster') ||
-                         window.parent !== window // embedded iframe
+      // Detect if we're in Farcaster context, but allow override for full experience
+      const urlParams = new URLSearchParams(window.location.search)
+      const forceFullApp = urlParams.has('full') || urlParams.has('desktop') || 
+                          window.location.hash.includes('full')
+      
+      const isFarcaster = !forceFullApp && (
+        window.navigator.userAgent.includes('farcaster') || 
+        window.location.search.includes('farcaster') ||
+        (window.parent !== window && !forceFullApp) // embedded iframe
+      )
       
       async function loadApp() {
         try {
           if (isFarcaster) {
             // Load Farcaster Mini App
             window.env.MINIAPP_MODE = true
+            console.log('Loading Farcaster Mini App mode')
             const { default: initMiniApp } = await import('/miniapp.js')
             // miniapp.js handles its own initialization
           } else {
             // Load regular Hyperfy app
+            console.log('Loading full Hyperfy app')
             const { default: initApp } = await import('{jsPath}')
             // Regular app handles its own initialization
           }
