@@ -52,6 +52,27 @@ const fastify = Fastify({ logger: { level: 'error' } })
 
 fastify.register(cors)
 fastify.register(compress)
+
+// Serve the main HTML file with proper template processing
+fastify.get('/', async (req, reply) => {
+  const title = world.settings?.title || 'Hyperfy'
+  const desc = world.settings?.desc || 'A virtual world platform'
+  const image = world.resolveURL(world.settings?.image?.url) || ''
+  const url = process.env.PUBLIC_ASSETS_URL || ''
+  const filePath = path.join(__dirname, 'public', 'index.html')
+  try {
+    let html = await fs.readFile(filePath, 'utf-8')
+    html = html.replaceAll('{url}', url)
+    html = html.replaceAll('{title}', title)
+    html = html.replaceAll('{desc}', desc)
+    html = html.replaceAll('{image}', image)
+    reply.type('text/html').send(html)
+  } catch (err) {
+    console.error('Error serving index.html:', err)
+    reply.code(500).send('Error loading page')
+  }
+})
+
 fastify.get('/manifest.json', async (req, reply) => {
   // Serve Farcaster Mini App manifest
   const filePath = path.join(__dirname, 'manifest.json')
