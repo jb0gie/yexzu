@@ -426,4 +426,78 @@ const migrations = [
     const value = JSON.stringify(settings)
     await db('config').where('key', 'settings').update({ value })
   },
+  // add worlds table for ElizaOS plugin compatibility
+  async db => {
+    if (!(await db.schema.hasTable('worlds'))) {
+      await db.schema.createTable('worlds', table => {
+        table.string('id').primary()
+        table.string('name').notNullable()
+        table.string('ownerId')
+        table.timestamp('createdAt').notNullable()
+        table.timestamp('updatedAt').notNullable()
+      })
+    }
+  },
+  // add rooms table for ElizaOS plugin compatibility
+  async db => {
+    if (!(await db.schema.hasTable('rooms'))) {
+      await db.schema.createTable('rooms', table => {
+        table.string('id').primary()
+        table.string('name').notNullable()
+        table.string('worldId').notNullable()
+        table.string('agentId')
+        table.string('source')
+        table.string('type')
+        table.string('channelId')
+        table.string('serverId')
+        table.timestamp('createdAt').notNullable()
+        table.timestamp('updatedAt').notNullable()
+        table.foreign('worldId').references('id').inTable('worlds').onDelete('CASCADE')
+      })
+    }
+  },
+  // add participants table for ElizaOS plugin compatibility
+  async db => {
+    if (!(await db.schema.hasTable('participants'))) {
+      await db.schema.createTable('participants', table => {
+        table.string('id').primary()
+        table.string('roomId').notNullable()
+        table.string('agentId').notNullable()
+        table.string('roomState')
+        table.timestamp('createdAt').notNullable()
+        table.timestamp('updatedAt').notNullable()
+        table.foreign('roomId').references('id').inTable('rooms').onDelete('CASCADE')
+      })
+    }
+  },
+  // add memories table for ElizaOS plugin compatibility
+  async db => {
+    if (!(await db.schema.hasTable('memories'))) {
+      await db.schema.createTable('memories', table => {
+        table.string('id').primary()
+        table.string('roomId').notNullable()
+        table.string('agentId').notNullable()
+        table.text('content').notNullable()
+        table.string('type')
+        table.timestamp('createdAt').notNullable()
+        table.timestamp('updatedAt').notNullable()
+        table.foreign('roomId').references('id').inTable('rooms').onDelete('CASCADE')
+      })
+    }
+  },
+  // create default world if none exists
+  async db => {
+    const worlds = await db('worlds')
+    if (worlds.length === 0) {
+      const now = moment().toISOString()
+      const defaultWorld = {
+        id: 'default',
+        name: 'Default World',
+        ownerId: null,
+        createdAt: now,
+        updatedAt: now
+      }
+      await db('worlds').insert(defaultWorld)
+    }
+  },
 ]

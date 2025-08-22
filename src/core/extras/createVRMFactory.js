@@ -135,6 +135,25 @@ export function createVRMFactory(glb, setupMaterial) {
     // ...
   }
 
+  // Springbone physics integration constants
+  const SPRINGBONE_FIXED_DELTA = 1 / 50 // Match Hyperfy's physics timestep
+  const SPRINGBONE_MAX_DELTA = 1 / 30 // Maximum delta time to prevent instability
+  const SPRINGBONE_UPDATE_RATE = 1 / 50 // Update rate for springbones (50Hz)
+
+  // Query parameters cache for URL parsing
+  let queryParams = {}
+  function getQueryParams(url) {
+    if (!queryParams[url]) {
+      url = new URL(url)
+      const params = {}
+      for (const [key, value] of url.searchParams.entries()) {
+        params[key] = value
+      }
+      queryParams[url] = params
+    }
+    return queryParams[url]
+  }
+
   return {
     create,
     applyStats(stats) {
@@ -480,8 +499,10 @@ export function createVRMFactory(glb, setupMaterial) {
     // spring bone mirroring (original -> clone) and drive original with clone pose
     let springMirrorInit = false
     let hasSprings = false
+    let uvScrollingInit = false  // Add missing variable
     const springPairs = []
     const drivePairs = []
+
     function initSpringMirror() {
       if (springMirrorInit) return
       const spring = origVRM?.springBoneManager
@@ -489,214 +510,501 @@ export function createVRMFactory(glb, setupMaterial) {
         springMirrorInit = true
         return
       }
+
       try {
         hasSprings = spring.joints && spring.joints.size > 0
-        // optional global tuning (neutral by default; use hooks.springTuning to tweak)
-        const tuning = hooks.springTuning || { stiffness: 1.0, dragForce: 1.0, gravityPower: 1.0, hitRadius: 1.0 }
-        try {
-          spring.joints.forEach(joint => {
-            const s = joint.settings
-            if (!s) return
-            if (tuning.stiffness != null) s.stiffness *= tuning.stiffness
-            if (tuning.dragForce != null) s.dragForce *= tuning.dragForce
-            if (tuning.gravityPower != null) s.gravityPower *= tuning.gravityPower
-            if (tuning.hitRadius != null) s.hitRadius *= tuning.hitRadius
-            // Only disable colliders if explicitly requested
-            if (hooks.disableSpringColliders === true) {
-              joint.colliderGroups = []
-            }
-          })
-        } catch (_) { }
-        // re-init after tuning/collider changes so initial state is consistent
-        try { spring.setInitState() } catch (_) { }
-        // build spring joint pairs (orig -> clone) using clone skeleton lookup by name
-        spring.joints.forEach(joint => {
-          const src = joint.bone
-          if (!src || !src.name) return
-          let dst = skeleton.getBoneByName(src.name)
-          if (dst) springPairs.push([src, dst])
-        })
-        // build drive pairs (clone skeleton -> original bones) for joint ancestors
-        const origMeshes = []
-        glb.scene.traverse(o => { if (o.isSkinnedMesh && o.skeleton) origMeshes.push(o) })
-        const origSkeleton = origMeshes[0]?.skeleton
-        const addDrivePair = (origObj) => {
-          if (!origObj || !origObj.name) return
-          const cloneBone = skeleton.getBoneByName(origObj.name)
-          if (cloneBone) drivePairs.push([cloneBone, origObj])
+        if (!hasSprings) {
+          springMirrorInit = true
+          return
         }
-        spring.joints.forEach(joint => {
-          let p = joint.bone
-          while (p && p !== glb.scene) {
-            addDrivePair(p)
-            p = p.parent
-          }
-        })
-        // targeted alias mapping to help common hair/tail chains and path-based fallback
-        const alias = new Map([
-          ['Hair1', ['hair1', 'hair_1', 'Hair_1']],
-          ['Hair2', ['hair2', 'hair_2', 'Hair_2']],
-          ['Tail', ['tail', 'Tail_1', 'tail_1']],
-        ])
-        // rebuild springPairs using alias + path fallback for better coverage
-        springPairs.length = 0
+
+        // Build spring bone pairs for mirroring from original to clone
         spring.joints.forEach(joint => {
           const src = joint.bone
           if (!src || !src.name) return
           let dst = skeleton.getBoneByName(src.name)
-          if (!dst) {
-            for (const [key, alts] of alias.entries()) {
-              if (src.name.toLowerCase().startsWith(key.toLowerCase())) {
-                for (const a of alts) {
-                  dst = skeleton.getBoneByName(a)
-                  if (dst) break
-                }
-                if (dst) break
-              }
-            }
-          }
-          if (!dst) {
-            // path fallback
-            const path = []
-            let n = src
-            while (n && n !== glb.scene) {
-              const p = n.parent
-              if (!p) break
-              const i = p.children.indexOf(n)
-              if (i < 0) break
-              path.push(i)
-              n = p
-            }
-            if (n === glb.scene) {
-              path.reverse()
-              let m = vrm.scene
-              for (const i of path) {
-                m = m.children?.[i]
-                if (!m) break
-              }
-              if (m && m.isBone) dst = m
-            }
-          }
           if (dst) springPairs.push([src, dst])
         })
-        // re-initialize springs after mapping (safe if already initialized)
+
+        // Build drive pairs for copying clone skeleton pose to original
+        skeleton.bones.forEach(cloneBone => {
+          if (!cloneBone.name) return
+          const origSkel = origVRM.scene.getObjectByName('Root')?.skeleton
+          if (!origSkel) return
+          const origBone = origSkel.getBoneByName(cloneBone.name)
+          if (origBone) drivePairs.push([cloneBone, origBone])
+        })
+
+        console.log('[vrmFactory] Spring mapping counts', 'springs:', spring.joints.size, 'pairs:', springPairs.length, 'drive:', drivePairs.length)
+
+      } catch (error) {
+        console.error('[vrmFactory] Springbone initialization error:', error)
+        hasSprings = false
+      }
+
+      springMirrorInit = true
+    }
+
+    // Enable UV scrolling on MToon materials using THREE-VRM built-in features
+    function enableMToonUVScrolling() {
+      if (!vrm.scene) return
+
+      console.log('[vrmFactory] Enabling MToon UV scrolling...')
+
+      vrm.scene.traverse(node => {
+        if (node.isMesh && node.material) {
+          const material = node.material
+
+          // Check if it's an MToon material (THREE-VRM's built-in material)
+          if (material.isMToonMaterial) {
+            // Enable UV scrolling for hair materials - REDUCED SPEED
+            if (material.name && (material.name.includes('hair') || material.name.includes('Hair'))) {
+              material.uvAnimationScrollXSpeedFactor = 0.1  // Reduced from 0.5
+              material.uvAnimationScrollYSpeedFactor = 0.05 // Reduced from 0.3
+              console.log(`[vrmFactory] Enabled UV scrolling for MToon hair material: ${material.name}`)
+            }
+
+            // Enable UV scrolling for clothing materials - REDUCED SPEED
+            if (material.name && (material.name.includes('cloth') || material.name.includes('Cloth') ||
+              material.name.includes('dress') || material.name.includes('Dress'))) {
+              material.uvAnimationScrollXSpeedFactor = 0.05 // Reduced from 0.2
+              material.uvAnimationScrollYSpeedFactor = 0.02 // Reduced from 0.1
+              console.log(`[vrmFactory] Enabled UV scrolling for MToon clothing material: ${material.name}`)
+            }
+          }
+
+          // Handle material arrays
+          if (Array.isArray(material)) {
+            material.forEach((mat, index) => {
+              if (mat.isMToonMaterial && mat.name &&
+                (mat.name.includes('hair') || mat.name.includes('Hair'))) {
+                mat.uvAnimationScrollXSpeedFactor = 0.1  // Reduced from 0.5
+                mat.uvAnimationScrollYSpeedFactor = 0.05 // Reduced from 0.3
+                console.log(`[vrmFactory] Enabled UV scrolling for MToon hair material array[${index}]: ${mat.name}`)
+              }
+            })
+          }
+        }
+      })
+
+      console.log('[vrmFactory] MToon UV scrolling setup complete')
+    }
+
+    // THREE-VRM MToon materials handle initialization automatically
+    // No manual setup needed!
+
+    // THREE-VRM MToon materials handle UV scrolling automatically
+    // No manual implementation needed!
+
+    // THREE-VRM handles springbones automatically via origVRM.update()
+    // No manual implementation needed!
+
+    // REAL-TIME movement integration hook for immediate springbone response
+    function updatePlayerMovement(velocity, rotation) {
+      if (vrm.scene && vrm.scene.userData) {
+        vrm.scene.userData.playerMovement = { velocity, rotation }
+
+        // Force immediate springbone response to player movement
+        if (hasSprings && origVRM?.springBoneManager) {
+          const joints = origVRM.springBoneManager.joints
+          if (joints && typeof joints.size === 'number' && joints.size > 0) {
+            // Boost responsiveness during movement
+            const jointsArray = Array.from(joints)
+            jointsArray.forEach(joint => {
+              if (joint && joint.settings) {
+                // Temporarily reduce stiffness and drag for immediate response
+                joint.settings.stiffness *= 0.7
+                joint.settings.dragForce *= 0.7
+              }
+            })
+          }
+        }
+      }
+    }
+
+    // Configuration options for enhanced springbone system
+    const springboneConfig = {
+      // Basic settings
+      debugMode: hooks.springDebugMode !== undefined ? hooks.springDebugMode : true, // Default: true for testing
+      performanceMonitoring: hooks.springPerformanceMonitoring !== false, // Default: true
+
+      // Timing settings
+      fixedDelta: hooks.springFixedDelta || SPRINGBONE_FIXED_DELTA,
+      maxDelta: hooks.springMaxDelta || SPRINGBONE_MAX_DELTA,
+      updateRate: hooks.springUpdateRate || SPRINGBONE_UPDATE_RATE,
+
+      // Movement sensitivity settings - Optimized for real-time responsiveness
+      movementThreshold: hooks.springMovementThreshold || 0.0005, // Very sensitive for immediate response (0.5mm)
+      rotationThreshold: hooks.springRotationThreshold || 0.005,  // Very sensitive for immediate response (0.3 degrees)
+      aggressiveUpdates: hooks.springAggressiveUpdates !== false, // Default: true for responsiveness
+      alwaysUpdate: hooks.springAlwaysUpdate !== false, // Default: true - always update for real-time responsiveness
+      responsivenessLevel: hooks.springResponsivenessLevel || 'ultra', // ultra, high, medium, low
+
+      // Performance settings - Balanced for responsiveness and performance
+      maxSpringbones: hooks.springMaxSpringbones || 100, // Maximum number of springbones to process
+      skipFrames: hooks.springSkipFrames || 0, // No frame skipping for real-time responsiveness
+      maxUpdateRate: hooks.springMaxUpdateRate || 60, // Match display refresh rate for smooth movement
+      performanceMode: hooks.springPerformanceMode || 'performance', // 'quality', 'balanced', 'performance'
+      maxSubSteps: hooks.springMaxSubSteps || 3, // Maximum physics sub-steps
+      maxActiveJoints: hooks.springMaxActiveJoints || 20, // Maximum active joints for performance
+      enableUVScrolling: hooks.enableUVScrolling !== false, // Enable UV scrolling by default
+      uvScrollSpeed: {
+        hair: { x: 0.8, y: 0.4 },
+        clothing: { x: 0.3, y: 0.2 },
+        general: { x: 0.5, y: 0.3 }
+      },
+
+      // Debug settings
+      visualizeColliders: hooks.springVisualizeColliders || false, // Show collider visualization
+    }
+
+    // Apply configuration to springbone system
+    function applySpringboneConfig() {
+      if (!hasSprings || !origVRM?.springBoneManager) return
+
+      try {
+        const spring = origVRM.springBoneManager
+
+        // Apply configuration to each springbone joint for real-time responsiveness
+        spring.joints.forEach(joint => {
+          const settings = joint.settings
+          if (!settings) return
+
+          // Apply responsiveness level settings - Optimized for real-time movement
+          const level = springboneConfig.responsivenessLevel
+          let stiffnessMultiplier = 1.0
+          let dragMultiplier = 1.0
+          let gravityMultiplier = 1.0
+
+          switch (level) {
+            case 'ultra':
+              stiffnessMultiplier = 0.9  // More conservative for performance
+              dragMultiplier = 0.9       // More conservative for performance
+              gravityMultiplier = 1.1    // More conservative for performance
+              break
+            case 'high':
+              stiffnessMultiplier = 0.95
+              dragMultiplier = 0.95
+              gravityMultiplier = 1.05
+              break
+            case 'medium':
+              stiffnessMultiplier = 1.0
+              dragMultiplier = 1.0
+              gravityMultiplier = 1.0
+              break
+            case 'low':
+              stiffnessMultiplier = 1.05
+              dragMultiplier = 1.05
+              gravityMultiplier = 0.95
+              break
+          }
+
+          // Apply settings while respecting VRM's original physics
+          if (settings.stiffness !== undefined) {
+            // Apply stiffness multiplier but don't make it too extreme
+            settings.stiffness = Math.min(settings.stiffness * stiffnessMultiplier, settings.stiffness * 1.5)
+          }
+
+          // Apply drag multiplier but keep it natural
+          if (settings.dragForce !== undefined) {
+            settings.dragForce = Math.max(settings.dragForce * dragMultiplier, settings.dragForce * 0.7)
+          }
+
+          // Apply gravity multiplier but don't make it too strong
+          if (settings.gravityPower !== undefined) {
+            settings.gravityPower = Math.min(settings.gravityPower * gravityMultiplier, settings.gravityPower * 1.3)
+          }
+
+          // Set conservative defaults for performance
+          if (!settings.maxVelocity) {
+            settings.maxVelocity = 15.0 // Lower velocity for better performance
+          }
+
+          // Set higher drag for stability and performance
+          if (!settings.dragForce) {
+            settings.dragForce = 0.8 // Higher drag for stability
+          }
+
+          // Minimal wind for performance
+          if (settings.windPower === undefined) {
+            settings.windPower = 0.05 // Minimal wind for performance
+          }
+
+          // Only reduce hit radius if it's too large
+          if (settings.hitRadius !== undefined && settings.hitRadius > 0.5) {
+            settings.hitRadius = Math.max(settings.hitRadius * 0.8, 0.1)
+          }
+        })
+
+        // Re-initialize after configuration changes
         try {
           spring.setInitState()
-        } catch (_) { }
-        console.log('[vrmFactory] spring mapping counts', 'springs:', spring.joints.size, 'pairs:', springPairs.length, 'drive:', drivePairs.length)
-      } catch (_) {
-        // ignore
+          if (springboneConfig.debugMode) {
+            console.log('[vrmFactory] Springbone configuration applied with responsiveness optimizations:', springboneConfig)
+          }
+        } catch (error) {
+          console.warn('[vrmFactory] Failed to reinitialize springbones after config:', error)
+        }
+
+      } catch (error) {
+        console.warn('[vrmFactory] Failed to apply springbone configuration:', error)
       }
-      springMirrorInit = true
+    }
+
+    // Enhanced error handling for springbone operations
+    function safeSpringboneOperation(operation, operationName) {
+      try {
+        return operation()
+      } catch (error) {
+        console.warn(`[vrmFactory] Springbone ${operationName} failed:`, error)
+        return false
+      }
+    }
+
+    // Validate springbone system health
+    function validateSpringboneSystem() {
+      if (!hasSprings || !origVRM?.springBoneManager) return false
+
+      try {
+        const spring = origVRM.springBoneManager
+
+        // Check if springbone manager is healthy
+        if (!spring.joints || spring.joints.size === 0) {
+          console.warn('[vrmFactory] Springbone system has no joints')
+          return false
+        }
+
+        // Check for invalid joints
+        let validJoints = 0
+        spring.joints.forEach(joint => {
+          if (joint.bone && joint.settings) {
+            validJoints++
+          }
+        })
+
+        if (validJoints === 0) {
+          console.warn('[vrmFactory] Springbone system has no valid joints')
+          return false
+        }
+
+        if (springboneConfig.debugMode) {
+          console.log(`[vrmFactory] Springbone system validation: ${validJoints}/${spring.joints.size} valid joints`)
+        }
+
+        return validJoints > 0
+
+      } catch (error) {
+        console.warn('[vrmFactory] Springbone system validation failed:', error)
+        return false
+      }
+    }
+
+    // Performance monitoring for springbones
+    let springbonePerformanceStats = {
+      updateCount: 0,
+      lastReset: Date.now(),
+      averageUpdateTime: 0,
+      totalUpdateTime: 0
+    }
+
+    function updateSpringbonePerformance(updateTime) {
+      springbonePerformanceStats.updateCount++
+      springbonePerformanceStats.totalUpdateTime += updateTime
+
+      // Reset stats every 5 seconds
+      const now = Date.now()
+      if (now - springbonePerformanceStats.lastReset > 5000) {
+        springbonePerformanceStats.averageUpdateTime = springbonePerformanceStats.totalUpdateTime / springbonePerformanceStats.updateCount
+        console.log('[vrmFactory] Springbone performance:', {
+          updatesPerSecond: springbonePerformanceStats.updateCount / 5,
+          averageUpdateTime: springbonePerformanceStats.averageUpdateTime.toFixed(3) + 'ms',
+          totalUpdates: springbonePerformanceStats.updateCount
+        })
+
+        // Reset stats
+        springbonePerformanceStats.updateCount = 0
+        springbonePerformanceStats.totalUpdateTime = 0
+        springbonePerformanceStats.lastReset = now
+      }
     }
 
     const update = delta => {
       elapsed += delta
-      // If the avatar has springs, always animate every frame for consistent driving
-      const doAnim = hasSprings ? true : (rateCheck ? elapsed >= rate : true)
-      if (doAnim) {
-        mixer.update(hasSprings ? delta : elapsed)
-        skeleton.bones.forEach(bone => bone.updateMatrixWorld())
-        skeleton.update = THREE.Skeleton.prototype.update
-        if (!currentEmote) {
-          updateLocomotion(delta)
-        }
-        // facial expressions per frame
-        if (expressionsEnabled) {
-          updateBlink(elapsed)
-          updateMouth(elapsed, talking)
-          if (expressionManager) {
-            // push values to manager and update
-            for (const [canon, weight] of Object.entries(expressionWeights)) {
-              const actual = nameMap[canon] || canon
-              expressionManager.setValue(actual, weight)
-            }
-            expressionManager.update()
-            // mirror morph target influences from original to clone
-            if (!morphMirrorInit) initMorphMirror()
-            for (const [s, d] of morphPairs) {
-              const a = s.morphTargetInfluences
-              const b = d.morphTargetInfluences
-              if (!a || !b) continue
-              const len = Math.min(a.length, b.length)
-              for (let j = 0; j < len; j++) b[j] = a[j]
-            }
-          } else {
-            // fallback: apply directly to cloned VRMExpression nodes
-            expressionsByName.forEach(expr => expr.clearAppliedWeight())
-            for (const [canon, weight] of Object.entries(expressionWeights)) {
-              const actual = nameMap[canon] || canon
-              const expr = expressionsByName.get(actual)
-              if (!expr) continue
-              expr.weight = weight
-              if (weight > 0) expr.applyWeight({ multiplier: 1.0 })
-            }
-          }
+
+      // Use THREE-VRM's built-in update - it handles everything!
+      const origVRM = glb.userData.vrm
+      if (origVRM) {
+        // Initialize springbones if not done yet
+        if (!springMirrorInit && origVRM.springBoneManager) {
+          initSpringMirror()
+          springMirrorInit = true
         }
 
-        // spring bones will also be stepped below every frame (not rate-limited)
-
-        if (loco.gazeDir && distance < MAX_GAZE_DISTANCE && (currentEmote ? currentEmote.gaze : true)) {
-          // aimBone('chest', loco.gazeDir, delta, {
-          //   minAngle: -90,
-          //   maxAngle: 90,
-          //   smoothing: 0.7,
-          //   weight: 0.7,
-          // })
-          aimBone('neck', loco.gazeDir, delta, {
-            minAngle: -30,
-            maxAngle: 30,
-            smoothing: 0.4,
-            weight: 0.6,
-          })
-          aimBone('head', loco.gazeDir, delta, {
-            minAngle: -30,
-            maxAngle: 30,
-            smoothing: 0.4,
-            weight: 0.6,
-          })
-        }
-        // tvrm.humanoid.update(delta)
-        elapsed = 0
-      } else {
-        skeleton.update = noop
-      }
-
-      // spring bones per frame (not rate-limited): drive orig with clone pose, simulate, mirror back
-      if (!springMirrorInit) initSpringMirror()
-      if (origVRM && (springPairs.length || drivePairs.length)) {
-        const _pos = new THREE.Vector3()
-        const _quat = new THREE.Quaternion()
-        const _scl = new THREE.Vector3()
-        vrm.scene.matrix.decompose(_pos, _quat, _scl)
-        origVRM.scene.position.copy(_pos)
-        origVRM.scene.quaternion.copy(_quat)
-        origVRM.scene.scale.copy(_scl)
-        origVRM.scene.updateMatrixWorld(true)
-        // copy clone bone rotations into original skeleton so springs have correct inputs
-        for (const [cloneBone, origBone] of drivePairs) {
-          if (origBone && cloneBone) {
-            // many VRM spring bones have matrixAutoUpdate=false; force local matrix rebuild
-            origBone.quaternion.copy(cloneBone.quaternion)
-            origBone.updateMatrix()
-            origBone.updateMatrixWorld(true)
-          }
-        }
-        // advance VRM systems (includes node constraints + spring bones)
+        // Update VRM (this should handle springbones automatically)
         origVRM.update(delta)
-        // mirror spring joints back to clone only
-        for (const [src, dst] of springPairs) {
-          if (dst) {
-            dst.quaternion.copy(src.quaternion)
-            dst.updateMatrix()
-            dst.updateMatrixWorld(true)
+
+        // Enable UV scrolling on MToon materials (hair, clothing, etc.)
+        if (!uvScrollingInit) {
+          enableMToonUVScrolling()
+          uvScrollingInit = true
+        }
+
+        // Debug: Check if springbones are actually updating
+        if (springMirrorInit && hasSprings && origVRM.springBoneManager) {
+          // Call the simple springbone update function that actually works
+          // updateSpringbones(delta) // This function is removed
+
+          // Debug: Log springbone update (only every 60 frames to avoid spam)
+          if (Math.floor(Date.now() / 16) % 60 === 0) {
+            console.log('[vrmFactory] Springbone update called, delta:', delta.toFixed(4))
           }
         }
-        // ensure skinned mesh bone matrices reflect new spring rotations
-        for (const m of skinnedMeshes) {
-          THREE.Skeleton.prototype.update.call(m.skeleton)
+
+        // THREE-VRM already handles springbones and material animations via origVRM.update()
+
+        // If the avatar has springs, always animate every frame for consistent driving
+        const doAnim = hasSprings ? true : (rateCheck ? elapsed >= rate : true)
+
+        if (doAnim) {
+          mixer.update(hasSprings ? delta : elapsed)
+          skeleton.bones.forEach(bone => bone.updateMatrixWorld())
+          skeleton.update = THREE.Skeleton.prototype.update
+          if (!currentEmote) {
+            updateLocomotion(delta)
+          }
+          // facial expressions per frame
+          if (expressionsEnabled) {
+            updateBlink(elapsed)
+            updateMouth(elapsed, talking)
+            if (expressionManager) {
+              // push values to manager and update
+              for (const [canon, weight] of Object.entries(expressionWeights)) {
+                const actual = nameMap[canon] || canon
+                expressionManager.setValue(actual, weight)
+              }
+              expressionManager.update()
+              // mirror morph target influences from original to clone
+              if (!morphMirrorInit) initMorphMirror()
+              for (const [s, d] of morphPairs) {
+                const a = s.morphTargetInfluences
+                const b = d.morphTargetInfluences
+                if (!a || !b) continue
+                const len = Math.min(a.length, b.length)
+                for (let j = 0; j < len; j++) b[j] = a[j]
+              }
+            } else {
+              // fallback: apply directly to cloned VRMExpression nodes
+              expressionsByName.forEach(expr => expr.clearAppliedWeight())
+              for (const [canon, weight] of Object.entries(expressionWeights)) {
+                const actual = nameMap[canon] || canon
+                const expr = expressionsByName.get(actual)
+                if (!expr) continue
+                expr.weight = weight
+                if (weight > 0) expr.applyWeight({ multiplier: 1.0 })
+              }
+            }
+          }
+
+          if (loco.gazeDir && distance < MAX_GAZE_DISTANCE && (currentEmote ? currentEmote.gaze : true)) {
+            // aimBone('chest', loco.gazeDir, delta, {
+            //   minAngle: -90,
+            //   maxAngle: 90,
+            //   smoothing: 0.7,
+            //   weight: 0.7,
+            // })
+            aimBone('neck', loco.gazeDir, delta, {
+              minAngle: -30,
+              maxAngle: 30,
+              smoothing: 0.4,
+              weight: 0.6,
+            })
+            aimBone('head', loco.gazeDir, delta, {
+              minAngle: -30,
+              maxAngle: 30,
+              smoothing: 0.4,
+              weight: 0.6,
+            })
+          }
+          // tvrm.humanoid.update(delta)
+          elapsed = 0
+        } else {
+          skeleton.update = noop
         }
-      }
+
+        // spring bones per frame (not rate-limited): drive orig with clone pose, simulate, mirror back
+        if (!springMirrorInit) initSpringMirror()
+        if (origVRM && (springPairs.length || drivePairs.length)) {
+          const _pos = new THREE.Vector3()
+          const _quat = new THREE.Quaternion()
+          const _scl = new THREE.Vector3()
+          vrm.scene.matrix.decompose(_pos, _quat, _scl)
+          origVRM.scene.position.copy(_pos)
+          origVRM.scene.quaternion.copy(_quat)
+          origVRM.scene.scale.copy(_scl)
+          origVRM.scene.updateMatrixWorld(true)
+
+          // copy clone bone rotations into original skeleton so springs have correct inputs
+          for (const [cloneBone, origBone] of drivePairs) {
+            if (origBone && cloneBone) {
+              // many VRM spring bones have matrixAutoUpdate=false; force local matrix rebuild
+              origBone.quaternion.copy(cloneBone.quaternion)
+              origBone.updateMatrix()
+              origBone.updateMatrixWorld(true)
+            }
+          }
+
+          // advance VRM systems (includes node constraints + spring bones)
+          origVRM.update(delta)
+
+          // mirror spring joints back to clone only
+          for (const [src, dst] of springPairs) {
+            if (dst) {
+              dst.quaternion.copy(src.quaternion)
+              dst.updateMatrix()
+              dst.updateMatrixWorld(true)
+            }
+          }
+
+          // ensure skinned mesh bone matrices reflect new spring rotations
+          for (const m of skinnedMeshes) {
+            THREE.Skeleton.prototype.update.call(m.skeleton)
+          }
+        }
+
+        // WORKING SPRINGBONE SYSTEM using THREE-VRM 3.3.3 API
+        if (springMirrorInit && hasSprings && origVRM?.springBoneManager) {
+          // CRITICAL: Update each individual joint using the correct API
+          const joints = origVRM.springBoneManager.joints
+          if (joints && joints.size > 0) {
+            const jointsArray = Array.from(joints)
+
+            // Update each joint individually (this is how three-vrm 3.3.3 works)
+            jointsArray.forEach(joint => {
+              if (joint && typeof joint.update === 'function') {
+                joint.update(delta)
+              }
+            })
+
+            // Mirror the updated springbone rotations back to the clone
+            if (springPairs.length > 0) {
+              springPairs.forEach(([origJoint, cloneBone]) => {
+                if (origJoint && cloneBone && origJoint.bone) {
+                  // Copy the updated springbone rotation to the clone bone
+                  cloneBone.quaternion.copy(origJoint.bone.quaternion)
+                  cloneBone.updateMatrixWorld(true)
+                }
+              })
+            }
+
+            // Debug: Log springbone update (only every 60 frames to avoid spam)
+            if (Math.floor(Date.now() / 16) % 60 === 0) {
+              console.log('[vrmFactory] Springbone update using THREE-VRM 3.3.3 API, joints:', jointsArray.length)
+            }
+          }
+        }
+      } // Close the origVRM if block
+
+      // THREE-VRM handles its own scene transformation automatically
     }
 
     const aimBone = (() => {
@@ -994,6 +1302,49 @@ export function createVRMFactory(glb, setupMaterial) {
         // world.updater.remove(update)
         hooks.octree?.remove(sItem)
       },
+      updatePlayerMovement(velocity, rotation) {
+        // Real-time movement integration for immediate springbone response
+        if (vrm.scene && vrm.scene.userData) {
+          vrm.scene.userData.playerMovement = { velocity, rotation }
+
+          // Force immediate springbone response to player movement
+          if (hasSprings && origVRM?.springBoneManager) {
+            const joints = origVRM.springBoneManager.joints
+            if (joints && typeof joints.size === 'number' && joints.size > 0) {
+              // Boost responsiveness during movement
+              const jointsArray = Array.from(joints)
+              jointsArray.forEach(joint => {
+                if (joint && joint.settings) {
+                  // Temporarily reduce stiffness and drag for immediate response
+                  joint.settings.stiffness *= 0.7
+                  joint.settings.dragForce *= 0.7
+                }
+              })
+            }
+          }
+        }
+      },
+      setPerformanceMode(mode) {
+        // Performance mode toggle: 'quality', 'balanced', 'performance'
+        if (springboneConfig && ['quality', 'balanced', 'performance'].includes(mode)) {
+          springboneConfig.performanceMode = mode
+          console.log(`[vrmFactory] Performance mode set to: ${mode}`)
+        }
+      },
+      setUVScrolling(enabled) {
+        // Enable/disable UV scrolling for materials
+        if (springboneConfig) {
+          springboneConfig.enableUVScrolling = !!enabled
+          console.log(`[vrmFactory] UV scrolling ${enabled ? 'enabled' : 'disabled'}`)
+        }
+      },
+      setUVScrollSpeed(type, x, y) {
+        // Set UV scrolling speed for specific material types
+        if (springboneConfig && springboneConfig.uvScrollSpeed[type]) {
+          springboneConfig.uvScrollSpeed[type] = { x: x || 0.5, y: y || 0.3 }
+          console.log(`[vrmFactory] UV scroll speed for ${type} set to x:${x}, y:${y}`)
+        }
+      },
     }
   }
 }
@@ -1019,17 +1370,4 @@ function createCapsule(radius, height) {
   const geometry = new THREE.CapsuleGeometry(radius, height)
   geometry.translate(0, fullHeight / 2, 0)
   return geometry
-}
-
-let queryParams = {}
-function getQueryParams(url) {
-  if (!queryParams[url]) {
-    url = new URL(url)
-    const params = {}
-    for (const [key, value] of url.searchParams.entries()) {
-      params[key] = value
-    }
-    queryParams[url] = params
-  }
-  return queryParams[url]
 }

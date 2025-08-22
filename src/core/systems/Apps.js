@@ -237,6 +237,150 @@ export class Apps extends System {
         const newUrl = window.location.pathname + '?' + urlParams.toString()
         window.history.replaceState({}, '', newUrl)
       },
+      // Starknet functionality
+      getStarknetAccount(entity) {
+        return world.starknet.getAccount()
+      },
+      isStarknetConnected(entity) {
+        return world.starknet.isConnected()
+      },
+      getStarknetChainId(entity) {
+        return world.starknet.getChainId()
+      },
+      async callStarknetContract(entity, address, abi, functionName, calldata = []) {
+        const contract = world.starknet.getContract(address, abi)
+        return await contract.call(functionName, calldata)
+      },
+      async invokeStarknetContract(entity, address, abi, functionName, calldata = [], options = {}) {
+        const contract = world.starknet.getContract(address, abi)
+        return await contract.invoke(functionName, calldata, options)
+      },
+      async sendStarknetTransaction(entity, transaction) {
+        return await world.starknet.sendTransaction(transaction)
+      },
+      async getStarknetTransactionStatus(entity, txHash) {
+        return await world.starknet.getTransactionStatus(txHash)
+      },
+      async getStarknetBalance(entity, tokenAddress = null) {
+        return await world.starknet.getBalance(tokenAddress)
+      },
+      async signStarknetMessage(entity, message) {
+        return await world.starknet.signMessage(message)
+      },
+      onStarknetEvent(entity, event, callback) {
+        world.starknet.on(event, callback)
+      },
+      offStarknetEvent(entity, event, callback) {
+        world.starknet.off(event, callback)
+      },
+      // Wallet detection and access methods
+      detectWallets(entity) {
+        if (!world.network.isClient) {
+          return { starknet: [], ethereum: [] }
+        }
+
+        const wallets = {
+          starknet: [],
+          ethereum: []
+        }
+
+        try {
+          // Check for Starknet wallets
+          if (window.starknet) {
+            wallets.starknet.push({
+              name: window.starknet.name || 'Starknet Wallet',
+              provider: window.starknet
+            })
+          }
+
+          if (window.starknet_argentX) {
+            wallets.starknet.push({
+              name: 'ArgentX',
+              provider: window.starknet_argentX
+            })
+          }
+
+          if (window.starknet_braavos) {
+            wallets.starknet.push({
+              name: 'Braavos',
+              provider: window.starknet_braavos
+            })
+          }
+
+          // Check for Ethereum wallets
+          if (window.ethereum) {
+            if (window.ethereum.isMetaMask) {
+              wallets.ethereum.push({
+                name: 'MetaMask',
+                provider: window.ethereum
+              })
+            } else if (window.ethereum.isCoinbaseWallet) {
+              wallets.ethereum.push({
+                name: 'Coinbase Wallet',
+                provider: window.ethereum
+              })
+            } else {
+              wallets.ethereum.push({
+                name: 'Ethereum Wallet',
+                provider: window.ethereum
+              })
+            }
+          }
+        } catch (error) {
+          console.error('[Apps] Error detecting wallets:', error)
+        }
+
+        return wallets
+      },
+      async connectStarknetWallet(entity, walletProvider) {
+        if (!world.network.isClient) {
+          throw new Error('Wallet connection only available on client')
+        }
+
+        try {
+          await walletProvider.enable()
+
+          let address
+          if (walletProvider.selectedAddress) {
+            address = walletProvider.selectedAddress
+          } else if (walletProvider.account && walletProvider.account.address) {
+            address = walletProvider.account.address
+          } else {
+            throw new Error('Could not get wallet address')
+          }
+
+          const chainId = walletProvider.chainId || 'starknet-mainnet'
+
+          return {
+            address,
+            chainId,
+            provider: walletProvider
+          }
+        } catch (error) {
+          console.error('[Apps] Starknet wallet connection failed:', error)
+          throw error
+        }
+      },
+      async connectEthereumWallet(entity, walletProvider) {
+        if (!world.network.isClient) {
+          throw new Error('Wallet connection only available on client')
+        }
+
+        try {
+          const accounts = await walletProvider.request({ method: 'eth_requestAccounts' })
+          const address = accounts[0]
+          const chainId = await walletProvider.request({ method: 'eth_chainId' })
+
+          return {
+            address,
+            chainId,
+            provider: walletProvider
+          }
+        } catch (error) {
+          console.error('[Apps] Ethereum wallet connection failed:', error)
+          throw error
+        }
+      },
     }
   }
 
