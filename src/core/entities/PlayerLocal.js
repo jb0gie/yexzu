@@ -86,6 +86,8 @@ export class PlayerLocal extends Entity {
     this.jumped = false
     this.jumping = false
     this.justLeftGround = false
+    this.canDoubleJump = true  // Track if we can perform a double jump
+    this.doubleJumpUsed = false  // Prevent multiple triggers per air session
 
     this.fallTimer = 0
     this.falling = false
@@ -529,7 +531,6 @@ export class PlayerLocal extends Entity {
       // this is to prevent animation jitter when only falling for a very small amount of time
       if (this.fallTimer > 0.1 && !this.falling) {
         this.jumping = false
-        this.airJumping = false
         this.falling = true
         this.fallStartY = this.base.position.y
       }
@@ -549,10 +550,15 @@ export class PlayerLocal extends Entity {
         this.jumping = false
       }
 
-      // if airJumping and we're now on the ground, clear it
-      if (this.airJumped && this.grounded) {
-        this.airJumped = false
-        this.airJumping = false
+      // Reset double jump when landing
+      if (this.grounded) {
+        this.canDoubleJump = true
+        this.doubleJumpUsed = false  // Reset for next jump
+        // Clear flip animation when landing
+        if (this.flipUntil > 0) {
+          this.flipStartAt = 0
+          this.flipUntil = 0
+        }
       }
 
       // if we're grounded we don't need gravity.
@@ -619,8 +625,6 @@ export class PlayerLocal extends Entity {
             // ensure other stuff is reset
             this.jumping = false
             this.falling = false
-            this.airJumped = false
-            this.airJumping = false
           }
         }
         velocity.add(this.pushForce)
@@ -659,7 +663,7 @@ export class PlayerLocal extends Entity {
       const shouldJump =
         (this.grounded || hasCoyote) && !this.jumping && bufferedJump && !this.data.effect?.snare && !this.data.effect?.freeze
       const shouldAirJump =
-        !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
+        !this.grounded && this.canDoubleJump && !this.doubleJumpUsed && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -679,8 +683,8 @@ export class PlayerLocal extends Entity {
           this.falling = false
           this.fallTimer = 0
           this.jumping = true
-          this.airJumped = true
-          this.airJumping = true
+          this.canDoubleJump = false  // Prevent multiple double jumps
+          this.doubleJumpUsed = true  // Mark as used for this air session
           // lock flip pose for a short, deterministic duration
           this.flipStartAt = this.world.time
           this.flipUntil = this.flipStartAt + this.flipDuration
@@ -803,6 +807,10 @@ export class PlayerLocal extends Entity {
 
     // watch jump presses to either fly or air-jump
     this.jumpDown = isXR ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
+    // Reset double jump used flag when button is released (allows next press)
+    if (!this.jumpDown && this.doubleJumpUsed && !this.grounded) {
+      this.doubleJumpUsed = false
+    }
     // capture jump press for buffering
     const pressed = isXR ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed
     if (pressed) {
@@ -944,17 +952,21 @@ export class PlayerLocal extends Entity {
     // pass speaking state to animation system for blending
     this.avatar?.instance?.setSpeaking(this.speaking)
 
+    // Clear expired flip animation
+    if (this.flipUntil > 0 && this.world.time >= this.flipUntil) {
+      this.flipStartAt = 0
+      this.flipUntil = 0
+    }
+
     // get locomotion mode
     let mode
     if (this.data.effect?.emote) {
       // emote = this.data.effect.emote
     } else if (this.flying) {
       mode = Modes.FLY
-    } else if (this.world.time < this.flipUntil) {
-      // keep FLIP exclusive while locked, unless we have clearly transitioned into falling
-      const flipElapsed = this.world.time - this.flipStartAt
-      const unlockForFall = this.falling && flipElapsed > Math.min(0.45, this.flipDuration * 0.7)
-      mode = unlockForFall ? null : Modes.FLIP
+    } else if (this.flipUntil > 0 && !this.grounded) {
+      // Only show flip animation when in air and timer is active
+      mode = Modes.FLIP
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
