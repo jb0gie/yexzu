@@ -907,10 +907,14 @@ export function createVRMFactory(glb, setupMaterial) {
     addPose('walkLeft', Emotes.WALK_LEFT)
     addPose('walkBack', Emotes.WALK_BACK)
     addPose('walkRight', Emotes.WALK_RIGHT)
+    addPose('walkBackLeft', Emotes.WALK_BACK_LEFT)
+    addPose('walkBackRight', Emotes.WALK_BACK_RIGHT)
     addPose('run', Emotes.RUN)
     addPose('runLeft', Emotes.RUN_LEFT)
     addPose('runBack', Emotes.RUN_BACK)
     addPose('runRight', Emotes.RUN_RIGHT)
+    addPose('runBackLeft', Emotes.RUN_BACK_LEFT)
+    addPose('runBackRight', Emotes.RUN_BACK_RIGHT)
     addPose('jump', Emotes.JUMP)
     addPose('fall', Emotes.FALL)
     addPose('fly', Emotes.FLY)
@@ -935,6 +939,8 @@ export function createVRMFactory(glb, setupMaterial) {
         const leftKey = `${prefix}Left`
         const backKey = `${prefix}Back`
         const rightKey = `${prefix}Right`
+        const backLeftKey = `${prefix}BackLeft`
+        const backRightKey = `${prefix}BackRight`
         if (axis.length() > 0.01) {
           if (angleDeg >= 337.5 || angleDeg < 22.5) {
             // Pure forward
@@ -948,18 +954,14 @@ export function createVRMFactory(glb, setupMaterial) {
             // Pure right
             poses[rightKey].target = 1
           } else if (angleDeg >= 112.5 && angleDeg < 157.5) {
-            // Right-back blend
-            const blend = (angleDeg - 112.5) / 45
-            poses[rightKey].target = 1 - blend
-            poses[backKey].target = blend
+            // Back-right diagonal - swap: the file might be named opposite
+            poses[backLeftKey].target = 1
           } else if (angleDeg >= 157.5 && angleDeg < 202.5) {
             // Pure back
             poses[backKey].target = 1
           } else if (angleDeg >= 202.5 && angleDeg < 247.5) {
-            // Back-left blend
-            const blend = (angleDeg - 202.5) / 45
-            poses[backKey].target = 1 - blend
-            poses[leftKey].target = blend
+            // Back-left diagonal - swap: the file might be named opposite
+            poses[backRightKey].target = 1
           } else if (angleDeg >= 247.5 && angleDeg < 292.5) {
             // Pure left
             poses[leftKey].target = 1
