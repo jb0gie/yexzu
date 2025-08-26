@@ -385,13 +385,21 @@ export function createVRMFactory(glb, setupMaterial) {
         }
       }
     })
-    const setEmote = url => {
+    const setEmote = (url, options = {}) => {
+      const { crossFade = true, fadeDuration = 0.15, warp = true } = options
+      
       if (currentEmote?.url === url) return
-      if (currentEmote) {
-        currentEmote.action?.fadeOut(0.15)
-        currentEmote = null
+      
+      const prevEmote = currentEmote
+      
+      if (!url) {
+        if (currentEmote) {
+          currentEmote.action?.fadeOut(fadeDuration)
+          currentEmote = null
+        }
+        return
       }
-      if (!url) return
+      
       const opts = getQueryParams(url)
       const loop = opts.l !== '0'
       const speed = parseFloat(opts.s || 1)
@@ -403,7 +411,19 @@ export function createVRMFactory(glb, setupMaterial) {
           currentEmote.loop = loop
           currentEmote.action.clampWhenFinished = !loop
           currentEmote.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-          currentEmote.action.reset().fadeIn(0.15).play()
+          
+          // Use crossFadeTo if requested and there's a previous emote playing
+          if (crossFade && prevEmote?.action?.isRunning()) {
+            console.log(`[VRM] Using crossFadeTo for emote transition (duration: ${fadeDuration}s)`)
+            currentEmote.action.reset().play()
+            prevEmote.action.crossFadeTo(currentEmote.action, fadeDuration, warp)
+          } else {
+            // Fall back to original fade behavior
+            if (prevEmote) {
+              prevEmote.action?.fadeOut(fadeDuration)
+            }
+            currentEmote.action.reset().fadeIn(fadeDuration).play()
+          }
           clearLocomotion()
         }
       } else {
@@ -429,7 +449,17 @@ export function createVRMFactory(glb, setupMaterial) {
           if (currentEmote === emote) {
             action.clampWhenFinished = !loop
             action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-            action.play()
+            
+            // Check if we should crossfade from previous
+            if (crossFade && prevEmote?.action?.isRunning()) {
+              action.play()
+              prevEmote.action.crossFadeTo(action, fadeDuration, warp)
+            } else {
+              if (prevEmote?.action) {
+                prevEmote.action.fadeOut(fadeDuration)
+              }
+              action.fadeIn(fadeDuration).play()
+            }
             clearLocomotion()
           }
         })
@@ -844,6 +874,13 @@ export function createVRMFactory(glb, setupMaterial) {
               pose.action.reset().fadeIn(0.15).play()
               pose.active = true
             }
+          }
+        },
+        crossFadeTo: (targetPose, duration = 0.15, warp = true) => {
+          if (pose.action && targetPose.action && pose.active) {
+            pose.action.crossFadeTo(targetPose.action, duration, warp)
+            pose.active = false
+            targetPose.active = true
           }
         },
         fadeOut: () => {
