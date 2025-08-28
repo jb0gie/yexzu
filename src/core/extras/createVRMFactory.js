@@ -50,6 +50,7 @@ const Modes = {
   FLY: 5,
   TALK: 6,
   FLIP: 7,
+  BACKFLIP: 8,
 }
 
 export function createVRMFactory(glb, setupMaterial) {
@@ -983,6 +984,10 @@ export function createVRMFactory(glb, setupMaterial) {
       } else if (mode === Modes.FLIP) {
         // play the dedicated flip emote; locomotion poses will be cleared by setEmote
         setEmote(Emotes.FLIP)
+      } else if (mode === Modes.BACKFLIP) {
+        // play the dedicated backflip emote for backward double jumps
+        console.log('[VRM] Triggering BACKFLIP animation')
+        setEmote(Emotes.BACKFLIP)
       }
       const lerpSpeed = 16
       for (const key in poses) {

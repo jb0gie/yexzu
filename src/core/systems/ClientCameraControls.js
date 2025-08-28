@@ -108,7 +108,20 @@ export class ClientCameraControls extends System {
   
   update(delta) {
     // Handle ADS-style zoom (right mouse button)
-    if (this.enabled && this.adsZoomEnabled && this.control) {
+    // Disable ADS if in build mode since right-click is used for building
+    const inBuildMode = this.world.builder?.enabled
+    
+    // If we were aiming but entered build mode, stop aiming immediately
+    if (inBuildMode && this.isAiming) {
+      this.isAiming = false
+      this.targetFocalLength = this.baseFocalLength
+      this.world.prefs.setDOFBokehScale(this.normalBokehScale)
+      if (this.control?.mouseRight?.capture !== undefined) {
+        this.control.mouseRight.capture = false
+      }
+    }
+    
+    if (this.enabled && this.adsZoomEnabled && this.control && !inBuildMode) {
       // Check if right mouse button is currently down (not pressed/released)
       const rightMouseDown = this.control?.mouseRight?.down
       

@@ -53,6 +53,7 @@ const Modes = {
   FLY: 5,
   TALK: 6,
   FLIP: 7, // air-jump / acrobatic mid-air move
+  BACKFLIP: 8, // backward air-jump
 }
 
 export class PlayerLocal extends Entity {
@@ -110,6 +111,7 @@ export class PlayerLocal extends Entity {
     this.flipStartAt = 0
     this.flipUntil = 0
     this.flipDuration = 0.6
+    this.isBackflip = false
 
     this.platform = {
       actor: null,
@@ -474,6 +476,8 @@ export class PlayerLocal extends Entity {
         this.grounded = true
         this.groundNormal.copy(sweepHit.normal)
         this.groundAngle = UP.angleTo(this.groundNormal) * RAD2DEG
+        // Reset backflip state when landing
+        this.isBackflip = false
       } else {
         this.justLeftGround = !!this.grounded
         this.grounded = false
@@ -681,6 +685,11 @@ export class PlayerLocal extends Entity {
           this.jumping = true
           this.airJumped = true
           this.airJumping = true
+          // Check if moving backward for backflip
+          const moveRad = Math.atan2(this.axis.x, -this.axis.z)
+          const moveDeg = ((moveRad * 180) / Math.PI + 360) % 360
+          this.isBackflip = moveDeg >= 112.5 && moveDeg < 247.5 // Backward range
+          console.log(`[Double Jump] moveDeg: ${moveDeg}, isBackflip: ${this.isBackflip}, axis:`, this.axis)
           // lock flip pose for a short, deterministic duration
           this.flipStartAt = this.world.time
           this.flipUntil = this.flipStartAt + this.flipDuration
@@ -951,10 +960,11 @@ export class PlayerLocal extends Entity {
     } else if (this.flying) {
       mode = Modes.FLY
     } else if (this.world.time < this.flipUntil) {
-      // keep FLIP exclusive while locked, unless we have clearly transitioned into falling
+      // keep FLIP/BACKFLIP exclusive while locked, unless we have clearly transitioned into falling
       const flipElapsed = this.world.time - this.flipStartAt
       const unlockForFall = this.falling && flipElapsed > Math.min(0.45, this.flipDuration * 0.7)
-      mode = unlockForFall ? null : Modes.FLIP
+      mode = unlockForFall ? null : (this.isBackflip ? Modes.BACKFLIP : Modes.FLIP)
+      if (!unlockForFall) console.log(`[Locomotion] Mode: ${this.isBackflip ? 'BACKFLIP' : 'FLIP'}`)
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
