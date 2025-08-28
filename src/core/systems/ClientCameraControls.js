@@ -58,14 +58,16 @@ export class ClientCameraControls extends System {
     
     // Initialize camera with current settings
     if (this.world.prefs) {
-      // Always reset to base focal length on init (don't persist zoom state)
-      this.baseFocalLength = 50  // Default base focal length
+      // Default to wide landscape preset: 24mm focal length (73° FOV) 
+      // This matches the desired "what i want it to look like.png"
+      this.baseFocalLength = 24  // Wide landscape preset: 24mm (73° FOV)
       this.currentFocalLength = this.baseFocalLength
       this.targetFocalLength = this.baseFocalLength
       
-      console.log(`ClientCameraControls: Resetting focal length from ${this.world.prefs.focalLength} to ${this.baseFocalLength}`)
+      console.log(`ClientCameraControls: Setting focal length to wide landscape preset: ${this.baseFocalLength}mm (73° FOV)`)
       
-      // Reset focal length to base on load
+      // Force reset focal length to base on load (ignore saved prefs)
+      this.world.prefs.focalLength = this.baseFocalLength
       this.world.prefs.setFocalLength(this.baseFocalLength)
       this.applyFocalLength(this.baseFocalLength)
       
@@ -109,10 +111,10 @@ export class ClientCameraControls extends System {
     // Listen for pref changes
     this.world.prefs.on('change', this.onPrefsChange)
     
-    // Force reset zoom on start in case it was saved incorrectly
-    if (this.world.camera && this.world.prefs.focalLength !== 50) {
-      console.log('ClientCameraControls: Force resetting zoom on start')
-      this.setFocalLength(50)
+    // Force reset to landscape preset on start in case it was saved incorrectly
+    if (this.world.camera && this.world.prefs.focalLength !== this.baseFocalLength) {
+      console.log(`ClientCameraControls: Force resetting to landscape preset (${this.baseFocalLength}mm) on start`)
+      this.setFocalLength(this.baseFocalLength)
     }
   }
   
@@ -936,6 +938,46 @@ export class ClientCameraControls extends System {
         return true
       },
       
+      // Reset to default Hyperfy camera settings
+      reset: () => {
+        if (!this.isPlayerAdmin()) {
+          console.warn('Camera controls are admin-only')
+          return false
+        }
+        console.log('Resetting camera to wide landscape preset...')
+        
+        // Reset to wide landscape preset: 24mm focal length (73° FOV)
+        this.setFocalLength(24)
+        
+        // Disable all effects
+        this.disableDOF()
+        this.enableScrollZoom = false
+        this.adsZoomEnabled = false
+        
+        // Reset DOF settings to defaults
+        this.world.prefs.setDOFFocusDistance(10)
+        this.world.prefs.setDOFFocusRange(5)
+        this.world.prefs.setDOFBokehScale(1)
+        
+        // Reset autofocus settings
+        this.reticleAutofocus = false
+        this.playerAutofocus = false
+        this.dynamicDOF = false
+        this.focusSmoothing = true
+        this.focusSpeed = 0.1
+        
+        // Save reset state
+        this.world.prefs.persist()
+        
+        console.log('Camera reset to wide landscape preset:')
+        console.log('- FOV: 73° (24mm focal length)')
+        console.log('- DOF: Disabled')
+        console.log('- Scroll zoom: Disabled')
+        console.log('- ADS zoom: Disabled')
+        console.log('- All autofocus: Disabled')
+        return true
+      },
+      
       // Get current settings
       settings: () => {
         if (!this.isPlayerAdmin()) {
@@ -1010,6 +1052,7 @@ cam.preset('standard') - Apply standard preset
 
 Info:
 cam.settings() - Show current camera settings
+cam.reset() - Reset to default Hyperfy camera
 cam.help() - Show this help message
         `)
       }

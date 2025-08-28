@@ -143,6 +143,15 @@ export class ClientGraphics extends System {
   start() {
     this.world.on('xrSession', this.onXRSession)
     this.world.settings.on('change', this.onSettingsChange)
+    
+    // Listen for camera changes from CameraManager
+    this.world.on('camera-changed', (camera) => {
+      // Update the render pass with the new camera
+      if (this.renderPass && camera?.camera) {
+        this.renderPass.camera = camera.camera
+        console.log('ClientGraphics: Updated render pass camera')
+      }
+    })
   }
 
   resize(width, height) {
@@ -158,9 +167,16 @@ export class ClientGraphics extends System {
   }
 
   render() {
+    // Check if we have an active camera node with its own composer
+    const activeCameraNode = this.world.cameraManager?.activeCamera
+    
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
       this.renderer.render(this.world.stage.scene, this.world.camera)
+    } else if (activeCameraNode?.composer) {
+      // Use the camera node's composer if it has one
+      activeCameraNode.composer.render()
     } else {
+      // Fall back to the default composer
       this.composer.render()
     }
     if (this.xrDimensionsNeeded) {
