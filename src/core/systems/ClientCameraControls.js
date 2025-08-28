@@ -54,11 +54,28 @@ export class ClientCameraControls extends System {
   }
 
   init() {
+    console.log('ClientCameraControls: Initializing')
+    
     // Initialize camera with current settings
     if (this.world.prefs) {
-      this.applyFocalLength(this.world.prefs.focalLength)
-      this.baseFocalLength = this.world.prefs.focalLength || 50
+      // Always reset to base focal length on init (don't persist zoom state)
+      this.baseFocalLength = 50  // Default base focal length
       this.currentFocalLength = this.baseFocalLength
+      this.targetFocalLength = this.baseFocalLength
+      
+      console.log(`ClientCameraControls: Resetting focal length from ${this.world.prefs.focalLength} to ${this.baseFocalLength}`)
+      
+      // Reset focal length to base on load
+      this.world.prefs.setFocalLength(this.baseFocalLength)
+      this.applyFocalLength(this.baseFocalLength)
+      
+      // Reset bokeh to normal (in case it was saved while zoomed)
+      this.normalBokehScale = 1
+      const currentBokeh = this.world.prefs.dofBokehScale || 1
+      if (currentBokeh > 2) {
+        console.log(`ClientCameraControls: Resetting bokeh from ${currentBokeh} to ${this.normalBokehScale}`)
+        this.world.prefs.setDOFBokehScale(this.normalBokehScale)
+      }
       
       // Initialize autofocus settings from prefs - default to OFF
       this.reticleAutofocus = this.world.prefs.reticleAutofocus || false
@@ -70,6 +87,9 @@ export class ClientCameraControls extends System {
       this.zoomSpeed = this.world.prefs.zoomSpeed || 5
       this.currentFocusDistance = this.world.prefs.dofFocusDistance || 10
       this.targetFocusDistance = this.world.prefs.dofFocusDistance || 10
+      
+      // Reset aiming state
+      this.isAiming = false
     }
     
     // Bind controls for mouse input
@@ -88,6 +108,12 @@ export class ClientCameraControls extends System {
   start() {
     // Listen for pref changes
     this.world.prefs.on('change', this.onPrefsChange)
+    
+    // Force reset zoom on start in case it was saved incorrectly
+    if (this.world.camera && this.world.prefs.focalLength !== 50) {
+      console.log('ClientCameraControls: Force resetting zoom on start')
+      this.setFocalLength(50)
+    }
   }
   
   destroy() {
@@ -109,7 +135,7 @@ export class ClientCameraControls extends System {
   update(delta) {
     // Handle ADS-style zoom (right mouse button)
     // Disable ADS if in build mode since right-click is used for building
-    const inBuildMode = this.world.builder?.enabled
+    const inBuildMode = this.world.builder?.enabled === true
     
     // If we were aiming but entered build mode, stop aiming immediately
     if (inBuildMode && this.isAiming) {
@@ -119,8 +145,12 @@ export class ClientCameraControls extends System {
       if (this.control?.mouseRight?.capture !== undefined) {
         this.control.mouseRight.capture = false
       }
+      if (this.debugDOF) {
+        console.log('ADS: Disabled due to build mode')
+      }
     }
     
+    // Only process ADS if not in build mode
     if (this.enabled && this.adsZoomEnabled && this.control && !inBuildMode) {
       // Check if right mouse button is currently down (not pressed/released)
       const rightMouseDown = this.control?.mouseRight?.down
@@ -165,8 +195,10 @@ export class ClientCameraControls extends System {
           console.log('ADS: Zooming out')
         }
       }
-      
-      // Smooth focal length transition
+    }
+    
+    // Smooth focal length transition (only if not in build mode or if zooming out)
+    if (!inBuildMode || this.targetFocalLength === this.baseFocalLength) {
       if (Math.abs(this.targetFocalLength - this.currentFocalLength) > 0.1) {
         this.currentFocalLength += (this.targetFocalLength - this.currentFocalLength) * this.zoomTransitionSpeed
         this.setFocalLength(this.currentFocalLength)
