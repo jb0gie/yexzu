@@ -49,7 +49,7 @@ export class ClientPrefs extends System {
     this.dofAperture = isNumber(data.dofAperture) ? data.dofAperture : 5.6  // F-stop value (1.4 = shallow DOF, 22 = deep DOF)
     this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
     this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 1
-    this.focalLength = isNumber(data.focalLength) ? data.focalLength : 50
+    this.focalLength = isNumber(data.focalLength) ? data.focalLength : 24 // Wide landscape preset default (73° FOV)
     this.showHelpers = isBoolean(data.showHelpers) ? data.showHelpers : false
     // Autofocus settings
     this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : false

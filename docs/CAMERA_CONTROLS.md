@@ -1,150 +1,243 @@
 # Camera Controls Documentation
 
-Hyperfy now includes advanced camera controls for depth of field, focal length, and Three.js helper visualizations.
+Hyperfy includes two camera systems: the legacy camera controls for the singleton camera, and the new Camera node system for multiple cameras with cinematic effects.
 
-## Features
+## Legacy Camera Controls (Current)
 
-### Depth of Field (DOF)
-- **Focus Distance**: Control what distance from the camera is in sharp focus
-- **Focus Range**: Adjust the range of distances that appear in focus  
-- **Bokeh Scale**: Control the intensity of the background blur effect
+The existing singleton camera can be controlled via `world.cameraControls`:
 
-### Focal Length
-- Simulate different camera lenses (24mm wide angle to 200mm telephoto)
-- Automatically adjusts field of view based on focal length
+### ADS Zoom (Aim Down Sights)
+- **Right-click**: Hold to zoom in (like aiming in FPS games)
+- **Scroll wheel**: Adjust zoom level while zoomed
+- Disabled automatically in build mode
 
-### Helper Visualizations
-- Camera frustum helper
-- Grid helper for spatial reference
-- Axes helper showing X (red), Y (green), Z (blue) directions
-
-## API Reference
-
-### Accessing Camera Controls
-
-```javascript
-// Access via world object
-world.cameraControls
-```
-
-### Depth of Field Methods
-
+### Depth of Field
 ```javascript
 // Enable/disable DOF
 world.cameraControls.enableDOF()
 world.cameraControls.disableDOF()
 
-// Set focus distance (in world units)
+// Set focus distance
 world.cameraControls.setDOFFocusDistance(10)
-
-// Set focus range (in world units)
-world.cameraControls.setDOFFocusRange(5)
-
-// Set bokeh scale (blur intensity, typically 0.5 to 3)
-world.cameraControls.setDOFBokehScale(2)
-
-// Auto-focus on a position
-const targetPos = new THREE.Vector3(0, 0, -10)
-world.cameraControls.autoFocus(targetPos)
 ```
 
-### Focal Length Methods
-
+### Browser Console
 ```javascript
-// Set focal length (1-200mm, standard is 50mm)
+// Check if camera controls are available
+world.cameraControls
+
+// Enable DOF
+world.cameraControls.enableDOF()
+world.cameraControls.setDOFFocusDistance(5)
+
+// Adjust focal length
 world.cameraControls.setFocalLength(85)
-
-// Get current focal length
-const focalLength = world.cameraControls.getFocalLength()
 ```
 
-### Helper Methods
+## Camera Node System (New - Working!)
+
+The Camera node allows multiple cameras with per-camera postprocessing effects. Camera nodes are now functional and can be created through app scripts.
+
+### Creating Camera Nodes
 
 ```javascript
-// Show/hide/toggle helper visualizations
-world.cameraControls.showHelpers()
-world.cameraControls.hideHelpers()
-world.cameraControls.toggleHelpers()
+// In a HyperScript app
+const camera = app.create('camera', {
+  name: 'cinematic',
+  fov: 35,           // Field of view
+  near: 0.1,         // Near clipping plane  
+  far: 2000,         // Far clipping plane
+  active: true,      // Make this the active camera
+  position: [0, 5, 10],
+  rotation: [-20, 0, 0],
+  
+  // Depth of field settings
+  dof: {
+    enabled: true,
+    fStop: 1.4,          // Aperture (lower = more blur)
+    focusDistance: 10,   // Focus distance
+    maxBlur: 0.025,      // Maximum blur amount
+    autofocus: true,     // Enable autofocus
+    autofocusSpeed: 2,   // Focus tracking speed
+    pentagon: true       // Pentagon bokeh shape
+  },
+  
+  // Bloom effect
+  bloom: {
+    enabled: true,
+    intensity: 0.5,
+    luminanceThreshold: 0.8,
+    luminanceSmoothing: 0.3
+  },
+  
+  // Vignette effect  
+  vignette: {
+    enabled: true,
+    offset: 0.35,
+    darkness: 0.4
+  },
+  
+  // Film grain
+  filmGrain: {
+    enabled: true,
+    intensity: 0.35
+  },
+  
+  // Chromatic aberration
+  chromaticAberration: {
+    enabled: true,
+    offset: [0.002, 0.002]
+  }
+})
+
+app.add(camera)
+```
+
+### Camera Methods
+
+```javascript
+// Activation
+camera.activate()      // Make this the active camera
+camera.deactivate()    // Deactivate
+
+// Camera settings
+camera.setFOV(50)
+camera.setFocalLength(85)  // In mm
+camera.lookAt([0, 0, 0])   // Look at position
+
+// Effect controls
+camera.setDOF({ enabled: true, fStop: 1.2 })
+camera.setBloom({ intensity: 0.8 })
+camera.setVignette({ darkness: 0.5 })
+camera.setFilmGrain({ intensity: 0.4 })
 ```
 
 ### Camera Presets
 
+Common camera configurations:
+
+#### Cinematic (35mm)
 ```javascript
-// Apply preset configurations
-world.cameraControls.applyPreset('portrait')   // 85mm, shallow DOF
-world.cameraControls.applyPreset('landscape')  // 24mm, no DOF
-world.cameraControls.applyPreset('macro')      // 100mm, extreme shallow DOF
-world.cameraControls.applyPreset('standard')   // 50mm, default settings
-```
-
-### Getting Camera Settings
-
-```javascript
-// Get all current camera settings
-const settings = world.cameraControls.getCameraSettings()
-// Returns: {
-//   dof: { enabled, focusDistance, focusRange, bokehScale },
-//   focalLength,
-//   fov,
-//   showHelpers
-// }
-```
-
-## Browser Console Usage
-
-You can control the camera directly from the browser console:
-
-```javascript
-// Enable DOF with portrait-like settings
-world.cameraControls.enableDOF()
-world.cameraControls.setDOFFocusDistance(5)
-world.cameraControls.setDOFFocusRange(2)
-world.cameraControls.setDOFBokehScale(2)
-
-// Change to telephoto lens
-world.cameraControls.setFocalLength(135)
-
-// Show helpers for debugging
-world.cameraControls.showHelpers()
-```
-
-## Keyboard Shortcuts Example
-
-Here's an example of implementing keyboard shortcuts in a Hyperfy app:
-
-```javascript
-export default {
-  keydown({ world, event }) {
-    switch(event.key) {
-      case '1': world.cameraControls.applyPreset('portrait'); break
-      case '2': world.cameraControls.applyPreset('landscape'); break
-      case '3': world.cameraControls.applyPreset('macro'); break
-      case '4': world.cameraControls.applyPreset('standard'); break
-      case 'd': // Toggle DOF
-        if (world.prefs.dofEnabled) {
-          world.cameraControls.disableDOF()
-        } else {
-          world.cameraControls.enableDOF()
-        }
-        break
-      case 'h': world.cameraControls.toggleHelpers(); break
-    }
-  }
+{
+  fov: 35,
+  dof: { enabled: true, fStop: 1.4, autofocus: true },
+  bloom: { enabled: true, intensity: 0.5 },
+  vignette: { enabled: true, darkness: 0.4 }
 }
+```
+
+#### Portrait (50mm)
+```javascript
+{
+  fov: 50,
+  dof: { enabled: true, fStop: 1.2, maxBlur: 0.04 },
+  bloom: { enabled: true, intensity: 0.3 }
+}
+```
+
+#### Documentary (24mm)
+```javascript
+{
+  fov: 24,
+  dof: { enabled: false },
+  bloom: { enabled: false },
+  vignette: { enabled: false }
+}
+```
+
+### Multiple Cameras Example
+
+```javascript
+// Create multiple cameras
+const cameras = []
+
+// Wide establishing shot
+cameras.push(app.create('camera', {
+  name: 'wide',
+  fov: 24,
+  position: [20, 15, 20],
+  active: true
+}))
+
+// Close-up portrait
+cameras.push(app.create('camera', {
+  name: 'portrait',
+  fov: 50,
+  position: [3, 2, 3],
+  dof: { enabled: true, fStop: 1.2 }
+}))
+
+// Add all cameras
+cameras.forEach(cam => app.add(cam))
+
+// Switch cameras
+let current = 0
+app.on('keydown', (e) => {
+  if (e.key === 'c') {
+    cameras[current].deactivate()
+    current = (current + 1) % cameras.length
+    cameras[current].activate()
+  }
+})
 ```
 
 ## Performance Considerations
 
-- DOF effect runs at half resolution by default for better performance
-- Disable DOF when not needed to improve frame rates
-- Helpers should only be enabled during development/debugging
+- Each camera has its own postprocessing pipeline
+- Effects only render when camera is active
+- DOF runs at reduced resolution (480p) for performance
+- Disable unused effects to improve frame rate
+- Autofocus uses raycasting (performance cost)
 
-## Settings Persistence
+## Current Limitations
 
-All camera settings are automatically persisted to browser local storage and will be restored on page reload.
+- Camera nodes work through `app.create('camera', {...})` in app scripts
+- Only PerspectiveCamera supported (no OrthographicCamera)
+- Maximum one active camera at a time
+- Some effects may not work in XR mode
+- Transitions between cameras are instant (no interpolation yet)
+- ChromaticAberration effect temporarily disabled due to postprocessing conflicts
+- DOF and ChromaticAberration can't be used together (separated into different passes)
 
-## Technical Details
+## Migration Guide
 
-- Focal length to FOV conversion uses 35mm film equivalent (24mm sensor height)
-- DOF implementation uses the postprocessing library's DepthOfFieldEffect
-- Helper visualizations use Three.js built-in helper classes
+Moving from legacy camera controls to Camera nodes:
+
+**Before (Legacy):**
+```javascript
+world.cameraControls.enableDOF()
+world.cameraControls.setDOFFocusDistance(10)
+world.cameraControls.setFocalLength(85)
+```
+
+**After (Camera Node):**
+```javascript
+const camera = app.create('camera', {
+  fov: 35,
+  dof: { enabled: true, focusDistance: 10 },
+  active: true
+})
+app.add(camera)
+camera.setFocalLength(85)
+```
+
+## Browser Console Testing
+
+```javascript
+// Legacy system (currently working)
+world.cameraControls.enableDOF()
+world.cameraControls.setFocalLength(50)
+
+// Reset camera to defaults (admin only)
+world.cameraControls.reset()
+
+// Camera node system
+// Cameras must be created through app scripts (see examples/)
+// Direct console creation not supported
+```
+
+## Working Examples
+
+- `/examples/camera-test.js` - Simple camera node test
+- `/examples/cinematic-camera.js` - Cinematic camera with postprocessing
+- `/examples/camera-showcase.js` - Multiple camera configurations showcase

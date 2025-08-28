@@ -32,8 +32,27 @@ export class World extends EventEmitter {
     this.rig = new THREE.Object3D()
     // NOTE: camera near is slightly smaller than spherecast. far is slightly more than skybox.
     // this gives us minimal z-fighting without needing logarithmic depth buffers
-    this.camera = new THREE.PerspectiveCamera(70, 0, 0.2, 1200)
-    this.rig.add(this.camera)
+    // Default to wide landscape preset: 73° FOV (24mm focal length)
+    this._legacyCamera = new THREE.PerspectiveCamera(73, 0, 0.2, 1200)
+    this.rig.add(this._legacyCamera)
+    
+    // Backwards compatibility: world.camera returns active camera node's camera, or legacy camera
+    Object.defineProperty(this, 'camera', {
+      get() {
+        // If we have a camera manager with an active camera node, use that
+        if (this.cameraManager?.activeCamera?.camera) {
+          return this.cameraManager.activeCamera.camera
+        }
+        // Otherwise fall back to legacy camera
+        return this._legacyCamera
+      },
+      set(value) {
+        // Allow setting for backwards compatibility
+        if (value && value.isPerspectiveCamera) {
+          this._legacyCamera = value
+        }
+      }
+    })
 
     this.register('settings', Settings)
     this.register('collections', Collections)
