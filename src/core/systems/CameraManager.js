@@ -58,6 +58,14 @@ export class CameraManager extends System {
   unregisterCamera(camera) {
     if (!camera || !camera.id) return
     
+    console.log(`CameraManager: Unregistering camera ${camera.id} (${camera.name})`)
+    
+    // Don't allow unregistering the world's default camera
+    if (camera === this.world?.defaultCameraNode) {
+      console.warn('CameraManager: Cannot unregister world default camera')
+      return
+    }
+    
     this.cameras.delete(camera.id)
     
     // Handle if this was the active camera
@@ -66,6 +74,16 @@ export class CameraManager extends System {
       // Switch to default camera if available
       if (this.defaultCamera && this.defaultCamera !== camera) {
         this.setActiveCamera(this.defaultCamera)
+      } else if (this.cameras.size > 0) {
+        // No default camera, pick the first available one
+        const firstCamera = this.cameras.values().next().value
+        if (firstCamera) {
+          this.setActiveCamera(firstCamera)
+        }
+      } else {
+        // No cameras left, emit event to fall back to legacy camera
+        console.log('CameraManager: No cameras remaining, falling back to legacy camera')
+        this.world.emit('camera-manager-empty')
       }
     }
     
@@ -86,9 +104,11 @@ export class CameraManager extends System {
       return false
     }
     
-    // Deactivate current camera
+    // Deactivate current render camera without unmounting the node
     if (this.activeCamera && this.activeCamera !== camera) {
-      this.activeCamera.active = false
+      if (this.activeCamera.makeInactive) {
+        this.activeCamera.makeInactive()
+      }
     }
     
     // Handle transition
@@ -97,7 +117,8 @@ export class CameraManager extends System {
     } else {
       // Immediate switch
       this.activeCamera = camera
-      camera.active = true
+      // Only prepare camera local state here; do not recurse back into manager
+      camera._active = true
       this.world.emit('camera-changed', camera)
     }
     
@@ -217,6 +238,15 @@ export class CameraManager extends System {
     // Update active camera (for autofocus, etc)
     if (this.activeCamera && this.activeCamera.update) {
       this.activeCamera.update(delta)
+    }
+    
+    // Update feeds for all cameras that have them enabled
+    // Keep it lightweight: only render feeds when postprocessing is not busy rendering
+    const renderer = this.world.graphics?.renderer
+    if (renderer) {
+      this.cameras.forEach((cam) => {
+        if (cam && cam.updateFeed) cam.updateFeed(delta)
+      })
     }
   }
   

@@ -109,11 +109,11 @@ export class ClientGraphics extends System {
       radius: 0.8,
     })
     this.bloomEnabled = this.world.prefs.bloom
-    // Depth of Field effect
+    // Depth of Field effect (normalize focus inputs by camera.far)
     this.dof = new DepthOfFieldEffect(this.world.camera, {
       blendFunction: BlendFunction.NORMAL,
-      worldFocusDistance: this.world.prefs.dofFocusDistance, // Use world units directly
-      worldFocusRange: this.world.prefs.dofFocusRange,
+      focusDistance: (this.world.prefs.dofFocusDistance || 10) / this.world.camera.far,
+      focusRange: (this.world.prefs.dofFocusRange || 5) / this.world.camera.far,
       bokehScale: this.world.prefs.dofBokehScale,
       resolutionScale: 1.0, // Full resolution to prevent flickering
       height: 480, // Limit resolution for performance
@@ -171,7 +171,8 @@ export class ClientGraphics extends System {
     const activeCameraNode = this.world.cameraManager?.activeCamera
     
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
-      this.renderer.render(this.world.stage.scene, this.world.camera)
+      const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
+      this.renderer.render(this.world.stage.scene, cam)
     } else if (activeCameraNode?.composer) {
       // Use the camera node's composer if it has one
       activeCameraNode.composer.render()
@@ -221,14 +222,13 @@ export class ClientGraphics extends System {
       this.updatePostProcessingEffects()
     }
     if (changes.dofFocusDistance) {
-      // Update using the circleOfConfusionMaterial for world units
       if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value = changes.dofFocusDistance.value
+        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value = changes.dofFocusDistance.value / this.world.camera.far
       }
     }
     if (changes.dofFocusRange) {
       if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value = changes.dofFocusRange.value
+        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value = changes.dofFocusRange.value / this.world.camera.far
       }
     }
     if (changes.dofBokehScale) {
