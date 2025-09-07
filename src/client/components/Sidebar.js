@@ -593,6 +593,33 @@ function Prefs({ world, hidden }) {
             onChange={ao => world.prefs.setAO(ao)}
           />
         )}
+        <Group label='Mobile Controls' />
+        <FieldRange
+          label='Touch Look Sensitivity'
+          hint='Adjust camera look sensitivity for touch dragging'
+          min={0.2}
+          max={3}
+          step={0.1}
+          value={world.prefs.touchLookSensitivity}
+          onChange={v => world.prefs.setTouchLookSensitivity(v)}
+        />
+        <FieldToggle
+          label='Invert Y (Touch)'
+          hint='Invert vertical look direction when dragging on touch'
+          trueLabel='Inverted'
+          falseLabel='Normal'
+          value={world.prefs.touchInvertY}
+          onChange={v => world.prefs.setTouchInvertY(v)}
+        />
+        <FieldRange
+          label='Auto-Sprint Threshold'
+          hint='Stick magnitude required to sprint on touch/XR (0.5-1.0)'
+          min={0.5}
+          max={1.0}
+          step={0.05}
+          value={world.prefs.autoSprintThreshold}
+          onChange={v => world.prefs.setAutoSprintThreshold(v)}
+        />
         <Group label='Audio' />
         <FieldRange
           label='Music'

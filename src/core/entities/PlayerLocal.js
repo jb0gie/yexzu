@@ -64,6 +64,15 @@ export class PlayerLocal extends Entity {
     this.init()
   }
 
+  // External touch-look input for mobile UI lookpad
+  applyTouchLookDelta(dx, dy) {
+    const sens = this.world.prefs?.touchLookSensitivity ?? 1
+    const signY = this.world.prefs?.touchInvertY ? -1 : 1
+    this.cam.rotation.x += signY * -dy * PAN_LOOK_SPEED * sens * (1 / 60)
+    this.cam.rotation.y += -dx * PAN_LOOK_SPEED * sens * (1 / 60)
+    this.cam.rotation.z = 0
+  }
+
   async init() {
     this.mass = 1
     this.gravity = 20
@@ -768,9 +777,12 @@ export class PlayerLocal extends Entity {
       this.cam.rotation.y += -this.control.pointer.delta.x * POINTER_LOOK_SPEED * delta
       this.cam.rotation.z = 0
     } else if (this.pan) {
-      // or when touch panning
-      this.cam.rotation.x += -this.pan.delta.y * PAN_LOOK_SPEED * delta
-      this.cam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * delta
+      // or when touch panning (mobile look)
+      const sens = this.world.prefs?.touchLookSensitivity ?? 1
+      const signY = this.world.prefs?.touchInvertY ? -1 : 1
+      // Default (not inverted): swipe up looks up (negative pitch)
+      this.cam.rotation.x += signY * -this.pan.delta.y * PAN_LOOK_SPEED * sens * delta
+      this.cam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * sens * delta
       this.cam.rotation.z = 0
     }
 
@@ -808,6 +820,41 @@ export class PlayerLocal extends Entity {
     // stick movement threshold
     if (this.stick && !this.stick.active) {
       this.stick.active = this.stick.center.distanceTo(this.stick.touch.position) > 3
+    }
+
+    // Mobile gesture: cruise-control autorun with latch zone above joystick center
+    if (!isXR) {
+      const stick = this.stick
+      const lr = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
+      // Create/update a virtual lock band above the joystick where autorun latches
+      this._lockBandY = this._lockBandY ?? null
+      if (stick?.active) {
+        const dx = stick.touch.position.x - stick.center.x
+        const dy = stick.touch.position.y - stick.center.y
+        const mag = Math.sqrt(dx * dx + dy * dy) / Math.max(1, lr)
+        const forward = dy < -10
+        const threshold = this.world.prefs?.autoSprintThreshold ?? 0.9
+        if (forward && mag > threshold) this._autoRunTimer = (this._autoRunTimer || 0) + delta
+        else this._autoRunTimer = 0
+        if (this._autoRunTimer > 0.6 && !this._autoRunning) {
+          this._autoRunning = true
+          // set a lock band vertically above the original center
+          this._lockBandY = stick.center.y - lr * 0.9
+        }
+        // if locked, pin visual center to lock band to keep knob forward
+        if (this._autoRunning && this._lockBandY != null) {
+          stick.center.y = this._lockBandY
+          this.world.emit('stick', stick)
+        }
+        // cancel if dragged well below center (strong back pull)
+        if (dy > 15 || mag < 0.25) {
+          this._autoRunning = false
+          this._lockBandY = null
+        }
+      } else {
+        // allow autorun to remain even when no active touch
+        // do not clear lock band here; it visually resets when stick reappears
+      }
     }
 
     // watch jump presses to either fly or air-jump
@@ -868,8 +915,19 @@ export class PlayerLocal extends Entity {
 
     // determine if we're "running"
     if (this.stick?.active || isXR) {
-      // touch/xr joysticks at full extent
-      this.running = this.moving && this.moveDir.length() > 0.9
+      // touch/xr joysticks at full extent (auto-sprint)
+      const threshold = this.world.prefs?.autoSprintThreshold ?? 0.9
+      const mag = this.moveDir.length()
+      // honor autorun gesture on mobile
+      const autorun = !!this._autoRunning
+      this.running = this.moving && (autorun || mag > threshold)
+      // if autorun is active and stick is released, keep moving forward based on camera
+      if (autorun && mag < 0.2) {
+        this.moving = true
+        this.moveDir.set(0, 0, -1)
+        const yQuaternion = q1.setFromAxisAngle(UP, this.cam.rotation.y)
+        this.moveDir.applyQuaternion(yQuaternion)
+      }
     } else {
       // or keyboard shift key
       this.running = this.moving && (this.control.shiftLeft.down || this.control.shiftRight.down)

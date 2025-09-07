@@ -59,6 +59,10 @@ export class ClientPrefs extends System {
     this.reticleFocusDelay = isNumber(data.reticleFocusDelay) ? data.reticleFocusDelay : 0.5
     this.scrollZoomEnabled = isBoolean(data.scrollZoomEnabled) ? data.scrollZoomEnabled : false
     this.zoomSpeed = isNumber(data.zoomSpeed) ? data.zoomSpeed : 5
+    // Mobile/touch controls
+    this.touchLookSensitivity = isNumber(data.touchLookSensitivity) ? data.touchLookSensitivity : (isTouch ? 1.2 : 1)
+    this.touchInvertY = isBoolean(data.touchInvertY) ? data.touchInvertY : false
+    this.autoSprintThreshold = isNumber(data.autoSprintThreshold) ? data.autoSprintThreshold : 0.9
     this.v = data.v
 
     this.changes = null
@@ -108,6 +112,9 @@ export class ClientPrefs extends System {
       reticleFocusDelay: this.reticleFocusDelay,
       scrollZoomEnabled: this.scrollZoomEnabled,
       zoomSpeed: this.zoomSpeed,
+      touchLookSensitivity: this.touchLookSensitivity,
+      touchInvertY: this.touchInvertY,
+      autoSprintThreshold: this.autoSprintThreshold,
       v: this.v,
     })
   }
@@ -207,6 +214,19 @@ export class ClientPrefs extends System {
   
   setZoomSpeed(value) {
     this.modify('zoomSpeed', value)
+  }
+
+  // Touch/mobile controls
+  setTouchLookSensitivity(value) {
+    this.modify('touchLookSensitivity', value)
+  }
+
+  setTouchInvertY(value) {
+    this.modify('touchInvertY', value)
+  }
+
+  setAutoSprintThreshold(value) {
+    this.modify('autoSprintThreshold', value)
   }
 
   destroy() {
