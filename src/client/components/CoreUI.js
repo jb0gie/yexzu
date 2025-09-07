@@ -17,6 +17,22 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 // import { MenuMain } from './MenuMain'
 // import { MenuApp } from './MenuApp'
 import { ChevronDoubleUpIcon, HandIcon } from './Icons'
+
+// Simple camera icon for the camera toggle button
+function CameraIcon({ size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
+      <path
+        d='M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z'
+        fill='currentColor'
+      />
+      <path
+        d='M9 2L7.17 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4H16.83L15 2H9ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17Z'
+        fill='currentColor'
+      />
+    </svg>
+  )
+}
 import { Sidebar } from './Sidebar'
 
 export function CoreUI({ world }) {
@@ -1068,6 +1084,10 @@ function ToastMsg({ text }) {
 
 function TouchBtns({ world }) {
   const [action, setAction] = useState(world.actions.current.node)
+  const [adsToggled, setAdsToggled] = useState(false)
+  const [cameraMode, setCameraMode] = useState(0) // 0 = medium 3rd (default), 1 = close 3rd, 2 = first person, 3 = far 3rd
+  const [platformerMode, setPlatformerMode] = useState(0) // Track current platformer mode
+  
   useEffect(() => {
     function onChange(isAction) {
       setAction(isAction)
@@ -1077,6 +1097,64 @@ function TouchBtns({ world }) {
       world.actions.off('change', onChange)
     }
   }, [])
+
+  // Track platformer mode changes
+  useEffect(() => {
+    const player = world.entities.player
+    if (player) {
+      setPlatformerMode(player.platformerMode || 0)
+    }
+  }, [world])
+
+  // Update platformer mode when player changes
+  useEffect(() => {
+    const player = world.entities.player
+    if (player) {
+      const updatePlatformerMode = () => {
+        setPlatformerMode(player.platformerMode || 0)
+      }
+      
+      // Listen for player updates
+      world.on('player', updatePlatformerMode)
+      
+      return () => {
+        world.off('player', updatePlatformerMode)
+      }
+    }
+  }, [world])
+  
+  // Handle ADS toggle state
+  useEffect(() => {
+    if (adsToggled) {
+      world.controls.simulateButton('mouseRight', true)
+    } else {
+      world.controls.simulateButton('mouseRight', false)
+    }
+  }, [adsToggled, world])
+  
+  // Handle camera mode changes - Desktop scroll emulation
+  useEffect(() => {
+    const player = world.entities.player
+    if (player) {
+      // Desktop scroll emulation - starts at medium 3rd person (default)
+      // 0 = medium 3rd person (zoom = 5.0, avatar visible) - DEFAULT
+      // 1 = close 3rd person (zoom = 1.0, avatar visible)
+      // 2 = first person (zoom = 0, avatar hidden)
+      // 3 = far 3rd person (zoom = 7.0, avatar visible) - furthest back
+      const zoomLevels = [5.0, 1, 0, 7]
+      player.cam.zoom = zoomLevels[cameraMode]
+      
+      // Hide/show avatar based on camera mode
+      if (player.avatar) {
+        player.avatar.visible = cameraMode !== 2 // Hide avatar only in first person
+      }
+    }
+  }, [cameraMode, world])
+  
+  const cycleCameraMode = () => {
+    setCameraMode(prev => (prev + 1) % 4) // Cycle through 4 modes: 0, 1, 2, 3
+  }
+  
   // lookpad removed
   return (
     <div
@@ -1115,6 +1193,81 @@ function TouchBtns({ world }) {
             bottom: 9.25rem;
             right: 4rem;
             font-size: 0.75rem;
+            &.active {
+              background: rgba(0, 255, 170, 0.4);
+              border-color: rgba(0, 255, 170, 0.6);
+              color: #00ffaa;
+            }
+          }
+          &.camera {
+            width: 2rem;
+            height: 2rem;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.6rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+            &:hover {
+              opacity: 0.8;
+            }
+            &:active {
+              opacity: 1;
+            }
+            &.medium-3rd {
+              background: rgba(100, 200, 255, 0.15);
+              border-color: rgba(100, 200, 255, 0.3);
+              color: #64c8ff;
+            }
+            &.close-3rd {
+              background: rgba(100, 255, 100, 0.15);
+              border-color: rgba(100, 255, 100, 0.3);
+              color: #64ff64;
+            }
+            &.first-person {
+              background: rgba(255, 100, 100, 0.15);
+              border-color: rgba(255, 100, 100, 0.3);
+              color: #ff6464;
+            }
+            &.far-3rd {
+              background: rgba(200, 200, 255, 0.15);
+              border-color: rgba(200, 200, 255, 0.3);
+              color: #c8c8ff;
+            }
+          }
+          &.platformer {
+            width: 2.5rem;
+            height: 2.5rem;
+            font-size: 0.7rem;
+            font-weight: bold;
+            &.climb {
+              bottom: 12.5rem;
+              right: 1rem;
+              background: rgba(255, 140, 0, 0.3);
+              border: 1px solid rgba(255, 140, 0, 0.5);
+              color: #ff8c00;
+            }
+            &.ledge {
+              bottom: 12.5rem;
+              right: 4rem;
+              background: rgba(255, 68, 0, 0.3);
+              border: 1px solid rgba(255, 68, 0, 0.5);
+              color: #ff4400;
+            }
+            &.dive {
+              bottom: 12.5rem;
+              right: 7rem;
+              background: rgba(136, 0, 255, 0.3);
+              border: 1px solid rgba(136, 0, 255, 0.5);
+              color: #8800ff;
+            }
+            &.active {
+              background: rgba(0, 255, 170, 0.4);
+              border-color: rgba(0, 255, 170, 0.6);
+              color: #00ffaa;
+            }
           }
         }
         /* lookpad removed */
@@ -1136,37 +1289,21 @@ function TouchBtns({ world }) {
           <HandIcon size='1.5rem' />
         </div>
       )}
-      {/* ADS / Right-click button for mobile */}
+      {/* ADS / Right-click button for mobile - Toggle Mode */}
       <div
-        className='touchbtns-btn ads'
+        className={cls('touchbtns-btn ads', { active: adsToggled })}
         onPointerDown={e => {
-          e.currentTarget.setPointerCapture(e.pointerId)
-          // prime last pos for look while ADS
-          e.currentTarget.__lastX = e.clientX
-          e.currentTarget.__lastY = e.clientY
-          world.controls.simulateButton('mouseRight', true)
-        }}
-        onPointerLeave={e => {
-          world.controls.simulateButton('mouseRight', false)
-          e.currentTarget.releasePointerCapture(e.pointerId)
-        }}
-        onPointerUp={e => {
-          world.controls.simulateButton('mouseRight', false)
-          e.currentTarget.releasePointerCapture(e.pointerId)
-        }}
-        onPointerMove={e => {
-          // while holding ADS, allow drag-to-look
-          const lastX = e.currentTarget.__lastX ?? e.clientX
-          const lastY = e.currentTarget.__lastY ?? e.clientY
-          const dx = e.clientX - lastX
-          const dy = e.clientY - lastY
-          e.currentTarget.__lastX = e.clientX
-          e.currentTarget.__lastY = e.clientY
-          const player = world.entities.player
-          player?.applyTouchLookDelta?.(dx, dy)
+          e.stopPropagation() // Prevent interference with other controls
+          // Toggle ADS state
+          setAdsToggled(!adsToggled)
         }}
       >
         ADS
+        {adsToggled && (
+          <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', opacity: 0.8 }}>
+            ON
+          </div>
+        )}
       </div>
       <div
         className='touchbtns-btn jump'
@@ -1184,6 +1321,106 @@ function TouchBtns({ world }) {
         }}
       >
         <ChevronDoubleUpIcon size='1.5rem' />
+      </div>
+      
+      {/* Camera cycle button - Desktop scroll emulation */}
+      <div
+        className={cls('touchbtns-btn camera', {
+          'medium-3rd': cameraMode === 0,
+          'close-3rd': cameraMode === 1,
+          'first-person': cameraMode === 2,
+          'far-3rd': cameraMode === 3
+        })}
+        onPointerDown={e => {
+          e.stopPropagation()
+          cycleCameraMode()
+        }}
+        title={`Camera: ${cameraMode === 0 ? 'Medium 3rd' : 
+                         cameraMode === 1 ? 'Close 3rd' : 
+                         cameraMode === 2 ? 'First Person' : 'Far 3rd'}`}
+      >
+        <CameraIcon size='1rem' />
+      </div>
+
+      {/* Platformer Mechanics Buttons */}
+      {/* Climb Button */}
+      <div
+        className={cls('touchbtns-btn platformer climb', {
+          active: platformerMode === 10 // CLIMBING mode
+        })}
+        onPointerDown={e => {
+          e.stopPropagation()
+          world.controls.simulateButton('keyF', true)
+          setTimeout(() => world.controls.simulateButton('keyF', false), 100)
+        }}
+        title="Climb Walls (F)"
+      >
+        CLIMB
+      </div>
+
+      {/* Ledge Grab Button */}
+      <div
+        className={cls('touchbtns-btn platformer ledge', {
+          active: platformerMode === 11 // LEDGE_HANGING mode
+        })}
+        onPointerDown={e => {
+          e.stopPropagation()
+          world.controls.simulateButton('keyG', true)
+          setTimeout(() => world.controls.simulateButton('keyG', false), 100)
+        }}
+        title="Grab Ledges (G)"
+      >
+        LEDGE
+      </div>
+
+      {/* Air Dive Button */}
+      <div
+        className={cls('touchbtns-btn platformer dive', {
+          active: platformerMode === 12 // AIR_DIVING mode
+        })}
+        onPointerDown={e => {
+          e.stopPropagation()
+          world.controls.simulateButton('keyH', true)
+          setTimeout(() => world.controls.simulateButton('keyH', false), 100)
+        }}
+        title="Air Dive (H)"
+      >
+        DIVE
+      </div>
+
+      {/* Platformer Status Display for Mobile */}
+      <div
+        className="platformer-status"
+        css={css`
+          position: absolute;
+          top: 1rem;
+          left: 1rem;
+          background: rgba(0, 0, 0, 0.6);
+          border-radius: 0.5rem;
+          padding: 0.5rem;
+          color: white;
+          font-size: 0.8rem;
+          pointer-events: none;
+          opacity: ${platformerMode !== 0 ? 1 : 0.3};
+          transition: opacity 0.3s ease;
+        `}
+      >
+        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>
+          Platformer Status
+        </div>
+        <div>
+          {platformerMode === 9 && '🛤️ Grinding'}
+          {platformerMode === 10 && '🧗 Climbing'}
+          {platformerMode === 11 && '🤝 Hanging'}
+          {platformerMode === 12 && '💨 Air Diving'}
+          {platformerMode === 13 && '🏃 Wall Sliding'}
+          {platformerMode === 0 && 'Ready'}
+        </div>
+        {world.entities.player && (
+          <div style={{ marginTop: '0.2rem', fontSize: '0.7rem' }}>
+            Stamina: {Math.round(world.entities.player.getStamina())}%
+          </div>
+        )}
       </div>
     </div>
   )

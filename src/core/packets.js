@@ -25,6 +25,8 @@ const names = [
   'kick',
   'ping',
   'pong',
+  'platformerState',
+  'platformerAction',
 ]
 
 const byName = {}

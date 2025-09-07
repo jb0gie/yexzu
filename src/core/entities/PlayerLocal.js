@@ -54,6 +54,11 @@ const Modes = {
   TALK: 6,
   FLIP: 7, // air-jump / acrobatic mid-air move
   BACKFLIP: 8, // backward air-jump
+  GRINDING: 9, // grinding on rails
+  CLIMBING: 10, // climbing walls
+  LEDGE_HANGING: 11, // hanging from ledges
+  AIR_DIVING: 12, // air diving
+  WALL_SLIDING: 13, // sliding down walls
 }
 
 export class PlayerLocal extends Entity {
@@ -134,6 +139,22 @@ export class PlayerLocal extends Entity {
     this.speaking = false
 
     this.lastSendAt = 0
+
+    // Platformer mechanics state
+    this.platformerMode = Modes.IDLE
+    this.stamina = 100
+    this.grindRail = null
+    this.grindProgress = 0
+    this.grindSpeed = 0
+    this.climbWall = null
+    this.climbDirection = 0
+    this.ledgeHanging = false
+    this.ledgePosition = null
+    this.airDiving = false
+    this.diveMomentum = new THREE.Vector3()
+    this.wallSliding = false
+    this.wallNormal = new THREE.Vector3()
+    this.wallSlideSpeed = 0
 
     this.base = createNode('group')
     this.base.position.fromArray(this.data.position)
@@ -822,40 +843,6 @@ export class PlayerLocal extends Entity {
       this.stick.active = this.stick.center.distanceTo(this.stick.touch.position) > 3
     }
 
-    // Mobile gesture: cruise-control autorun with latch zone above joystick center
-    if (!isXR) {
-      const stick = this.stick
-      const lr = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
-      // Create/update a virtual lock band above the joystick where autorun latches
-      this._lockBandY = this._lockBandY ?? null
-      if (stick?.active) {
-        const dx = stick.touch.position.x - stick.center.x
-        const dy = stick.touch.position.y - stick.center.y
-        const mag = Math.sqrt(dx * dx + dy * dy) / Math.max(1, lr)
-        const forward = dy < -10
-        const threshold = this.world.prefs?.autoSprintThreshold ?? 0.9
-        if (forward && mag > threshold) this._autoRunTimer = (this._autoRunTimer || 0) + delta
-        else this._autoRunTimer = 0
-        if (this._autoRunTimer > 0.6 && !this._autoRunning) {
-          this._autoRunning = true
-          // set a lock band vertically above the original center
-          this._lockBandY = stick.center.y - lr * 0.9
-        }
-        // if locked, pin visual center to lock band to keep knob forward
-        if (this._autoRunning && this._lockBandY != null) {
-          stick.center.y = this._lockBandY
-          this.world.emit('stick', stick)
-        }
-        // cancel if dragged well below center (strong back pull)
-        if (dy > 15 || mag < 0.25) {
-          this._autoRunning = false
-          this._lockBandY = null
-        }
-      } else {
-        // allow autorun to remain even when no active touch
-        // do not clear lock band here; it visually resets when stick reappears
-      }
-    }
 
     // watch jump presses to either fly or air-jump
     this.jumpDown = isXR ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
@@ -865,6 +852,9 @@ export class PlayerLocal extends Entity {
       this.jumpPressed = true
       this.jumpBufferTimer = this.jumpBufferTime
     }
+
+    // Platformer mechanics input handling
+    this.handlePlatformerInput()
 
     // get our movement direction
     this.moveDir.set(0, 0, 0)
@@ -918,16 +908,7 @@ export class PlayerLocal extends Entity {
       // touch/xr joysticks at full extent (auto-sprint)
       const threshold = this.world.prefs?.autoSprintThreshold ?? 0.9
       const mag = this.moveDir.length()
-      // honor autorun gesture on mobile
-      const autorun = !!this._autoRunning
-      this.running = this.moving && (autorun || mag > threshold)
-      // if autorun is active and stick is released, keep moving forward based on camera
-      if (autorun && mag < 0.2) {
-        this.moving = true
-        this.moveDir.set(0, 0, -1)
-        const yQuaternion = q1.setFromAxisAngle(UP, this.cam.rotation.y)
-        this.moveDir.applyQuaternion(yQuaternion)
-      }
+      this.running = this.moving && mag > threshold
     } else {
       // or keyboard shift key
       this.running = this.moving && (this.control.shiftLeft.down || this.control.shiftRight.down)
@@ -1015,6 +996,9 @@ export class PlayerLocal extends Entity {
     let mode
     if (this.data.effect?.emote) {
       // emote = this.data.effect.emote
+    } else if (this.platformerMode !== Modes.IDLE) {
+      // Platformer mechanics take priority
+      mode = this.platformerMode
     } else if (this.flying) {
       mode = Modes.FLY
     } else if (this.world.time < this.flipUntil) {
@@ -1279,5 +1263,78 @@ export class PlayerLocal extends Entity {
     if (changed) {
       this.world.emit('player', this)
     }
+  }
+
+  // Platformer mechanics input handling
+  handlePlatformerInput() {
+    if (!this.world.platformerMechanics) return
+
+    const isXR = this.world.xr?.session
+    
+    // Climbing input (W/S keys or XR stick)
+    if (this.platformerMode === Modes.CLIMBING) {
+      if (isXR) {
+        this.climbDirection = this.control.xrLeftStick.value.z
+      } else {
+        this.climbDirection = 0
+        if (this.control.keyW.down || this.control.arrowUp.down) this.climbDirection = 1
+        if (this.control.keyS.down || this.control.arrowDown.down) this.climbDirection = -1
+      }
+    }
+
+    // Ledge hanging input (A/D keys or XR stick)
+    if (this.platformerMode === Modes.LEDGE_HANGING) {
+      if (isXR) {
+        this.climbDirection = this.control.xrLeftStick.value.x
+      } else {
+        this.climbDirection = 0
+        if (this.control.keyA.down || this.control.arrowLeft.down) this.climbDirection = -1
+        if (this.control.keyD.down || this.control.arrowRight.down) this.climbDirection = 1
+      }
+    }
+
+    // Attempt to start platformer mechanics
+    if (this.platformerMode === Modes.IDLE) {
+      // Climbing (F key or XR button)
+      if ((!isXR && this.control.keyF.pressed) || (isXR && this.control.xrRightBtn1.pressed)) {
+        this.world.platformerMechanics.attemptClimbStart(this.data.id)
+      }
+      
+      // Ledge grab (G key or XR button)
+      if ((!isXR && this.control.keyG.pressed) || (isXR && this.control.xrLeftBtn1.pressed)) {
+        this.world.platformerMechanics.attemptLedgeGrab(this.data.id)
+      }
+      
+      // Air dive (H key or XR button)
+      if ((!isXR && this.control.keyH.pressed) || (isXR && this.control.xrRightBtn2.pressed)) {
+        this.world.platformerMechanics.attemptAirDive(this.data.id)
+      }
+      
+      // Wall slide (automatic when touching wall while falling)
+      if (!this.grounded && this.falling) {
+        this.world.platformerMechanics.attemptWallSlide(this.data.id)
+      }
+    }
+
+    // Send input to platformer mechanics system
+    this.world.platformerMechanics.handlePlayerInput(this.data.id, {
+      climbUp: this.climbDirection > 0,
+      climbDown: this.climbDirection < 0,
+      moveLeft: this.climbDirection < 0,
+      moveRight: this.climbDirection > 0,
+    })
+  }
+
+  // Platformer mechanics state management
+  setPlatformerMode(mode) {
+    this.platformerMode = mode
+  }
+
+  getStamina() {
+    return this.stamina
+  }
+
+  setStamina(stamina) {
+    this.stamina = Math.max(0, Math.min(100, stamina))
   }
 }

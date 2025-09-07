@@ -920,6 +920,15 @@ export function createVRMFactory(glb, setupMaterial) {
     addPose('fall', Emotes.FALL)
     addPose('fly', Emotes.FLY)
     addPose('talk', Emotes.TALK)
+    // Platformer Mechanics Poses
+    addPose('grinding', Emotes.GRINDING)
+    addPose('climbIdle', Emotes.CLIMB_IDLE)
+    addPose('climbUp', Emotes.CLIMB_UP)
+    addPose('climbDown', Emotes.CLIMB_DOWN)
+    addPose('ledgeHangingIdle', Emotes.LEDGE_HANGING_IDLE)
+    addPose('ledgeHangingMoving', Emotes.LEDGE_HANGING_MOVING)
+    addPose('airDive', Emotes.AIR_DIVE)
+    addPose('wallSlide', Emotes.WALL_SLIDE)
     function clearLocomotion() {
       for (const key in poses) {
         poses[key].fadeOut()
@@ -988,6 +997,18 @@ export function createVRMFactory(glb, setupMaterial) {
         // play the dedicated backflip emote for backward double jumps
         console.log('[VRM] Triggering BACKFLIP animation')
         setEmote(Emotes.BACKFLIP)
+      } else if (mode === Modes.GRINDING) {
+        poses.grinding.target = 1
+      } else if (mode === Modes.CLIMBING) {
+        // Use climbIdle as default, will be overridden by platformer mechanics
+        poses.climbIdle.target = 1
+      } else if (mode === Modes.LEDGE_HANGING) {
+        // Use ledgeHangingIdle as default, will be overridden by platformer mechanics
+        poses.ledgeHangingIdle.target = 1
+      } else if (mode === Modes.AIR_DIVING) {
+        poses.airDive.target = 1
+      } else if (mode === Modes.WALL_SLIDING) {
+        poses.wallSlide.target = 1
       }
       const lerpSpeed = 16
       for (const key in poses) {
