@@ -90,6 +90,7 @@ export function CoreUI({ world }) {
         position: absolute;
         inset: 0;
         overflow: hidden;
+        pointer-events: none;
       `}
     >
       {disconnected && <Disconnected />}
@@ -1076,6 +1077,7 @@ function TouchBtns({ world }) {
       world.actions.off('change', onChange)
     }
   }, [])
+  // lookpad removed
   return (
     <div
       className='touchbtns'
@@ -1094,6 +1096,7 @@ function TouchBtns({ world }) {
           display: flex;
           align-items: center;
           justify-content: center;
+          color: white;
           &.jump {
             width: 4rem;
             height: 4rem;
@@ -1106,9 +1109,18 @@ function TouchBtns({ world }) {
             bottom: 6rem;
             right: 4rem;
           }
+          &.ads {
+            width: 2.5rem;
+            height: 2.5rem;
+            bottom: 9.25rem;
+            right: 4rem;
+            font-size: 0.75rem;
+          }
         }
+        /* lookpad removed */
       `}
     >
+      {/* lookpad removed */}
       {action && (
         <div
           className='touchbtns-btn action'
@@ -1124,6 +1136,38 @@ function TouchBtns({ world }) {
           <HandIcon size='1.5rem' />
         </div>
       )}
+      {/* ADS / Right-click button for mobile */}
+      <div
+        className='touchbtns-btn ads'
+        onPointerDown={e => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          // prime last pos for look while ADS
+          e.currentTarget.__lastX = e.clientX
+          e.currentTarget.__lastY = e.clientY
+          world.controls.simulateButton('mouseRight', true)
+        }}
+        onPointerLeave={e => {
+          world.controls.simulateButton('mouseRight', false)
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }}
+        onPointerUp={e => {
+          world.controls.simulateButton('mouseRight', false)
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }}
+        onPointerMove={e => {
+          // while holding ADS, allow drag-to-look
+          const lastX = e.currentTarget.__lastX ?? e.clientX
+          const lastY = e.currentTarget.__lastY ?? e.clientY
+          const dx = e.clientX - lastX
+          const dy = e.clientY - lastY
+          e.currentTarget.__lastX = e.clientX
+          e.currentTarget.__lastY = e.clientY
+          const player = world.entities.player
+          player?.applyTouchLookDelta?.(dx, dy)
+        }}
+      >
+        ADS
+      </div>
       <div
         className='touchbtns-btn jump'
         onPointerDown={e => {
@@ -1131,6 +1175,10 @@ function TouchBtns({ world }) {
           world.controls.setTouchBtn('touchA', true)
         }}
         onPointerLeave={e => {
+          world.controls.setTouchBtn('touchA', false)
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }}
+        onPointerUp={e => {
           world.controls.setTouchBtn('touchA', false)
           e.currentTarget.releasePointerCapture(e.pointerId)
         }}
