@@ -144,6 +144,18 @@ export class ClientNetwork extends System {
     storage.set('authToken', data.authToken)
   }
 
+  onPlatformerState(data) {
+    if (this.world.platformerMechanics) {
+      this.world.platformerMechanics.onPlatformerState(data)
+    }
+  }
+
+  onPlatformerAction(data) {
+    if (this.world.platformerMechanics) {
+      this.world.platformerMechanics.onPlatformerAction(data)
+    }
+  }
+
   onSettingsModified = data => {
     this.world.settings.set(data.key, data.value)
   }

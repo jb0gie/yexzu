@@ -556,6 +556,19 @@ export class ServerNetwork extends System {
     socket.send('pong', time)
   }
 
+  onPlatformerState = (socket, data) => {
+    // Broadcast platformer state to all other clients
+    this.send('platformerState', data, socket.id)
+  }
+
+  onPlatformerAction = (socket, data) => {
+    // Handle platformer action and broadcast to all clients
+    if (this.world.platformerMechanics) {
+      this.world.platformerMechanics.onPlatformerAction(data)
+    }
+    this.send('platformerAction', data, socket.id)
+  }
+
   onDisconnect = (socket, code) => {
     this.world.livekit.clearModifiers(socket.id)
     socket.player.destroy(true)

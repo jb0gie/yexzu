@@ -406,6 +406,11 @@ export class ClientControls extends System {
     }
   }
 
+  setTouchBtn(prop, pressed) {
+    // Set touch button state for mobile controls
+    this.simulateButton(prop, pressed)
+  }
+
   onKeyDown = e => {
     if (e.defaultPrevented) return
     if (e.repeat) return

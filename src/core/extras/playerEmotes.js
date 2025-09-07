@@ -18,6 +18,15 @@ export const Emotes = {
   FLIP: 'asset://emote-flip.glb?s=1.1&l=0',
   BACKFLIP: 'asset://emote-backflip.glb?s=2.2&l=0',
   TALK: 'asset://emote-talk.glb',
+  // Platformer Mechanics Animations
+  GRINDING: 'asset://mp-grinding.glb?s=1.0',
+  CLIMB_IDLE: 'asset://mp-climb-idle.glb?s=1.0',
+  CLIMB_UP: 'asset://mp-climb-up.glb?s=1.2',
+  CLIMB_DOWN: 'asset://mp-climb-down.glb?s=1.2',
+  LEDGE_HANGING_IDLE: 'asset://mp-ledge-hanging-idle.glb?s=1.0',
+  LEDGE_HANGING_MOVING: 'asset://mp-ledge-hanging-moving.glb?s=1.2',
+  AIR_DIVE: 'asset://mp-air-dive.glb?s=1.0',
+  WALL_SLIDE: 'asset://mp-wallslide.glb?s=1.0',
 }
 
 export const emoteUrls = [
@@ -40,4 +49,13 @@ export const emoteUrls = [
   Emotes.FLIP,
   Emotes.BACKFLIP,
   Emotes.TALK,
+  // Platformer Mechanics Animations
+  Emotes.GRINDING,
+  Emotes.CLIMB_IDLE,
+  Emotes.CLIMB_UP,
+  Emotes.CLIMB_DOWN,
+  Emotes.LEDGE_HANGING_IDLE,
+  Emotes.LEDGE_HANGING_MOVING,
+  Emotes.AIR_DIVE,
+  Emotes.WALL_SLIDE,
 ]
