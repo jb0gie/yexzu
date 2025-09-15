@@ -352,31 +352,6 @@ export class ClientControls extends System {
     this.world.emit('actions', this.actions)
   }
 
-  setTouchBtn(prop, down) {
-    if (down) {
-      this.buttonsDown.add(prop)
-      for (const control of this.controls) {
-        const button = control.entries[prop]
-        if (button?.$button) {
-          button.pressed = true
-          button.down = true
-          const capture = button.onPress?.()
-          if (capture || button.capture) break
-        }
-      }
-    } else {
-      this.buttonsDown.delete(prop)
-      for (const control of this.controls) {
-        const button = control.entries[prop]
-        if (button?.$button && button.down) {
-          button.down = false
-          button.released = true
-          button.onRelease?.()
-        }
-      }
-    }
-  }
-
   simulateButton(prop, pressed) {
     if (pressed) {
       if (this.buttonsDown.has(prop)) return
@@ -389,7 +364,7 @@ export class ClientControls extends System {
           const capture = button.onPress?.()
           if (capture || button.capture) break
         }
-        const capture = control.onButtonPress?.(prop, text)
+        const capture = control.onButtonPress?.(prop)
         if (capture) break
       }
     } else {
