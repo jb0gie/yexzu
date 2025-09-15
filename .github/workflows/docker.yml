@@ -8,7 +8,7 @@ on:
       - 'main'
       - 'dev'
       - 'solana-v2'
-      - 'nodeCam'
+      - 'refinedCtrls'
     tags:
       - 'v*.*.*'
 
