@@ -34,6 +34,10 @@ export class Entities extends System {
   getPlayer(entityId) {
     return this.players.get(entityId)
   }
+  
+  getLocalPlayer() {
+    return this.player
+  }
 
   add(data, local) {
     let Entity

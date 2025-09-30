@@ -6,8 +6,8 @@ import { OpenAI } from 'openai'
 import { System } from './System'
 import { hashFile } from '../utils-server'
 
-const prefix = `app.remove(app.get('Block'))
-`
+
+const prefix = `app.remove(app.get('Block'))`
 
 const docs = fs.readFileSync(path.join(__dirname, 'public/ai-docs.md'), 'utf8')
 

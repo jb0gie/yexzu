@@ -17,6 +17,33 @@ export class Client extends System {
     super(world)
     window.world = world
     window.THREE = THREE
+    // quick debug helpers exposed in console (guarded)
+    try {
+      Object.defineProperty(window.world, 'debug', {
+        get: () => ({
+          octree: {
+            toggle: enabled => this.world.stage.octree.toggleHelper(enabled),
+            depth: () => this.world.stage.octree.getDepth(),
+            count: () => this.world.stage.octree.getCount(),
+          },
+          springs: () => {
+            try {
+              const inst = this.world.entities.player?.avatar?.instance
+              return inst?.debug?.listSprings?.()
+            } catch (_) { }
+            return []
+          },
+          springAxes: (size, color) => {
+            try {
+              const inst = this.world.entities.player?.avatar?.instance
+              return inst?.debug?.showSpringAxes?.(size, color)
+            } catch (_) { }
+            return []
+          },
+        }),
+        configurable: true,
+      })
+    } catch (_) { }
   }
 
   async init({ loadYoga }) {

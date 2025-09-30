@@ -16,6 +16,7 @@ import {
   DepthPass,
   Pass,
   DepthEffect,
+  DepthOfFieldEffect,
 } from 'postprocessing'
 
 import { System } from './System'
@@ -46,6 +47,7 @@ function getRenderer() {
 export class ClientGraphics extends System {
   constructor(world) {
     super(world)
+    this.helpers = new Set()
   }
 
   async init({ viewport }) {
@@ -70,6 +72,8 @@ export class ClientGraphics extends System {
     const maxMultisampling = context.getParameter(context.MAX_SAMPLES)
     this.composer = new EffectComposer(this.renderer, {
       frameBufferType: THREE.HalfFloatType,
+      depthBuffer: true,
+      stencilBuffer: false,
       // multisampling: Math.min(8, maxMultisampling),
     })
     this.renderPass = new RenderPass(this.world.stage.scene, this.world.camera)
@@ -108,6 +112,16 @@ export class ClientGraphics extends System {
       radius: 0.8,
     })
     this.bloomEnabled = this.world.prefs.bloom
+    // Depth of Field effect (normalize focus inputs by camera.far)
+    this.dof = new DepthOfFieldEffect(this.world.camera, {
+      blendFunction: BlendFunction.NORMAL,
+      focusDistance: (this.world.prefs.dofFocusDistance || 10) / this.world.camera.far,
+      focusRange: (this.world.prefs.dofFocusRange || 5) / this.world.camera.far,
+      bokehScale: this.world.prefs.dofBokehScale,
+      resolutionScale: 1.0, // Full resolution to prevent flickering
+      height: 480, // Limit resolution for performance
+    })
+    this.dofEnabled = this.world.prefs.dofEnabled
     this.smaa = new SMAAEffect({
       preset: SMAAPreset.ULTRA,
     })
@@ -132,6 +146,15 @@ export class ClientGraphics extends System {
   start() {
     this.world.on('xrSession', this.onXRSession)
     this.world.settings.on('change', this.onSettingsChange)
+    
+    // Listen for camera changes from CameraManager
+    this.world.on('camera-changed', (camera) => {
+      // Update the render pass with the new camera
+      if (this.renderPass && camera?.camera) {
+        this.renderPass.camera = camera.camera
+        console.log('ClientGraphics: Updated render pass camera')
+      }
+    })
   }
 
   resize(width, height) {
@@ -147,9 +170,17 @@ export class ClientGraphics extends System {
   }
 
   render() {
+    // Check if we have an active camera node with its own composer
+    const activeCameraNode = this.world.cameraManager?.activeCamera
+    
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
-      this.renderer.render(this.world.stage.scene, this.world.camera)
+      const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
+      this.renderer.render(this.world.stage.scene, cam)
+    } else if (activeCameraNode?.composer) {
+      // Use the camera node's composer if it has one
+      activeCameraNode.composer.render()
     } else {
+      // Fall back to the default composer
       this.composer.render()
     }
     if (this.xrDimensionsNeeded) {
@@ -187,6 +218,39 @@ export class ClientGraphics extends System {
     // ao
     if (changes.ao) {
       this.aoPass.enabled = changes.ao.value && this.world.settings.ao
+    }
+    // depth of field
+    if (changes.dofEnabled) {
+      this.dofEnabled = changes.dofEnabled.value
+      this.updatePostProcessingEffects()
+    }
+    if (changes.dofFocusDistance) {
+      if (this.dof.circleOfConfusionMaterial) {
+        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value = changes.dofFocusDistance.value / this.world.camera.far
+      }
+    }
+    if (changes.dofFocusRange) {
+      if (this.dof.circleOfConfusionMaterial) {
+        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value = changes.dofFocusRange.value / this.world.camera.far
+      }
+    }
+    if (changes.dofBokehScale) {
+      // Bokeh scale might be on the bokehMaterial
+      if (this.dof.bokehMaterial) {
+        this.dof.bokehMaterial.uniforms.scale.value = changes.dofBokehScale.value
+      }
+    }
+    // focal length
+    if (changes.focalLength) {
+      // Convert focal length to FOV
+      const sensorHeight = 24 // 35mm sensor height in mm
+      const fov = 2 * Math.atan(sensorHeight / (2 * changes.focalLength.value)) * (180 / Math.PI)
+      this.world.camera.fov = fov
+      this.world.camera.updateProjectionMatrix()
+    }
+    // helpers
+    if (changes.showHelpers) {
+      this.updateHelpers(changes.showHelpers.value)
     }
   }
 
@@ -242,6 +306,9 @@ export class ClientGraphics extends System {
 
   updatePostProcessingEffects() {
     const effects = []
+    if (this.dofEnabled) {
+      effects.push(this.dof)
+    }
     if (this.bloomEnabled) {
       effects.push(this.bloom)
     }
@@ -249,6 +316,37 @@ export class ClientGraphics extends System {
     effects.push(this.tonemapping)
     this.effectPass.setEffects(effects)
     this.effectPass.recompile()
+  }
+
+  updateHelpers(show) {
+    if (show) {
+      // Add helpers
+      if (!this.cameraHelper) {
+        this.cameraHelper = new THREE.CameraHelper(this.world.camera)
+        this.world.stage.scene.add(this.cameraHelper)
+        this.helpers.add(this.cameraHelper)
+      }
+      if (!this.gridHelper) {
+        this.gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222)
+        this.world.stage.scene.add(this.gridHelper)
+        this.helpers.add(this.gridHelper)
+      }
+      if (!this.axesHelper) {
+        this.axesHelper = new THREE.AxesHelper(5)
+        this.world.stage.scene.add(this.axesHelper)
+        this.helpers.add(this.axesHelper)
+      }
+    } else {
+      // Remove helpers
+      this.helpers.forEach(helper => {
+        this.world.stage.scene.remove(helper)
+        if (helper.dispose) helper.dispose()
+      })
+      this.helpers.clear()
+      this.cameraHelper = null
+      this.gridHelper = null
+      this.axesHelper = null
+    }
   }
 
   destroy() {
