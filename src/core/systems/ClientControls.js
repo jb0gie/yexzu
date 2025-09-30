@@ -212,6 +212,12 @@ export class ClientControls extends System {
         this.world.camera.position.z = camera.zoom
         written = true
       } else if (camera) {
+        // SKIP updating camera if active camera is in free-flying mode
+        const activeCamera = this.world.systems.CameraManager?.activeCamera
+        if (activeCamera?.freeFlying) {
+          // Free-flying camera controls its own position/rotation
+          continue
+        }
         camera.position.copy(this.world.rig.position)
         camera.quaternion.copy(this.world.rig.quaternion)
         camera.zoom = this.world.camera.position.z

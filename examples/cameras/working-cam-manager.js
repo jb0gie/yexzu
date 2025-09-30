@@ -15,6 +15,7 @@ const cameraPresets = [
 		position: [8, 3, 8],
 		rotation: [-0.2, 0.785, 0],
 		fov: 35,
+		freeFlying: false,
 		dof: { enabled: true, fStop: 1.4, focusDistance: 10, maxBlur: 0.05 },
 		motion: { enabled: true, bobAmount: 0.003, swayAmount: 0.002 },
 		color: '#ff6b6b'
@@ -24,15 +25,31 @@ const cameraPresets = [
 		position: [2, 1.5, 2],
 		rotation: [-0.1, 0.5, 0],
 		fov: 85,
+		freeFlying: false,
 		dof: { enabled: true, fStop: 0.8, focusDistance: 3, maxBlur: 0.08 },
 		motion: { enabled: false },
 		color: '#4ecdc4'
+	},
+	{
+		name: 'Free-Flying Spectator',
+		position: [5, 5, 5],
+		rotation: [-0.5, 0.785, 0],
+		fov: 75,
+		freeFlying: true,
+		flySpeed: 8,
+		flyBoostMultiplier: 3,
+		lookSensitivity: 0.003,
+		smoothMovement: true,
+		dof: { enabled: false },
+		motion: { enabled: false },
+		color: '#9b59b6'
 	},
 	{
 		name: 'Action Cam',
 		position: [0, 0.5, 1],
 		rotation: [0, 0, 0],
 		fov: 120,
+		freeFlying: false,
 		dof: { enabled: false },
 		motion: { enabled: true, bobAmount: 0.01, swayAmount: 0.005, handheldShake: 0.002 },
 		color: '#45b7d1'
@@ -42,6 +59,7 @@ const cameraPresets = [
 		position: [0, 8, 0],
 		rotation: [-Math.PI / 2, 0, 0],
 		fov: 60,
+		freeFlying: false,
 		dof: { enabled: false },
 		motion: { enabled: false },
 		color: '#96ceb4'
@@ -61,6 +79,7 @@ function addNewCamera() {
 		position: [playerPos.x + 5, playerPos.y + 2, playerPos.z + 5],
 		rotation: [-0.2, 0.5, 0],
 		fov: props.cameraFOV || 50,
+		freeFlying: false,  // New cameras are static by default
 		dof: {
 			enabled: props.enableDOF,
 			fStop: 2.8,
@@ -96,6 +115,13 @@ function addNewCamera() {
 		showHelper: true,
 		helperScale: 0.25,
 
+		// Free-flying settings
+		freeFlying: newPreset.freeFlying || false,
+		flySpeed: newPreset.flySpeed || 5,
+		flyBoostMultiplier: newPreset.flyBoostMultiplier || 3,
+		lookSensitivity: newPreset.lookSensitivity || 0.003,
+		smoothMovement: newPreset.smoothMovement !== false,
+
 		fov: newPreset.fov,
 		near: 0.1,
 		far: 2000,
@@ -104,7 +130,7 @@ function addNewCamera() {
 			enabled: newPreset.motion.enabled,
 			bobAmount: newPreset.motion.bobAmount,
 			bobSpeed: 0.02,
-			swayAmount: newPreset.motion.swayAmount,
+			swayAmount: newPreset.swayAmount,
 			swaySpeed: 0.01,
 			dampingFactor: 0.98
 		},
@@ -396,6 +422,13 @@ if (world.isClient) {
 			console.log('  F - Toggle DOF')
 			console.log('  G - Toggle motion')
 			console.log('  H - Toggle UI')
+			console.log('')
+			console.log('Free-Flying Camera Controls:')
+			console.log('  WASD - Move horizontally')
+			console.log('  Q/Space - Move up')
+			console.log('  E - Move down')
+			console.log('  Shift - Speed boost')
+			console.log('  Mouse - Look around')
 		}
 
 		// Handle key presses
@@ -441,6 +474,13 @@ if (world.isClient) {
 				isPlayerCamera: false,
 				showHelper: true,
 				helperScale: 0.25,
+
+				// Free-flying settings
+				freeFlying: preset.freeFlying || false,
+				flySpeed: preset.flySpeed || 5,
+				flyBoostMultiplier: preset.flyBoostMultiplier || 3,
+				lookSensitivity: preset.lookSensitivity || 0.003,
+				smoothMovement: preset.smoothMovement !== false,
 
 				fov: preset.fov,
 				near: 0.1,
@@ -523,7 +563,14 @@ if (world.isClient) {
 [ ] - Cycle Presets
 F - Toggle DOF
 G - Toggle Motion
-H - Toggle UI`,
+H - Toggle UI
+
+Free-Flying Cam:
+WASD - Move
+Q/Space - Up
+E - Down
+Shift - Boost
+Mouse - Look`,
 			color: '#cccccc',
 			fontSize: 14,
 			lineHeight: 1.4
