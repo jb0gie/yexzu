@@ -9,6 +9,17 @@ export function createEmoteFactory(glb, url) {
 
   const clip = glb.animations[0]
 
+  // Safety check: ensure GLB has children before accessing scale
+  if (!glb.scene.children || glb.scene.children.length === 0) {
+    console.error(`[createEmoteFactory] GLB has no children, cannot process emote. URL: ${url}`)
+    // Return a minimal factory that returns empty clips
+    return {
+      toClip() {
+        return new THREE.AnimationClip('empty', 0, [])
+      },
+    }
+  }
+
   const scale = glb.scene.children[0].scale.x // armature should be here?
 
   // no matter what vrm/emote combo we use for some reason avatars
@@ -48,8 +59,17 @@ export function createEmoteFactory(glb, url) {
     const trackSplitted = track.name.split('.')
     const mixamoRigName = trackSplitted[0]
     const mixamoRigNode = glb.scene.getObjectByName(mixamoRigName)
+    if (!mixamoRigNode) {
+      console.warn(`[createEmoteFactory] Could not find bone: ${mixamoRigName} in ${url}`)
+      return
+    }
     mixamoRigNode.getWorldQuaternion(restRotationInverse).invert()
-    mixamoRigNode.parent.getWorldQuaternion(parentRestWorldRotation)
+    const parent = mixamoRigNode.parent
+    if (!parent) {
+      console.warn(`[createEmoteFactory] Bone ${mixamoRigName} has no parent in ${url}`)
+      return
+    }
+    parent.getWorldQuaternion(parentRestWorldRotation)
     if (track instanceof THREE.QuaternionKeyframeTrack) {
       // Retarget rotation of mixamoRig to NormalizedBone.
       for (let i = 0; i < track.values.length; i += 4) {

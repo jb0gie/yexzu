@@ -807,13 +807,16 @@ export class PlayerLocal extends Entity {
       this.cam.rotation.z = 0
     }
 
+    // Check if a free-flying camera is active (used multiple times below)
+    const activeCamera = this.world.systems.CameraManager?.activeCamera
+
     // ensure we can't look too far up/down
     if (!isXR) {
       this.cam.rotation.x = clamp(this.cam.rotation.x, -89 * DEG2RAD, 89 * DEG2RAD)
     }
 
-    // zoom camera if scrolling wheel
-    if (!isXR) {
+    // zoom camera if scrolling wheel (skip if free-flying camera is active)
+    if (!isXR && !activeCamera?.freeFlying) {
       this.cam.zoom += -this.control.scrollDelta.value * ZOOM_SPEED * delta
       this.cam.zoom = clamp(this.cam.zoom, MIN_ZOOM, MAX_ZOOM)
     }
@@ -858,35 +861,39 @@ export class PlayerLocal extends Entity {
 
     // get our movement direction
     this.moveDir.set(0, 0, 0)
-    if (isXR) {
-      // in xr use controller input
-      this.moveDir.x = this.control.xrLeftStick.value.x
-      this.moveDir.z = this.control.xrLeftStick.value.z
-    } else if (this.stick?.active) {
-      // if we have a touch joystick use that
-      const touchX = this.stick.touch.position.x
-      const touchY = this.stick.touch.position.y
-      const centerX = this.stick.center.x
-      const centerY = this.stick.center.y
-      const dx = centerX - touchX
-      const dy = centerY - touchY
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      const moveRadius = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
-      if (distance > moveRadius) {
-        this.stick.center.x = touchX + (moveRadius * dx) / distance
-        this.stick.center.y = touchY + (moveRadius * dy) / distance
+
+    // Skip ALL player movement if a free-flying camera is active
+    if (!activeCamera?.freeFlying) {
+      if (isXR) {
+        // in xr use controller input
+        this.moveDir.x = this.control.xrLeftStick.value.x
+        this.moveDir.z = this.control.xrLeftStick.value.z
+      } else if (this.stick?.active) {
+        // if we have a touch joystick use that
+        const touchX = this.stick.touch.position.x
+        const touchY = this.stick.touch.position.y
+        const centerX = this.stick.center.x
+        const centerY = this.stick.center.y
+        const dx = centerX - touchX
+        const dy = centerY - touchY
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        const moveRadius = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
+        if (distance > moveRadius) {
+          this.stick.center.x = touchX + (moveRadius * dx) / distance
+          this.stick.center.y = touchY + (moveRadius * dy) / distance
+        }
+        const stickX = (touchX - this.stick.center.x) / moveRadius
+        const stickY = (touchY - this.stick.center.y) / moveRadius
+        this.moveDir.x = stickX
+        this.moveDir.z = stickY
+        this.world.emit('stick', this.stick)
+      } else {
+        // otherwise use keyboard
+        if (this.control.keyW.down || this.control.arrowUp.down) this.moveDir.z -= 1
+        if (this.control.keyS.down || this.control.arrowDown.down) this.moveDir.z += 1
+        if (this.control.keyA.down || this.control.arrowLeft.down) this.moveDir.x -= 1
+        if (this.control.keyD.down || this.control.arrowRight.down) this.moveDir.x += 1
       }
-      const stickX = (touchX - this.stick.center.x) / moveRadius
-      const stickY = (touchY - this.stick.center.y) / moveRadius
-      this.moveDir.x = stickX
-      this.moveDir.z = stickY
-      this.world.emit('stick', this.stick)
-    } else {
-      // otherwise use keyboard
-      if (this.control.keyW.down || this.control.arrowUp.down) this.moveDir.z -= 1
-      if (this.control.keyS.down || this.control.arrowDown.down) this.moveDir.z += 1
-      if (this.control.keyA.down || this.control.arrowLeft.down) this.moveDir.x -= 1
-      if (this.control.keyD.down || this.control.arrowRight.down) this.moveDir.x += 1
     }
 
     // we're moving if direction is set
@@ -1120,13 +1127,18 @@ export class PlayerLocal extends Entity {
         this.cam.position.add(right.multiplyScalar(0.3))
       }
     }
-    if (this.world.xr?.session) {
-      // in vr snap camera
-      this.control.camera.position.copy(this.cam.position)
-      this.control.camera.quaternion.copy(this.cam.quaternion)
-    } else {
-      // otherwise interpolate camera towards target
-      simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+
+    // SKIP camera updates if a free-flying camera is active
+    const activeCamera = this.world.systems.CameraManager?.activeCamera
+    if (!activeCamera?.freeFlying) {
+      if (this.world.xr?.session) {
+        // in vr snap camera
+        this.control.camera.position.copy(this.cam.position)
+        this.control.camera.quaternion.copy(this.cam.quaternion)
+      } else {
+        // otherwise interpolate camera towards target
+        simpleCamLerp(this.world, this.control.camera, this.cam, delta)
+      }
     }
     if (this.avatar) {
       const matrix = this.avatar.getBoneTransform('head')
@@ -1150,12 +1162,15 @@ export class PlayerLocal extends Entity {
       q: this.base.quaternion.toArray(),
       t: true,
     })
-    // snap camera
-    this.cam.position.copy(this.base.position)
-    this.cam.position.y += this.camHeight
-    if (hasRotation) this.cam.rotation.y = rotationY
-    this.control.camera.position.copy(this.cam.position)
-    this.control.camera.quaternion.copy(this.cam.quaternion)
+    // snap camera (unless a free-flying camera is active)
+    const activeCamera = this.world.systems.CameraManager?.activeCamera
+    if (!activeCamera?.freeFlying) {
+      this.cam.position.copy(this.base.position)
+      this.cam.position.y += this.camHeight
+      if (hasRotation) this.cam.rotation.y = rotationY
+      this.control.camera.position.copy(this.cam.position)
+      this.control.camera.quaternion.copy(this.cam.quaternion)
+    }
   }
 
   setEffect(effect, onEnd) {
@@ -1269,8 +1284,12 @@ export class PlayerLocal extends Entity {
   handlePlatformerInput() {
     if (!this.world.platformerMechanics) return
 
+    // Skip if a free-flying camera is active
+    const activeCamera = this.world.systems.CameraManager?.activeCamera
+    if (activeCamera?.freeFlying) return
+
     const isXR = this.world.xr?.session
-    
+
     // Climbing input (W/S keys or XR stick)
     if (this.platformerMode === Modes.CLIMBING) {
       if (isXR) {
@@ -1299,17 +1318,17 @@ export class PlayerLocal extends Entity {
       if ((!isXR && this.control.keyF.pressed) || (isXR && this.control.xrRightBtn1.pressed)) {
         this.world.platformerMechanics.attemptClimbStart(this.data.id)
       }
-      
+
       // Ledge grab (G key or XR button)
       if ((!isXR && this.control.keyG.pressed) || (isXR && this.control.xrLeftBtn1.pressed)) {
         this.world.platformerMechanics.attemptLedgeGrab(this.data.id)
       }
-      
+
       // Air dive (H key or XR button)
       if ((!isXR && this.control.keyH.pressed) || (isXR && this.control.xrRightBtn2.pressed)) {
         this.world.platformerMechanics.attemptAirDive(this.data.id)
       }
-      
+
       // Wall slide (automatic when touching wall while falling)
       if (!this.grounded && this.falling) {
         this.world.platformerMechanics.attemptWallSlide(this.data.id)
