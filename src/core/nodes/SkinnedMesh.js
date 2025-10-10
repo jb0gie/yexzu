@@ -168,7 +168,7 @@ export class SkinnedMesh extends Node {
     if (this.action?._clip.name === name) {
       return
     }
-    
+
     const prevAction = this.action
     this.action = this.actions[name]
     if (!this.action) {
@@ -177,7 +177,7 @@ export class SkinnedMesh extends Node {
       this.action = this.mixer.clipAction(clip)
       this.actions[name] = this.action
     }
-    
+
     // Use provided speed or fall back to global timeScale
     if (speed !== undefined) {
       this.action.timeScale = speed
@@ -186,7 +186,7 @@ export class SkinnedMesh extends Node {
     }
     this.action.clampWhenFinished = !loop
     this.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-    
+
     // Use crossFadeTo if requested and there's a previous action
     if (crossFade && prevAction && prevAction.isRunning()) {
       console.log(`[SkinnedMesh] Using crossFadeTo from ${prevAction._clip.name} to ${name} (duration: ${fade}s)`)

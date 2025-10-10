@@ -561,7 +561,9 @@ export class Camera extends Node {
 
     // Destroy spectator capsule if exists
     if (this._freeActor) {
-      try { this._freeActor.destroy() } catch (e) { }
+      try {
+        this._freeActor.destroy()
+      } catch (e) {}
       this._freeActor = null
     }
   }
@@ -1093,21 +1095,39 @@ export class Camera extends Node {
       if (this._lastFreePos) {
         const dist = this.camera.position.distanceTo(this._lastFreePos)
         if (dist > 0.01) {
-          console.log('[FREE] ⚠️ POSITION WAS RESET! Distance:', dist.toFixed(3),
-            'From:', this._lastFreePos.x.toFixed(2), this._lastFreePos.y.toFixed(2), this._lastFreePos.z.toFixed(2),
-            'To:', this.camera.position.x.toFixed(2), this.camera.position.y.toFixed(2), this.camera.position.z.toFixed(2))
-          console.log('[FREE] Parent:', this.camera.parent?.type || 'none',
-            '| This.parent:', this.parent?.name || 'none',
-            '| attachToRig:', this.attachToRig)
+          console.log(
+            '[FREE] ⚠️ POSITION WAS RESET! Distance:',
+            dist.toFixed(3),
+            'From:',
+            this._lastFreePos.x.toFixed(2),
+            this._lastFreePos.y.toFixed(2),
+            this._lastFreePos.z.toFixed(2),
+            'To:',
+            this.camera.position.x.toFixed(2),
+            this.camera.position.y.toFixed(2),
+            this.camera.position.z.toFixed(2)
+          )
+          console.log(
+            '[FREE] Parent:',
+            this.camera.parent?.type || 'none',
+            '| This.parent:',
+            this.parent?.name || 'none',
+            '| attachToRig:',
+            this.attachToRig
+          )
         }
       }
 
       this.updateFreeFlying(delta)
 
       // Simple debug: Log position when any movement key is held (throttled to ~10 times per second)
-      const isMoving = this.control?.keyW?.down || this.control?.keyA?.down ||
-        this.control?.keyS?.down || this.control?.keyD?.down ||
-        this.control?.keyQ?.down || this.control?.keyE?.down ||
+      const isMoving =
+        this.control?.keyW?.down ||
+        this.control?.keyA?.down ||
+        this.control?.keyS?.down ||
+        this.control?.keyD?.down ||
+        this.control?.keyQ?.down ||
+        this.control?.keyE?.down ||
         this.control?.space?.down
       if (isMoving) {
         this._freeLogTimer = (this._freeLogTimer || 0) + delta
@@ -1293,7 +1313,8 @@ export class Camera extends Node {
     }
 
     // Only log when keys are actually pressed
-    const anyKeyPressed = this.control.keyW?.down || this.control.keyA?.down || this.control.keyS?.down || this.control.keyD?.down
+    const anyKeyPressed =
+      this.control.keyW?.down || this.control.keyA?.down || this.control.keyS?.down || this.control.keyD?.down
     if (anyKeyPressed) {
       console.log('[FREE] Key pressed:', {
         W: this.control.keyW?.down,
@@ -1340,8 +1361,8 @@ export class Camera extends Node {
     const up = new THREE.Vector3()
 
     // Extract basis vectors from matrix (columns are the local axes)
-    right.setFromMatrixColumn(matrix, 0)      // X axis = right
-    up.setFromMatrixColumn(matrix, 1)         // Y axis = up
+    right.setFromMatrixColumn(matrix, 0) // X axis = right
+    up.setFromMatrixColumn(matrix, 1) // Y axis = up
     forward.setFromMatrixColumn(matrix, 2).negate() // -Z axis = forward
 
     // Debug: Log the vectors when moving
@@ -1349,7 +1370,7 @@ export class Camera extends Node {
       console.log('[FREE] Strafe vectors:', {
         right: `${right.x.toFixed(3)}, ${right.y.toFixed(3)}, ${right.z.toFixed(3)}`,
         forward: `${forward.x.toFixed(3)}, ${forward.y.toFixed(3)}, ${forward.z.toFixed(3)}`,
-        up: `${up.x.toFixed(3)}, ${up.y.toFixed(3)}, ${up.z.toFixed(3)}`
+        up: `${up.x.toFixed(3)}, ${up.y.toFixed(3)}, ${up.z.toFixed(3)}`,
       })
     }
 
@@ -1447,24 +1468,32 @@ export class Camera extends Node {
           old: `${oldPos.x.toFixed(2)},${oldPos.y.toFixed(2)},${oldPos.z.toFixed(2)}`,
           new: `${newPos.x.toFixed(2)},${newPos.y.toFixed(2)},${newPos.z.toFixed(2)}`,
           velocity: `${this.flyState.velocity.x.toFixed(2)},${this.flyState.velocity.y.toFixed(2)},${this.flyState.velocity.z.toFixed(2)}`,
-          delta: delta.toFixed(3)
+          delta: delta.toFixed(3),
         })
       }
     }
 
     // Detailed debug (orientation and velocity)
     if (this._debugFreeLogInterval > 0) {
-      const pitch = this.flyState.euler.x * 180 / Math.PI
-      const yaw = this.flyState.euler.y * 180 / Math.PI
+      const pitch = (this.flyState.euler.x * 180) / Math.PI
+      const yaw = (this.flyState.euler.y * 180) / Math.PI
       const v = this.flyState.velocity
       const tv = this.flyState.targetVelocity
-      console.log('[FreeCam 6DOF]',
-        'pitch', pitch.toFixed(1),
-        'yaw', yaw.toFixed(1),
-        '| fwd', `[${forward.x.toFixed(2)},${forward.y.toFixed(2)},${forward.z.toFixed(2)}]`,
-        '| tgtVel', `[${tv.x.toFixed(2)},${tv.y.toFixed(2)},${tv.z.toFixed(2)}]`,
-        '| vel', `[${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}]`,
-        '| W?', this.control.keyW?.down ? 'Y' : 'N')
+      console.log(
+        '[FreeCam 6DOF]',
+        'pitch',
+        pitch.toFixed(1),
+        'yaw',
+        yaw.toFixed(1),
+        '| fwd',
+        `[${forward.x.toFixed(2)},${forward.y.toFixed(2)},${forward.z.toFixed(2)}]`,
+        '| tgtVel',
+        `[${tv.x.toFixed(2)},${tv.y.toFixed(2)},${tv.z.toFixed(2)}]`,
+        '| vel',
+        `[${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}]`,
+        '| W?',
+        this.control.keyW?.down ? 'Y' : 'N'
+      )
     }
   }
 

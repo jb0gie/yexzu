@@ -1,170 +1,356 @@
 ;({
   init() {
-    // Only run on client
     if (!world.isClient) return
 
-    // Get control interface
     this.control = app.control()
-    if (!this.control) {
-      console.warn('No control interface available')
-      return
-    }
+    if (!this.control) return
 
-    // Capture necessary controls
-    this.control.keyW.capture = true
-    this.control.keyA.capture = true
-    this.control.keyS.capture = true
-    this.control.keyD.capture = true
-    this.control.keyQ.capture = true
-    this.control.keyE.capture = true
-    this.control.space.capture = true
-    this.control.mouseLeft.capture = true
-    this.control.mouseRight.capture = true
+    this.cameras = []
+    this.currentCameraIndex = 0
+    this.mouseLookEnabled = false
+    this.cameraRotation = new THREE.Euler(0, 0, 0)
+    this.velocity = new THREE.Vector3(0, 0, 0)
 
-    // Create capsule rigidbody for physics-based movement
-    this.capsule = app.create('rigidbody', {
-      type: 'dynamic',
-      mass: 1,
-      linearDamping: 0.9,
-      angularDamping: 0.9,
-      gravity: [0, 0, 0], // No gravity for flying
-      position: [0, 2, 0],
+    app.keepActive = true
+
+    app.configure([
+      { type: 'section', key: 'camera', label: 'Camera System' },
+      {
+        type: 'switch',
+        key: 'mode',
+        label: 'Camera Mode',
+        initial: 'preset',
+        options: [
+          { value: 'preset', label: 'Preset Cameras' },
+          { value: 'free', label: 'Free Camera' },
+          { value: 'fps', label: 'First Person' },
+        ],
+      },
+      {
+        type: 'number',
+        key: 'currentPreset',
+        label: 'Current Preset',
+        initial: 0,
+        min: 0,
+        max: 4,
+        when: [{ key: 'mode', op: 'eq', value: 'preset' }],
+      },
+      {
+        type: 'number',
+        key: 'fov',
+        label: 'Field of View',
+        initial: 73,
+        min: 30,
+        max: 120,
+      },
+      {
+        type: 'number',
+        key: 'speed',
+        label: 'Movement Speed',
+        initial: 8,
+        min: 1,
+        max: 30,
+      },
+      {
+        type: 'switch',
+        key: 'dofEnabled',
+        label: 'Depth of Field',
+        initial: false,
+        options: [
+          { value: true, label: 'Enabled' },
+          { value: false, label: 'Disabled' },
+        ],
+      },
+      {
+        type: 'number',
+        key: 'fStop',
+        label: 'F-Stop',
+        initial: 2.8,
+        min: 1.4,
+        max: 16,
+        when: [{ key: 'dofEnabled', op: 'eq', value: true }],
+      },
+      {
+        type: 'number',
+        key: 'focusDistance',
+        label: 'Focus Distance',
+        initial: 10,
+        min: 0.1,
+        max: 100,
+        when: [{ key: 'dofEnabled', op: 'eq', value: true }],
+      },
+    ])
+
+    this.setupControls()
+    this.createPresetCameras()
+    this.createFreeCamera()
+
+    app.on('update', delta => this.update(delta))
+  },
+
+  setupControls() {
+    const controls = [
+      'digit1',
+      'digit2',
+      'digit3',
+      'digit4',
+      'digit5',
+      'bracketLeft',
+      'bracketRight',
+      'keyC',
+      'keyR',
+      'keyW',
+      'keyA',
+      'keyS',
+      'keyD',
+      'keyQ',
+      'keyE',
+      'space',
+      'shiftLeft',
+      'mouseRight',
+    ]
+
+    controls.forEach(key => {
+      if (this.control[key]) this.control[key].capture = true
     })
+  },
 
-    // Add capsule collider
-    this.collider = app.create('collider', {
-      shape: 'capsule',
-      radius: 0.5,
-      height: 1.8,
-      center: [0, 0, 0],
+  createPresetCameras() {
+    const presets = [
+      { name: 'Third Person', position: [0, 2, 6], rotation: [-0.15, 0, 0], fov: 73 },
+      { name: 'First Person', position: [0, 1.6, 0], rotation: [0, 0, 0], fov: 80 },
+      { name: 'Cinematic Wide', position: [12, 4, 12], rotation: [-0.2, 0.785, 0], fov: 35 },
+      { name: 'Top Down', position: [0, 15, 1], rotation: [-Math.PI / 2, 0, 0], fov: 60 },
+      { name: 'Side View', position: [15, 2, 0], rotation: [0, -Math.PI / 2, 0], fov: 50 },
+    ]
+
+    presets.forEach((preset, index) => {
+      const camera = app.create('camera', {
+        name: `camera-${index}`,
+        position: preset.position,
+        rotation: preset.rotation,
+        fov: preset.fov,
+        active: false,
+        attachToRig: false,
+        isPlayerCamera: false,
+        showHelper: true,
+      })
+
+      camera.preset = preset
+      this.cameras.push(camera)
+      app.add(camera)
     })
-    this.capsule.add(this.collider)
+  },
 
-    // Create camera attached to capsule
-    this.camera = app.create('camera', {
-      name: 'free-flying-camera',
-      attachToRig: false, // World space, not attached to player
+  createFreeCamera() {
+    this.cameraRoot = app.create('group', { position: [0, 2, 0] })
+
+    this.freeCamera = app.create('camera', {
+      name: 'free-camera',
+      attachToRig: false,
       isPlayerCamera: false,
       active: true,
-      fov: 75,
-      near: 0.1,
-      far: 1000,
-      position: [0, 0, 0], // Will be positioned relative to capsule
-      rotation: [0, 0, 0],
+      fov: app.config.fov,
+      dof: {
+        enabled: app.config.dofEnabled,
+        fStop: app.config.fStop,
+        focusDistance: app.config.focusDistance,
+        maxBlur: 0.02,
+        autofocus: false,
+      },
     })
 
-    // Add camera to capsule so it moves with it
-    this.capsule.add(this.camera)
-
-    // Movement settings
-    this.moveSpeed = 10
-    this.lookSensitivity = 0.002
-
-    // Mouse look state
-    this.mouseLookEnabled = false
-    this.lastMouseX = 0
-    this.lastMouseY = 0
-
-    // Store initial rotation for relative movement
-    this.cameraRotation = new THREE.Euler(0, 0, 0, 'YXZ')
-
-    // Add to scene
-    app.add(this.capsule)
-
-    console.log('Free-flying camera system initialized')
+    this.cameraRoot.add(this.freeCamera)
+    app.add(this.cameraRoot)
   },
 
   update(delta) {
-    if (!world.isClient || !this.control || !this.capsule || !this.camera) return
+    if (!world.isClient || !this.control) return
 
-    // Handle mouse look toggle (right mouse button)
-    if (this.control.mouseRight && this.control.mouseRight.pressed) {
-      this.mouseLookEnabled = !this.mouseLookEnabled
-      if (this.mouseLookEnabled) {
-        this.lastMouseX = this.control.mouseX
-        this.lastMouseY = this.control.mouseY
-        this.control.mouseMove.capture = true
-      } else {
-        this.control.mouseMove.capture = false
+    this.updateConfig()
+    this.handleInput()
+    this.updateCameraMovement(delta)
+  },
+
+  updateConfig() {
+    if (this.freeCamera.fov !== app.config.fov) {
+      this.freeCamera.fov = app.config.fov
+    }
+
+    const dofEnabled = app.config.dofEnabled
+    if (this.freeCamera.dof?.enabled !== dofEnabled) {
+      this.freeCamera.dof = {
+        enabled: dofEnabled,
+        fStop: app.config.fStop,
+        focusDistance: app.config.focusDistance,
+        maxBlur: 0.02,
+        autofocus: false,
+      }
+    } else if (dofEnabled && this.freeCamera.dof) {
+      this.freeCamera.dof.fStop = app.config.fStop
+      this.freeCamera.dof.focusDistance = app.config.focusDistance
+    }
+
+    const mode = app.config.mode
+    if (mode === 'preset') {
+      const presetIndex = parseInt(app.config.currentPreset) || 0
+      if (presetIndex !== this.currentCameraIndex && this.cameras[presetIndex]) {
+        this.switchToPreset(presetIndex)
+      }
+    } else {
+      this.switchToFreeCamera()
+    }
+  },
+
+  handleInput() {
+    if (this.control.digit1?.pressed) this.handlePresetSwitch(0)
+    if (this.control.digit2?.pressed) this.handlePresetSwitch(1)
+    if (this.control.digit3?.pressed) this.handlePresetSwitch(2)
+    if (this.control.digit4?.pressed) this.handlePresetSwitch(3)
+    if (this.control.digit5?.pressed) this.handlePresetSwitch(4)
+
+    if (this.control.bracketLeft?.pressed) this.cyclePreset(-1)
+    if (this.control.bracketRight?.pressed) this.cyclePreset(1)
+
+    if (this.control.keyC?.pressed) this.toggleMode()
+    if (this.control.keyR?.pressed) this.resetPosition()
+
+    const mode = app.config.mode
+    if (mode === 'free' || mode === 'fps') {
+      if (this.control.mouseRight?.pressed) {
+        this.mouseLookEnabled = true
+      } else if (this.control.mouseRight?.released) {
+        this.mouseLookEnabled = false
       }
     }
+  },
 
-    // Mouse look
+  handlePresetSwitch(index) {
+    app.config.mode = 'preset'
+    app.config.currentPreset = index
+  },
+
+  cyclePreset(direction) {
+    const newIndex = (this.currentCameraIndex + direction + this.cameras.length) % this.cameras.length
+    app.config.mode = 'preset'
+    app.config.currentPreset = newIndex
+  },
+
+  toggleMode() {
+    const modes = ['preset', 'free', 'fps']
+    const currentIndex = modes.indexOf(app.config.mode)
+    app.config.mode = modes[(currentIndex + 1) % modes.length]
+  },
+
+  resetPosition() {
+    this.cameraRoot.position.set(0, 2, 0)
+    this.cameraRotation.set(0, 0, 0)
+    this.velocity.set(0, 0, 0)
+  },
+
+  updateCameraMovement(delta) {
+    const mode = app.config.mode
+    if (mode !== 'free' && mode !== 'fps') return
+
     if (this.mouseLookEnabled && this.control.mouseMove) {
-      const deltaX = this.control.mouseX - this.lastMouseX
-      const deltaY = this.control.mouseY - this.lastMouseY
-
-      this.cameraRotation.y -= deltaX * this.lookSensitivity
-      this.cameraRotation.x -= deltaY * this.lookSensitivity
-      this.cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.cameraRotation.x))
-
-      this.camera.rotation = [this.cameraRotation.x, this.cameraRotation.y, this.cameraRotation.z]
-
-      this.lastMouseX = this.control.mouseX
-      this.lastMouseY = this.control.mouseY
+      this.updateMouseLook()
     }
 
-    // Movement input
-    const moveVector = new THREE.Vector3()
+    this.updateMovement(delta)
+    this.applyCameraTransform()
+  },
 
-    // Forward/backward (W/S)
-    if (this.control.keyW && this.control.keyW.down) {
-      moveVector.z -= 1
-    }
-    if (this.control.keyS && this.control.keyS.down) {
-      moveVector.z += 1
-    }
+  updateMouseLook() {
+    const deltaX = this.control.mouseX - (this.lastMouseX || this.control.mouseX)
+    const deltaY = this.control.mouseY - (this.lastMouseY || this.control.mouseY)
 
-    // Left/right (A/D)
-    if (this.control.keyA && this.control.keyA.down) {
-      moveVector.x -= 1
-    }
-    if (this.control.keyD && this.control.keyD.down) {
-      moveVector.x += 1
-    }
+    this.cameraRotation.y -= deltaX * 0.002
+    this.cameraRotation.x -= deltaY * 0.002
+    this.cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.cameraRotation.x))
 
-    // Up/down (Q/E or Space)
-    if (this.control.keyQ && this.control.keyQ.down) {
-      moveVector.y -= 1
-    }
-    if (this.control.keyE && this.control.keyE.down) {
-      moveVector.y += 1
-    }
-    if (this.control.space && this.control.space.down) {
-      moveVector.y += 1
-    }
+    this.lastMouseX = this.control.mouseX
+    this.lastMouseY = this.control.mouseY
+  },
 
-    // Normalize and apply camera rotation to movement
-    if (moveVector.length() > 0) {
+  updateMovement(delta) {
+    const speed = app.config.speed
+    const acceleration = speed * 4
+    const friction = 8
+
+    let moveX = 0,
+      moveY = 0,
+      moveZ = 0
+
+    if (this.control.keyW?.down) moveZ -= 1
+    if (this.control.keyS?.down) moveZ += 1
+    if (this.control.keyA?.down) moveX -= 1
+    if (this.control.keyD?.down) moveX += 1
+    if (this.control.keyQ?.down) moveY -= 1
+    if (this.control.keyE?.down || this.control.space?.down) moveY += 1
+
+    const boost = this.control.shiftLeft?.down ? 2 : 1
+
+    if (moveX !== 0 || moveY !== 0 || moveZ !== 0) {
+      const moveVector = this.tempMoveVector || (this.tempMoveVector = new THREE.Vector3())
+      moveVector.set(moveX, moveY, moveZ)
       moveVector.normalize()
+      moveVector.multiplyScalar(acceleration * delta * boost)
       moveVector.applyEuler(this.cameraRotation)
-      moveVector.multiplyScalar(this.moveSpeed * delta)
+      this.velocity.add(moveVector)
+    }
 
-      // Apply force to rigidbody
-      this.capsule.applyForce([moveVector.x, moveVector.y, moveVector.z])
+    this.velocity.multiplyScalar(Math.max(0, 1 - friction * delta))
+
+    if (this.velocity.length() > 0.01) {
+      this.cameraRoot.position.add(this.velocity.clone().multiplyScalar(delta))
+    }
+  },
+
+  applyCameraTransform() {
+    this.freeCamera.rotation.set(this.cameraRotation.x, this.cameraRotation.y, 0)
+
+    if (app.config.mode === 'fps') {
+      this.cameraRoot.position.y = 1.6
+    }
+  },
+
+  switchToPreset(index) {
+    if (!this.cameras[index] || index === this.currentCameraIndex) return
+
+    this.cameras.forEach(camera => {
+      camera.active = false
+    })
+
+    this.freeCamera.active = false
+    this.cameras[index].active = true
+    this.currentCameraIndex = index
+  },
+
+  switchToFreeCamera() {
+    if (app.config.mode === 'free' || app.config.mode === 'fps') {
+      this.cameras.forEach(camera => {
+        camera.active = false
+      })
+      this.freeCamera.active = true
+      this.mouseLookEnabled = app.config.mode === 'fps'
     }
   },
 
   cleanup() {
-    // Release controls
     if (this.control) {
-      this.control.keyW.capture = false
-      this.control.keyA.capture = false
-      this.control.keyS.capture = false
-      this.control.keyD.capture = false
-      this.control.keyQ.capture = false
-      this.control.keyE.capture = false
-      this.control.space.capture = false
-      this.control.mouseLeft.capture = false
-      this.control.mouseRight.capture = false
-      this.control.mouseMove.capture = false
+      Object.keys(this.control).forEach(key => {
+        if (this.control[key]?.capture !== undefined) {
+          this.control[key].capture = false
+        }
+      })
     }
 
-    // Remove nodes
-    if (this.capsule) {
-      app.remove(this.capsule)
-    }
+    this.cameras.forEach(camera => {
+      if (camera) app.remove(camera)
+    })
 
-    console.log('Free-flying camera system cleaned up')
+    if (this.cameraRoot) {
+      app.remove(this.cameraRoot)
+    }
   },
 })

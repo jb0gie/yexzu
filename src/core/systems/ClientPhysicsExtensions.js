@@ -16,14 +16,14 @@ export class ClientPhysicsExtensions extends System {
 
   async init() {
     if (typeof window === 'undefined') return // Server-only
-    
+
     try {
       // Load PhysX on client to get THREE.js extensions
       await loadPhysX()
-      
+
       // Extend THREE.js objects with physics methods
       extendThreePhysX()
-      
+
       this.initialized = true
       console.log('[ClientPhysicsExtensions] PhysX loaded and THREE.js extended')
     } catch (error) {
@@ -36,7 +36,7 @@ export class ClientPhysicsExtensions extends System {
   addStubs() {
     // Add stub methods to prevent toPxVec3 errors if PhysX fails to load
     if (typeof THREE !== 'undefined' && THREE.Vector3 && !THREE.Vector3.prototype.toPxVec3) {
-      THREE.Vector3.prototype.toPxVec3 = function(pxVec3) {
+      THREE.Vector3.prototype.toPxVec3 = function (pxVec3) {
         console.warn('toPxVec3 called but PhysX not available')
         return null
       }

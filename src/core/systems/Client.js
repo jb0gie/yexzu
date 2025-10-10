@@ -30,20 +30,20 @@ export class Client extends System {
             try {
               const inst = this.world.entities.player?.avatar?.instance
               return inst?.debug?.listSprings?.()
-            } catch (_) { }
+            } catch (_) {}
             return []
           },
           springAxes: (size, color) => {
             try {
               const inst = this.world.entities.player?.avatar?.instance
               return inst?.debug?.showSpringAxes?.(size, color)
-            } catch (_) { }
+            } catch (_) {}
             return []
           },
         }),
         configurable: true,
       })
-    } catch (_) { }
+    } catch (_) {}
   }
 
   async init({ loadYoga }) {
