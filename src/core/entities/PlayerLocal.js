@@ -273,11 +273,11 @@ export class PlayerLocal extends Entity {
       Layers.player.group,
       Layers.player.mask,
       PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-      PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
-      PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
-      PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
-      PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
+        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
+        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
+        PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
+        PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
+        PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
       0
     )
     shape.setContactOffset(0.08) // just enough to fire contacts (because we muck with velocity sometimes standing on a thing doesn't contact)
@@ -691,9 +691,12 @@ export class PlayerLocal extends Entity {
       const bufferedJump = this.jumpBufferTimer > 0
       const hasCoyote = this.coyoteTimer > 0
       const shouldJump =
-        (this.grounded || hasCoyote) && !this.jumping && bufferedJump && !this.data.effect?.snare && !this.data.effect?.freeze
-      const shouldAirJump =
-        !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
+        (this.grounded || hasCoyote) &&
+        !this.jumping &&
+        bufferedJump &&
+        !this.data.effect?.snare &&
+        !this.data.effect?.freeze
+      const shouldAirJump = !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -846,7 +849,6 @@ export class PlayerLocal extends Entity {
       this.stick.active = this.stick.center.distanceTo(this.stick.touch.position) > 3
     }
 
-
     // watch jump presses to either fly or air-jump
     this.jumpDown = isXR ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
     // capture jump press for buffering
@@ -989,7 +991,12 @@ export class PlayerLocal extends Entity {
     if (this.data.effect?.emote) {
       const url = this.data.effect.emote
       const allowDuringFlip = (() => {
-        try { const u = new URL(url); return u.searchParams.get('af') === '1' } catch (_) { return false }
+        try {
+          const u = new URL(url)
+          return u.searchParams.get('af') === '1'
+        } catch (_) {
+          return false
+        }
       })()
       const aerial = this.world.time < this.flipUntil
       if (!aerial || allowDuringFlip) emote = url
@@ -1012,7 +1019,7 @@ export class PlayerLocal extends Entity {
       // keep FLIP/BACKFLIP exclusive while locked, unless we have clearly transitioned into falling
       const flipElapsed = this.world.time - this.flipStartAt
       const unlockForFall = this.falling && flipElapsed > Math.min(0.45, this.flipDuration * 0.7)
-      mode = unlockForFall ? null : (this.isBackflip ? Modes.BACKFLIP : Modes.FLIP)
+      mode = unlockForFall ? null : this.isBackflip ? Modes.BACKFLIP : Modes.FLIP
       if (!unlockForFall) console.log(`[Locomotion] Mode: ${this.isBackflip ? 'BACKFLIP' : 'FLIP'}`)
     } else if (this.jumping) {
       mode = Modes.JUMP

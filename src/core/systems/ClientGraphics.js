@@ -143,9 +143,9 @@ export class ClientGraphics extends System {
   start() {
     this.world.on('xrSession', this.onXRSession)
     this.world.settings.on('change', this.onSettingsChange)
-    
+
     // Listen for camera changes from CameraManager
-    this.world.on('camera-changed', (camera) => {
+    this.world.on('camera-changed', camera => {
       // Update the render pass with the new camera
       if (this.renderPass && camera?.camera) {
         this.renderPass.camera = camera.camera
@@ -169,7 +169,7 @@ export class ClientGraphics extends System {
   render() {
     // Check if we have an active camera node with its own composer
     const activeCameraNode = this.world.cameraManager?.activeCamera
-    
+
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
       const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
       this.renderer.render(this.world.stage.scene, cam)
@@ -223,12 +223,14 @@ export class ClientGraphics extends System {
     }
     if (changes.dofFocusDistance) {
       if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value = changes.dofFocusDistance.value / this.world.camera.far
+        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value =
+          changes.dofFocusDistance.value / this.world.camera.far
       }
     }
     if (changes.dofFocusRange) {
       if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value = changes.dofFocusRange.value / this.world.camera.far
+        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value =
+          changes.dofFocusRange.value / this.world.camera.far
       }
     }
     if (changes.dofBokehScale) {

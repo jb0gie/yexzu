@@ -7,3 +7,9 @@ localstorage.json
 node_modules/
 build/
 /world*
+
+/.swarm*
+/.claude-flow*
+/code_search_index*
+/.hive-mind*
+code_search_index*

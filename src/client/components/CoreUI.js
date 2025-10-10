@@ -1087,7 +1087,7 @@ function TouchBtns({ world }) {
   const [adsToggled, setAdsToggled] = useState(false)
   const [cameraMode, setCameraMode] = useState(0) // 0 = medium 3rd (default), 1 = close 3rd, 2 = first person, 3 = far 3rd
   const [platformerMode, setPlatformerMode] = useState(0) // Track current platformer mode
-  
+
   useEffect(() => {
     function onChange(isAction) {
       setAction(isAction)
@@ -1113,16 +1113,16 @@ function TouchBtns({ world }) {
       const updatePlatformerMode = () => {
         setPlatformerMode(player.platformerMode || 0)
       }
-      
+
       // Listen for player updates
       world.on('player', updatePlatformerMode)
-      
+
       return () => {
         world.off('player', updatePlatformerMode)
       }
     }
   }, [world])
-  
+
   // Handle ADS toggle state
   useEffect(() => {
     if (adsToggled) {
@@ -1131,7 +1131,7 @@ function TouchBtns({ world }) {
       world.controls.simulateButton('mouseRight', false)
     }
   }, [adsToggled, world])
-  
+
   // Handle camera mode changes - Desktop scroll emulation
   useEffect(() => {
     const player = world.entities.player
@@ -1143,18 +1143,18 @@ function TouchBtns({ world }) {
       // 3 = far 3rd person (zoom = 7.0, avatar visible) - furthest back
       const zoomLevels = [5.0, 1, 0, 7]
       player.cam.zoom = zoomLevels[cameraMode]
-      
+
       // Hide/show avatar based on camera mode
       if (player.avatar) {
         player.avatar.visible = cameraMode !== 2 // Hide avatar only in first person
       }
     }
   }, [cameraMode, world])
-  
+
   const cycleCameraMode = () => {
     setCameraMode(prev => (prev + 1) % 4) // Cycle through 4 modes: 0, 1, 2, 3
   }
-  
+
   // lookpad removed
   return (
     <div
@@ -1299,11 +1299,7 @@ function TouchBtns({ world }) {
         }}
       >
         ADS
-        {adsToggled && (
-          <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', opacity: 0.8 }}>
-            ON
-          </div>
-        )}
+        {adsToggled && <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', opacity: 0.8 }}>ON</div>}
       </div>
       <div
         className='touchbtns-btn jump'
@@ -1322,22 +1318,28 @@ function TouchBtns({ world }) {
       >
         <ChevronDoubleUpIcon size='1.5rem' />
       </div>
-      
+
       {/* Camera cycle button - Desktop scroll emulation */}
       <div
         className={cls('touchbtns-btn camera', {
           'medium-3rd': cameraMode === 0,
           'close-3rd': cameraMode === 1,
           'first-person': cameraMode === 2,
-          'far-3rd': cameraMode === 3
+          'far-3rd': cameraMode === 3,
         })}
         onPointerDown={e => {
           e.stopPropagation()
           cycleCameraMode()
         }}
-        title={`Camera: ${cameraMode === 0 ? 'Medium 3rd' : 
-                         cameraMode === 1 ? 'Close 3rd' : 
-                         cameraMode === 2 ? 'First Person' : 'Far 3rd'}`}
+        title={`Camera: ${
+          cameraMode === 0
+            ? 'Medium 3rd'
+            : cameraMode === 1
+              ? 'Close 3rd'
+              : cameraMode === 2
+                ? 'First Person'
+                : 'Far 3rd'
+        }`}
       >
         <CameraIcon size='1rem' />
       </div>
@@ -1346,14 +1348,14 @@ function TouchBtns({ world }) {
       {/* Climb Button */}
       <div
         className={cls('touchbtns-btn platformer climb', {
-          active: platformerMode === 10 // CLIMBING mode
+          active: platformerMode === 10, // CLIMBING mode
         })}
         onPointerDown={e => {
           e.stopPropagation()
           world.controls.simulateButton('keyF', true)
           setTimeout(() => world.controls.simulateButton('keyF', false), 100)
         }}
-        title="Climb Walls (F)"
+        title='Climb Walls (F)'
       >
         CLIMB
       </div>
@@ -1361,14 +1363,14 @@ function TouchBtns({ world }) {
       {/* Ledge Grab Button */}
       <div
         className={cls('touchbtns-btn platformer ledge', {
-          active: platformerMode === 11 // LEDGE_HANGING mode
+          active: platformerMode === 11, // LEDGE_HANGING mode
         })}
         onPointerDown={e => {
           e.stopPropagation()
           world.controls.simulateButton('keyG', true)
           setTimeout(() => world.controls.simulateButton('keyG', false), 100)
         }}
-        title="Grab Ledges (G)"
+        title='Grab Ledges (G)'
       >
         LEDGE
       </div>
@@ -1376,21 +1378,21 @@ function TouchBtns({ world }) {
       {/* Air Dive Button */}
       <div
         className={cls('touchbtns-btn platformer dive', {
-          active: platformerMode === 12 // AIR_DIVING mode
+          active: platformerMode === 12, // AIR_DIVING mode
         })}
         onPointerDown={e => {
           e.stopPropagation()
           world.controls.simulateButton('keyH', true)
           setTimeout(() => world.controls.simulateButton('keyH', false), 100)
         }}
-        title="Air Dive (H)"
+        title='Air Dive (H)'
       >
         DIVE
       </div>
 
       {/* Platformer Status Display for Mobile */}
       <div
-        className="platformer-status"
+        className='platformer-status'
         css={css`
           position: absolute;
           top: 1rem;
@@ -1405,9 +1407,7 @@ function TouchBtns({ world }) {
           transition: opacity 0.3s ease;
         `}
       >
-        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>
-          Platformer Status
-        </div>
+        <div style={{ fontWeight: 'bold', marginBottom: '0.2rem' }}>Platformer Status</div>
         <div>
           {platformerMode === 9 && '🛤️ Grinding'}
           {platformerMode === 10 && '🧗 Climbing'}

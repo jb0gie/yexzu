@@ -204,7 +204,7 @@ export class ClientLoader extends System {
           const springManager = glb.userData.vrm?.springBoneManager
           const jointCount = springManager?.joints?.size ?? 0
           console.log('[avatar] spring manager:', !!springManager, 'joints:', jointCount)
-        } catch (_) { }
+        } catch (_) {}
         const factory = createVRMFactory(glb, this.world.setupMaterial)
         const hooks = this.vrmHooks
         const node = createNode('group', { id: '$root' })

@@ -34,10 +34,10 @@ export class World extends EventEmitter {
     this.rig = new THREE.Object3D()
     // NOTE: camera near is slightly smaller than spherecast. far is slightly more than skybox.
     // this gives us minimal z-fighting without needing logarithmic depth buffers
-    
+
     // We'll create the default camera node after systems are initialized
     this.defaultCameraNode = null
-    
+
     // Backwards compatibility: world.camera returns active camera node's camera
     Object.defineProperty(this, 'camera', {
       get() {
@@ -52,7 +52,7 @@ export class World extends EventEmitter {
         // Last resort: create a temporary camera (shouldn't happen)
         console.warn('No camera available - this should not happen')
         return new THREE.PerspectiveCamera(73, 1, 0.2, 1200)
-      }
+      },
     })
 
     this.register('settings', Settings)
@@ -81,12 +81,12 @@ export class World extends EventEmitter {
     this.storage = options.storage
     this.assetsDir = options.assetsDir
     this.assetsUrl = options.assetsUrl
-    
+
     // Initialize all systems first
     for (const system of this.systems) {
       await system.init(options)
     }
-    
+
     // Now start systems and create camera
     this.start()
   }
@@ -96,55 +96,55 @@ export class World extends EventEmitter {
     for (const system of this.systems) {
       system.start()
     }
-    
+
     // Create default camera AFTER systems are started
     // This ensures CameraManager is ready
     if (this.cameraManager) {
       this.createDefaultCamera()
     }
   }
-  
+
   createDefaultCamera() {
     console.log('World: Creating default camera node')
-    
+
     // Only create default camera if no other cameras exist
     if (!this.cameraManager?.cameras?.size) {
       // Create the default camera node with wide landscape preset
       // Start with minimal effects to prevent performance issues on load
       this.defaultCameraNode = new Camera({
         name: 'default-camera',
-        fov: 73,  // Wide landscape preset (24mm)
+        fov: 73, // Wide landscape preset (24mm)
         near: 0.2,
         far: 1200,
         position: [0, 0, 0],
         active: true,
         attachToRig: true,
-        isPlayerCamera: true,  // This is the main player camera
+        isPlayerCamera: true, // This is the main player camera
         // Start with effects disabled for faster initial load
         dof: { enabled: false },
         bloom: { enabled: false },
         vignette: { enabled: false },
         chromaticAberration: { enabled: false },
-        filmGrain: { enabled: false }
+        filmGrain: { enabled: false },
       })
     }
-    
+
     // Only activate if we created a default camera
     if (this.defaultCameraNode) {
       // Give it a context (minimal context for default camera)
       const ctx = {
         world: this,
-        entity: null
+        entity: null,
       }
-      
+
       // Activate the camera node (this will mount it and register with CameraManager)
       this.defaultCameraNode.activate(ctx)
-      
+
       // Add camera to rig for movement
       if (this.defaultCameraNode.camera) {
         this.rig.add(this.defaultCameraNode.camera)
       }
-      
+
       console.log('World: Default camera node created and activated')
     } else {
       console.log('World: Skipping default camera - other cameras exist')

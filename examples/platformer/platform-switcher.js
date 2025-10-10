@@ -1,4 +1,3 @@
-
 const pltfrm = app.get('Pltfrm')
 const medPltfrm = app.get('MedPltfrm')
 const lrgPltfrm = app.get('LrgPltfrm')
@@ -17,10 +16,10 @@ app.configure([
     label: 'Platform Type',
     options: [
       { label: 'Small', value: 'small' },
-			{ label: 'Medium', value: 'medium' },
-			{ label: 'Large', value: 'large' },
-			{ label: 'X-Large', value: 'x-large' },
-			{ label: 'Falling', value: 'falling' },
-		],
-	}
+      { label: 'Medium', value: 'medium' },
+      { label: 'Large', value: 'large' },
+      { label: 'X-Large', value: 'x-large' },
+      { label: 'Falling', value: 'falling' },
+    ],
+  },
 ])

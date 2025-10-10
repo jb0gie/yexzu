@@ -40,8 +40,7 @@ class Panel {
     this.context = this.canvas.getContext('2d')
 
     if (this.context) {
-      this.context.font =
-        'bold ' + 9 * this.PR + 'px Helvetica,Arial,sans-serif'
+      this.context.font = 'bold ' + 9 * this.PR + 'px Helvetica,Arial,sans-serif'
       this.context.textBaseline = 'top'
 
       this.context.fillStyle = this.bg
@@ -49,21 +48,11 @@ class Panel {
 
       this.context.fillStyle = this.fg
       this.context.fillText(this.name, this.TEXT_X, this.TEXT_Y)
-      this.context.fillRect(
-        this.GRAPH_X,
-        this.GRAPH_Y,
-        this.GRAPH_WIDTH,
-        this.GRAPH_HEIGHT
-      )
+      this.context.fillRect(this.GRAPH_X, this.GRAPH_Y, this.GRAPH_WIDTH, this.GRAPH_HEIGHT)
 
       this.context.fillStyle = this.bg
       this.context.globalAlpha = 0.9
-      this.context.fillRect(
-        this.GRAPH_X,
-        this.GRAPH_Y,
-        this.GRAPH_WIDTH,
-        this.GRAPH_HEIGHT
-      )
+      this.context.fillRect(this.GRAPH_X, this.GRAPH_Y, this.GRAPH_WIDTH, this.GRAPH_HEIGHT)
     }
   }
 
@@ -106,12 +95,7 @@ class Panel {
       this.GRAPH_HEIGHT
     )
 
-    this.context.fillRect(
-      this.GRAPH_X + this.GRAPH_WIDTH - this.PR,
-      this.GRAPH_Y,
-      this.PR,
-      this.GRAPH_HEIGHT
-    )
+    this.context.fillRect(this.GRAPH_X + this.GRAPH_WIDTH - this.PR, this.GRAPH_Y, this.PR, this.GRAPH_HEIGHT)
 
     this.context.fillStyle = this.bg
     this.context.globalAlpha = 0.9

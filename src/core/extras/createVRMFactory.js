@@ -211,7 +211,7 @@ export function createVRMFactory(glb, setupMaterial) {
     try {
       const sm = origVRM?.springBoneManager
       console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
-    } catch (_) { }
+    } catch (_) {}
     const expressionManager = origVRM?.expressionManager || null
     // expressions from the cloned scene (fallback path if no manager)
     // expressions live on the top-level scene of the GLB, not the skinned subtree
@@ -381,18 +381,20 @@ export function createVRMFactory(glb, setupMaterial) {
       if (!currentEmote) return
       if (e?.action === currentEmote.action) {
         if (!currentEmote.loop) {
-          try { currentEmote.action?.fadeOut?.(0.15) } catch (_) { }
+          try {
+            currentEmote.action?.fadeOut?.(0.15)
+          } catch (_) {}
           currentEmote = null
         }
       }
     })
     const setEmote = (url, options = {}) => {
       const { crossFade = true, fadeDuration = 0.15, warp = true } = options
-      
+
       if (currentEmote?.url === url) return
-      
+
       const prevEmote = currentEmote
-      
+
       if (!url) {
         if (currentEmote) {
           currentEmote.action?.fadeOut(fadeDuration)
@@ -400,7 +402,7 @@ export function createVRMFactory(glb, setupMaterial) {
         }
         return
       }
-      
+
       const opts = getQueryParams(url)
       const loop = opts.l !== '0'
       const speed = parseFloat(opts.s || 1)
@@ -412,7 +414,7 @@ export function createVRMFactory(glb, setupMaterial) {
           currentEmote.loop = loop
           currentEmote.action.clampWhenFinished = !loop
           currentEmote.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-          
+
           // Use crossFadeTo if requested and there's a previous emote playing
           if (crossFade && prevEmote?.action?.isRunning()) {
             console.log(`[VRM] Using crossFadeTo for emote transition (duration: ${fadeDuration}s)`)
@@ -450,7 +452,7 @@ export function createVRMFactory(glb, setupMaterial) {
           if (currentEmote === emote) {
             action.clampWhenFinished = !loop
             action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-            
+
             // Check if we should crossfade from previous
             if (crossFade && prevEmote?.action?.isRunning()) {
               action.play()
@@ -537,9 +539,11 @@ export function createVRMFactory(glb, setupMaterial) {
               joint.colliderGroups = []
             }
           })
-        } catch (_) { }
+        } catch (_) {}
         // re-init after tuning/collider changes so initial state is consistent
-        try { spring.setInitState() } catch (_) { }
+        try {
+          spring.setInitState()
+        } catch (_) {}
         // build spring joint pairs (orig -> clone) using clone skeleton lookup by name
         spring.joints.forEach(joint => {
           const src = joint.bone
@@ -549,9 +553,11 @@ export function createVRMFactory(glb, setupMaterial) {
         })
         // build drive pairs (clone skeleton -> original bones) for joint ancestors
         const origMeshes = []
-        glb.scene.traverse(o => { if (o.isSkinnedMesh && o.skeleton) origMeshes.push(o) })
+        glb.scene.traverse(o => {
+          if (o.isSkinnedMesh && o.skeleton) origMeshes.push(o)
+        })
         const origSkeleton = origMeshes[0]?.skeleton
-        const addDrivePair = (origObj) => {
+        const addDrivePair = origObj => {
           if (!origObj || !origObj.name) return
           const cloneBone = skeleton.getBoneByName(origObj.name)
           if (cloneBone) drivePairs.push([cloneBone, origObj])
@@ -613,8 +619,16 @@ export function createVRMFactory(glb, setupMaterial) {
         // re-initialize springs after mapping (safe if already initialized)
         try {
           spring.setInitState()
-        } catch (_) { }
-        console.log('[vrmFactory] spring mapping counts', 'springs:', spring.joints.size, 'pairs:', springPairs.length, 'drive:', drivePairs.length)
+        } catch (_) {}
+        console.log(
+          '[vrmFactory] spring mapping counts',
+          'springs:',
+          spring.joints.size,
+          'pairs:',
+          springPairs.length,
+          'drive:',
+          drivePairs.length
+        )
       } catch (_) {
         // ignore
       }
@@ -624,7 +638,7 @@ export function createVRMFactory(glb, setupMaterial) {
     const update = delta => {
       elapsed += delta
       // If the avatar has springs, always animate every frame for consistent driving
-      const doAnim = hasSprings ? true : (rateCheck ? elapsed >= rate : true)
+      const doAnim = hasSprings ? true : rateCheck ? elapsed >= rate : true
       if (doAnim) {
         mixer.update(hasSprings ? delta : elapsed)
         skeleton.bones.forEach(bone => bone.updateMatrixWorld())
