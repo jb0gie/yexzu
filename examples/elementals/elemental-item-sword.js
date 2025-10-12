@@ -27,7 +27,8 @@ sphere.parent.remove(sphere)
 sphere.scale.setScalar(HIT_RADIUS)
 
 const src = initialSword.clone(true)
-const overlapLayerMask = world.createLayerMask('player')
+// Don't use layer mask so we can hit both players and mobs
+// const overlapLayerMask = world.createLayerMask('player')
 
 createItem(({ player, hooks }) => {
   let model
@@ -91,35 +92,60 @@ createItem(({ player, hooks }) => {
     // #region SERVER
     server: {
       attack(data) {
-        const { pos, dir } = data
-        const origin = v1.fromArray(pos)
-        const radius = HIT_RADIUS
-        const hits = world.overlapSphere(radius, origin, overlapLayerMask)
-        for (const hit of hits) {
-          if (hit.playerId && hit.playerId !== player.id) {
-            const playerB = world.getPlayer(hit.playerId)
-            if (!playerB) continue
-            if (!playerB.health) continue
-            let amount = num(MIN_DMG, MAX_DMG)
-            let crit = false
-            if (playerB.health > amount) {
-              crit = num(0, 1, 1) < CRIT_CHANCE
+        console.log('[sword] ========== ATTACK START ==========')
+        try {
+          const { pos, dir } = data
+          const origin = v1.fromArray(pos)
+          const radius = HIT_RADIUS
+          // Don't use layer mask to hit both players and mobs
+          const hits = world.overlapSphere(radius, origin)
+          console.log('[sword] Server attack - hits found:', hits.length)
+          for (const hit of hits) {
+            console.log('[sword] Hit details:', {
+              playerId: hit.playerId,
+              tag: hit.tag,
+              entityId: hit.entityId,
+              hasTag: !!hit.tag,
+              tagValue: hit.tag
+            })
+            if (hit.playerId && hit.playerId !== player.id) {
+              const playerB = world.getPlayer(hit.playerId)
+              if (!playerB) {
+                console.warn('[sword] Player not found:', hit.playerId)
+                continue
+              }
+              if (!playerB.health) {
+                console.warn('[sword] Player has no health property:', hit.playerId)
+                continue
+              }
+              let amount = num(MIN_DMG, MAX_DMG)
+              let crit = false
+              if (playerB.health > amount) {
+                crit = num(0, 1, 1) < CRIT_CHANCE
+                if (crit) amount *= CRIT_MULTIPLIER
+              }
+              if (amount > playerB.health) amount = playerB.health
+              console.log('[sword] Damaging player', playerB.id, 'health before:', playerB.health, 'damage:', amount)
+              hooks.damage(playerB, amount, crit)
+              console.log('[sword] Player health after damage:', playerB.health)
+              //player.push(v1.fromArray(dir).multiplyScalar(3))
+            } else if (hit.tag?.startsWith('elemental-mob:')) {
+              const mobInstanceId = hit.tag.split(':')[1]
+              console.log(`[sword] Attacking elemental mob with tag: ${hit.tag}, instanceId: ${mobInstanceId}`)
+              let amount = num(MIN_DMG, MAX_DMG)
+              const crit = num(0, 1, 1) < CRIT_CHANCE
               if (crit) amount *= CRIT_MULTIPLIER
+              // Use elemental mob damage system - send instanceId (not full tag)
+              app.emit('elemental-mob:hit', [mobInstanceId, player.id, amount, crit])
+              console.log(`[sword] Emitted elemental-mob:hit event for instanceId: ${mobInstanceId} (via app.emit)`)
+            } else {
+              console.log('[sword] Hit unknown object - no playerId or mob tag:', hit)
             }
-            if (amount > playerB.health) amount = playerB.health
-            console.log('damaging player', playerB.id, playerB.health, amount)
-            hooks.damage(playerB, amount, crit)
-            console.log('remaining: ', playerB.health)
-            //player.push(v1.fromArray(dir).multiplyScalar(3))
           }
-          if (hit.playerId) {
-            console.log(`Attacking player: ${hit.playerId}`)
-            app.emit('prism:player_hit', [hit.playerId, damageAmount, crit])
-          } else if (hit.tag?.startsWith('mob:')) {
-            const mobId = hit.tag.split(':')[1]
-            console.log(`Attacking mob: ${mobId}`)
-            app.emit(`prism:mob_hit:${mobId}`, [player.id, damageAmount, crit])
-          }
+          console.log('[sword] ========== ATTACK END ==========')
+        } catch (error) {
+          console.error('[sword] ERROR in server.attack():', error)
+          console.error('[sword] Error stack:', error.stack)
         }
       },
     },
@@ -247,6 +273,8 @@ function createItem(createInstance) {
           damage(player, amount, crit) {
             player.damage(amount)
             app.send('dmg', [player.id, amount, crit])
+            // Emit health event for elemental-combat to handle death/respawn
+            app.emit('health', { playerId: player.id, health: player.health })
           },
         },
       })

@@ -15,9 +15,9 @@ if (world.isServer) {
   const invs = {
     // [playerId]: {
     //   active: 0,
+  }
     //   items: [{ id, qty }],
     // }
-  }
   function getInv(playerId) {
     let inv = invs[playerId]
     if (!inv) {
@@ -276,13 +276,13 @@ if (world.isClient) {
     pivot: 'bottom-center',
     position: [0.5, 1, 0],
     offset: [0, -40, 0],
-    width: 330,
-    height: 70,
+    width: 140,
+    height: 50,
     padding: 5,
     borderRadius: 10,
     flexDirection: 'row',
     gap: 5,
-    backgroundColor: 'black',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   })
   const slots = []
   for (let i = 0; i < 5; i++) {

@@ -13,3 +13,5 @@ build/
 /code_search_index*
 /.hive-mind*
 code_search_index*
+/.sequential-thoughts*
+/.call_overflow*
