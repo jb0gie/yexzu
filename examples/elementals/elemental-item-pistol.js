@@ -22,110 +22,70 @@ createItem(({ player, hooks }) => {
 
   let control
   let lastFireTime = 0
-  let ammo = 0 // Current ammo in loaded magazine
-  let isLoaded = false // Track if pistol has a loaded magazine
+  let ammo = props.maxAmmo || 100 // Start with full ammo
   const projectiles = new Map() // Track active bullets
   const projectileUpdateHandlers = new Map() // Track update handlers for cleanup
 
+
   // Helper function to check if player has ammunition available
   function checkHasAmmunition() {
-    // Player can only fire if pistol is loaded with ammo
-    if (!isLoaded) {
-      console.log('[pistol] Pistol not loaded - equip magazine first!')
-      return false
-    }
-
     if (ammo > 0) {
-      return true // Has ammo in current magazine
+      return true
     }
-
-    console.log('[pistol] Pistol empty - reload to continue firing!')
-    return false // Pistol loaded but empty
+    console.log('[pistol] Out of ammo!')
+    return false
   }
 
-  // Helper function to load magazine into pistol
-  function loadMagazine() {
-    if (isLoaded) {
-      console.log('[pistol] Pistol already has magazine loaded')
+  // Reload function - restore ammo
+  function reloadPistol() {
+    const maxAmmo = props.maxAmmo || 100
+    if (ammo >= maxAmmo) {
+      console.log('[pistol] Already at max ammo')
       return
     }
 
-    isLoaded = true
-    ammo = props.magazineSize || 15
-    console.log('[pistol] Magazine loaded into pistol! Ammo:', ammo)
+    ammo = maxAmmo
+    console.log(`[pistol] Reloaded! Ammo: ${ammo}/${maxAmmo}`)
 
-    // Make magazine visible in pistol with animation
-    if (magazineMesh) {
-      magazineMesh.visible = true
-      // Add a brief scale pulse to show loading
-      const originalScale = magazineMesh.scale.x
-      magazineMesh.scale.setScalar(originalScale * 1.3)
-      setTimeout(() => {
-        if (magazineMesh) {
-          magazineMesh.scale.setScalar(originalScale)
-        }
-      }, 300)
-    }
+    // Play BOTH pistol model animation AND player animation
+    playPistolAnimation('EmoteReload')
+    playSound('reloadSound')
 
-    // Visual feedback on pistol model
-    if (pistolSkin) {
-      const originalScale = pistolSkin.scale.x
-      pistolSkin.scale.setScalar(originalScale * 1.1)
-      setTimeout(() => {
-        if (pistolSkin) {
-          pistolSkin.scale.setScalar(originalScale)
-        }
-      }, 200)
-    }
-
-    // Send ammo count to magazine item
-    app.emit('pistol:ammo-count', {
-      playerId: player.id,
-      ammo: ammo,
-      maxAmmo: props.magazineSize || 15,
-    })
-
-    // Play reload animation
     const reloadUrl = getAnimationUrl('reload')
     if (reloadUrl) {
-      console.log('[pistol] Playing reload animation for magazine loading')
+      console.log('[pistol] Playing reload animation')
       playAnimation(reloadUrl, {
-        duration: 1.0,
+        duration: props.reloadDuration || 0.917,
         loop: false,
-        fadeDuration: 0.3,
+        fadeDuration: 0.1,
       })
-    } else {
-      console.log('[pistol] No reload animation configured - using visual feedback only')
     }
 
-    // Emit sound effect (optional, if configured)
-    app.emit('pistol:reload-sound', {
-      playerId: player.id,
-    })
-
-    // Notify server of ammo state
-    app.emit('pistol:loaded', {
-      playerId: player.id,
-      ammo: ammo,
-    })
+    // Notify server
+    hooks.call('reload', { ammo })
   }
 
   // Helper function to get animation URL based on configuration
   function getAnimationUrl(animType) {
     const emoteKey = `${animType}Emote`
+    console.log(`[pistol] Looking for ${animType} animation with key: ${emoteKey}`)
+    console.log(`[pistol] ${emoteKey} value:`, props[emoteKey])
+
     if (props[emoteKey] && props[emoteKey].url) {
       const url = props[emoteKey].url
+      console.log(`[pistol] ${animType} animation URL:`, url)
 
       // Validate URL to prevent crashes in VRM system
       try {
-        // Check if URL is valid by attempting to construct it
-        if (typeof url === 'string' && url.trim() && url.startsWith('http')) {
-          new URL(url)
+        // Check if URL is valid - support both asset:// and http:// URLs
+        if (typeof url === 'string' && url.trim() && (url.startsWith('asset://') || url.startsWith('http'))) {
           console.log(`[pistol] Found valid ${animType} animation:`, url)
           return url
+        } else {
+          console.warn(`[pistol] Invalid ${animType} animation URL format:`, url)
         }
       } catch (error) {
-        console.warn(`[pistol] Invalid animation URL for ${animType}:`, url, error)
+        console.warn(`[pistol] Invalid ${animType} animation URL:`, url, error)
       }
     } else {
       console.log(`[pistol] No ${animType} animation configured`)
@@ -170,90 +130,150 @@ createItem(({ player, hooks }) => {
     }
   }
 
-  // Helper function to eject magazine with physics
-  function ejectMagazine() {
-    if (!pistolSkin || !gripBone) return
+  // Helper function to play pistol model animations
+  function playPistolAnimation(animName, loop = false) {
+    console.log(`[pistol] Attempting to play pistol animation: ${animName}, loop: ${loop}`)
 
-    // Clone the entire pistol skinned mesh to get the magazine
-    const ejectedMag = pistolSkin.clone(true)
-
-    // Hide everything except the magazine (WAPClip bone/mesh)
-    ejectedMag.traverse(child => {
-      if (child.isMesh || child.isSkinnedMesh) {
-        // Hide all meshes except magazine
-        child.visible = false
+    // Play on the ORIGINAL app nodes (animations don't work on clones in Hyperfy)
+    let foundAnim = false
+    app.traverse(node => {
+      if (node.anims && node.anims.includes(animName)) {
+        console.log(`[pistol] Found animation '${animName}' on node: ${node.id}`)
+        node.play({ name: animName, loop: loop, fade: 0.1 })
+        foundAnim = true
       }
     })
 
-    // Try to find and show only the magazine part
-    if (magazineMesh && magazineMesh.visible !== undefined) {
-      // If magazineMesh is a visible bone, make sure the clone shows it
-      const clonedMagMesh = ejectedMag.getBone && ejectedMag.getBone('WAPClip')
-      if (clonedMagMesh && clonedMagMesh.visible !== undefined) {
-        clonedMagMesh.visible = true
-      }
-    }
-
-    // Get the grip bone position as the ejection origin
-    const ejectionOrigin = v1.setFromMatrixPosition(gripBone.matrixWorld)
-
-    // Create a rigidbody for the ejected magazine
-    const magBody = app.create('rigidbody')
-    magBody.type = 'dynamic'
-    magBody.mass = 0.05 // Light magazine
-    magBody.position.copy(ejectionOrigin)
-
-    // Add collider to the magazine - make it dynamic
-    const magCollider = app.create('collider')
-    magCollider.type = 'box'
-    magCollider.setSize(0.02, 0.05, 0.01) // Magazine dimensions
-    magCollider.isTrigger = false // Make it solid for physics
-    magBody.add(magCollider)
-
-    // Add the visual mesh to the rigidbody
-    magBody.add(ejectedMag)
-
-    // Add to world
-    world.add(magBody)
-
-    // Apply ejection force (downward and slightly left)
-    const ejectForce = props.ejectForce || 2
-    const ejectTorque = props.ejectTorque || 5
-
-    // Get player's left direction
-    const leftDir = v2.set(-1, -0.5, 0).applyQuaternion(player.quaternion).normalize()
-    leftDir.multiplyScalar(ejectForce)
-
-    // Apply impulse
-    magBody.applyImpulse(leftDir, ejectionOrigin)
-
-    // Apply random spin
-    const torque = v3.set(
-      (Math.random() - 0.5) * ejectTorque,
-      (Math.random() - 0.5) * ejectTorque,
-      (Math.random() - 0.5) * ejectTorque
-    )
-    magBody.setAngularVelocity(torque)
-
-    // Schedule despawn with cleanup
-    const despawnTime = props.despawnTime || 5
-    let elapsed = 0
-    const despawnUpdate = dt => {
-      elapsed += dt
-      if (elapsed >= despawnTime) {
-        // Clean up physics body and visual mesh
-        if (magBody.physics) {
-          magBody.physics.destroy()
+    if (!foundAnim) {
+      console.warn(`[pistol] Animation '${animName}' not found on pistol model`)
+      console.log('[pistol] Available animations on app:')
+      app.traverse(node => {
+        if (node.anims && node.anims.length > 0) {
+          console.log(`  - Node ${node.id}:`, node.anims)
         }
-        world.remove(magBody)
-        app.off('update', despawnUpdate)
-        console.log('[pistol] Magazine despawned after', despawnTime, 'seconds')
-      }
+      })
+    } else {
+      console.log(`[pistol] Successfully started pistol animation: ${animName}`)
     }
-    app.on('update', despawnUpdate)
-
-    console.log('[pistol] Magazine ejected - will despawn in', despawnTime, 'seconds')
   }
+
+  // Helper function to play sound effects
+  function playSound(soundType) {
+    const soundUrl = props[soundType]?.url
+    if (!soundUrl) return
+
+    const audio = app.create('audio')
+    audio.src = soundUrl
+    audio.spatial = true
+    audio.volume = 0.8
+    audio.group = 'sfx'
+
+    // Position at muzzle if available, otherwise at pistol position
+    if (muzzleBone && muzzleBone.matrixWorld && world.isClient) {
+      const muzzlePos = new Vector3()
+      muzzlePos.setFromMatrixPosition(muzzleBone.matrixWorld)
+      audio.position.copy(muzzlePos)
+    } else if (pistolSkin) {
+      audio.position.copy(pistolSkin.position)
+    }
+
+    world.add(audio)
+    audio.play()
+
+    // Auto-cleanup after sound finishes
+    setTimeout(() => {
+      world.remove(audio)
+    }, 2000)
+  }
+
+  // Helper function to create muzzle flash burst
+  function createMuzzleFlash() {
+    if (!props.enableParticles || !muzzleBone || !muzzleBone.matrixWorld) return
+
+    const muzzleFlash = app.create('particles', {
+      shape: ['sphere', 0.1, 1],
+      direction: 1,
+      rate: 0,
+      max: 30,
+      bursts: [
+        { time: 0, count: 30 }
+      ],
+      color: props.muzzleFlashColor || '#ffaa00',
+      size: '0.05~0.15',
+      alphaOverLife: '1,1|1,0',
+      emissive: '10',
+      speed: '2~5',
+      life: '0.1~0.3'
+    })
+
+    // Position at muzzle bone
+    const muzzlePos = new Vector3()
+    muzzlePos.setFromMatrixPosition(muzzleBone.matrixWorld)
+    muzzleFlash.position.copy(muzzlePos)
+
+    world.add(muzzleFlash)
+
+    // Remove after particles fade
+    setTimeout(() => {
+      world.remove(muzzleFlash)
+    }, 500)
+  }
+
+  // Helper function to create bullet trail particle
+  function createBulletTrail(startPos, direction) {
+    if (!props.enableParticles) return null
+
+    const trail = app.create('particles', {
+      shape: ['sphere', 0.05, 1],
+      direction: 1,
+      rate: 0,
+      color: props.bulletTrailColor || '#ffff00',
+      rateOverDistance: 50,
+      life: '0.05~0.15',
+      size: '0.03~0.08',
+      alphaOverLife: '1,1|1,0',
+      emissive: '8'
+    })
+
+    trail.position.copy(startPos)
+    world.add(trail)
+
+    return trail
+  }
+
+  // Helper function to create impact spark effect
+  function createImpactSparks(position) {
+    if (!props.enableParticles) return
+
+    const sparks = app.create('particles', {
+      shape: ['sphere', 0.1, 1],
+      direction: 1,
+      rate: 0,
+      max: 15,
+      bursts: [
+        { time: 0, count: 15 }
+      ],
+      color: props.impactSparkColor || '#ff8800',
+      size: '0.02~0.08',
+      alphaOverLife: '1,1|1,0',
+      emissive: '10',
+      speed: '1~4',
+      life: '0.1~0.3',
+      force: new Vector3(0, -5, 0)
+    })
+
+    sparks.position.copy(position)
+    world.add(sparks)
+
+    // Play impact sound
+    playSound('impactSound')
+
+    // Remove after particles fade
+    setTimeout(() => {
+      world.remove(sparks)
+    }, 400)
+  }
+
 
   return {
     client: {
@@ -303,6 +323,19 @@ createItem(({ player, hooks }) => {
         world.add(pistolSkin)
         console.log('[pistol] Pistol instance created and added to world')
 
+        // ===== DEBUG: Check for animations on pistol model =====
+        console.log('[pistol] Checking for animations on pistol model...')
+        let hasAnimations = false
+        app.traverse(node => {
+          if (node.anims && node.anims.length > 0) {
+            console.log(`[pistol] Found node with animations: ${node.id}`, node.anims)
+            hasAnimations = true
+          }
+        })
+        if (!hasAnimations) {
+          console.warn('[pistol] No animations found on pistol model - check your GLB has animations')
+        }
+
         // ===== Get bone references for positioning =====
         // Note: getBone returns { position, quaternion, rotation, scale, matrixWorld }
         // These might be null if not a SkinnedMesh, which is okay
@@ -325,100 +358,74 @@ createItem(({ player, hooks }) => {
           console.warn("[pistol] Not a SkinnedMesh - bone animations won't work")
         }
 
-        // Initialize ammo and magazines
-        // Initialize ammo state - pistol starts empty
-        ammo = 0
-        console.log(`[pistol] Pistol initialized - needs magazine to load`)
+        // Initialize ammo
+        ammo = props.maxAmmo || 100
+        console.log(`[pistol] Pistol initialized with ${ammo} rounds`)
 
         // Get control handle for local player
         control = player.local ? app.control() : null
 
-        // ===== SIGNAL LISTENERS =====
-        // Listen for magazine equip signals to load pistol
-        app.on('magazine:equipped', data => {
-          if (data.playerId === player.id) {
-            console.log('[pistol] Magazine equipped signal received - checking if pistol can be loaded!')
-
-            // Check if this pistol is currently active/equipped
-            // If so, load the magazine immediately
-            if (pistolSkin && pistolSkin.parent) {
-              loadMagazine()
-            } else {
-              console.log('[pistol] Pistol not currently active - magazine ready for when pistol is equipped')
-              // Signal that we have a magazine ready
-              app.emit('pistol:magazine-ready', {
-                playerId: player.id,
-                magazineId: data.magazineId,
-              })
-            }
-          }
-        })
-
-        // Listen for when this pistol is equipped to check for ready magazine
-        app.on('pistol:equipped', data => {
-          if (data.playerId === player.id) {
-            console.log('[pistol] Pistol equipped - checking for ready magazine')
-
-            // Signal that we're looking for a magazine
-            app.emit('pistol:need-magazine', {
-              playerId: player.id,
-              pistolId: props.id || 'pistol',
-            })
-          }
-        })
-
-        // Listen for magazine ready response
-        app.on('magazine:ready-response', data => {
-          if (data.playerId === player.id) {
-            console.log('[pistol] Magazine ready response received - loading pistol!')
-            loadMagazine()
-          }
-        })
-
-        // Listen for magazine unequip signals
-        app.on('magazine:unequipped', data => {
-          if (data.playerId === player.id) {
-            console.log('[pistol] Magazine unequipped signal received')
-            // Don't automatically unload - pistol keeps its magazine
-          }
-        })
-
-        // Play equip animation with crossfade
+        // Play equip animation (non-looping action)
         const equipUrl = getAnimationUrl('equip')
         if (equipUrl) {
-          console.log('[pistol] Playing equip animation for pistol equipped')
           playAnimation(equipUrl, {
-            duration: 0.5,
+            duration: props.equipDuration || 0.5,
             loop: false,
-            fadeDuration: 0.3, // Smooth equip transition
+            fadeDuration: 0.3,
           })
-        } else {
-          console.log('[pistol] No equip animation configured')
         }
 
-        // Apply idle animation override when pistol is equipped
-        const idleUrl = getAnimationUrl('idle')
-        if (idleUrl) {
-          console.log('[pistol] Playing idle animation for pistol equipped')
-          playAnimation(idleUrl, {
-            loop: true,
-            duration: 0, // Continuous
-            fadeDuration: 0.5, // Longer crossfade for idle
-          })
-        } else {
-          console.log('[pistol] No idle animation configured')
-        }
+        console.log('[pistol] Pistol equipped - natural locomotion preserved')
 
-        // Emit pistol equipped signal
-        console.log('[pistol] Emitting pistol:equipped signal')
-        app.emit('pistol:equipped', {
-          playerId: player.id,
-          pistolId: props.id || 'pistol',
+        // Debug: List all configured animations
+        console.log('[pistol] Configured targeted action animations:')
+        console.log('  - equip:', props.equipEmote?.url || 'not configured')
+        console.log('  - fire:', props.fireEmote?.url || 'not configured')
+        console.log('  - reload:', props.reloadEmote?.url || 'not configured')
+        console.log('[pistol] Natural locomotion preserved - no overrides needed!')
+
+        // Handle projectile visual effects from server
+        app.on('projectile', (data) => {
+          const startPos = new Vector3().fromArray(data.start)
+          const dir = new Vector3().fromArray(data.direction)
+
+          // Create bullet trail
+          const trail = createBulletTrail(startPos, dir)
+          if (!trail) return
+
+          // Animate bullet travel
+          const distance = data.distance
+          const speed = PROJECTILE_SPEED
+          let traveled = 0
+
+          const updateHandler = (delta) => {
+            const step = speed * delta
+            traveled += step
+
+            v1.copy(dir).multiplyScalar(step)
+            trail.position.add(v1)
+
+            // Check if reached target
+            if (traveled >= distance) {
+              // Create impact effect
+              if (data.hit) {
+                const impactPos = new Vector3().fromArray(data.hit.position)
+                createImpactSparks(impactPos)
+              }
+
+              // Cleanup
+              world.remove(trail)
+              app.off('update', updateHandler)
+            }
+          }
+
+          app.on('update', updateHandler)
         })
       },
 
       update(delta) {
         if (!control) return
+
 
         // ===== Get configurable keybinds =====
         const fireButton = props.fireButton || 'mouseLeft'
@@ -437,103 +444,68 @@ createItem(({ player, hooks }) => {
             if (!checkHasAmmunition()) {
               return
             }
-            // Get firing direction from camera
+            // Get firing direction from camera (like tackle.js)
             const e1 = new Euler(0, 0, 0, 'YXZ')
-            e1.setFromQuaternion(control.camera.quaternion)
-            e1.x = 0
-            e1.z = 0 // Zero out pitch/roll for horizontal aim
+            if (control.camera && control.camera.quaternion) {
+              e1.setFromQuaternion(control.camera.quaternion)
+            } else {
+              // Fallback to player rotation if camera not available
+              e1.setFromQuaternion(player.quaternion)
+            }
+            e1.x = 0 // Zero out pitch for horizontal aim
+            e1.z = 0 // Zero out roll for horizontal aim
             const q1 = new Quaternion()
             q1.setFromEuler(e1)
             const dir = v1.set(0, 0, -1).applyQuaternion(q1)
 
-            // Get muzzle position from bone (not hardcoded offset)
+            // Get muzzle position from bone (like tackle.js - project forward to avoid self-hits)
             let origin = player.position.clone()
             origin.y += 1.5 // Fallback height
 
             if (muzzleBone && muzzleBone.matrixWorld) {
               origin.setFromMatrixPosition(muzzleBone.matrixWorld)
+              // Project origin slightly forward to avoid self-hits in third person
+              const forwardOffset = dir.clone().multiplyScalar(0.3)
+              origin.add(forwardOffset)
             }
 
             // Send fire event to server
+            console.log(`[pistol] CLIENT: Sending fire event to server - ammo: ${ammo}`)
             hooks.call('fire', {
               origin: origin.toArray(),
               dir: dir.toArray(),
               ammo,
             })
             lastFireTime = now
+            console.log(`[pistol] CLIENT: Fire event sent`)
 
             // Visual feedback
-            const remainingAmmo = ammo - 1
-            console.log(`[pistol] BANG! Ammo: ${remainingAmmo}/${props.magazineSize || 15}`)
+            ammo -= 1
+            console.log(`[pistol] BANG! Ammo: ${ammo}/${props.maxAmmo || 100}`)
 
-            // Play fire animation with quick crossfade
+            // Play BOTH pistol model animation AND player animation
+            playPistolAnimation('EmoteShoot')
+
+            // Add sound and particle effects
+            playSound('fireSound')
+            createMuzzleFlash()
+
+            // Play shooting animation (arm movement)
             const fireUrl = getAnimationUrl('fire')
             if (fireUrl) {
-              console.log('[pistol] Playing fire animation')
               playAnimation(fireUrl, {
-                duration: 0.2,
+                duration: props.fireDuration || 0.3,
                 loop: false,
-                fadeDuration: 0.1, // Quick transition for firing
+                fadeDuration: 0.1,
               })
-            } else {
-              console.log('[pistol] No fire animation configured')
-            }
-
-            // Local ammo decrement (will be synced by server)
-            ammo -= 1
-
-            // Send updated ammo count to magazine
-            app.emit('pistol:ammo-count', {
-              playerId: player.id,
-              ammo: ammo,
-              maxAmmo: props.magazineSize || 15,
-            })
-
-            // Check if magazine is empty and notify
-            if (ammo === 0) {
-              app.emit('pistol:ammo-empty', {
-                playerId: player.id,
-                ammo: 0,
-              })
-              console.log('[pistol] Magazine empty - signal sent to magazine')
             }
           }
         }
 
-        // ===== TASK 6: Reload with configurable button =====
+        // ===== Reload with configurable button =====
         const reloadInput = control[reloadButton]
         if (reloadInput && reloadInput.pressed) {
-          // Check if pistol needs reloading (empty or not loaded)
-          if (!isLoaded || ammo <= 0) {
-            console.log('[pistol] Reload pressed - attempting to load magazine!')
-
-            // Signal that we need a magazine
-            app.emit('pistol:need-magazine', {
-              playerId: player.id,
-              pistolId: props.id || 'pistol',
-            })
-
-            // Visual feedback - shake pistol to indicate no magazine
-            if (pistolSkin) {
-              const originalPos = pistolSkin.position.clone()
-              let shakeCount = 0
-              const shakeInterval = setInterval(() => {
-                shakeCount++
-                if (shakeCount >= 6) {
-                  clearInterval(shakeInterval)
-                  pistolSkin.position.copy(originalPos)
-                  return
-                }
-                const shakeAmount = 0.02
-                pistolSkin.position.x = originalPos.x + (Math.random() - 0.5) * shakeAmount
-                pistolSkin.position.y = originalPos.y + (Math.random() - 0.5) * shakeAmount
-              }, 50)
-            }
-
-            console.log('[pistol] No magazine available - equip magazine first!')
-          } else {
-            console.log(`[pistol] Pistol already loaded with ${ammo} ammo`)
-          }
+          reloadPistol()
         }
       },
 
@@ -616,10 +588,12 @@ createItem(({ player, hooks }) => {
       // Called when server confirms reload
       reload(data) {
         ammo = data.ammo
-        console.log(`[pistol] Reloaded: ${ammo} rounds in magazine`)
+        console.log(`[pistol] Server confirmed reload: ${ammo} rounds`)
       },
 
       destroy() {
+        // Clean up pistol resources
+
         if (pistolSkin) {
           world.remove(pistolSkin)
           pistolSkin = null
@@ -645,84 +619,182 @@ createItem(({ player, hooks }) => {
         // Don't call player.applyEffect during destruction - can cause freezes
         // The system will automatically clear effects when item is unequipped
       },
+
     },
     server: {
       init() {
-        // Initialize server-side ammo tracking - pistol starts empty
-        ammo = 0
-
-        // Listen for magazine loaded signals
-        app.on('pistol:loaded', data => {
-          if (data.playerId === player.id) {
-            console.log(`[pistol] Server: Magazine loaded - setting ammo to ${data.ammo}`)
-            ammo = data.ammo
-          }
-        })
+        // Initialize server-side ammo tracking
+        ammo = props.maxAmmo || 100
+        console.log(`[pistol] Server: Pistol initialized with ${ammo} rounds`)
       },
 
       fire(data) {
-        if (ammo <= 0) return // No ammo server-side check
-
-        const origin = v1.fromArray(data.origin)
-        const dir = v2.fromArray(data.dir).normalize()
-        const layerMask = world.createLayerMask('player', 'environment')
-
-        // ===== TASK 5: Authoritative raycast for hit detection =====
-        const hit = world.raycast(origin, dir, RANGE, layerMask)
-        const targetPos = hit ? hit.point : origin.clone().add(dir.multiplyScalar(RANGE))
-
-        // Consume ammo server-side (authoritative)
-        ammo -= 1
-
-        // Send updated ammo back to client
-        hooks.call('fire', { ammo })
-
-        // ===== Launch bullet projectile =====
-        const projectileId = `bullet_${Date.now()}_${Math.random()}`
-        const projectile = {
-          id: projectileId,
-          position: origin.clone(),
-          target: targetPos,
-          velocity: dir.clone().multiplyScalar(PROJECTILE_SPEED),
-          lifetime: 0,
-          owner: player.id,
+        console.log(`[pistol] ========== FIRE START ==========`)
+        console.log(`[pistol] server.fire() called - player: ${player.id}, ammo: ${ammo}, player.health: ${player.health}`)
+        if (ammo <= 0) {
+          console.log('[pistol] server.fire() - no ammo, returning')
+          return
         }
-        projectiles.set(projectileId, projectile)
 
-        // ===== TASK 5: Muzzle flash at correct bone position =====
-        // Note: On server we don't have visual bones, so this would be
-        // better handled client-side or as a particle effect
-        // For now, create a temporary marker for debugging
-        const flash = app.create('prim', {
-          type: 'sphere',
-          size: [0.1],
-          color: '#ffaa00',
-          emissive: '#ffaa00',
-          emissiveIntensity: 5,
-        })
-        flash.position.copy(origin)
-        world.add(flash)
+        try {
+          const origin = v1.fromArray(data.origin)
+          const dir = v2.fromArray(data.dir).normalize()
+          const layerMask = world.createLayerMask('player', 'environment')
 
-        let flashTime = 0
-        function flashUpdate(dt) {
-          flashTime += dt
-          if (flashTime > 0.05) {
-            world.remove(flash)
-            app.off('update', flashUpdate)
+          // ===== TASK 5: Authoritative raycast for hit detection =====
+          const hit = world.raycast(origin, dir, RANGE, layerMask)
+          const targetPos = hit ? hit.point : origin.clone().add(dir.multiplyScalar(RANGE))
+
+          console.log(`[pistol] Raycast from:`, origin.toArray(), 'direction:', dir.toArray(), 'range:', RANGE)
+          console.log(`[pistol] Raycast hit:`, hit ? 'HIT!' : 'no hit')
+          if (hit) {
+            console.log(`[pistol] Hit result properties:`, Object.keys(hit))
+            console.log(`[pistol] Hit details:`, {
+              playerId: hit.playerId,
+              tag: hit.tag,
+              entityId: hit.entityId,
+              point: hit.point?.toArray(),
+              distance: hit.distance
+            })
+
+            // Check if we hit a player (prevent self-hits like tackle.js)
+            if (hit.playerId && hit.playerId !== player.id) {
+              console.log(`[pistol] Hit detected - playerId: ${hit.playerId}, shooter: ${player.id}`)
+              const playerB = world.getPlayer(hit.playerId)
+              console.log(`[pistol] Got player object:`, !!playerB, 'has health:', !!playerB?.health, 'health value:', playerB?.health)
+
+              // Additional safety checks to prevent self-hits
+              if (playerB && playerB.id === player.id) {
+                console.log(`[pistol] Preventing self-hit - same player ID detected`)
+                return
+              }
+
+              // Prevent hits that are too close (likely self-hits in third person)
+              if (hit.distance < 0.5) {
+                console.log(`[pistol] Preventing close-range hit - distance: ${hit.distance}`)
+                return
+              }
+
+              if (playerB && playerB.health !== undefined) {
+                let amount = num(MIN_DMG, MAX_DMG)
+                let crit = false
+                if (playerB.health > amount) {
+                  crit = num(0, 1, 1) < CRIT_CHANCE
+                  if (crit) amount *= CRIT_MULTIPLIER
+                }
+                if (amount > playerB.health) amount = playerB.health
+
+                console.log(`[pistol] Calling hooks.damage for player ${playerB.id} - amount: ${amount}, crit: ${crit}`)
+                console.log(`[pistol] Player health before damage:`, playerB.health)
+                hooks.damage(playerB, amount, crit)
+                console.log(`[pistol] Player health after damage:`, playerB.health)
+              } else {
+                console.warn(`[pistol] Cannot damage player - playerB:`, !!playerB, 'health:', playerB?.health)
+              }
+            }
+            // Check if we hit a mob
+            else if (hit.tag?.startsWith('elemental-mob:')) {
+              try {
+                const mobInstanceId = hit.tag.split(':')[1]
+                let amount = num(MIN_DMG, MAX_DMG)
+                const crit = num(0, 1) < CRIT_CHANCE
+                if (crit) amount *= CRIT_MULTIPLIER
+
+                console.log(`[pistol] Hit mob ${mobInstanceId} for ${amount} damage (crit: ${crit})`)
+                app.emit('elemental-mob:hit', [mobInstanceId, player.id, amount, crit])
+                console.log(`[pistol] Successfully emitted mob hit event (via app.emit)`)
+              } catch (error) {
+                console.error('[pistol] Error handling mob hit:', error)
+              }
+            }
           }
-        }
-        app.on('update', flashUpdate)
 
-        // Schedule bullet update with proper cleanup tracking
-        const updateHandler = delta => updateProjectile(projectileId, delta)
-        app.on('update', updateHandler)
-        projectileUpdateHandlers.set(projectileId, updateHandler)
+          // Consume ammo server-side (authoritative)
+          ammo -= 1
+
+          // Send updated ammo back to client
+          hooks.call('fire', { ammo })
+
+          // ===== Launch bullet projectile =====
+          const projectileId = `bullet_${Date.now()}_${Math.random()}`
+          const projectile = {
+            id: projectileId,
+            position: origin.clone(),
+            target: targetPos,
+            velocity: dir.clone().multiplyScalar(PROJECTILE_SPEED),
+            lifetime: 0,
+            owner: player.id,
+          }
+          projectiles.set(projectileId, projectile)
+
+          console.log(`[pistol] Created projectile ${projectileId} with origin:`, origin.toArray(), 'target:', targetPos.toArray(), 'velocity:', dir.toArray(), 'speed:', PROJECTILE_SPEED)
+
+          console.log(`[pistol] Created projectile ${projectileId}`)
+          console.log(`[pistol] Origin:`, origin.toArray())
+          console.log(`[pistol] Target:`, targetPos.toArray())
+          console.log(`[pistol] Direction:`, dir.toArray())
+          console.log(`[pistol] Velocity:`, projectile.velocity.toArray())
+          console.log(`[pistol] Hit result:`, hit ? `hit ${hit.object?.id} at ${hit.point.toArray()}` : 'no hit')
+
+          // Send projectile data to clients for visual trail
+          app.send('projectile', {
+            id: `${player.id}-${Date.now()}`,
+            start: origin.toArray(),
+            direction: dir.toArray(),
+            distance: hit ? hit.distance : RANGE,
+            hit: hit ? {
+              position: hit.point.toArray(),
+              playerId: hit.playerId,
+              entityId: hit.entityId
+            } : null
+          })
+
+          // ===== TASK 5: Muzzle flash at correct bone position =====
+          // Note: On server we don't have visual bones, so this would be
+          // better handled client-side or as a particle effect
+          // For now, create a temporary marker for debugging
+          const flash = app.create('prim', {
+            type: 'sphere',
+            size: [0.1],
+            color: '#ffaa00',
+            emissive: '#ffaa00',
+            emissiveIntensity: 5,
+          })
+          flash.position.copy(origin)
+          world.add(flash)
+
+          let flashTime = 0
+          function flashUpdate(dt) {
+            flashTime += dt
+            if (flashTime > 0.05) {
+              world.remove(flash)
+              app.off('update', flashUpdate)
+            }
+          }
+          app.on('update', flashUpdate)
+
+          // Don't use projectile damage system - we already did instant raycast damage above
+          // The projectile is just for visual effect, not for hit detection
+          // Schedule bullet update with proper cleanup tracking
+          const updateHandler = delta => updateProjectile(projectileId, delta)
+          app.on('update', updateHandler)
+          projectileUpdateHandlers.set(projectileId, updateHandler)
+
+          console.log(`[pistol] ========== FIRE END ==========`)
+        } catch (error) {
+          console.error('[pistol] ERROR in server.fire():', error)
+          console.error('[pistol] Error stack:', error.stack)
+        }
       },
 
       reload(data) {
-        // Reload is now handled by signal-based magazine loading system
-        // This method is kept for compatibility but ammo loading is managed by loadMagazine()
-        console.log(`[pistol] Server reload called - ammo management handled by signals`)
+        // Restore ammo to max
+        const maxAmmo = props.maxAmmo || 100
+        ammo = maxAmmo
+        console.log(`[pistol] Server: Reloaded to ${ammo} rounds`)
+
+        // Send updated ammo to client
+        hooks.call('reload', { ammo })
       },
     },
   }
@@ -747,18 +819,14 @@ createItem(({ player, hooks }) => {
     proj.position.add(proj.velocity.clone().multiplyScalar(delta))
     const distanceToTarget = proj.position.distanceTo(proj.target)
 
+    console.log(`[pistol] Projectile ${id} at position:`, proj.position.toArray(), 'distance to target:', distanceToTarget.toFixed(2))
+
     if (distanceToTarget < 1) {
-      // Hit
-      const players = world.getPlayers()
-      for (const p of players) {
-        if (p.id !== proj.owner && p.position.distanceTo(proj.position) < 2) {
-          let amount = num(MIN_DMG, MAX_DMG)
-          if (num(0, 1) < CRIT_CHANCE) amount *= CRIT_MULTIPLIER
-          hooks.damage(p, amount, amount > MAX_DMG)
-          break
-        }
-      }
-      // Clean up update handler when projectile hits
+      console.log(`[pistol] Projectile ${id} reached target - cleaning up (damage already applied by raycast)`)
+
+      // Damage was already applied by instant raycast in server.fire()
+      // This projectile is just for visual effect
+      // Clean up the projectile
       const updateHandler = projectileUpdateHandlers.get(id)
       if (updateHandler) {
         app.off('update', updateHandler)
@@ -788,10 +856,9 @@ app.configure([
     initial: false,
   },
 
-  // ===== Ammo & Magazine Settings =====
-  { type: 'section', key: 'ammoSection', label: 'Ammo & Magazines' },
-  { key: 'magazineSize', type: 'number', label: 'Magazine Size', initial: 15, hint: 'Rounds per magazine' },
-  { key: 'startingMags', type: 'number', label: 'Starting Magazines', initial: 3, hint: 'Number of extra magazines' },
+  // ===== Ammo Settings =====
+  { type: 'section', key: 'ammoSection', label: 'Ammo' },
+  { key: 'maxAmmo', type: 'number', label: 'Max Ammo', initial: 100, hint: 'Total rounds available' },
 
   // ===== Visual Adjustments =====
   { type: 'section', key: 'visualSection', label: 'Position & Scale' },
@@ -846,40 +913,37 @@ app.configure([
     hint: 'Require mouse to be locked to fire',
   },
 
-  // ===== Magazine Ejection =====
-  { type: 'section', key: 'ejectionSection', label: 'Magazine Ejection' },
-  {
-    key: 'ejectForce',
-    type: 'number',
-    label: 'Eject Force',
-    initial: 2,
-    dp: 1,
-    step: 0.5,
-    hint: 'Impulse force when ejected',
-  },
-  { key: 'ejectTorque', type: 'number', label: 'Eject Torque', initial: 5, dp: 1, step: 0.5, hint: 'Rotational force' },
-  {
-    key: 'despawnTime',
-    type: 'number',
-    label: 'Despawn Time',
-    initial: 5,
-    hint: 'Seconds before ejected mag despawns',
-  },
+  // ===== Targeted Action Animations =====
+  { type: 'section', key: 'animSection', label: 'Targeted Action Animations (Short GLB Emotes)' },
 
-  // ===== Animation Files (One GLB per animation) =====
-  { type: 'section', key: 'animSection', label: 'Animations' },
+  // Short, targeted animations that layer over natural locomotion
+  // These should be designed to work as additive layers over natural movement
+  { key: 'equipEmote', type: 'file', kind: 'emote', label: 'Equip Animation (Short GLB)' },
+  { key: 'fireEmote', type: 'file', kind: 'emote', label: 'Fire Animation (Short GLB - Arm Recoil)' },
+  { key: 'reloadEmote', type: 'file', kind: 'emote', label: 'Reload Animation (Short GLB - Arm Movement)' },
 
-  // Individual animation files
-  { key: 'equipEmote', type: 'file', kind: 'emote', label: 'Equip Animation (GLB)' },
-  { key: 'idleEmote', type: 'file', kind: 'emote', label: 'Idle Animation (GLB)' },
-  { key: 'fireEmote', type: 'file', kind: 'emote', label: 'Fire Animation (GLB)' },
-  { key: 'reloadEmote', type: 'file', kind: 'emote', label: 'Reload Animation (GLB)' },
-  { key: 'walkEmote', type: 'file', kind: 'emote', label: 'Walk Animation (GLB)' },
-  { key: 'runEmote', type: 'file', kind: 'emote', label: 'Run Animation (GLB)' },
-  { key: 'walkFireEmote', type: 'file', kind: 'emote', label: 'Walk+Fire Animation (GLB)' },
-  { key: 'runFireEmote', type: 'file', kind: 'emote', label: 'Run+Fire Animation (GLB)' },
-  { key: 'aimDownEmote', type: 'file', kind: 'emote', label: 'Aim Down Animation (GLB)' },
-  { key: 'aimUpEmote', type: 'file', kind: 'emote', label: 'Aim Up Animation (GLB)' },
+  // Animation timing controls
+  { key: 'equipDuration', type: 'number', label: 'Equip Duration (seconds)', initial: 0.5, min: 0.1, max: 3, step: 0.1, dp: 1 },
+  { key: 'fireDuration', type: 'number', label: 'Fire Duration (seconds)', initial: 0.3, min: 0.1, max: 2, step: 0.05, dp: 2 },
+  { key: 'reloadDuration', type: 'number', label: 'Reload Duration (seconds)', initial: 0.917, min: 0.1, max: 5, step: 0.01, dp: 3 },
+
+  // ===== Sound Effects =====
+  { type: 'section', key: 'soundSection', label: 'Sound Effects' },
+  { key: 'fireSound', type: 'file', kind: 'audio', label: 'Fire Sound' },
+  { key: 'reloadSound', type: 'file', kind: 'audio', label: 'Reload Sound' },
+  { key: 'impactSound', type: 'file', kind: 'audio', label: 'Impact Sound' },
+
+  // ===== Particle Effects =====
+  { type: 'section', key: 'particleSection', label: 'Particle Effects' },
+  { key: 'muzzleFlashColor', type: 'color', label: 'Muzzle Flash Color', initial: '#ffaa00' },
+  { key: 'bulletTrailColor', type: 'color', label: 'Bullet Trail Color', initial: '#ffff00' },
+  { key: 'impactSparkColor', type: 'color', label: 'Impact Spark Color', initial: '#ff8800' },
+  {
+    key: 'enableParticles', type: 'switch', label: 'Enable Particles', initial: true, options: [
+      { label: 'Yes', value: true },
+      { label: 'No', value: false }
+    ]
+  },
 
   // ===== Admin Tools =====
   { type: 'section', key: 'adminSection', label: 'Admin' },
@@ -972,8 +1036,13 @@ function createItem(createInstance) {
             app.emit('elemental-item:take', [playerId, id, qty])
           },
           damage(player, amount, crit) {
+            console.log(`[pistol hooks.damage] Called with player ${player.id}, amount: ${amount}, health before: ${player.health}`)
             player.damage(amount)
+            console.log(`[pistol hooks.damage] Health after damage: ${player.health}`)
             app.send('dmg', [player.id, amount, crit])
+            // Emit health event for elemental-combat to handle death/respawn
+            console.log(`[pistol hooks.damage] Emitting health event`)
+            app.emit('health', { playerId: player.id, health: player.health })
           },
         },
       })
@@ -999,8 +1068,14 @@ function createItem(createInstance) {
       app.emit('elemental-item:take', [playerId, id, 1])
     })
     app.on('call', ([method, data], playerId) => {
+      console.log(`[pistol] Server received call: method=${method}, playerId=${playerId}`)
       const instance = instances.get(playerId)
-      if (!instance) return console.error('[item] error 1')
+      if (!instance) {
+        console.error('[pistol] No instance found for player:', playerId)
+        console.error('[pistol] Available instances:', Array.from(instances.keys()))
+        return
+      }
+      console.log(`[pistol] Instance found, calling server.${method}`)
       instance.server?.[method]?.(data)
     })
     world.on('leave', e => {
