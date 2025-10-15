@@ -55,6 +55,19 @@ export class World extends EventEmitter {
       },
     })
 
+    // Expose network properties for client/server detection
+    Object.defineProperty(this, 'isClient', {
+      get() {
+        return this.network?.isClient || false
+      },
+    })
+
+    Object.defineProperty(this, 'isServer', {
+      get() {
+        return this.network?.isServer || false
+      },
+    })
+
     this.register('settings', Settings)
     this.register('collections', Collections)
     this.register('apps', Apps)
@@ -76,6 +89,7 @@ export class World extends EventEmitter {
     this[key] = system
     return system
   }
+
 
   async init(options) {
     this.storage = options.storage

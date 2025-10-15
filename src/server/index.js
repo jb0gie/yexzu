@@ -90,7 +90,12 @@ await world.init({
   collections: collections.list,
 })
 
-fastify.register(cors)
+fastify.register(cors, {
+  origin: '*',
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+})
 fastify.register(compress)
 fastify.get('/', async (req, reply) => {
   const title = world.settings.title || 'World'

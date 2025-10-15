@@ -211,7 +211,7 @@ export function createVRMFactory(glb, setupMaterial) {
     try {
       const sm = origVRM?.springBoneManager
       console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
-    } catch (_) {}
+    } catch (_) { }
     const expressionManager = origVRM?.expressionManager || null
     // expressions from the cloned scene (fallback path if no manager)
     // expressions live on the top-level scene of the GLB, not the skinned subtree
@@ -375,7 +375,210 @@ export function createVRMFactory(glb, setupMaterial) {
       //   action: AnimationAction
       // }
     }
+
+    // Additive animation layer system
+    const additiveAnimations = {
+      // [url]: {
+      //   url: String
+      //   action: AnimationAction
+      //   affectedBones: Set<String> - bones this animation affects
+      //   weight: Number - current blend weight
+      //   targetWeight: Number - target blend weight
+      //   fadeSpeed: Number - how fast to fade in/out
+      // }
+    }
+    let currentAdditiveAnims = new Map() // Currently playing additive animations
+
+    // Detect which bones an animation clip affects
+    function getAffectedBones(clip) {
+      const affectedBones = new Set()
+      for (const track of clip.tracks) {
+        // Extract bone name from track name (format: "boneName.property")
+        const boneName = track.name.split('.')[0]
+        affectedBones.add(boneName)
+      }
+      return affectedBones
+    }
+
+    // Filter bones to only include upper body for weapon animations
+    function filterWeaponBones(affectedBones) {
+      const upperBodyBones = new Set()
+
+      // First, let's see what bones we actually have
+      console.log(`[VRM] All affected bones from animation:`, Array.from(affectedBones).sort())
+
+      // Create a comprehensive set of allowed bone name variations (case-insensitive)
+      const allowedBonePatterns = [
+        // Spine and torso
+        'spine', 'chest', 'neck', 'head',
+        // Left arm variations
+        'shoulderl', 'shoulder_l', 'upperarml', 'upper_arml', 'upperarm_l', 'upper_arm_l',
+        'lowerarml', 'lower_arml', 'lowerarm_l', 'lower_arm_l',
+        'handl', 'hand_l',
+        // Right arm variations  
+        'shoulderr', 'shoulder_r', 'upperarmr', 'upper_armr', 'upperarm_r', 'upper_arm_r',
+        'lowerarmr', 'lower_armr', 'lowerarm_r', 'lower_arm_r',
+        'handr', 'hand_r',
+        // Alternative naming
+        'leftshoulder', 'leftupperarm', 'leftlowerarm', 'lefthand',
+        'rightshoulder', 'rightupperarm', 'rightlowerarm', 'righthand',
+        // VRM standard bone names
+        'leftshoulder', 'leftupperarm', 'leftlowerarm', 'lefthand',
+        'rightshoulder', 'rightupperarm', 'rightlowerarm', 'righthand',
+        'leftupperarm', 'leftlowerarm', 'lefthand',
+        'rightupperarm', 'rightlowerarm', 'righthand',
+        // More variations
+        'left_shoulder', 'left_upper_arm', 'left_lower_arm', 'left_hand',
+        'right_shoulder', 'right_upper_arm', 'right_lower_arm', 'right_hand',
+        'leftshoulder', 'leftupperarm', 'leftlowerarm', 'lefthand',
+        'rightshoulder', 'rightupperarm', 'rightlowerarm', 'righthand'
+      ]
+
+      for (const bone of affectedBones) {
+        const boneLower = bone.toLowerCase()
+        // Check if bone matches any allowed pattern
+        const isAllowed = allowedBonePatterns.some(pattern =>
+          boneLower.includes(pattern) || pattern.includes(boneLower)
+        )
+
+        if (isAllowed) {
+          upperBodyBones.add(bone)
+          console.log(`[VRM] Allowed bone: ${bone}`)
+        } else {
+          console.log(`[VRM] Filtered out bone: ${bone}`)
+        }
+      }
+
+      console.log(`[VRM] Final filtered bones:`, Array.from(upperBodyBones).sort())
+      return upperBodyBones
+    }
+
+    // Create a filtered animation clip that excludes root bone tracks
+    function createFilteredClip(originalClip, allowedBones) {
+      const filteredTracks = []
+
+      for (const track of originalClip.tracks) {
+        const boneName = track.name.split('.')[0]
+        if (allowedBones.has(boneName)) {
+          filteredTracks.push(track)
+        }
+      }
+
+      if (filteredTracks.length === 0) {
+        console.warn(`[VRM] No tracks remaining after filtering for bones:`, Array.from(allowedBones))
+        return originalClip // Return original if no tracks remain
+      }
+
+      console.log(`[VRM] Filtered clip: ${originalClip.tracks.length} -> ${filteredTracks.length} tracks`)
+
+      // Debug: Show which tracks were kept vs filtered out
+      const keptTracks = filteredTracks.map(track => track.name.split('.')[0])
+      const filteredOutTracks = originalClip.tracks
+        .filter(track => !filteredTracks.includes(track))
+        .map(track => track.name.split('.')[0])
+
+      console.log(`[VRM] Kept tracks (${keptTracks.length}):`, [...new Set(keptTracks)].slice(0, 10))
+      console.log(`[VRM] Filtered out tracks (${filteredOutTracks.length}):`, [...new Set(filteredOutTracks)].slice(0, 10))
+      return new THREE.AnimationClip(originalClip.name, originalClip.duration, filteredTracks)
+    }
+
+    // Load and setup additive animation
+    function loadAdditiveAnimation(url, options = {}) {
+      console.log(`[VRM] loadAdditiveAnimation called with url: ${url}, options:`, options)
+      const { fadeDuration = 0.15, weight = 1.0 } = options
+
+      // Stop all current additive animations to prevent bone conflicts
+      for (const [currentUrl, currentAnim] of currentAdditiveAnims) {
+        if (currentUrl !== url) {
+          console.log(`[VRM] Stopping conflicting animation: ${currentUrl}`)
+          currentAnim.targetWeight = 0
+          currentAnim.fadeSpeed = 1 / (fadeDuration * 0.3) // Much faster fade out
+        }
+      }
+
+      if (additiveAnimations[url]) {
+        console.log(`[VRM] Animation already loaded, updating weight`)
+        // Already loaded, just update weight
+        const anim = additiveAnimations[url]
+        anim.targetWeight = weight
+        anim.fadeSpeed = 1 / fadeDuration
+        currentAdditiveAnims.set(url, anim)
+        return Promise.resolve(anim)
+      }
+
+      console.log(`[VRM] Loading new additive animation from: ${url}`)
+      // Load new additive animation
+      return hooks.loader.load('emote', url).then(emo => {
+        console.log(`[VRM] Animation loaded, creating clip`)
+        const originalClip = emo.toClip({
+          rootToHips,
+          version,
+          getBoneName,
+        })
+
+        // Filter the clip to only include upper body bones
+        const allAffectedBones = getAffectedBones(originalClip)
+        const filteredBones = filterWeaponBones(allAffectedBones)
+        const clip = createFilteredClip(originalClip, filteredBones)
+
+        console.log(`[VRM] Creating additive action with blend mode:`, THREE.AdditiveAnimationBlendMode)
+        // Create additive action
+        const action = mixer.clipAction(clip)
+        action.blendMode = THREE.AdditiveAnimationBlendMode
+        action.setLoop(options.loop !== false ? THREE.LoopRepeat : THREE.LoopOnce) // Default to loop unless explicitly set to false
+        action.weight = 0 // Start at 0, fade in
+        action.play()
+
+        const anim = {
+          url,
+          action,
+          affectedBones: filteredBones,
+          weight: 0,
+          targetWeight: weight,
+          fadeSpeed: 1 / fadeDuration,
+        }
+
+        additiveAnimations[url] = anim
+        currentAdditiveAnims.set(url, anim)
+
+        console.log(`[VRM] Loaded additive animation: ${url}`)
+        console.log(`[VRM] Animation clip tracks: ${clip.tracks.length}`)
+        console.log(`[VRM] All affected bones (${allAffectedBones.size}):`, Array.from(allAffectedBones).slice(0, 10))
+        console.log(`[VRM] Filtered bones (${filteredBones.size}):`, Array.from(filteredBones))
+
+        // Debug: Show first few track names
+        const trackNames = clip.tracks.slice(0, 10).map(track => track.name)
+        console.log(`[VRM] First 10 track names:`, trackNames)
+
+        // Debug: Show which bones are actually being animated
+        const animatedBones = new Set()
+        clip.tracks.forEach(track => {
+          const boneName = track.name.split('.')[0]
+          animatedBones.add(boneName)
+        })
+        console.log(`[VRM] Actually animated bones (${animatedBones.size}):`, Array.from(animatedBones).slice(0, 15))
+        return anim
+      }).catch(error => {
+        console.error(`[VRM] Failed to load additive animation: ${url}`, error)
+        throw error
+      })
+    }
+
+    // Stop and remove additive animation
+    function stopAdditiveAnimation(url, fadeDuration = 0.15) {
+      const anim = additiveAnimations[url]
+      if (!anim) return
+
+      console.log(`[VRM] Stopping additive animation: ${url}`)
+      anim.targetWeight = 0
+      anim.fadeSpeed = 1 / fadeDuration
+
+      // Remove from current set immediately for faster clearing
+      currentAdditiveAnims.delete(url)
+    }
+
     let currentEmote
+    let locomotionDisabled = false // Track if locomotion should be disabled
     // auto-clear currentEmote when a non-looping emote finishes
     mixer.addEventListener('finished', e => {
       if (!currentEmote) return
@@ -383,8 +586,9 @@ export function createVRMFactory(glb, setupMaterial) {
         if (!currentEmote.loop) {
           try {
             currentEmote.action?.fadeOut?.(0.15)
-          } catch (_) {}
+          } catch (_) { }
           currentEmote = null
+          locomotionDisabled = false // Re-enable locomotion when emote finishes
         }
       }
     })
@@ -400,6 +604,7 @@ export function createVRMFactory(glb, setupMaterial) {
           currentEmote.action?.fadeOut(fadeDuration)
           currentEmote = null
         }
+        locomotionDisabled = false // Re-enable locomotion when clearing emote
         return
       }
 
@@ -427,6 +632,7 @@ export function createVRMFactory(glb, setupMaterial) {
             }
             currentEmote.action.reset().fadeIn(fadeDuration).play()
           }
+          locomotionDisabled = true // Regular emotes disable locomotion
           clearLocomotion()
         }
       } else {
@@ -452,6 +658,7 @@ export function createVRMFactory(glb, setupMaterial) {
           if (currentEmote === emote) {
             action.clampWhenFinished = !loop
             action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
+            locomotionDisabled = true // Regular emotes disable locomotion
 
             // Check if we should crossfade from previous
             if (crossFade && prevEmote?.action?.isRunning()) {
@@ -539,11 +746,11 @@ export function createVRMFactory(glb, setupMaterial) {
               joint.colliderGroups = []
             }
           })
-        } catch (_) {}
+        } catch (_) { }
         // re-init after tuning/collider changes so initial state is consistent
         try {
           spring.setInitState()
-        } catch (_) {}
+        } catch (_) { }
         // build spring joint pairs (orig -> clone) using clone skeleton lookup by name
         spring.joints.forEach(joint => {
           const src = joint.bone
@@ -619,7 +826,7 @@ export function createVRMFactory(glb, setupMaterial) {
         // re-initialize springs after mapping (safe if already initialized)
         try {
           spring.setInitState()
-        } catch (_) {}
+        } catch (_) { }
         console.log(
           '[vrmFactory] spring mapping counts',
           'springs:',
@@ -641,10 +848,46 @@ export function createVRMFactory(glb, setupMaterial) {
       const doAnim = hasSprings ? true : rateCheck ? elapsed >= rate : true
       if (doAnim) {
         mixer.update(hasSprings ? delta : elapsed)
+
+        // Update additive animation weights
+        for (const [url, anim] of currentAdditiveAnims) {
+          // Smooth weight transition
+          const weightDiff = anim.targetWeight - anim.weight
+          if (Math.abs(weightDiff) > 0.01) {
+            anim.weight += weightDiff * anim.fadeSpeed * delta
+            anim.action.weight = anim.weight
+          } else {
+            anim.weight = anim.targetWeight
+            anim.action.weight = anim.weight
+          }
+
+          // Debug: Log when additive animations are active
+          if (anim.weight > 0.01 && Math.random() < 0.01) { // 1% chance per frame
+            console.log(`[VRM] Additive animation active: ${url.split('/').pop()}, weight: ${anim.weight.toFixed(2)}, bones: ${Array.from(anim.affectedBones).join(', ')}`)
+          }
+
+          // Remove if fully faded out
+          if (anim.weight <= 0.01 && anim.targetWeight === 0) {
+            anim.action.stop()
+            currentAdditiveAnims.delete(url)
+          }
+        }
+
         skeleton.bones.forEach(bone => bone.updateMatrixWorld())
         skeleton.update = THREE.Skeleton.prototype.update
-        if (!currentEmote) {
+
+        // Update base locomotion unless disabled by regular emotes (additive animations layer over it)
+        if (!locomotionDisabled) {
           updateLocomotion(delta)
+          // Debug: Log when locomotion is running (1% chance per frame)
+          if (Math.random() < 0.01) {
+            console.log(`[VRM] Locomotion running, disabled: ${locomotionDisabled}, currentEmote: ${currentEmote?.url || 'none'}`)
+          }
+        } else {
+          // Debug: Log when locomotion is disabled
+          if (Math.random() < 0.01) {
+            console.log(`[VRM] Locomotion DISABLED - currentEmote: ${currentEmote?.url || 'none'}`)
+          }
         }
         // facial expressions per frame
         if (expressionsEnabled) {
@@ -1045,6 +1288,26 @@ export function createVRMFactory(glb, setupMaterial) {
       height,
       headToHeight,
       setEmote,
+      setAdditiveAnimation(url, options = {}) {
+        console.log(`[VRM] setAdditiveAnimation called with url: ${url}, options:`, options)
+        if (!url) {
+          // Clear all additive animations immediately
+          console.log(`[VRM] Clearing all additive animations (${currentAdditiveAnims.size} active)`)
+          for (const [animUrl, anim] of currentAdditiveAnims) {
+            anim.targetWeight = 0
+            anim.fadeSpeed = 1 / (options.fadeDuration || 0.1)
+            anim.action.stop()
+          }
+          currentAdditiveAnims.clear()
+          return
+        }
+
+        return loadAdditiveAnimation(url, options)
+      },
+      stopAdditiveAnimation,
+      getAdditiveAnimations() {
+        return Array.from(currentAdditiveAnims.keys())
+      },
       setSpeaking,
       // expression controls
       setExpression,
@@ -1056,6 +1319,63 @@ export function createVRMFactory(glb, setupMaterial) {
       updateRate,
       getBoneTransform,
       setLocomotion,
+      // Bone rotation manipulation methods
+      addBoneRotation(boneName, euler) {
+        console.log(`[VRM] addBoneRotation called for bone: ${boneName}`)
+        if (!skeleton || !skeleton.bones) {
+          console.warn('[VRM] No skeleton available for bone rotation')
+          return false
+        }
+
+        const bone = skeleton.getBoneByName(boneName)
+        if (!bone) {
+          console.warn(`[VRM] Bone not found: ${boneName}`)
+          return false
+        }
+
+        // Convert euler to quaternion and apply additive rotation
+        const rotationQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(euler.x, euler.y, euler.z))
+        bone.quaternion.multiply(rotationQuat)
+        bone.updateMatrixWorld()
+
+        console.log(`[VRM] Applied rotation to bone: ${boneName}`)
+        return true
+      },
+      resetBoneRotation(boneName) {
+        console.log(`[VRM] resetBoneRotation called for bone: ${boneName}`)
+        if (!skeleton || !skeleton.bones) {
+          console.warn('[VRM] No skeleton available for bone reset')
+          return false
+        }
+
+        const bone = skeleton.getBoneByName(boneName)
+        if (!bone) {
+          console.warn(`[VRM] Bone not found: ${boneName}`)
+          return false
+        }
+
+        // Reset to identity rotation
+        bone.quaternion.set(0, 0, 0, 1)
+        bone.updateMatrixWorld()
+
+        console.log(`[VRM] Reset rotation for bone: ${boneName}`)
+        return true
+      },
+      resetAllBoneRotations() {
+        console.log(`[VRM] resetAllBoneRotations called`)
+        if (!skeleton || !skeleton.bones) {
+          console.warn('[VRM] No skeleton available for bone reset')
+          return false
+        }
+
+        skeleton.bones.forEach(bone => {
+          bone.quaternion.set(0, 0, 0, 1)
+          bone.updateMatrixWorld()
+        })
+
+        console.log(`[VRM] Reset all bone rotations`)
+        return true
+      },
       setVisible(visible) {
         vrm.scene.traverse(o => {
           o.visible = visible

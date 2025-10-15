@@ -1,4 +1,5 @@
 import * as THREE from '../extras/three'
+import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { N8AOPostPass } from 'n8ao'
 import {
   EffectComposer,
@@ -51,6 +52,7 @@ export class ClientGraphics extends System {
   }
 
   async init({ viewport }) {
+    console.log('[ClientGraphics] init() called with viewport:', !!viewport)
     this.viewport = viewport
     this.width = this.viewport.offsetWidth
     this.height = this.viewport.offsetHeight
@@ -70,6 +72,18 @@ export class ClientGraphics extends System {
     this.maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy()
     THREE.Texture.DEFAULT_ANISOTROPY = this.maxAnisotropy
     this.usePostprocessing = this.world.prefs.postprocessing
+
+    // Initialize CSS3D renderer for WebViews
+    this.css3dScene = new THREE.Scene()
+    this.css3dRenderer = new CSS3DRenderer()
+    this.css3dRenderer.setSize(this.width, this.height)
+    this.css3dRenderer.domElement.style.position = 'absolute'
+    this.css3dRenderer.domElement.style.top = '0'
+    this.css3dRenderer.domElement.style.left = '0'
+    this.css3dRenderer.domElement.style.pointerEvents = 'none'
+    this.css3dRenderer.domElement.style.zIndex = '1'
+    this.viewport.appendChild(this.css3dRenderer.domElement)
+
     const context = this.renderer.getContext()
     const maxMultisampling = context.getParameter(context.MAX_SAMPLES)
     this.composer = new EffectComposer(this.renderer, {
@@ -162,6 +176,9 @@ export class ClientGraphics extends System {
     this.world.camera.updateProjectionMatrix()
     this.renderer.setSize(this.width, this.height)
     this.composer.setSize(this.width, this.height)
+    this.css3dRenderer.setSize(this.width, this.height)
+
+
     this.emit('resize')
     this.render()
   }
@@ -169,9 +186,10 @@ export class ClientGraphics extends System {
   render() {
     // Check if we have an active camera node with its own composer
     const activeCameraNode = this.world.cameraManager?.activeCamera
+    const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
 
+    // Render WebGL scene
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
-      const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
       this.renderer.render(this.world.stage.scene, cam)
     } else if (activeCameraNode?.composer) {
       // Use the camera node's composer if it has one
@@ -180,6 +198,13 @@ export class ClientGraphics extends System {
       // Fall back to the default composer
       this.composer.render()
     }
+
+    // Render CSS3D after main scene
+    if (this.css3dRenderer && this.css3dScene) {
+      const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
+      this.css3dRenderer.render(this.css3dScene, cam)
+    }
+
     if (this.xrDimensionsNeeded) {
       this.checkXRDimensions()
     }
@@ -188,6 +213,7 @@ export class ClientGraphics extends System {
   commit() {
     this.render()
   }
+
 
   preTick() {
     // calc world to screen factor
@@ -350,6 +376,13 @@ export class ClientGraphics extends System {
 
   destroy() {
     this.resizer.disconnect()
+
+    if (this.css3dRenderer) {
+      this.css3dRenderer.domElement.remove()
+      this.css3dRenderer = null
+      this.css3dScene = null
+    }
+
     this.viewport.removeChild(this.renderer.domElement)
   }
 }
