@@ -226,6 +226,46 @@ export class SkinnedMesh extends Node {
     return bone
   }
 
+  // Add bone rotation offset (for procedural aiming, IK, etc.)
+  addBoneRotation(boneName, euler) {
+    const bone = this.readBone(boneName)
+    if (!bone) {
+      console.warn(`[skinnedmesh] addBoneRotation failed: bone '${boneName}' not found`)
+      return false
+    }
+
+    // Store original rotation if not already stored
+    if (!bone.userData.originalRotation) {
+      bone.userData.originalRotation = bone.rotation.clone()
+      console.log(`[skinnedmesh] Stored original rotation for bone '${boneName}':`, bone.userData.originalRotation)
+    }
+
+    // Apply additive rotation
+    bone.rotation.x = bone.userData.originalRotation.x + euler.x
+    bone.rotation.y = bone.userData.originalRotation.y + euler.y
+    bone.rotation.z = bone.userData.originalRotation.z + euler.z
+
+    console.log(`[skinnedmesh] Applied rotation to bone '${boneName}':`, bone.rotation.x, bone.rotation.y, bone.rotation.z)
+    return true
+  }
+
+  // Reset bone rotation to original
+  resetBoneRotation(boneName) {
+    const bone = this.readBone(boneName)
+    if (!bone || !bone.userData.originalRotation) return false
+
+    bone.rotation.copy(bone.userData.originalRotation)
+    return true
+  }
+
+  // Reset all bone rotations
+  resetAllBoneRotations() {
+    if (!this.bones) return
+    for (const boneName in this.bones) {
+      this.resetBoneRotation(boneName)
+    }
+  }
+
   getBone(name) {
     let handle = this.boneHandles[name]
     if (!handle) {

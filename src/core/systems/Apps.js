@@ -50,6 +50,10 @@ export class Apps extends System {
       isClient(entity) {
         return world.network.isClient
       },
+      // Expose world.prefs to apps for focal length control
+      prefs(entity) {
+        return world.prefs
+      },
     }
     this.worldSetters = {
       // ...

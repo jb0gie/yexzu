@@ -209,6 +209,7 @@ export class Prim extends Node {
     this.scaleOffset.fromArray(scaleOffset)
     this.updateMatrixWorldOffset()
 
+
     // Get unit-sized geometry for this type
     const geometry = getGeometry(this._type, size)
 
@@ -249,6 +250,7 @@ export class Prim extends Node {
       this.mountPhysics(size)
     }
   }
+
 
   mountPhysics(size) {
     if (!PHYSX) return
@@ -440,6 +442,7 @@ export class Prim extends Node {
     this.handle?.destroy()
     this.handle = null
     this.unmountPhysics()
+
   }
 
   copy(source, recursive) {
@@ -482,12 +485,26 @@ export class Prim extends Node {
   }
 
   applyStats(stats) {
-    const geometry = getGeometry(this._type)
+    // Get geometry config with proper size
+    const { size } = getGeometryConfig(this._type, this._size)
+    const geometry = getGeometry(this._type, size)
     if (geometry && !stats.geometries.has(geometry.uuid)) {
       stats.geometries.add(geometry.uuid)
       stats.triangles += getTrianglesFromGeometry(geometry)
     }
-    const material = getMaterial()
+
+    // Get material with proper properties
+    const material = getMaterial({
+      color: this._color,
+      emissive: this._emissive,
+      emissiveIntensity: this._emissiveIntensity,
+      metalness: this._metalness,
+      roughness: this._roughness,
+      opacity: this._opacity,
+      transparent: this._transparent,
+      texture: this._texture,
+      doubleside: this._doubleside,
+    })
     if (material && !stats.materials.has(material.uuid)) {
       stats.materials.add(material.uuid)
       stats.textureBytes += getTextureBytesFromMaterial(material)
@@ -910,6 +927,7 @@ export class Prim extends Node {
     }
   }
 
+
   getProxy() {
     if (!this.proxy) {
       const self = this
@@ -1147,6 +1165,7 @@ function getGeometryConfig(type, requestedSize) {
       scaleOffset = [...requestedSize, 1] // Scale X/Y, keep Z at 1
       break
     }
+
 
     default: {
       size = [1, 1, 1]

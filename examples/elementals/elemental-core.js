@@ -16,8 +16,8 @@ if (world.isServer) {
     // [playerId]: {
     //   active: 0,
   }
-    //   items: [{ id, qty }],
-    // }
+  //   items: [{ id, qty }],
+  // }
   function getInv(playerId) {
     let inv = invs[playerId]
     if (!inv) {
@@ -276,8 +276,8 @@ if (world.isClient) {
     pivot: 'bottom-center',
     position: [0.5, 1, 0],
     offset: [0, -40, 0],
-    width: 140,
-    height: 50,
+    width: 330,
+    height: 70,
     padding: 5,
     borderRadius: 10,
     flexDirection: 'row',
@@ -750,4 +750,320 @@ function addBagSlot({ parent, idx }) {
       // ...
     },
   }
+}
+
+// ===== PROCEDURAL LOCOMOTION & AIMING API =====
+if (world.isClient) {
+  console.log('[locomotion-api] ✓ Initializing locomotion API system')
+
+  const locomotionAPI = {
+    // Active aiming states per player
+    aimingStates: new Map(), // playerId -> { active, intensity, targetBones }
+
+    // Camera zoom/ADS system
+    zoomStates: new Map(), // playerId -> { current, target, levels, levelIndex }
+
+    /**
+     * Initialize locomotion system for a player
+     * @param {string} playerId - Player ID
+     */
+    init(playerId) {
+      if (!this.aimingStates.has(playerId)) {
+        this.aimingStates.set(playerId, {
+          active: false,
+          intensity: 0,
+          targetIntensity: 0,
+          targetBones: {}
+        })
+      }
+
+      if (!this.zoomStates.has(playerId)) {
+        this.zoomStates.set(playerId, {
+          current: 1.5, // Default third-person distance
+          target: 1.5,
+          levels: [1.5, 1.0, 0.5, 0.3], // Configurable zoom levels
+          levelIndex: 0,
+          transitionSpeed: 8.0
+        })
+      }
+    },
+
+    /**
+     * Set zoom levels for a player
+     * @param {string} playerId - Player ID  
+     * @param {Array<number>} levels - Array of zoom distances
+     */
+    setZoomLevels(playerId, levels) {
+      const state = this.zoomStates.get(playerId)
+      if (state) {
+        state.levels = [...levels]
+        state.levelIndex = 0
+        state.target = state.levels[0]
+      }
+    },
+
+    /**
+     * Cycle to next zoom level
+     * @param {string} playerId - Player ID
+     * @returns {number} New zoom level
+     */
+    cycleZoom(playerId) {
+      const state = this.zoomStates.get(playerId)
+      if (!state) return 1.5
+
+      state.levelIndex = (state.levelIndex + 1) % state.levels.length
+      state.target = state.levels[state.levelIndex]
+
+      return state.target
+    },
+
+    /**
+     * Get current zoom level
+     * @param {string} playerId - Player ID
+     * @returns {number} Current zoom distance
+     */
+    getZoom(playerId) {
+      const state = this.zoomStates.get(playerId)
+      return state ? state.current : 1.5
+    },
+
+    /**
+     * Update zoom (called in update loop)
+     * @param {string} playerId - Player ID
+     * @param {number} delta - Delta time
+     */
+    updateZoom(playerId, delta) {
+      const state = this.zoomStates.get(playerId)
+      if (!state) return
+
+      // Smooth interpolation to target zoom
+      const diff = state.target - state.current
+      if (Math.abs(diff) > 0.001) {
+        state.current += diff * state.transitionSpeed * delta
+      } else {
+        state.current = state.target
+      }
+
+      // Update camera zoom (control.camera.zoom)
+      const player = world.getPlayer(playerId)
+      if (player) {
+        const control = app.control()
+        if (control && control.camera) {
+          control.camera.zoom = state.current
+        }
+      }
+    },
+
+    /**
+     * Start aiming for a player
+     * @param {string} playerId - Player ID
+     * @param {Object} config - Aiming configuration
+     *   - bones: Array of bone names to manipulate
+     *   - maxRotations: Object with max rotation per bone (in radians)
+     *   - transitionSpeed: Speed of aim transition
+     */
+    startAiming(playerId, config = {}) {
+      const state = this.aimingStates.get(playerId)
+      if (!state) return
+
+      state.active = true
+      state.targetIntensity = 1.0
+      state.config = {
+        bones: config.bones || ['spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm'],
+        maxRotations: config.maxRotations || {
+          spine: { x: 0.1, y: 0.2 },
+          chest: { x: 0.15, y: 0.25 },
+          neck: { x: 0.1, y: 0.15 },
+          head: { x: 0.2, y: 0.3 },
+          leftUpperArm: { x: -0.3, y: 0 },
+          rightUpperArm: { x: -0.3, y: 0 }
+        },
+        transitionSpeed: config.transitionSpeed || 5.0
+      }
+    },
+
+    /**
+     * Stop aiming for a player
+     * @param {string} playerId - Player ID
+     */
+    stopAiming(playerId) {
+      const state = this.aimingStates.get(playerId)
+      if (!state) return
+
+      state.targetIntensity = 0.0
+      // Will transition out, then set active = false when intensity reaches 0
+    },
+
+    /**
+     * Set aiming intensity (0-1)
+     * @param {string} playerId - Player ID
+     * @param {number} intensity - Target intensity (0-1)
+     */
+    setAimIntensity(playerId, intensity) {
+      const state = this.aimingStates.get(playerId)
+      if (!state) return
+
+      state.targetIntensity = Math.max(0, Math.min(1, intensity))
+    },
+
+    /**
+     * Update aiming bones (called in update loop)
+     * @param {string} playerId - Player ID
+     * @param {number} delta - Delta time
+     */
+    updateAiming(playerId, delta) {
+      const state = this.aimingStates.get(playerId)
+      if (!state) return
+
+      const player = world.getPlayer(playerId)
+      if (!player) return
+
+      // Smooth intensity transition
+      const intensityDiff = state.targetIntensity - state.intensity
+      if (Math.abs(intensityDiff) > 0.001) {
+        state.intensity += intensityDiff * (state.config?.transitionSpeed || 5.0) * delta
+      } else {
+        state.intensity = state.targetIntensity
+      }
+
+      // If fully transitioned out, deactivate and reset bones
+      if (state.intensity <= 0.001 && state.targetIntensity === 0) {
+        state.active = false
+        state.intensity = 0
+        // Reset all bone rotations to original
+        if (state.config && state.config.bones) {
+          for (const boneName of state.config.bones) {
+            player.resetBoneRotation(boneName)
+          }
+        }
+        return
+      }
+
+      if (!state.active || state.intensity <= 0) return
+
+      // Get camera direction for aiming
+      const control = app.control()
+      if (!control || !control.camera) return
+
+      const cameraDir = new Vector3(0, 0, -1)
+      cameraDir.applyQuaternion(control.camera.quaternion)
+
+      // Calculate aim angles from camera direction
+      const aimYaw = Math.atan2(cameraDir.x, cameraDir.z)
+      const aimPitch = Math.asin(-cameraDir.y)
+
+      // Get player base rotation
+      const playerYaw = Math.atan2(player.quaternion.x, player.quaternion.w) * 2
+
+      // Calculate relative aim angles
+      let relativeYaw = aimYaw - playerYaw
+      // Normalize to -PI to PI
+      while (relativeYaw > Math.PI) relativeYaw -= Math.PI * 2
+      while (relativeYaw < -Math.PI) relativeYaw += Math.PI * 2
+
+      const relativePitch = aimPitch
+
+      // Apply bone rotations based on config
+      if (state.config && state.config.bones) {
+        // Debug log once per second
+        if (!state._lastDebugLog || Date.now() - state._lastDebugLog > 1000) {
+          console.log('[locomotion-api] Applying aim rotations - intensity:', state.intensity.toFixed(2))
+          console.log('  relativePitch:', (relativePitch * 180 / Math.PI).toFixed(1), 'deg')
+          console.log('  relativeYaw:', (relativeYaw * 180 / Math.PI).toFixed(1), 'deg')
+          state._lastDebugLog = Date.now()
+        }
+
+        for (const boneName of state.config.bones) {
+          const maxRot = state.config.maxRotations[boneName]
+          if (!maxRot) continue
+
+          // Calculate target rotation for this bone
+          const targetX = relativePitch * maxRot.x * state.intensity
+          const targetY = relativeYaw * maxRot.y * state.intensity
+
+          // Create Euler rotation
+          const euler = new Euler(targetX, targetY, 0, 'YXZ')
+
+          // Apply additive bone rotation
+          const result = player.addBoneRotation(boneName, euler)
+
+          // Debug first application
+          if (!state._debuggedBones) state._debuggedBones = new Set()
+          if (!state._debuggedBones.has(boneName)) {
+            console.log(`[locomotion-api] Applied rotation to ${boneName}:`, result ? 'SUCCESS' : 'FAILED')
+            console.log(`  targetX: ${(targetX * 180 / Math.PI).toFixed(1)}°, targetY: ${(targetY * 180 / Math.PI).toFixed(1)}°`)
+            state._debuggedBones.add(boneName)
+          }
+
+          // Store target rotations for debugging
+          if (!state.targetBones[boneName]) {
+            state.targetBones[boneName] = { x: 0, y: 0, z: 0 }
+          }
+
+          state.targetBones[boneName].x = targetX
+          state.targetBones[boneName].y = targetY
+        }
+      }
+    },
+
+    /**
+     * Get target bone rotations for a player
+     * @param {string} playerId - Player ID
+     * @returns {Object} Bone rotations object
+     */
+    getBoneRotations(playerId) {
+      const state = this.aimingStates.get(playerId)
+      return state ? state.targetBones : {}
+    }
+  }
+
+  // Expose locomotion API globally for weapons to use
+  world.on('elemental-core:get-locomotion-api', (callback) => {
+    callback(locomotionAPI)
+  })
+
+  // Track which players have custom zoom control
+  locomotionAPI.customZoomPlayers = new Set()
+
+  // World configuration for default zoom behavior
+  world.on('elemental-core:disable-default-zoom', (playerId) => {
+    locomotionAPI.customZoomPlayers.add(playerId)
+    console.log('[locomotion-api] ✓ Disabled default zoom for player:', playerId)
+    console.log('[locomotion-api] Custom zoom players:', Array.from(locomotionAPI.customZoomPlayers))
+  })
+
+  world.on('elemental-core:enable-default-zoom', (playerId) => {
+    locomotionAPI.customZoomPlayers.delete(playerId)
+    console.log('[locomotion-api] ✓ Enabled default zoom for player:', playerId)
+    console.log('[locomotion-api] Custom zoom players:', Array.from(locomotionAPI.customZoomPlayers))
+  })
+
+  // Check if a player has custom zoom control (for PlayerLocal to query)
+  world.on('elemental-core:has-custom-zoom', (playerId, callback) => {
+    const hasCustom = locomotionAPI.customZoomPlayers.has(playerId)
+    console.log('[locomotion-api] Query has-custom-zoom for', playerId, '→', hasCustom)
+    callback(hasCustom)
+  })
+
+  // Handle focal length requests from weapons
+  world.on('pistol:set-focal-length', (data) => {
+    console.log('[locomotion-api] Received focal length request:', data.focalLength, 'mm from', data.source)
+    if (world.prefs && world.prefs.setFocalLength) {
+      world.prefs.setFocalLength(data.focalLength)
+      console.log('[locomotion-api] Applied focal length via world.prefs:', data.focalLength, 'mm')
+    } else {
+      console.warn('[locomotion-api] Could not access world.prefs.setFocalLength')
+    }
+  })
+
+  // Auto-update for all players
+  app.on('update', (delta) => {
+    const players = world.getPlayers()
+    for (const player of players) {
+      if (locomotionAPI.aimingStates.has(player.id)) {
+        locomotionAPI.updateAiming(player.id, delta)
+        locomotionAPI.updateZoom(player.id, delta)
+      }
+    }
+  })
 }

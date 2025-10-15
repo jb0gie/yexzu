@@ -6,7 +6,7 @@ const CRIT_MULTIPLIER = 1.8
 const PROJECTILE_SPEED = 50 // Faster for "bullet" feel
 const PROJECTILE_LIFETIME = 3 // Shorter lifetime for bullets
 const RANGE = 100 // Longer range for a pistol
-const FIRE_RATE = 0.5 // Cooldown in seconds between shots
+const FIRE_RATE = 0.1 // Cooldown in seconds between shots (reduced for testing)
 
 const v1 = new Vector3()
 const v2 = new Vector3()
@@ -51,15 +51,31 @@ createItem(({ player, hooks }) => {
     playPistolAnimation('EmoteReload')
     playSound('reloadSound')
 
+    // Play reload animation
     const reloadUrl = getAnimationUrl('reload')
     if (reloadUrl) {
-      console.log('[pistol] Playing reload animation')
+      setPistolState('reloading')
       playAnimation(reloadUrl, {
         duration: props.reloadDuration || 0.917,
         loop: false,
-        fadeDuration: 0.1,
+        fadeDuration: 0.2,
       })
+
+      // Return to appropriate idle state after reload animation
+      setTimeout(() => {
+        returnToIdleState()
+      }, (props.reloadDuration || 0.917) * 1000)
     }
+
+    // Reset to appropriate pose after reload
+    setTimeout(() => {
+      console.log('[pistol] Reload completed, returning to appropriate pose')
+      if (isAiming) {
+        playAimAnimation()
+      } else {
+        playPistolGripAnimation()
+      }
+    }, props.reloadDuration * 1000 || 917)
 
     // Notify server
     hooks.call('reload', { ammo })
@@ -94,39 +110,234 @@ createItem(({ player, hooks }) => {
     return null
   }
 
-  // Helper function to play animation with crossfade support
+  // Helper function to play animation with additive support
   function playAnimation(animUrl, options = {}) {
     if (!animUrl) {
-      console.log(`[pistol] No animation URL provided, skipping animation`)
+      console.log(`[pistol] V2.0 - No animation URL provided, skipping animation`)
+      return
+    }
+
+    // Only check cooldown for non-looping animations to prevent spam
+    const now = world.getTime()
+    if (!options.loop && now - animationCooldown < 0.05) {
+      console.log(`[pistol] Animation cooldown active, skipping: ${animUrl}`)
       return
     }
 
     console.log(`[pistol] Playing animation: ${animUrl} with options:`, options)
 
-    // Apply the emote with standard player.applyEffect (fallback)
-    player.applyEffect({
-      emote: animUrl,
-      duration: options.duration || 0,
-      cancellable: false,
-      loop: options.loop || false,
-      priority: options.priority || 1,
+    // Smart animation system: Use additive for poses, standard for actions
+    // Check both the URL and the animation key/name for pose detection
+    const isPoseAnimation = options.isPose || animUrl.includes('grip') || animUrl.includes('aim') || animUrl.includes('idle') || animUrl.includes('Idle') || animUrl.includes('PistolIdle') || animUrl.includes('AimIdle')
+    const isActionAnimation = options.isAction || animUrl.includes('fire') || animUrl.includes('reload') || animUrl.includes('equip') || animUrl.includes('Fire') || animUrl.includes('Reload') || animUrl.includes('Equip')
+
+    // Use additive animations for poses (layers over locomotion)
+    // Use standard emotes for actions (replaces locomotion temporarily)
+    const useAdditive = isPoseAnimation && props.useAdditiveAnimations && player.applyAdditiveAnimation
+
+    console.log(`[pistol] Animation analysis:`, {
+      animUrl,
+      isPoseAnimation,
+      isActionAnimation,
+      useAdditiveAnimations: props.useAdditiveAnimations,
+      applyAdditiveAnimation: !!player.applyAdditiveAnimation,
+      useAdditive
     })
 
-    // Try to use enhanced crossfade via VRM system for smoother transitions
-    try {
-      const avatar = player.avatar?.instance
-      if (avatar && avatar.setEmote) {
-        const fadeDuration = options.fadeDuration || 0.2 // Default 0.2s for smooth transitions
-        avatar.setEmote(animUrl, {
-          crossFade: true,
-          fadeDuration: fadeDuration,
-          warp: true,
-        })
-        console.log(`[pistol] Enhanced crossfade animation: ${animUrl} (${fadeDuration}s fade)`)
+    // Debug: Check what's available
+    console.log(`[pistol] Smart animation system - isPose: ${isPoseAnimation}, isAction: ${isActionAnimation}, useAdditive: ${useAdditive}`)
+    console.log(`[pistol] player.applyAdditiveAnimation exists:`, !!player.applyAdditiveAnimation)
+    console.log(`[pistol] player.avatar exists:`, !!player.avatar)
+    console.log(`[pistol] player.avatar.instance exists:`, !!player.avatar?.instance)
+    console.log(`[pistol] player.avatar.instance.setAdditiveAnimation exists:`, !!player.avatar?.instance?.setAdditiveAnimation)
+
+    if (useAdditive && player.applyAdditiveAnimation) {
+      // Use additive animation system - layers over locomotion
+      console.log(`[pistol] Using ADDITIVE animation: ${animUrl}`)
+
+      // Always clear previous animations to allow replaying
+      if (player.clearAdditiveAnimations) {
+        player.clearAdditiveAnimations({ fadeDuration: 0.1 })
       }
-    } catch (error) {
-      // Silently fall back to standard player.applyEffect
-      console.log(`[pistol] Standard animation (crossfade unavailable): ${animUrl}`)
+
+      player.applyAdditiveAnimation(animUrl, {
+        weight: options.weight || 1.0,
+        fadeDuration: options.fadeDuration || 0.15,
+        loop: options.loop !== false, // Default to true unless explicitly set to false
+      })
+    } else {
+      // Use standard animation system - replaces locomotion
+      console.log(`[pistol] Using STANDARD emote animation: ${animUrl}`)
+
+      // Clear any existing additive animations first to prevent conflicts
+      if (player.clearAdditiveAnimations) {
+        console.log(`[pistol] Clearing additive animations before standard emote`)
+        player.clearAdditiveAnimations({ fadeDuration: 0.1 })
+      }
+
+      // Try multiple player API methods for standard emotes
+      try {
+        console.log(`[pistol] Checking available player methods...`)
+        console.log(`[pistol] player.modify exists:`, !!player.modify)
+        console.log(`[pistol] player.playEmote exists:`, !!player.playEmote)
+        console.log(`[pistol] player.setEmote exists:`, !!player.setEmote)
+        console.log(`[pistol] player.emote exists:`, !!player.emote)
+
+        let emoteSet = false
+
+        // Try player.modify first
+        if (player.modify && !emoteSet) {
+          console.log(`[pistol] Setting emote via player.modify: ${animUrl}`)
+          player.modify({
+            effect: {
+              emote: animUrl,
+              duration: options.duration || 0,
+              cancellable: false,
+              loop: options.loop || false,
+              priority: options.priority || 1,
+            }
+          })
+          emoteSet = true
+        }
+
+        // Try player.playEmote
+        if (player.playEmote && !emoteSet) {
+          console.log(`[pistol] Setting emote via player.playEmote: ${animUrl}`)
+          player.playEmote(animUrl, options.duration || 0)
+          emoteSet = true
+        }
+
+        // Try player.setEmote
+        if (player.setEmote && !emoteSet) {
+          console.log(`[pistol] Setting emote via player.setEmote: ${animUrl}`)
+          player.setEmote(animUrl)
+          emoteSet = true
+        }
+
+        // Try player.emote property
+        if (player.emote !== undefined && !emoteSet) {
+          console.log(`[pistol] Setting emote via player.emote: ${animUrl}`)
+          player.emote = animUrl
+          emoteSet = true
+        }
+
+        if (!emoteSet) {
+          console.log(`[pistol] No emote method available!`)
+          console.log(`[pistol] Available player methods:`, Object.getOwnPropertyNames(player))
+        }
+      } catch (error) {
+        console.log(`[pistol] Emote error:`, error)
+      }
+    }
+
+    // Track current animation and set cooldown only for non-looping animations
+    currentAnimation = animUrl
+    if (!options.loop) {
+      animationCooldown = now
+    }
+
+    console.log(`[pistol] Animation tracking - currentAnimation: ${currentAnimation}, cooldown: ${animationCooldown}, time: ${now}`)
+  }
+
+  // Helper function to clear all animations and reset to default
+  function clearAllAnimations() {
+    console.log('[pistol] Clearing all animations and resetting to default')
+
+    // Clear additive animations if available
+    if (player.clearAdditiveAnimations) {
+      player.clearAdditiveAnimations({ fadeDuration: 0.2 })
+    }
+
+    // Clear any emote animations using available player API
+    let emoteCleared = false
+
+    if (player.modify && !emoteCleared) {
+      try {
+        player.modify({
+          effect: {
+            emote: null,
+            duration: 0,
+            cancellable: true,
+            loop: false,
+            priority: 0,
+          }
+        })
+        console.log('[pistol] Cleared standard emote via player.modify')
+        emoteCleared = true
+      } catch (error) {
+        console.log('[pistol] Error clearing emote via player.modify:', error)
+      }
+    }
+
+    if (player.setEmote && !emoteCleared) {
+      try {
+        player.setEmote(null)
+        console.log('[pistol] Cleared standard emote via player.setEmote')
+        emoteCleared = true
+      } catch (error) {
+        console.log('[pistol] Error clearing emote via player.setEmote:', error)
+      }
+    }
+
+    if (player.emote !== undefined && !emoteCleared) {
+      try {
+        player.emote = null
+        console.log('[pistol] Cleared standard emote via player.emote')
+        emoteCleared = true
+      } catch (error) {
+        console.log('[pistol] Error clearing emote via player.emote:', error)
+      }
+    }
+
+    // Reset tracking
+    currentAnimation = null
+    animationCooldown = 0
+  }
+
+  // Helper function to force reset animation state (for debugging)
+  function resetAnimationState() {
+    console.log('[pistol] Force resetting animation state')
+    currentAnimation = null
+    animationCooldown = 0
+    clearAllAnimations()
+  }
+
+  // Helper function to play pistol grip animation
+  function playPistolGripAnimation() {
+    console.log('[pistol] Playing pistol grip animation')
+
+    // Play pistol idle animation if available
+    const pistolIdleUrl = getAnimationUrl('pistolIdle')
+    if (pistolIdleUrl) {
+      playAnimation(pistolIdleUrl, {
+        duration: props.pistolIdleDuration || 2.0,
+        loop: true,
+        fadeDuration: 0.3,
+        isPose: true, // Explicitly mark as pose animation
+      })
+    } else {
+      console.log('[pistol] No pistolIdle animation - letting natural locomotion continue')
+      // Don't clear animations - let the equip animation naturally blend into locomotion
+      // The VRM system will handle the transition smoothly
+    }
+  }
+
+  // Helper function to play aim animation
+  function playAimAnimation() {
+    console.log('[pistol] Playing aim animation')
+
+    // Play aim idle animation
+    const aimIdleUrl = getAnimationUrl('aimIdle')
+    if (aimIdleUrl) {
+      playAnimation(aimIdleUrl, {
+        duration: props.aimIdleDuration || 2.0,
+        loop: true,
+        fadeDuration: 0.3,
+        isPose: true, // Explicitly mark as pose animation
+      })
+    } else {
+      console.log('[pistol] No aimIdle animation - maintaining current pose')
+      // Don't clear animations - maintain current pose for aiming
     }
   }
 
@@ -275,9 +486,90 @@ createItem(({ player, hooks }) => {
   }
 
 
+  // Client-scoped variables (accessible in all client methods)
+  let zoomLevels = []
+  let currentZoomLevelIndex = 0
+  let currentZoom = 1.5
+  let targetZoom = 1.5
+  let isAiming = false
+  let aimIdleAnimationUrl = null
+  let currentAnimation = null // Track current additive animation
+  let animationCooldown = 0 // Prevent rapid animation changes
+  const ZOOM_TRANSITION_SPEED = 8.0
+
+  // Pistol state management for proper transitions
+  let pistolState = 'unequipped' // 'unequipped', 'equipped', 'aiming', 'firing', 'reloading'
+
+  // State transition functions
+  function setPistolState(newState) {
+    console.log(`[pistol] State transition: ${pistolState} → ${newState}`)
+    pistolState = newState
+  }
+
+  function returnToIdleState() {
+    console.log(`[pistol] Returning to idle state from: ${pistolState}`)
+
+    if (pistolState === 'aiming') {
+      // Return to aim idle
+      const aimIdleUrl = getAnimationUrl('aimIdle')
+      console.log(`[pistol] Aim idle URL: ${aimIdleUrl}`)
+      if (aimIdleUrl) {
+        playAnimation(aimIdleUrl, { loop: true, duration: props.aimIdleDuration || 2.0, isPose: true })
+        setPistolState('aiming')
+      }
+    } else if (pistolState === 'equipped') {
+      // Return to pistol grip idle
+      const pistolIdleUrl = getAnimationUrl('pistolIdle')
+      console.log(`[pistol] Pistol idle URL: ${pistolIdleUrl}`)
+      if (pistolIdleUrl) {
+        playAnimation(pistolIdleUrl, { loop: true, duration: props.pistolIdleDuration || 2.0, isPose: true })
+        setPistolState('equipped')
+      }
+    }
+  }
+
+  // Debug function to test additive blending
+  function testAdditiveBlending() {
+    console.log(`[pistol] Testing additive blending...`)
+    console.log(`[pistol] props.useAdditiveAnimations:`, props.useAdditiveAnimations)
+    console.log(`[pistol] player.applyAdditiveAnimation exists:`, !!player.applyAdditiveAnimation)
+    console.log(`[pistol] player.clearAdditiveAnimations exists:`, !!player.clearAdditiveAnimations)
+
+    const testUrl = getAnimationUrl('aimIdle')
+    console.log(`[pistol] Test URL: ${testUrl}`)
+
+    if (testUrl && player.applyAdditiveAnimation) {
+      console.log(`[pistol] Attempting to play test additive animation...`)
+      player.applyAdditiveAnimation(testUrl, {
+        weight: 1.0,
+        loop: true,
+        fadeDuration: 0.3
+      })
+    } else {
+      console.log(`[pistol] Testing via playAnimation with isPose flag...`)
+      if (testUrl) {
+        playAnimation(testUrl, { loop: true, duration: 2.0, isPose: true })
+      }
+    }
+  }
+
   return {
     client: {
       init() {
+        console.log('[pistol] VERSION 2.0 - Animation-only system initialized for player:', player.id)
+        // Parse zoom levels from config
+        zoomLevels = (props.zoomLevels || '1.5, 1.0, 0.5, 0.3')
+          .split(',')
+          .map(s => parseFloat(s.trim()))
+          .filter(n => !isNaN(n))
+
+        // Initialize zoom to first level (normal view)
+        currentZoom = zoomLevels[0]
+        targetZoom = zoomLevels[0]
+        currentZoomLevelIndex = 0
+
+        console.log('[pistol] Initialized zoom system with levels:', zoomLevels)
+
         // ===== TASK 1: Get SkinnedMesh and bones from GLB =====
         // The app's model IS the pistol GLB, so we clone the entire app hierarchy
         console.log('[pistol] Initializing pistol for player:', player.name)
@@ -364,10 +656,37 @@ createItem(({ player, hooks }) => {
 
         // Get control handle for local player
         control = player.local ? app.control() : null
+        console.log('[pistol] Control object created:', !!control, 'player.local:', player.local)
+
+        // Capture ADS button to prevent default behavior
+        if (control) {
+          const adsButton = props.adsButton || 'mouseRight'
+          if (control[adsButton]) {
+            control[adsButton].capture = true
+            console.log('[pistol] Captured ADS button:', adsButton)
+          }
+
+          // Also capture fire button
+          const fireButton = props.fireButton || 'mouseLeft'
+          if (control[fireButton]) {
+            control[fireButton].capture = true
+            console.log('[pistol] Captured fire button:', fireButton)
+          }
+        }
+
+        // Clear any existing additive animations before equipping
+        if (player.clearAdditiveAnimations) {
+          console.log('[pistol] Clearing existing additive animations before equip')
+          player.clearAdditiveAnimations({ fadeDuration: 0.1 })
+        }
+
+        // Clear any existing animations first
+        clearAllAnimations()
 
         // Play equip animation (non-looping action)
         const equipUrl = getAnimationUrl('equip')
         if (equipUrl) {
+          setPistolState('equipping')
           playAnimation(equipUrl, {
             duration: props.equipDuration || 0.5,
             loop: false,
@@ -375,13 +694,36 @@ createItem(({ player, hooks }) => {
           })
         }
 
+        // Set initial pistol grip animation after equip
+        setTimeout(() => {
+          setPistolState('equipped')
+          playPistolGripAnimation()
+        }, props.equipDuration * 1000 || 500)
+
         console.log('[pistol] Pistol equipped - natural locomotion preserved')
+
+        // Take control of zoom system
+        world.emit('weapon:take-zoom-control', { playerId: player.id, source: 'pistol' })
+
+        console.log('[pistol] ✓ Pistol zoom system active')
+        console.log('[pistol] Player has addBoneRotation method:', !!player.addBoneRotation)
+
+        // Debug: List available bone names
+        if (player.avatar && player.avatar.instance) {
+          const avatar = player.avatar.instance
+          if (avatar.bones) {
+            const boneNames = Object.keys(avatar.bones)
+            console.log('[pistol] Available bone names:', boneNames.slice(0, 10), '... (showing first 10)')
+          }
+        }
 
         // Debug: List all configured animations
         console.log('[pistol] Configured targeted action animations:')
         console.log('  - equip:', props.equipEmote?.url || 'not configured')
         console.log('  - fire:', props.fireEmote?.url || 'not configured')
         console.log('  - reload:', props.reloadEmote?.url || 'not configured')
+        console.log('  - pistol idle:', props.pistolIdleEmote?.url || 'not configured')
+        console.log('  - aim idle:', props.aimIdleEmote?.url || 'not configured')
         console.log('[pistol] Natural locomotion preserved - no overrides needed!')
 
         // Handle projectile visual effects from server
@@ -430,33 +772,45 @@ createItem(({ player, hooks }) => {
         // ===== Get configurable keybinds =====
         const fireButton = props.fireButton || 'mouseLeft'
         const reloadButton = props.reloadButton || 'keyR'
-        const requirePointerLock = props.requirePointerLock !== false // Default true
+        const requirePointerLock = props.requirePointerLock === true // Default false for easier testing
 
         // ===== TASK 4: Fire weapon with configurable button =====
-        const fireInput = control[fireButton]
-        const pointerLocked = control.pointer?.locked
+        const fireInput = control?.[fireButton]
+        const pointerLocked = control?.pointer?.locked
         const canFire = requirePointerLock ? pointerLocked : true
 
+        // Debug control input availability (reduced logging)
+        if (isAiming && fireInput && fireInput.pressed) {
+          console.log('[pistol] Fire button pressed while aiming - fireInput.pressed:', fireInput.pressed, 'canFire:', canFire)
+        }
+
+        // Debug firing conditions
+        if (fireInput && fireInput.pressed) {
+          console.log('[pistol] FIRE ATTEMPT - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'requirePointerLock:', requirePointerLock, 'pointerLocked:', pointerLocked, 'isAiming:', isAiming, 'ammo:', ammo)
+        }
+
         if (fireInput && fireInput.pressed && canFire) {
+          console.log('[pistol] FIRE TRIGGERED - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'isAiming:', isAiming)
           const now = world.getTime()
+
           if (now - lastFireTime > FIRE_RATE) {
             // Check if player has ammunition available
             if (!checkHasAmmunition()) {
               return
             }
-            // Get firing direction from camera (like tackle.js)
-            const e1 = new Euler(0, 0, 0, 'YXZ')
+            // Get firing direction from camera/reticle (full 3D aiming)
+            let dir
             if (control.camera && control.camera.quaternion) {
-              e1.setFromQuaternion(control.camera.quaternion)
+              // Use camera direction directly for accurate aiming
+              dir = v1.set(0, 0, -1).applyQuaternion(control.camera.quaternion)
             } else {
               // Fallback to player rotation if camera not available
+              const e1 = new Euler(0, 0, 0, 'YXZ')
               e1.setFromQuaternion(player.quaternion)
+              const q1 = new Quaternion()
+              q1.setFromEuler(e1)
+              dir = v1.set(0, 0, -1).applyQuaternion(q1)
             }
-            e1.x = 0 // Zero out pitch for horizontal aim
-            e1.z = 0 // Zero out roll for horizontal aim
-            const q1 = new Quaternion()
-            q1.setFromEuler(e1)
-            const dir = v1.set(0, 0, -1).applyQuaternion(q1)
 
             // Get muzzle position from bone (like tackle.js - project forward to avoid self-hits)
             let origin = player.position.clone()
@@ -483,22 +837,38 @@ createItem(({ player, hooks }) => {
             ammo -= 1
             console.log(`[pistol] BANG! Ammo: ${ammo}/${props.maxAmmo || 100}`)
 
-            // Play BOTH pistol model animation AND player animation
+            // Play pistol model animation (visual feedback)
             playPistolAnimation('EmoteShoot')
 
             // Add sound and particle effects
             playSound('fireSound')
             createMuzzleFlash()
 
-            // Play shooting animation (arm movement)
+            // Play fire animation
             const fireUrl = getAnimationUrl('fire')
             if (fireUrl) {
+              setPistolState('firing')
               playAnimation(fireUrl, {
                 duration: props.fireDuration || 0.3,
                 loop: false,
                 fadeDuration: 0.1,
               })
+
+              // Return to appropriate idle state after fire animation
+              setTimeout(() => {
+                returnToIdleState()
+              }, (props.fireDuration || 0.3) * 1000)
             }
+
+            // Reset to appropriate pose after fire
+            setTimeout(() => {
+              console.log('[pistol] Fire completed, returning to appropriate pose')
+              if (isAiming) {
+                playAimAnimation()
+              } else {
+                playPistolGripAnimation()
+              }
+            }, props.fireDuration * 1000 || 300)
           }
         }
 
@@ -507,6 +877,85 @@ createItem(({ player, hooks }) => {
         if (reloadInput && reloadInput.pressed) {
           reloadPistol()
         }
+
+        // ===== Debug: Reset animation state with T key =====
+        if (control.keyT && control.keyT.pressed) {
+          console.log('[pistol] DEBUG: Resetting animation state')
+          resetAnimationState()
+        }
+
+        // ===== Debug: Test additive blending with Y key =====
+        if (control.keyY && control.keyY.pressed) {
+          console.log('[pistol] DEBUG: Testing additive blending')
+          testAdditiveBlending()
+        }
+
+        // ===== Detect ADS State with Toggle =====
+        // Check if player toggled aiming (right-click pressed to toggle)
+        const adsButton = props.adsButton || 'mouseRight'
+        const adsInput = control[adsButton]
+        const wasAiming = isAiming
+
+        // Force capture the ADS button to prevent camera system from using it
+        if (adsInput) {
+          adsInput.capture = true
+
+          // Only process ADS input if we're not in the middle of equipping
+          const isEquipping = currentAnimation && currentAnimation.includes('equip')
+          if (!isEquipping && adsInput.pressed) {
+            isAiming = !isAiming
+            console.log('[pistol] ADS toggled:', isAiming ? 'Aiming' : 'Not aiming')
+
+            // Handle aim animations with proper state management
+            if (isAiming) {
+              // Play aim animation
+              setPistolState('aiming')
+              playAimAnimation()
+            } else {
+              // Return to pistol grip animation
+              setPistolState('equipped')
+              playPistolGripAnimation()
+            }
+          }
+        }
+
+        // ===== Animation maintenance is now handled by the animation system =====
+
+        // Debug ADS input state (removed excessive logging)
+
+        // ===== Handle smooth zoom via focal length =====
+        const adsFocalLength = props.adsFocalLength || 85
+        const normalFocalLength = 24
+        const zoomSpeed = props.zoomSpeed || 8.0 // How fast to interpolate between zoom levels
+
+        // Initialize zoom state if not exists
+        if (currentZoom === undefined) {
+          currentZoom = normalFocalLength
+          targetZoom = normalFocalLength
+        }
+
+        // Set target zoom based on aiming state
+        if (isAiming) {
+          targetZoom = adsFocalLength
+        } else {
+          targetZoom = normalFocalLength
+        }
+
+        // Smooth interpolation to target zoom
+        if (Math.abs(currentZoom - targetZoom) > 0.1) {
+          currentZoom += (targetZoom - currentZoom) * zoomSpeed * delta
+
+          if (world.prefs?.setFocalLength) {
+            world.prefs.setFocalLength(currentZoom)
+            // console.log('[pistol] Smooth zoom:', Math.round(currentZoom) + 'mm focal length') // Commented out - zoom is working
+          }
+        }
+
+        // ===== SKIP BONE ROTATION FOR NOW - FOCUS ON SHOOTING AND ZOOMING =====
+        // Bone rotation system is broken - will fix later
+        // if (isAiming) {
+        //   // Bone rotation code removed for now
+        // }
       },
 
       lateUpdate(delta) {
@@ -594,10 +1043,53 @@ createItem(({ player, hooks }) => {
       destroy() {
         // Clean up pistol resources
 
+        // Clear all animations and reset to default
+        clearAllAnimations()
+
+        // Reset zoom state and aiming
+        isAiming = false
+        currentZoomLevelIndex = 0
+        currentZoom = 24 // Reset to normal focal length
+        targetZoom = 24
+
+        // Reset pistol state
+        setPistolState('unequipped')
+
+        // Reset camera to normal focal length
+        if (world?.prefs?.setFocalLength) {
+          world.prefs.setFocalLength(24)
+          console.log('[pistol] Reset focal length to 24mm')
+        }
+
+        // Clear all additive animations from this weapon
+        if (player && player.clearAdditiveAnimations) {
+          player.clearAdditiveAnimations({ fadeDuration: 0.2 })
+          console.log('[pistol] Cleared additive animations')
+        }
+
+        // Reset aim idle animation state
+        aimIdleAnimationUrl = null
+        currentAnimation = null
+
+        // Release zoom control
+        world.emit('weapon:release-zoom-control', { playerId: player.id, source: 'pistol' })
+
+        console.log('[pistol] ✓ Aiming system cleaned up, zoom reset')
+
         if (pistolSkin) {
           world.remove(pistolSkin)
           pistolSkin = null
         }
+
+        // Release ADS button capture
+        if (control) {
+          const adsButton = props.adsButton || 'mouseRight'
+          if (control[adsButton]) {
+            control[adsButton].capture = false
+            console.log('[pistol] Released ADS button:', adsButton)
+          }
+        }
+
         control?.release()
 
         // Clean up all active projectiles to prevent memory leaks
@@ -902,10 +1394,46 @@ app.configure([
     hint: 'Button to reload weapon',
   },
   {
+    key: 'adsButton',
+    type: 'switch',
+    label: 'ADS Toggle Button',
+    initial: 'mouseRight',
+    options: [
+      { label: 'Right Mouse', value: 'mouseRight' },
+      { label: 'Middle Mouse', value: 'mouseMiddle' },
+      { label: 'V Key', value: 'keyV' },
+      { label: 'C Key', value: 'keyC' },
+      { label: 'Z Key', value: 'keyZ' },
+    ],
+    hint: 'Button to toggle aim down sights (zoom) - click to toggle on/off',
+  },
+  {
+    key: 'adsFocalLength',
+    type: 'number',
+    label: 'ADS Focal Length (mm)',
+    initial: 85,
+    min: 24,
+    max: 200,
+    step: 1,
+    dp: 0,
+    hint: 'Camera focal length when aiming (lower = more zoom)',
+  },
+  {
+    key: 'zoomSpeed',
+    type: 'number',
+    label: 'Zoom Speed',
+    initial: 15.0,
+    min: 0.5,
+    max: 30.0,
+    step: 0.5,
+    dp: 1,
+    hint: 'How fast the zoom transitions (higher = faster)',
+  },
+  {
     key: 'requirePointerLock',
     type: 'switch',
     label: 'Require Pointer Lock',
-    initial: true,
+    initial: false,
     options: [
       { label: 'No', value: false },
       { label: 'Yes', value: true },
@@ -921,11 +1449,29 @@ app.configure([
   { key: 'equipEmote', type: 'file', kind: 'emote', label: 'Equip Animation (Short GLB)' },
   { key: 'fireEmote', type: 'file', kind: 'emote', label: 'Fire Animation (Short GLB - Arm Recoil)' },
   { key: 'reloadEmote', type: 'file', kind: 'emote', label: 'Reload Animation (Short GLB - Arm Movement)' },
+  { key: 'pistolIdleEmote', type: 'file', kind: 'emote', label: 'Pistol Idle Animation (Looping GLB - Upper Body)' },
+  { key: 'aimIdleEmote', type: 'file', kind: 'emote', label: 'Aim Idle Animation (Looping GLB - Upper Body)' },
 
   // Animation timing controls
   { key: 'equipDuration', type: 'number', label: 'Equip Duration (seconds)', initial: 0.5, min: 0.1, max: 3, step: 0.1, dp: 1 },
   { key: 'fireDuration', type: 'number', label: 'Fire Duration (seconds)', initial: 0.3, min: 0.1, max: 2, step: 0.05, dp: 2 },
   { key: 'reloadDuration', type: 'number', label: 'Reload Duration (seconds)', initial: 0.917, min: 0.1, max: 5, step: 0.01, dp: 3 },
+  { key: 'pistolIdleDuration', type: 'number', label: 'Pistol Idle Duration (seconds)', initial: 2.0, min: 0.5, max: 10, step: 0.1, dp: 1 },
+  { key: 'aimIdleDuration', type: 'number', label: 'Aim Idle Duration (seconds)', initial: 2.0, min: 0.5, max: 10, step: 0.1, dp: 1, hint: 'How long the aim idle animation loop lasts' },
+
+  // ===== Animation System =====
+  { type: 'section', key: 'animSystemSection', label: 'Animation System' },
+  {
+    key: 'useAdditiveAnimations',
+    type: 'switch',
+    label: 'Use Additive Animations',
+    initial: true,
+    options: [
+      { label: 'Yes (smart blending - poses layer, actions replace)', value: true },
+      { label: 'No (all animations replace movement)', value: false },
+    ],
+    hint: 'Smart mode: poses layer over movement, actions replace movement',
+  },
 
   // ===== Sound Effects =====
   { type: 'section', key: 'soundSection', label: 'Sound Effects' },
@@ -943,6 +1489,71 @@ app.configure([
       { label: 'Yes', value: true },
       { label: 'No', value: false }
     ]
+  },
+
+  // ===== Camera & Aiming =====
+  { type: 'section', key: 'aimingSection', label: 'Aiming & Camera' },
+  {
+    key: 'zoomLevels',
+    type: 'text',
+    label: 'Zoom Levels (comma-separated)',
+    initial: '1.5, 1.0, 0.5, 0.3',
+    hint: 'Camera distances for each zoom level. Cycle with right-click.'
+  },
+  {
+    key: 'aimIntensityByZoom',
+    type: 'switch',
+    label: 'Aim Intensity Mode',
+    initial: 'binary',
+    options: [
+      { label: 'Binary (on/off)', value: 'binary' },
+      { label: 'Progressive (increases with zoom)', value: 'progressive' }
+    ],
+    hint: 'How bone manipulation intensity scales with zoom level'
+  },
+  {
+    key: 'maxSpineRotation',
+    type: 'number',
+    label: 'Max Spine Rotation',
+    initial: 0.1,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    hint: 'Maximum rotation for spine bone (radians)'
+  },
+  {
+    key: 'maxChestRotation',
+    type: 'number',
+    label: 'Max Chest Rotation',
+    initial: 0.15,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    hint: 'Maximum rotation for chest bone (radians)'
+  },
+  {
+    key: 'maxHeadRotation',
+    type: 'number',
+    label: 'Max Head Rotation',
+    initial: 0.2,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    hint: 'Maximum rotation for head bone (radians)'
+  },
+  {
+    key: 'maxArmRotation',
+    type: 'number',
+    label: 'Max Arm Rotation',
+    initial: 0.3,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    dp: 2,
+    hint: 'Maximum rotation for arm bones (radians)'
   },
 
   // ===== Admin Tools =====

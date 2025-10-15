@@ -42,7 +42,7 @@ export class ClientCameraControls extends System {
     this.debugDOF = false // Debug logging
 
     // ADS-style zoom
-    this.adsZoomEnabled = true // Enable ADS by default
+    this.adsZoomEnabled = true // Enabled by default
     this.isAiming = false
     this.baseFocalLength = 24 // Will be set properly in init()
     this.adsZoomFocalLength = 85 // Zoomed in focal length
@@ -78,7 +78,7 @@ export class ClientCameraControls extends System {
     this.focusRangeFarFactor = 3.0
 
     // One-click autofocus using right mouse (outside build mode)
-    this.rightClickAutofocus = true
+    this.rightClickAutofocus = false // Disabled - let weapons use right-click
   }
 
   init() {
@@ -196,6 +196,11 @@ export class ClientCameraControls extends System {
     if (changes.reticleFocusDelay) this.reticleFocusDelay = changes.reticleFocusDelay.value
     if (changes.scrollZoomEnabled) this.enableScrollZoom = changes.scrollZoomEnabled.value
     if (changes.zoomSpeed) this.zoomSpeed = changes.zoomSpeed.value
+
+    // Apply focal length changes from apps
+    if (changes.focalLength) {
+      this.applyFocalLength(changes.focalLength.value)
+    }
   }
 
   update(delta) {
@@ -216,62 +221,39 @@ export class ClientCameraControls extends System {
       }
     }
 
-    // Right-click autofocus (when not in build mode)
-    if (this.enabled && this.rightClickAutofocus && this.control && !inBuildMode) {
-      const rightPressed = this.control?.mouseRight?.pressed === true
-      if (rightPressed) {
-        // Capture to avoid context menu
-        if (this.control.mouseRight.capture !== undefined) this.control.mouseRight.capture = true
-        const distance = this.raycastFocusDistance() || this.getFocusDistanceToPlayer() || 10
-        this.targetFocusDistance = distance
-        // Snap focus faster for explicit autofocus
-        this.currentFocusDistance = distance
-        this.setDOFFocusDistance(distance)
-        if (this.debugDOF) console.log(`Right-click autofocus: ${distance.toFixed(2)}`)
-      }
-    }
+    // DISABLED: Right-click autofocus moved to weapon control
+    // Weapons can implement their own autofocus if needed
+    // if (this.enabled && this.rightClickAutofocus && this.control && !inBuildMode) {
+    //   ... autofocus logic removed ...
+    // }
 
-    // Only process ADS if not in build mode
-    if (this.enabled && this.adsZoomEnabled && this.control && !inBuildMode) {
-      // Check if right mouse button is currently down (not pressed/released)
-      // Make sure it's explicitly true, not undefined or truthy
-      const rightMouseDown = this.control?.mouseRight?.down === true
-
-      // Check if aiming state changed
-      if (rightMouseDown && !this.isAiming) {
-        // Start aiming
-        this.isAiming = true
-        this.targetFocalLength = this.adsZoomFocalLength
-
-        // Save current bokeh and enhance it
-        this.normalBokehScale = this.world.prefs.dofBokehScale || 1
-        this.world.prefs.setDOFBokehScale(this.normalBokehScale * this.adsBokehMultiplier)
-
-        // Do not auto-enable DOF; leave to user preference
-
-        // Capture right mouse to prevent context menu
-        if (this.control.mouseRight.capture !== undefined) {
-          this.control.mouseRight.capture = true
+    // ADS zoom (right-click) - DISABLED - weapons handle their own zoom
+    if (false && this.enabled && this.adsZoomEnabled && this.control && !inBuildMode) {
+      if (this.control.mouseRight?.down) {
+        if (!this.isAiming) {
+          this.isAiming = true
+          this.targetFocalLength = this.adsZoomFocalLength
+          this.world.prefs.setDOFBokehScale(this.adsBokehMultiplier)
+          // Don't capture right-click - let weapons handle it
+          // if (this.control.mouseRight.capture !== undefined) {
+          //   this.control.mouseRight.capture = true
+          // }
+          if (this.debugDOF) {
+            console.log('ADS: Started aiming')
+          }
         }
-
-        if (this.debugDOF) {
-          console.log('ADS: Zooming in')
-        }
-      } else if (!rightMouseDown && this.isAiming) {
-        // Stop aiming
-        this.isAiming = false
-        this.targetFocalLength = this.baseFocalLength
-
-        // Restore normal bokeh
-        this.world.prefs.setDOFBokehScale(this.normalBokehScale)
-
-        // Release capture
-        if (this.control.mouseRight.capture !== undefined) {
-          this.control.mouseRight.capture = false
-        }
-
-        if (this.debugDOF) {
-          console.log('ADS: Zooming out')
+      } else {
+        if (this.isAiming) {
+          this.isAiming = false
+          this.targetFocalLength = this.baseFocalLength
+          this.world.prefs.setDOFBokehScale(this.normalBokehScale)
+          // Don't capture right-click - let weapons handle it
+          // if (this.control.mouseRight.capture !== undefined) {
+          //   this.control.mouseRight.capture = false
+          // }
+          if (this.debugDOF) {
+            console.log('ADS: Stopped aiming')
+          }
         }
       }
     }
@@ -317,9 +299,9 @@ export class ClientCameraControls extends System {
         this.zoomStops && this.zoomStops.length >= 2
           ? this.zoomStops
           : [
-              { t: 0, focus: 3, range: 1.0, bokeh: 1.0 },
-              { t: 1, focus: Math.min(60, camFar * 0.5), range: Math.min(18, camFar * 0.4), bokeh: 0.5 },
-            ]
+            { t: 0, focus: 3, range: 1.0, bokeh: 1.0 },
+            { t: 1, focus: Math.min(60, camFar * 0.5), range: Math.min(18, camFar * 0.4), bokeh: 0.5 },
+          ]
       let s0 = stops[0]
       let s1 = stops[stops.length - 1]
       for (let i = 0; i < stops.length - 1; i++) {

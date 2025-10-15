@@ -219,6 +219,24 @@ export class PlayerLocal extends Entity {
 
     this.world.setHot(this, true)
     this.world.emit('ready', true)
+
+    // Track if a weapon is controlling zoom
+    this.weaponControlledZoom = false
+
+    // Listen for weapon zoom control requests
+    this.world.on('weapon:take-zoom-control', (data) => {
+      if (data.playerId === this.id) {
+        this.weaponControlledZoom = true
+        console.log('[PlayerLocal] Weapon took zoom control:', data.source)
+      }
+    })
+
+    this.world.on('weapon:release-zoom-control', (data) => {
+      if (data.playerId === this.id) {
+        this.weaponControlledZoom = false
+        console.log('[PlayerLocal] Weapon released zoom control:', data.source)
+      }
+    })
   }
 
   getAvatarUrl() {
@@ -273,11 +291,11 @@ export class PlayerLocal extends Entity {
       Layers.player.group,
       Layers.player.mask,
       PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
-        PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
-        PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
-        PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
+      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
+      PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
+      PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
+      PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
+      PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
       0
     )
     shape.setContactOffset(0.08) // just enough to fire contacts (because we muck with velocity sometimes standing on a thing doesn't contact)
@@ -348,7 +366,14 @@ export class PlayerLocal extends Entity {
     this.control.camera.write = true
     this.control.camera.position.copy(this.cam.position)
     this.control.camera.quaternion.copy(this.cam.quaternion)
-    this.control.camera.zoom = this.cam.zoom
+
+    // Only set zoom if no weapon is controlling it
+    if (!this.weaponControlledZoom) {
+      this.control.camera.zoom = this.cam.zoom
+    } else {
+      // When weapon controls zoom, sync our internal cam.zoom with control.camera.zoom
+      this.cam.zoom = this.control.camera.zoom
+    }
     // this.control.setActions([{ type: 'space', label: 'Jump / Double-Jump' }])
     // this.control.setActions([{ type: 'escape', label: 'Menu' }])
   }
@@ -818,8 +843,19 @@ export class PlayerLocal extends Entity {
       this.cam.rotation.x = clamp(this.cam.rotation.x, -89 * DEG2RAD, 89 * DEG2RAD)
     }
 
-    // zoom camera if scrolling wheel (skip if free-flying camera is active)
-    if (!isXR && !activeCamera?.freeFlying) {
+    // zoom camera if scrolling wheel (skip if free-flying camera is active or weapon has custom zoom)
+    let hasCustomZoom = false
+    this.world.emit('elemental-core:has-custom-zoom', this.id, (result) => {
+      hasCustomZoom = result
+    })
+
+    // Debug log once per second
+    if (hasCustomZoom && (!this._lastCustomZoomLog || Date.now() - this._lastCustomZoomLog > 1000)) {
+      console.log('[PlayerLocal] Skipping scroll zoom - weapon has custom zoom')
+      this._lastCustomZoomLog = Date.now()
+    }
+
+    if (!isXR && !activeCamera?.freeFlying && !hasCustomZoom) {
       this.cam.zoom += -this.control.scrollDelta.value * ZOOM_SPEED * delta
       this.cam.zoom = clamp(this.cam.zoom, MIN_ZOOM, MAX_ZOOM)
     }
@@ -1362,5 +1398,27 @@ export class PlayerLocal extends Entity {
 
   setStamina(stamina) {
     this.stamina = Math.max(0, Math.min(100, stamina))
+  }
+
+  // Apply additive animation that layers over locomotion
+  applyAdditiveAnimation(url, options = {}) {
+    if (!this.avatar?.instance?.setAdditiveAnimation) {
+      console.warn('[Player] Additive animations not supported by avatar')
+      return
+    }
+
+    return this.avatar.instance.setAdditiveAnimation(url, options)
+  }
+
+  // Stop additive animation
+  stopAdditiveAnimation(url, options = {}) {
+    if (!this.avatar?.instance?.stopAdditiveAnimation) return
+    this.avatar.instance.stopAdditiveAnimation(url, options?.fadeDuration)
+  }
+
+  // Clear all additive animations
+  clearAdditiveAnimations(options = {}) {
+    if (!this.avatar?.instance?.setAdditiveAnimation) return
+    this.avatar.instance.setAdditiveAnimation(null, options)
   }
 }
