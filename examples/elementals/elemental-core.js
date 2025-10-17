@@ -18,6 +18,9 @@ if (world.isServer) {
   }
   //   items: [{ id, qty }],
   // }
+  const ammoCounts = {
+    // [playerId]: { [itemId]: { ammo, maxAmmo } }
+  }
   function getInv(playerId) {
     let inv = invs[playerId]
     if (!inv) {
@@ -31,6 +34,14 @@ if (world.isServer) {
     }
     return inv
   }
+  function getAmmoCounts(playerId) {
+    let ammo = ammoCounts[playerId]
+    if (!ammo) {
+      ammo = {}
+      ammoCounts[playerId] = ammo
+    }
+    return ammo
+  }
   function save(playerId) {
     const inv = getInv(playerId)
     const key = `elemental-core:items:${playerId}`
@@ -40,9 +51,11 @@ if (world.isServer) {
   // when players enter send them their inventory
   world.on('enter', e => {
     const inv = getInv(e.playerId)
+    const ammo = getAmmoCounts(e.playerId)
     app.sendTo(e.playerId, 'init', {
       specs,
       ...inv,
+      ammoCounts: ammo,
     })
     // let active item know to activate for player
     const item = inv.items[inv.active]
@@ -168,6 +181,16 @@ if (world.isServer) {
     }
     app.emit('elemental:balance-response', [playerId, itemId, balance])
   })
+  // listen for ammo count updates from weapons
+  world.on('elemental-item:ammo-update', data => {
+    const { playerId, itemId, ammo, maxAmmo } = data
+    const ammoData = getAmmoCounts(playerId)
+    ammoData[itemId] = { ammo, maxAmmo }
+    console.log(`[core] Ammo update for ${playerId}: ${itemId} = ${ammo}/${maxAmmo}`)
+
+    // Send updated ammo count to client
+    app.sendTo(playerId, 'ammoUpdate', { itemId, ammo, maxAmmo })
+  })
   world.on('elemental-item:take', ([playerId, itemId, qty]) => {
     const inv = getInv(playerId)
     // ensure we have enough
@@ -232,9 +255,11 @@ if (world.isServer) {
   const players = world.getPlayers()
   for (const player of players) {
     const inv = getInv(player.id)
+    const ammo = getAmmoCounts(player.id)
     app.sendTo(player.id, 'init', {
       specs,
       ...inv,
+      ammoCounts: ammo,
     })
     // let active item know to activate for player
     const item = inv.items[inv.active]
@@ -379,6 +404,7 @@ if (world.isClient) {
   let open
   let control
   let selected = null
+  let ammoCounts = {}
   function setActive(idx) {
     if (selected) {
       slots[selected].$item.borderColor = null
@@ -431,6 +457,7 @@ if (world.isClient) {
     specs = data.specs
     items = data.items
     active = data.active
+    ammoCounts = data.ammoCounts || {}
     for (let i = 0; i < items.length; i++) {
       const slot = slots[i]
       if (!slot) {
@@ -446,7 +473,13 @@ if (world.isClient) {
           slot.$img.src = null
           console.warn('[core] No spec or icon found for item:', item.id)
         }
-        slot.$qty.value = item.qty > 1 ? item.qty : ''
+        // Show ammo count for weapons, regular quantity for other items
+        const ammoData = ammoCounts[item.id]
+        if (ammoData && spec && spec.showAmmoCount) {
+          slot.$qty.value = `${ammoData.ammo}/${ammoData.maxAmmo}`
+        } else {
+          slot.$qty.value = item.qty > 1 ? item.qty : ''
+        }
       } else {
         slot.$img.src = null
         slot.$qty.value = ''
@@ -486,12 +519,34 @@ if (world.isClient) {
         slots[idx].$img.src = null
         console.warn('[core] No spec or icon found for item:', item.id)
       }
-      slots[idx].$qty.value = item.qty > 1 ? item.qty : ''
+      // Show ammo count for weapons, regular quantity for other items
+      const ammoData = ammoCounts[item.id]
+      if (ammoData && spec && spec.showAmmoCount) {
+        slots[idx].$qty.value = `${ammoData.ammo}/${ammoData.maxAmmo}`
+      } else {
+        slots[idx].$qty.value = item.qty > 1 ? item.qty : ''
+      }
     } else {
       slots[idx].$img.src = null
       slots[idx].$qty.value = ''
     }
     console.log('items', items)
+  })
+  app.on('ammoUpdate', ({ itemId, ammo, maxAmmo }) => {
+    if (!init) return
+    console.log('ammoUpdate', itemId, ammo, maxAmmo)
+    ammoCounts[itemId] = { ammo, maxAmmo }
+
+    // Update all slots that have this item
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item && item.id === itemId) {
+        const spec = specs[item.id]
+        if (spec && spec.showAmmoCount) {
+          slots[i].$qty.value = `${ammo}/${maxAmmo}`
+        }
+      }
+    }
   })
   app.on('update', delta => {
     if (!init) return
