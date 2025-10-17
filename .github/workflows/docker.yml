@@ -9,6 +9,7 @@ on:
       - 'dev'
       - 'solana-v2'
       - 'refinedCtrls'
+      - 'crtrdg'
     tags:
       - 'v*.*.*'
 
