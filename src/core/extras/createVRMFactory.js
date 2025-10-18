@@ -928,12 +928,12 @@ export function createVRMFactory(glb, setupMaterial) {
           updateLocomotion(delta)
           // Debug: Log when locomotion is running (1% chance per frame)
           if (Math.random() < 0.01) {
-            console.log(`[VRM] Locomotion running, disabled: ${locomotionDisabled}, currentEmote: ${currentEmote?.url || 'none'}`)
+            // console.log(`[VRM] Locomotion running, disabled: ${locomotionDisabled}, currentEmote: ${currentEmote?.url || 'none'}`)
           }
         } else {
           // Debug: Log when locomotion is disabled
           if (Math.random() < 0.01) {
-            console.log(`[VRM] Locomotion DISABLED - currentEmote: ${currentEmote?.url || 'none'}`)
+            // console.log(`[VRM] Locomotion DISABLED - currentEmote: ${currentEmote?.url || 'none'}`)
           }
         }
         // facial expressions per frame
@@ -1025,12 +1025,12 @@ export function createVRMFactory(glb, setupMaterial) {
             break
           }
         }
-        console.log(`[VRM-DEBUG] Debug flag enabled: ${debugEnabled}, additiveAnims: ${currentAdditiveAnims.size}`)
+        // console.log(`[VRM-DEBUG] Debug flag enabled: ${debugEnabled}, additiveAnims: ${currentAdditiveAnims.size}`)
       }
 
       // DEBUG: Log all bone names to help identify the correct patterns
       if (Math.random() < 0.001) { // 0.1% chance per frame to avoid spam
-        console.log(`[VRM-DEBUG] All bone names:`, skeleton.bones.map(bone => bone.name).filter(name => name).slice(0, 20))
+        // console.log(`[VRM-DEBUG] All bone names:`, skeleton.bones.map(bone => bone.name).filter(name => name).slice(0, 20))
       }
 
       // spring bones per frame (not rate-limited): drive orig with clone pose, simulate, mirror back
@@ -1270,7 +1270,7 @@ export function createVRMFactory(glb, setupMaterial) {
         } else {
           // Debug logging when no conflict (1% chance per frame)
           if (Math.random() < 0.01) {
-            console.log(`[VRM] No conflict for ${bone.name}: effectiveLocoActive=${effectiveLocoActive}, hasAdditiveAnims=${hasActiveAdditiveAnimations}, baseLocomotionWeight=${baseLocomotionWeight.toFixed(2)}`)
+            // console.log(`[VRM] No conflict for ${bone.name}: effectiveLocoActive=${effectiveLocoActive}, hasAdditiveAnims=${hasActiveAdditiveAnimations}, baseLocomotionWeight=${baseLocomotionWeight.toFixed(2)}`)
           }
         }
 
