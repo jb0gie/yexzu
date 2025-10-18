@@ -21,35 +21,52 @@ export class ClientWeb3 extends System {
     this.listeners = new Map()
   }
 
-  init({
+  async init(options = {}) {
+    // Initialize with default configuration
+    // The options parameter comes from World.init() and contains storage, assetsDir, etc.
+    // We ignore those and use our own Web3-specific defaults
+    this.initWeb3({})
+  }
+
+  initWeb3({
     policies = null,
     chains = null,
     defaultChainId = constants.StarknetChainId.SN_SEPOLIA,
     keychainUrl = 'https://x.cartridge.gg',
   } = {}) {
-    const config = {
-      keychainUrl,
-      defaultChainId,
-    }
+    try {
+      const config = {
+        keychainUrl,
+        defaultChainId,
+      }
 
-    // Add policies if provided
-    if (policies) {
-      config.policies = policies
-    }
+      // Add policies if provided
+      if (policies) {
+        config.policies = policies
+      }
 
-    // Add custom chain configuration if provided
-    if (chains) {
-      config.chains = chains
-    } else {
-      // Default chains
-      config.chains = [
-        { rpcUrl: 'https://api.cartridge.gg/x/starknet/sepolia' },
-        { rpcUrl: 'https://api.cartridge.gg/x/starknet/mainnet' },
-      ]
-    }
+      // Add custom chain configuration if provided
+      if (chains) {
+        config.chains = chains
+      } else {
+        // Default chains
+        config.chains = [
+          { rpcUrl: 'https://api.cartridge.gg/x/starknet/sepolia' },
+          { rpcUrl: 'https://api.cartridge.gg/x/starknet/mainnet' },
+        ]
+      }
 
-    // Initialize controller
-    this.controller = new Controller(config)
+      // Initialize controller
+      this.controller = new Controller(config)
+      console.log('[ClientWeb3] Controller created successfully')
+    } catch (error) {
+      console.error('[ClientWeb3] Failed to create controller:', error)
+      // Create a mock controller for graceful degradation
+      this.controller = {
+        connect: async () => { throw new Error('Web3 not available') },
+        disconnect: async () => { }
+      }
+    }
 
     // Add web3 API to world
     this.world.web3 = {
@@ -69,6 +86,9 @@ export class ClientWeb3 extends System {
       // Event listeners
       on: this.on,
       off: this.off,
+
+      // Configuration
+      init: this.initWeb3,
 
       // Direct controller access for advanced usage
       getController: () => this.controller,

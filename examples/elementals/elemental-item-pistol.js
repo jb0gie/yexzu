@@ -12,6 +12,9 @@ const v1 = new Vector3()
 const v2 = new Vector3()
 const v3 = new Vector3()
 
+// ===== GLOBAL VARIABLES =====
+let pickupAction = null // Pickup action for the pistol
+
 createItem(({ player, hooks }) => {
   // ===== CLIENT & SERVER SHARED =====
   let pistolSkin // The main SkinnedMesh (CombatPistolSkin)
@@ -321,17 +324,17 @@ createItem(({ player, hooks }) => {
 
   // Helper function to play pistol grip animation
   function playPistolGripAnimation() {
-    console.log('[pistol] ===== PLAY PISTOL GRIP ANIMATION DEBUG =====')
-    console.log('[pistol] Playing pistol grip animation')
+    // console.log('[pistol] ===== PLAY PISTOL GRIP ANIMATION DEBUG =====')
+    // console.log('[pistol] Playing pistol grip animation')
 
     // Play pistol idle animation if available
     const pistolIdleUrl = getAnimationUrl('pistolIdle')
-    console.log('[pistol] pistolIdleUrl:', pistolIdleUrl)
-    console.log('[pistol] player.applyAdditiveAnimation exists:', !!player.applyAdditiveAnimation)
+    // console.log('[pistol] pistolIdleUrl:', pistolIdleUrl)
+    // console.log('[pistol] player.applyAdditiveAnimation exists:', !!player.applyAdditiveAnimation)
 
     if (pistolIdleUrl && player.applyAdditiveAnimation) {
-      console.log('[pistol] Applying grip pose via additive system')
-      console.log('[pistol] About to call player.applyAdditiveAnimation with URL:', pistolIdleUrl)
+      // console.log('[pistol] Applying grip pose via additive system')
+      // console.log('[pistol] About to call player.applyAdditiveAnimation with URL:', pistolIdleUrl)
 
       try {
         player.applyAdditiveAnimation(pistolIdleUrl, {
@@ -340,44 +343,44 @@ createItem(({ player, hooks }) => {
           fadeDuration: 0.3,
           debugArmRotations: props.debugArmRotations === true
         })
-        console.log('[pistol] Grip pose applied via additive system - SUCCESS')
+        // console.log('[pistol] Grip pose applied via additive system - SUCCESS')
       } catch (error) {
         console.error('[pistol] Error applying grip pose:', error)
       }
     } else {
-      console.log('[pistol] No pistolIdle animation or additive system unavailable')
+      // console.log('[pistol] No pistolIdle animation or additive system unavailable')
       if (!pistolIdleUrl) {
-        console.log('[pistol] No pistolIdle animation configured - letting natural locomotion continue')
+        // console.log('[pistol] No pistolIdle animation configured - letting natural locomotion continue')
       }
       if (!player.applyAdditiveAnimation) {
-        console.log('[pistol] Additive animation system unavailable')
+        // console.log('[pistol] Additive animation system unavailable')
       }
     }
-    console.log('[pistol] ===== END PLAY PISTOL GRIP ANIMATION DEBUG =====')
+    // console.log('[pistol] ===== END PLAY PISTOL GRIP ANIMATION DEBUG =====')
   }
 
   // Helper function to play aim animation
   function playAimAnimation() {
-    console.log('[pistol] Playing aim animation')
+    // console.log('[pistol] Playing aim animation')
 
     // Play aim idle animation
     const aimIdleUrl = getAnimationUrl('aimIdle')
     if (aimIdleUrl && player.applyAdditiveAnimation) {
-      console.log('[pistol] Applying aim pose via additive system')
+      // console.log('[pistol] Applying aim pose via additive system')
       player.applyAdditiveAnimation(aimIdleUrl, {
         weight: 1.0,
         loop: true,
         fadeDuration: 0.3,
         debugArmRotations: props.debugArmRotations === true
       })
-      console.log('[pistol] Aim pose applied via additive system')
+      // console.log('[pistol] Aim pose applied via additive system')
     } else {
-      console.log('[pistol] No aimIdle animation or additive system unavailable')
+      // console.log('[pistol] No aimIdle animation or additive system unavailable')
       if (!aimIdleUrl) {
-        console.log('[pistol] No aimIdle animation configured')
+        // console.log('[pistol] No aimIdle animation configured')
       }
       if (!player.applyAdditiveAnimation) {
-        console.log('[pistol] Additive animation system unavailable')
+        // console.log('[pistol] Additive animation system unavailable')
       }
     }
   }
@@ -487,17 +490,26 @@ createItem(({ player, hooks }) => {
     audio.volume = 0.8
     audio.group = 'sfx'
 
+    // Configure spatial audio properties for better 3D sound
+    audio.distanceModel = 'exponential'
+    audio.refDistance = 1
+    audio.maxDistance = 50
+    audio.rolloffFactor = 2
+
     // Position at muzzle if available, otherwise at pistol position
     if (muzzleBone && muzzleBone.matrixWorld && world.isClient) {
       const muzzlePos = new Vector3()
       muzzlePos.setFromMatrixPosition(muzzleBone.matrixWorld)
       audio.position.copy(muzzlePos)
+      console.log(`[pistol] Playing spatial sound at muzzle position:`, muzzlePos.toArray())
     } else if (pistolSkin) {
       audio.position.copy(pistolSkin.position)
+      console.log(`[pistol] Playing spatial sound at pistol position:`, pistolSkin.position.toArray())
     }
 
     world.add(audio)
     audio.play()
+    console.log(`[pistol] Spatial gunshot sound played - other players should hear this!`)
 
     // Auto-cleanup after sound finishes
     setTimeout(() => {
@@ -538,6 +550,7 @@ createItem(({ player, hooks }) => {
       world.remove(muzzleFlash)
     }, 500)
   }
+
 
   // Helper function to create shell casing ejection
   function createShellEjection() {
@@ -780,6 +793,8 @@ createItem(({ player, hooks }) => {
     client: {
       init() {
         console.log('[pistol] VERSION 2.0 - Animation-only system initialized for player:', player.id)
+
+
         // Parse zoom levels from config
         zoomLevels = (props.zoomLevels || '1.5, 1.0, 0.5, 0.3')
           .split(',')
@@ -837,6 +852,14 @@ createItem(({ player, hooks }) => {
 
         world.add(pistolSkin)
         console.log('[pistol] Pistol instance created and added to world')
+
+        // ===== HIDE PICKUP ACTION when pistol is equipped =====
+        if (pickupAction) {
+          pickupAction.active = false
+          console.log('[pistol] Hiding pickup action (pistol equipped)')
+        } else {
+          console.log('[pistol] Pickup action not found when trying to hide')
+        }
 
         // ===== DEBUG: Check for animations on pistol model =====
         console.log('[pistol] Checking for animations on pistol model...')
@@ -1013,17 +1036,17 @@ createItem(({ player, hooks }) => {
         const canFire = requirePointerLock ? pointerLocked : true
 
         // Debug control input availability (reduced logging)
-        if (isAiming && fireInput && fireInput.pressed) {
-          console.log('[pistol] Fire button pressed while aiming - fireInput.pressed:', fireInput.pressed, 'canFire:', canFire)
-        }
+        // if (isAiming && fireInput && fireInput.pressed) {
+        //   console.log('[pistol] Fire button pressed while aiming - fireInput.pressed:', fireInput.pressed, 'canFire:', canFire)
+        // }
 
         // Debug firing conditions
-        if (fireInput && fireInput.pressed) {
-          console.log('[pistol] FIRE ATTEMPT - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'requirePointerLock:', requirePointerLock, 'pointerLocked:', pointerLocked, 'isAiming:', isAiming, 'ammo:', ammo)
-        }
+        // if (fireInput && fireInput.pressed) {
+        //   console.log('[pistol] FIRE ATTEMPT - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'requirePointerLock:', requirePointerLock, 'pointerLocked:', pointerLocked, 'isAiming:', isAiming, 'ammo:', ammo)
+        // }
 
         if (fireInput && fireInput.pressed && canFire) {
-          console.log('[pistol] FIRE TRIGGERED - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'isAiming:', isAiming)
+          // console.log('[pistol] FIRE TRIGGERED - button:', fireButton, 'pressed:', fireInput.pressed, 'canFire:', canFire, 'isAiming:', isAiming)
           const now = world.getTime()
 
           if (now - lastFireTime > FIRE_RATE) {
@@ -1057,18 +1080,18 @@ createItem(({ player, hooks }) => {
             }
 
             // Send fire event to server
-            console.log(`[pistol] CLIENT: Sending fire event to server - ammo: ${ammo}`)
+            // console.log(`[pistol] CLIENT: Sending fire event to server - ammo: ${ammo}`)
             hooks.call('fire', {
               origin: origin.toArray(),
               dir: dir.toArray(),
               ammo,
             })
             lastFireTime = now
-            console.log(`[pistol] CLIENT: Fire event sent`)
+            // console.log(`[pistol] CLIENT: Fire event sent`)
 
             // Visual feedback
             ammo -= 1
-            console.log(`[pistol] BANG! Ammo: ${ammo}/${props.maxAmmo || 100}`)
+            // console.log(`[pistol] BANG! Ammo: ${ammo}/${props.maxAmmo || 100}`)
 
             // Notify core inventory of ammo change
             if (props.showAmmoCount) {
@@ -1172,7 +1195,7 @@ createItem(({ player, hooks }) => {
           const isEquipping = currentAnimation && currentAnimation.includes('equip')
           if (!isEquipping && adsInput.pressed) {
             isAiming = !isAiming
-            console.log('[pistol] ADS toggled:', isAiming ? 'Aiming' : 'Not aiming')
+            // console.log('[pistol] ADS toggled:', isAiming ? 'Aiming' : 'Not aiming')
 
             // Handle aim animations with proper state management
             if (isAiming) {
@@ -1425,6 +1448,14 @@ createItem(({ player, hooks }) => {
         if (pistolSkin) {
           world.remove(pistolSkin)
           pistolSkin = null
+        }
+
+        // Show pickup action again when pistol is unequipped
+        if (pickupAction) {
+          pickupAction.active = true
+          console.log('[pistol] Showing pickup action (pistol unequipped)')
+        } else {
+          console.log('[pistol] Pickup action not found when trying to show')
         }
 
         // Release ADS button capture
@@ -2047,6 +2078,37 @@ app.configure([
     hint: 'Maximum rotation for arm bones (radians)'
   },
 
+  // ===== Pickup Action =====
+  { type: 'section', key: 'pickupSection', label: 'Pickup Action' },
+  {
+    key: 'enablePickupAction',
+    type: 'switch',
+    label: 'Enable Pickup Action',
+    initial: true,
+    options: [
+      { label: 'Yes', value: true },
+      { label: 'No', value: false },
+    ],
+  },
+  {
+    key: 'pickupActionDistance',
+    type: 'number',
+    label: 'Pickup Distance (meters)',
+    initial: 3,
+    min: 1,
+    max: 10,
+    step: 0.5,
+  },
+  {
+    key: 'pickupActionDuration',
+    type: 'number',
+    label: 'Pickup Duration (seconds)',
+    initial: 0.5,
+    min: 0.1,
+    max: 3,
+    step: 0.1,
+  },
+
   // ===== Admin Tools =====
   { type: 'section', key: 'adminSection', label: 'Admin' },
   {
@@ -2208,6 +2270,29 @@ function createItem(createInstance) {
 
   if (world.isClient) {
     const localPlayer = world.getPlayer()
+
+    // Create pickup action at world level (only once for local player)
+    if (props.enablePickupAction && localPlayer && localPlayer.local && !pickupAction) {
+      pickupAction = app.create('action')
+      pickupAction.label = '[ PICK UP PISTOL ]'
+      pickupAction.distance = props.pickupActionDistance || 3
+      pickupAction.duration = props.pickupActionDuration || 0.5
+      pickupAction.position.copy(app.position)
+      pickupAction.position.y += 0.2
+      pickupAction.onTrigger = () => {
+        console.log('[pistol] Pickup action triggered!')
+        const p = world.getPlayer()
+        if (!p) {
+          console.warn('[pistol] No local player found for pickup')
+          return
+        }
+        app.send('give', p.id)
+        world.chat({ message: `Picked up ${props.name || 'Pistol'}!` })
+        pickupAction.active = false
+      }
+      world.add(pickupAction)
+      console.log('[pistol] Pickup action created at world level')
+    }
 
     let state = app.state
     if (state.ready) {
