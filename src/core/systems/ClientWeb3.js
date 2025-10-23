@@ -1,5 +1,5 @@
 import { System } from './System'
-import Controller from '@cartridge/controller'
+import ControllerProvider from '@cartridge/controller'
 import { constants } from 'starknet'
 
 /**
@@ -8,6 +8,9 @@ import { constants } from 'starknet'
  * - Runs on the client
  * - Provides Cartridge Controller integration for StarkNet wallet functionality
  * - Exposes wallet methods through world.web3 API
+ *
+ * IMPORTANT: This system operates at the browser level, not within the SES sandbox
+ * Apps access this through the world.web3 API which is injected into their environment
  *
  */
 export class ClientWeb3 extends System {
@@ -19,13 +22,27 @@ export class ClientWeb3 extends System {
     this.address = null
     this.networkId = null
     this.listeners = new Map()
+    this.isInitializing = false
+    this.initError = null
   }
 
   async init(options = {}) {
-    // Initialize with default configuration
-    // The options parameter comes from World.init() and contains storage, assetsDir, etc.
-    // We ignore those and use our own Web3-specific defaults
-    this.initWeb3({})
+    try {
+      console.log('[ClientWeb3] Initializing Web3 system...')
+      console.log('[ClientWeb3] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Unknown')
+
+      // We operate at the system level, not inside SES sandbox
+      this.isInitializing = true
+      this.initWeb3({})
+      console.log('[ClientWeb3] Web3 system initialized successfully')
+    } catch (error) {
+      console.error('[ClientWeb3] Failed to initialize Web3 system:', error)
+      this.initError = error
+      // Create a functioning mock API for graceful degradation
+      this.createFunctionalMockAPI()
+    } finally {
+      this.isInitializing = false
+    }
   }
 
   initWeb3({
@@ -35,6 +52,13 @@ export class ClientWeb3 extends System {
     keychainUrl = 'https://x.cartridge.gg',
   } = {}) {
     try {
+      console.log('[ClientWeb3] Starting controller initialization...')
+
+      // Check if we're in a browser environment with required APIs
+      if (typeof window === 'undefined') {
+        throw new Error('Cartridge Controller requires browser environment (window object not found)')
+      }
+
       const config = {
         keychainUrl,
         defaultChainId,
@@ -56,23 +80,73 @@ export class ClientWeb3 extends System {
         ]
       }
 
-      // Initialize controller
-      this.controller = new Controller(config)
-      console.log('[ClientWeb3] Controller created successfully')
+      console.log('[ClientWeb3] Environment check - window exists:', typeof window !== 'undefined')
+      console.log('[ClientWeb3] Environment check - localStorage exists:', typeof localStorage !== 'undefined')
+      console.log('[ClientWeb3] Environment check - WebSocket exists:', typeof WebSocket !== 'undefined')
+
+      // Initialize controller with better error handling
+      console.log('[ClientWeb3] Creating ControllerProvider...')
+      this.controller = new ControllerProvider(config)
+      console.log('[ClientWeb3] ControllerProvider created successfully')
+
     } catch (error) {
       console.error('[ClientWeb3] Failed to create controller:', error)
-      // Create a mock controller for graceful degradation
+      console.error('[ClientWeb3] Error name:', error.name)
+      console.error('[ClientWeb3] Error message:', error.message)
+      console.error('[ClientWeb3] Error stack:', error.stack)
+
+      // Create a mock controller that provides helpful error messages
       this.controller = {
-        connect: async () => { throw new Error('Web3 not available') },
-        disconnect: async () => { }
+        connect: async () => {
+          const errorMsg = this.getControllerInitError()
+          throw new Error(`Controller initialization failed: ${errorMsg}`)
+        },
+        disconnect: async () => { },
+        isConnected: () => false,
+        getAddress: () => null,
+        getChainId: () => null,
+        execute: async () => {
+          throw new Error('Controller not initialized - cannot execute transactions')
+        }
       }
+
+      // Still create the API so world.web3 exists with meaningful error messages
+      this.createFunctionalMockAPI()
+      return
     }
 
-    // Add web3 API to world
+    // Create the world.web3 API with proper binding
+    this.createWorldWeb3API()
+    console.log('[ClientWeb3] Web3 API created and attached to world')
+  }
+
+  getControllerInitError() {
+    if (this.initError) {
+      return this.initError.message
+    }
+    if (typeof window === 'undefined') {
+      return 'Browser environment required'
+    }
+    return 'Unknown initialization error'
+  }
+
+  createFunctionalMockAPI() {
+    console.log('[ClientWeb3] Creating functional mock API for debugging')
+
+    // Create a functional mock that provides helpful debugging information
     this.world.web3 = {
       // Connection methods
-      connect: this.connect,
-      disconnect: this.disconnect,
+      connect: async () => {
+        const errorMsg = this.getControllerInitError()
+        throw new Error(`Web3 system initialization failed: ${errorMsg}. This usually means the Cartridge Controller could not be initialized in the browser environment.`)
+      },
+      disconnect: async () => {
+        this.isConnected = false
+        this.account = null
+        this.address = null
+        this.networkId = null
+        this.emit('disconnected')
+      },
       isConnected: () => this.isConnected,
 
       // Account info
@@ -81,7 +155,9 @@ export class ClientWeb3 extends System {
       getAccount: () => this.account,
 
       // Transaction methods
-      execute: this.execute,
+      execute: async (calls, options = {}) => {
+        throw new Error(`Controller not initialized - cannot execute transactions. ${this.getControllerInitError()}`)
+      },
 
       // Event listeners
       on: this.on,
@@ -92,9 +168,54 @@ export class ClientWeb3 extends System {
 
       // Direct controller access for advanced usage
       getController: () => this.controller,
-    }
 
-    console.log('[ClientWeb3] Cartridge Controller initialized')
+      // Debug information
+      getDebugInfo: () => ({
+        initialized: false,
+        error: this.initError?.message,
+        environment: typeof window !== 'undefined' ? 'browser' : 'unknown',
+        hasWindow: typeof window !== 'undefined',
+        hasLocalStorage: typeof localStorage !== 'undefined',
+        hasWebSocket: typeof WebSocket !== 'undefined'
+      })
+    }
+  }
+
+  createWorldWeb3API() {
+    // Create a properly functioning world.web3 API
+    this.world.web3 = {
+      // Connection methods - bound to maintain 'this' context
+      connect: this.connect.bind(this),
+      disconnect: this.disconnect.bind(this),
+      isConnected: () => this.isConnected,
+
+      // Account info
+      getAddress: () => this.address,
+      getNetworkId: () => this.networkId,
+      getAccount: () => this.account,
+
+      // Transaction methods
+      execute: this.execute.bind(this),
+
+      // Event listeners
+      on: this.on.bind(this),
+      off: this.off.bind(this),
+
+      // Configuration
+      init: this.initWeb3.bind(this),
+
+      // Direct controller access for advanced usage
+      getController: () => this.controller,
+
+      // Debug information
+      getDebugInfo: () => ({
+        initialized: true,
+        isConnected: this.isConnected,
+        hasController: !!this.controller,
+        environment: typeof window !== 'undefined' ? 'browser' : 'unknown',
+        error: this.initError?.message
+      })
+    }
   }
 
   connect = async () => {
