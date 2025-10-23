@@ -1,497 +1,241 @@
 # CLAUDE.md
 
-This file provides comprehensive guidance to Claude Code (claude.ai/code) when working with the Hyperfy codebase.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Commands
+## Core Development Commands
 
-### Essential Commands
 ```bash
 # Development mode with hot reload
 npm run dev
 
-# Production build and run
+# Production build and start
 npm run build
 npm start
 
-# Code quality
-npm run lint          # Check code style  
-npm run lint:fix      # Auto-fix linting issues
-npm run format        # Format code with Prettier
-npm run check         # Run both lint and format
+# Run linting
+npm run lint
 
-# Specialized development modes
-npm run viewer:dev    # Viewer-only development mode
-npm run client:dev    # Client-only development mode
-npm run node-client:dev  # Node client development
+# Run formatting
+npm run format
 
-# World management
-npm run world:backup  # Backup world data
+# Run both lint and format checks
+npm run check
+
+# Clean up unused assets
+npm run world:clean
+
+# Viewer-only development mode
+npm run viewer:dev
+
+# Client-only development mode
+npm run client:dev
+
+# Backup world data
+npm run world:backup
 ```
-
-### Environment Setup
-1. Copy `.env.example` to `.env`
-2. Key environment variables:
-   - `WORLD=world` - The world folder to run
-   - `PORT=3000` - Server port
-   - `JWT_SECRET` - Token signing secret
-   - `ADMIN_CODE` - Admin access code (leave blank for open admin)
-   - `ASSETS=local|s3` - Asset storage mode
-   - `DB_URI=local|postgres://...` - Database configuration
 
 ## High-Level Architecture
 
-### Core System Design
-The project implements a **hybrid ECS architecture** with:
-- **World Class**: Central orchestrator managing all systems with a multi-phase update loop
-- **Systems**: Modular systems (Physics, Networking, Graphics, etc.) that register with World
-- **Entities**: Specialized objects (App, PlayerLocal, PlayerRemote) that can be networked
-- **Nodes**: Hierarchical scene graph nodes (Mesh, RigidBody, Collider, etc.) with Three.js integration
+### Hybrid ECS System Architecture
 
-### Update Loop Phases
-Systems update in this specific order:
-1. `preTick()` → `preFixedUpdate()` → `fixedUpdate()` → `postFixedUpdate()`
-2. `preUpdate()` → `update()` → `postUpdate()` → `lateUpdate()` → `postLateUpdate()`
-3. `commit()` → `postTick()`
+**World Class** (`src/core/World.js`) - Central orchestrator managing all systems:
+- **10-phase update loop**: `preTick` → `fixedUpdate` (60Hz) → `update` → `lateUpdate` → `postTick`
+- Manages system registration and lifecycle
+- Handles timing, physics, and rendering coordination
+- Critical for understanding execution order
 
-### Client-Server Architecture
-- **Authoritative Server**: Server maintains canonical world state
-- **Client Prediction**: Clients predict local changes for responsiveness
-- **Binary Protocol**: MessagePack (msgpackr) for efficient data serialization
-- **WebSocket Transport**: Real-time bidirectional communication
-- **Packet System**: Typed packets for snapshots, commands, chat, blueprints, entities
+**System Architecture** - All systems inherit from `src/core/systems/System.js`:
+- Implement EventEmitter pattern
+- Standardized lifecycle methods matching World phases
+- Separate client/server implementations for network synchronization
 
-## Key Systems
+### Client/Server Architecture
 
-### Core Systems (src/core/)
-- **World**: System orchestration and lifecycle management
-- **Entities**: Entity management (App, PlayerLocal, PlayerRemote)
-- **Physics**: PhysX-based physics with collision detection
-- **Apps**: Runtime script environment with SES sandboxing
-- **Avatars**: VRM avatar system with animation state machine
-- **Events**: Inter-app event communication
+**Dual System Design** - Completely separate client and server implementations:
 
-### Client Systems (src/client/)
-- **ClientGraphics**: Three.js rendering, post-processing, shadows, DOF
-- **ClientControls**: Input handling (keyboard, mouse, touch, XR)
-- **ClientCameraControls**: Camera with DOF, focal length, ADS zoom
-- **ClientBuilder**: In-world editing with transform controls
-- **ClientLoader**: Asset loading (GLTF, VRM, textures, audio, video)
-- **ClientNetwork**: WebSocket management and packet queuing
+**Server Systems**: `src/core/createServerWorld.js`
+- Authoritative world state management
+- Database operations via Knex (SQLite/PostgreSQL)
+- Asset storage (local/s3)
+- Network broadcasting to clients
 
-### Server Systems (src/server/)
-- **Server**: Main server coordination
-- **ServerNetwork**: Connection management and broadcasting
-- **Database**: SQLite/PostgreSQL integration via Knex
+**Client Systems**: `src/core/createClientWorld.js`
+- Three.js rendering with post-processing effects
+- Input handling and prediction
+- Audio, UI, and XR support
+- Asset streaming and interpolation
 
-## App Development
+### Core Systems Hierarchy
 
-### App Structure
-Apps are JavaScript code that runs in a secure sandboxed environment on both client and server. Apps can be created directly in the world editor or loaded from `.hyp` files.
+```
+World (World.js)
+├── Entities (App, PlayerLocal, PlayerRemote)
+├── Systems (10+ specialized systems)
+│   ├── Physics - PhysX integration (60Hz fixed)
+│   ├── Networks - WebSocket messaging
+│   ├── Graphics - Three.js rendering
+│   └── 10+ more specialized systems
+├── Nodes - Scene graph hierarchy
+│   ├── Mesh, Camera, Audio, UI
+│   ├── RigidBody, Collider, Joint
+│   └── 15+ more node types
+└── Apps - Sandbox JavaScript applications
+```
 
-### Important: SES Environment Restrictions
-Hyperfy uses SES (Secure ECMAScript) for security:
-- **NEVER use ES6 `export` or `import` syntax** - SES will throw errors
-- **Always wrap apps in parentheses** when using the object return format
-- **Use only approved global APIs and objects**
-- **No direct `eval()` or `new Function()` usage**
-- **Avoid browser-specific APIs** that aren't explicitly provided
+## Critical Architecture Patterns
 
-### App Format - Object Return (Recommended)
+### 1. SES Security Environment
+**Apps run in Secure ECMAScript (SES) sandbox** - MAJOR CONSTRAINTS:
+- **NO ES6 modules** - Cannot use `import`/`export`
+- **Must wrap apps in parentheses**: `({ init() {}, update(delta) {} })`
+- **No direct eval() or new Function()**
+- **Limited global API access** through controlled injection
+- **Console.log is reliable** - prefer over `world.chat()` which is broken
+
+### 2. Input System - Critical!
+**Keyboard events DO NOT work** through standard event listeners:
 ```javascript
+// ❌ WRONG - This will NOT work
+app.on('keydown', (event) => { /* won't work */ })
+
+// ✅ CORRECT - Use control() API
+const control = app.control()
+if (!control) return  // Always check
+control.keyW.capture = true
+if (control.keyW.pressed) {
+  // Handle input
+}
+```
+
+### 3. Chat API is Broken
+**`world.chat()` system is unreliable** due to Apps.js conversion bug:
+```javascript
+// ❌ CAUSES CRASH: Cannot create property 'id' on string
+debug: Apps.js:159
+world.chat('message', true)  // THIS BREAKS
+
+// ✅ WORKS: Use console.log
+console.log('📡 Your message here')
+```
+
+### 4. 3D Positioning Can Cause Crashes
+**Node position access can fail** - use try-catch and fallbacks:
+```javascript
+// ✅ STABLE - Handle position errors
+let position = [0, 1, 0]
+try {
+  position = node.position.toArray()
+} catch (e) {
+  console.warn('Position access failed, using default')
+}
+```
+
+### 5. App Development Pattern
+**Apps MUST use specific format** for SES compatibility:
+```javascript
+// ✅ CORRECT - Wrap in parentheses
 ({
+  configure() {
+    // Configuration options
+  },
   init() {
-    // Initialize app
-    this.cube = this.app.get('cube')
+    // Initialize resources
   },
-  
   update(delta) {
-    // Frame update
-    if (this.cube) {
-      this.cube.rotation.y += 0.01
-    }
+    // Frame updates (variable timestep)
   },
-  
   fixedUpdate(delta) {
-    // Physics update
+    // Physics updates (60Hz)
   },
-  
   cleanup() {
-    // Clean up resources
+    // Cleanup resources
   }
 })
 ```
 
-### App Format - Global App (Simple)
-```javascript
-// Direct use of the app global
-app.configure([
-  // Configuration options...
-])
+## Key System APIs
 
-const myObject = app.create('mesh')
-app.add(myObject)
+### World Object
+- `world.isClient` / `world.isServer` - Environment detection
+- `world.entities.*` - Entity management
+- `world.systems.*` - System access
+- `world.network.maxUploadSize` - Upload limits
 
-app.on('update', (dt) => {
-  // Update logic
-})
-```
+### App Object
+- `app.create('nodetype', config)` - Create nodes
+- `app.control()` - Input handling (MUST use for keyboard)
+- `app.on()` / `app.off()` - Event registration
+- `app.send(event, data)` - Custom events to server
+- `app.keepActive = true` - Keep app running
 
-### Available Global Objects
-- **`app`**: The main app instance for managing your application
-- **`world`**: World state and interactions with environment and players
-- **`props`**: App configuration values (shorthand for app.config)
-- **`config`**: Alias for app.config
-- **`THREE`**: Three.js library for 3D operations
-- **`Vector3`**, **`Quaternion`**, **`Euler`**, **`Matrix4`**: Math utilities
+### Node Properties
+- `position: [x, y, z]` - 3D position
+- `rotation: [x, y, z]` - Euler rotation
+- `scale: [x, y, z]` - Scale factor
+- `visible: boolean` - Rendering visibility
+- `collisionEnabled: boolean` - Physics interaction
 
-### Input System - Using app.control()
-For keyboard and mouse input in apps, use the `app.control()` method:
+## Development Constraints
 
-```javascript
-// Get control interface
-const control = app.control()
-if (!control) {
-  console.warn('No control interface available')
-  return
-}
+### 1. SES Sandbox Environment
+Apps execute in controlled sandbox with restricted APIs. Always assume limited global access and use only provided APIs.
 
-// Capture specific keys
-control.bracketLeft.capture = true  // Capture [ key
-control.bracketRight.capture = true // Capture ] key
+### 2. UI System Limitations
+- **No responsive sizing** - Use explicit pixel values
+- **No CSS animations** - Manual updates only
+- **Fixed positioning** - No relative layouts
+- **Basic shapes only** - Complex interactions manually implemented
 
-// Check key states in update loop
-app.on('update', () => {
-  if (control.bracketLeft && control.bracketLeft.pressed) {
-    // [ key was pressed this frame
-  }
-  if (control.keyW && control.keyW.down) {
-    // W key is being held down
-  }
-})
-```
+### 3. Networking Constraints
+- **Fixed timestep physics** - 60Hz - don't exceed
+- **Variable render updates** - Adapt to display refresh
+- **Binary protocol only** - Use provided message helpers
+- **Authoritative server** - Server is ground truth
 
-**Note**: The `app.on('keydown')` pattern does NOT work - keyboard events are not forwarded to apps. Always use `app.control()` for input handling.
+### 4. Asset Pipeline
+- **Content-addressed storage** - Assets identified by SHA-256 hash
+- **Automatic deduplication** - Duplicate binaries automatically handled
+- **Streaming loads** - Progressive asset loading built-in
+- **Format limits** - GLB, VRM, HTML, Canvas, Audio, Video
 
-### Configuration System
-Apps can expose configuration UI using `app.configure()`:
+## Common Development Tasks
 
-```javascript
-app.configure([
-  {
-    type: 'text',
-    key: 'title',
-    label: 'Title',
-    initial: 'Default Title'
-  },
-  {
-    type: 'file',
-    key: 'audioFile',
-    kind: 'audio',
-    label: 'Background Music'
-  },
-  {
-    type: 'switch',
-    key: 'theme',
-    label: 'Theme',
-    initial: 'neon',
-    options: [
-      { value: 'neon', label: 'Neon' },
-      { value: 'dark', label: 'Dark' },
-      { value: 'light', label: 'Light' }
-    ]
-  },
-  {
-    key: 'neonColor',
-    type: 'color',
-    label: 'Neon Color',
-    initial: '#00ffaa',
-    when: [{ key: 'theme', op: 'eq', value: 'neon' }] // Conditional field
-  }
-])
+### Getting Started Quickly
+1. Copy `.env.example` to `.env`
+2. Run `npm install`
+3. Start with `npm run dev`
+4. Open browser at port 3000 (or configured PORT)
+5. Create files in `world/` folder for persistent content
 
-// Access configuration values
-const title = props.title || app.config.title
-const audioUrl = app.config.audioFile?.url
-```
+### Adding New Systems
+1. Inherit from `System` class in appropriate `systems/` directory
+2. Register system with World in initialization order
+3. Implement required lifecycle methods
+4. Use `world.events.emit()` for cross-system communication
 
-### Client-Server Communication
-```javascript
-// Client-side
-if (world.isClient) {
-  const action = app.create('action')
-  action.onTrigger = () => {
-    app.send("cube:move", { data: 123 })
-  }
-  
-  app.on("cube:position", (data) => {
-    app.position.fromArray(data)
-  })
-}
-
-// Server-side
-if (world.isServer) {
-  app.on("cube:move", (data, networkId) => {
-    app.position.y += 1
-    app.send("cube:position", app.position.toArray())
-  })
-}
-```
-
-### Node Types Available
-`action`, `anchor`, `audio`, `avatar`, `camera`, `collider`, `controller`, `group`, `image`, `joint`, `lod`, `mesh`, `nametag`, `particles`, `prim`, `rigidbody`, `skinnedmesh`, `sky`, `snap`, `ui`, `uiview`, `uitext`, `uiimage`, `video`
-
-## Camera System
-
-### Creating Cameras
-```javascript
-const camera = app.create('camera', {
-  name: 'my-camera',
-  position: [10, 5, 10],
-  rotation: [-0.3, 0.785, 0],
-  active: false,  // Don't auto-activate
-  attachToRig: false,  // Place in world space (not attached to player)
-  isPlayerCamera: false,
-  showHelper: true,  // Show camera frustum visualization
-  
-  // Camera settings
-  fov: 50,
-  near: 0.1,
-  far: 2000,
-  
-  // Motion settings
-  motion: {
-    enabled: true,
-    bobAmount: 0.002,
-    bobSpeed: 0.02,
-    swayAmount: 0.001,
-    swaySpeed: 0.01,
-    dampingFactor: 0.98
-  },
-  
-  // DOF settings
-  dof: {
-    enabled: true,
-    fStop: 2.8,
-    focusDistance: 15,
-    maxBlur: 0.03,
-    autofocus: true
-  },
-  
-  // Other effects
-  bloom: { enabled: false, intensity: 0.5 },
-  vignette: { enabled: false, offset: 0.35, darkness: 0.4 },
-  filmGrain: { enabled: false, intensity: 0.25 }
-})
-
-app.add(camera)
-
-// Activate camera
-camera.active = true
-```
-
-## UI System
-
-### UI Components and Limitations
-The UI system uses Canvas-based rendering with Yoga layout engine. Important limitations:
-- **No responsive sizing**: Width/height must be explicit pixel values (no `auto` or percentages)
-- **No relative positioning**: Position is fixed, not relative to other elements
-- **No CSS animations**: No transitions, keyframes, or CSS animations
-- **No z-index control**: Render order determined by hierarchy
-- **Basic shapes only**: No complex shapes or clip paths
-
-### Creating UI
-```javascript
-// UI container in 3D world
-const ui = app.create('ui', {
-  width: 300,
-  height: 200,
-  backgroundColor: 'rgba(0, 15, 30, 0.8)',
-  borderRadius: 20,
-  padding: 15,
-  billboard: 'full',  // Always face camera
-  pivot: 'center',     // Anchor point
-  position: [0, 2, 0], // 3D position
-  size: 0.005         // Scale factor
-})
-
-// UI text element
-const text = app.create('uitext', {
-  value: 'Hello World',
-  color: '#00ffaa',
-  fontSize: 18,
-  padding: 10
-})
-
-// Interaction events
-text.onPointerDown = () => {
-  text.color = '#ffffff'
-}
-text.onPointerUp = () => {
-  text.color = '#00ffaa'
-  performAction()
-}
-
-ui.add(text)
-app.add(ui)
-```
-
-### Workaround for Responsive UI
-```javascript
-// Calculate screen dimensions using control
-const control = app.control()
-const screenWidth = control.screenWidth()
-const screenHeight = control.screenHeight()
-
-const ui = app.create('ui', {
-  space: 'screen',
-  width: screenWidth * 0.3,  // 30% of screen width
-  height: screenHeight * 0.2, // 20% of screen height
-})
-```
-
-## Build System
-
-### ESBuild Configuration
-- **Format**: ESM modules
-- **JSX Support**: React JSX transformation
-- **Source Maps**: Enabled in development
-- **Polyfills**: Node polyfills for browser compatibility
-- **Entry Points**:
-  - `src/index.js` → Full server + client
-  - `src/viewer.js` → Viewer-only build
-  - `src/client.js` → Client-only build
-
-### Asset Pipeline
-- **Hash-based Storage**: Content-addressed by SHA-256
-- **Deduplication**: Automatic asset deduplication
-- **Storage Options**: Local filesystem or S3
-- **Supported Formats**: GLB, VRM, JPG, PNG, MP3, MP4
-
-## Code Style
-
-### Formatting
-- **No Semicolons**: Omit semicolons (enforced by Prettier)
-- **Single Quotes**: Use single quotes for strings
-- **Arrow Functions**: Prefer arrow functions for callbacks
-- **Line Width**: 120 characters max
-- **Trailing Commas**: ES5 style
-- **2-Space Indentation**: Consistent throughout
-
-### Linting Rules
-- **React**: Hooks rules enforced
-- **No Console**: Warn except for warn/error
-- **Prefer Const**: Use const over let when possible
-- **No Var**: Never use var
-- **Unused Variables**: Allowed with underscore prefix
-
-### Ignored Paths
-- `build/**`, `world/**`, `node_modules/**`
-- `src/core/libs/**`, `src/core/vendors/**`
-- `src/core/three-vrm/**`, `src/core/three/**`
-- `physx-js-webidl.js` files
+### Debugging Tips
+- **Check browser console** - Most reliable feedback source
+- **Use `world.web3.getDebugInfo()`** - Web3 system diagnostics
+- **Test SES environment** - Try basic operations vs complex ones
+- **Monitor network tab** - Binary protocol debugging
+- **Check server logs** - Backend issues show there
 
 ## Performance Considerations
 
-- **Fixed Timestep**: Physics runs at 60Hz fixed timestep
-- **Variable Rendering**: Graphics update at display refresh rate
-- **LOD System**: Distance-based level of detail
-- **Culling**: Frustum and occlusion culling
-- **Asset Streaming**: Progressive asset loading
-- **Network Optimization**: Delta compression and interpolation
+### 1. Multi-threading Awareness
+- Physics runs on separate thread (WebAssembly)
+- Fixed timestep critical for stability
+- Asset loading in background threads
+- Multiple systems update in parallel
 
-## Voice Chat (LiveKit)
+### 2. Memory Management
+- Proper cleanup in app `cleanup()` method
+- Object pooling for frequently created objects
+- Octree spatial partitioning for large worlds
+- Physics system has its own memory management
 
-Configure in `.env`:
-- `LIVEKIT_WS_URL`: LiveKit server URL
-- `LIVEKIT_API_KEY`: API key
-- `LIVEKIT_API_SECRET`: API secret
-
-## Testing
-
-Currently no automated tests. Manual testing recommended:
-1. Run `npm run dev`
-2. Test in multiple browsers
-3. Verify multiplayer functionality
-4. Check build mode operations
-5. Test asset uploads
-6. Verify physics interactions
-
-## Important Patterns
-
-### System Registration
-```javascript
-class MySystem {
-  constructor(world) {
-    this.world = world
-    world.register(this)
-  }
-  update(delta) { /* ... */ }
-}
-```
-
-### Node Creation
-```javascript
-const mesh = app.create('mesh', {
-  id: 'MyMesh',
-  position: [0, 1, 0],
-  rotation: [0, Math.PI, 0]
-})
-app.add(mesh)
-```
-
-### Network Packets
-```javascript
-// Client → Server
-app.send('command', { action: 'jump' })
-
-// Server → Clients  
-app.send('snapshot', worldState)
-```
-
-## Common Issues and Solutions
-
-### Camera Not Following Player
-- Set `attachToRig: true` for player-attached cameras
-- Set `attachToRig: false` for world-space cameras
-
-### Keyboard Events Not Working
-- Don't use `app.on('keydown')` - it doesn't work
-- Use `app.control()` to access keyboard state
-
-### UI Not Responsive
-- UI dimensions must be explicit pixels, not percentages
-- Calculate dimensions based on screen size using `control.screenWidth()`
-
-### App Not Updating
-- Ensure you've subscribed to update events: `app.on('update', callback)`
-- Check that `app.keepActive = true` if needed
-
-### Assets Not Loading
-- Check file format is supported (GLB, VRM, JPG, PNG, MP3, MP4)
-- Verify URL is correct in configuration
-- Use optional chaining: `config.asset?.url`
-
-## Best Practices
-
-1. **Always clean up resources** in the `cleanup()` method
-2. **Use object pooling** for frequently created/destroyed objects
-3. **Minimize update subscriptions** - only subscribe when needed
-4. **Cache calculations** that don't change every frame
-5. **Use optional chaining** for nullable configuration values
-6. **Separate client/server code** clearly with `if (world.isClient)` blocks
-7. **Test multiplayer scenarios** with multiple browser tabs
-8. **Profile performance** using stats-gl integration
-9. **Document configuration fields** with clear labels and defaults
-10. **Handle errors gracefully** with try/catch blocks
-
-## Important Reminders
-
-- Do what has been asked; nothing more, nothing less
-- NEVER create files unless absolutely necessary
-- ALWAYS prefer editing existing files to creating new ones
-- NEVER proactively create documentation files (*.md) unless explicitly requested
-- Only use emojis if the user explicitly requests it
-- Remember that keyboard events (`app.on('keydown')`) don't work - use `app.control()`
-- Camera helpers show the frustum visualization, not the camera itself
-- The engine uses a fixed timestep for physics (60Hz) with interpolation for smooth visuals
-- right so there are a bunch of files in '/home/blank/hyperfy/examples'and it's getting confusing as to what we are doing let's start fresh using our new '/home/blank/hyperfy/CLAUDE.md' and make a working '/home/blank/hyperfy/examples/camera-control-system.js' don't delete '/home/blank/hyperfy/examples/camera-dof-bridge.js' and anything todo with prims.
+### 3. Network Considerations
+- Delta compression enabled by default
+- Client-side prediction for smooth feel
+- Priority-based update rates for distant objects
+- Built-in interpolation for smooth movement

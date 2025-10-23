@@ -15,6 +15,13 @@ const v3 = new Vector3()
 // ===== GLOBAL VARIABLES =====
 let pickupAction = null // Pickup action for the pistol
 
+// ===== DEBUG HELPER =====
+function debugLog(...args) {
+  if (props.debugLogs) {
+    console.log('[pistol]', ...args)
+  }
+}
+
 createItem(({ player, hooks }) => {
   // ===== CLIENT & SERVER SHARED =====
   let pistolSkin // The main SkinnedMesh (CombatPistolSkin)
@@ -54,12 +61,12 @@ createItem(({ player, hooks }) => {
   function reloadPistol() {
     const maxAmmo = props.maxAmmo || 100
     if (ammo >= maxAmmo) {
-      console.log('[pistol] Already at max ammo')
+      debugLog('Already at max ammo')
       return
     }
 
     ammo = maxAmmo
-    console.log(`[pistol] Reloaded! Ammo: ${ammo}/${maxAmmo}`)
+    debugLog(`Reloaded! Ammo: ${ammo}/${maxAmmo}`)
 
     // Notify core inventory of ammo change
     if (props.showAmmoCount) {
@@ -501,15 +508,15 @@ createItem(({ player, hooks }) => {
       const muzzlePos = new Vector3()
       muzzlePos.setFromMatrixPosition(muzzleBone.matrixWorld)
       audio.position.copy(muzzlePos)
-      console.log(`[pistol] Playing spatial sound at muzzle position:`, muzzlePos.toArray())
+      debugLog(`Playing spatial sound at muzzle position:`, muzzlePos.toArray())
     } else if (pistolSkin) {
       audio.position.copy(pistolSkin.position)
-      console.log(`[pistol] Playing spatial sound at pistol position:`, pistolSkin.position.toArray())
+      debugLog(`Playing spatial sound at pistol position:`, pistolSkin.position.toArray())
     }
 
     world.add(audio)
     audio.play()
-    console.log(`[pistol] Spatial gunshot sound played - other players should hear this!`)
+    debugLog(`Spatial gunshot sound played - other players should hear this!`)
 
     // Auto-cleanup after sound finishes
     setTimeout(() => {
@@ -856,9 +863,9 @@ createItem(({ player, hooks }) => {
         // ===== HIDE PICKUP ACTION when pistol is equipped =====
         if (pickupAction) {
           pickupAction.active = false
-          console.log('[pistol] Hiding pickup action (pistol equipped)')
+          debugLog('Hiding pickup action (pistol equipped)')
         } else {
-          console.log('[pistol] Pickup action not found when trying to hide')
+          debugLog('Pickup action not found when trying to hide')
         }
 
         // ===== DEBUG: Check for animations on pistol model =====
@@ -1195,7 +1202,7 @@ createItem(({ player, hooks }) => {
           const isEquipping = currentAnimation && currentAnimation.includes('equip')
           if (!isEquipping && adsInput.pressed) {
             isAiming = !isAiming
-            // console.log('[pistol] ADS toggled:', isAiming ? 'Aiming' : 'Not aiming')
+            debugLog('ADS toggled:', isAiming ? 'Aiming' : 'Not aiming')
 
             // Handle aim animations with proper state management
             if (isAiming) {
@@ -1453,9 +1460,9 @@ createItem(({ player, hooks }) => {
         // Show pickup action again when pistol is unequipped
         if (pickupAction) {
           pickupAction.active = true
-          console.log('[pistol] Showing pickup action (pistol unequipped)')
+          debugLog('Showing pickup action (pistol unequipped)')
         } else {
-          console.log('[pistol] Pickup action not found when trying to show')
+          debugLog('Pickup action not found when trying to show')
         }
 
         // Release ADS button capture
@@ -1759,6 +1766,10 @@ app.configure([
   { key: 'rotationX', type: 'number', label: 'Rotation X', initial: 0, dp: 2, step: 0.1, hint: 'Pitch (radians)' },
   { key: 'rotationY', type: 'number', label: 'Rotation Y', initial: 0, dp: 2, step: 0.1, hint: 'Yaw (radians)' },
   { key: 'rotationZ', type: 'number', label: 'Rotation Z', initial: 0, dp: 2, step: 0.1, hint: 'Roll (radians)' },
+
+  // ===== Debug Settings =====
+  { type: 'section', key: 'debugSection', label: 'Debug' },
+  { key: 'debugLogs', type: 'toggle', label: 'Enable Debug Logs', initial: false, hint: 'Show detailed console logs for debugging' },
 
   // ===== Keybinds =====
   { type: 'section', key: 'keybindSection', label: 'Keybinds' },
@@ -2280,7 +2291,7 @@ function createItem(createInstance) {
       pickupAction.position.copy(app.position)
       pickupAction.position.y += 0.2
       pickupAction.onTrigger = () => {
-        console.log('[pistol] Pickup action triggered!')
+        debugLog('Pickup action triggered!')
         const p = world.getPlayer()
         if (!p) {
           console.warn('[pistol] No local player found for pickup')
@@ -2291,7 +2302,7 @@ function createItem(createInstance) {
         pickupAction.active = false
       }
       world.add(pickupAction)
-      console.log('[pistol] Pickup action created at world level')
+      debugLog('Pickup action created at world level')
     }
 
     let state = app.state
