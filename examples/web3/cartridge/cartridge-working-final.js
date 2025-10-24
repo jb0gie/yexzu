@@ -257,8 +257,14 @@ async function connect() {
 			console.log('[Cartridge] Using world.web3 API')
 
 			try {
-				// Connect using the world web3 system
-				const result = await world.web3.connect()
+				// Add timeout to handle modal cancellation scenario
+				const connectPromise = world.web3.connect()
+				const timeoutPromise = new Promise((_, reject) => {
+					setTimeout(() => reject(new Error('Connection timeout - user may have cancelled modal')), 30000)
+				})
+
+				// Race between connection and timeout
+				const result = await Promise.race([connectPromise, timeoutPromise])
 				console.log('[Cartridge] World web3 connection result:', result)
 
 				if (result && result.address) {
@@ -272,6 +278,23 @@ async function connect() {
 
 			} catch (web3Error) {
 				console.log('[Cartridge] world.web3 connection failed:', web3Error.message)
+
+				// Check if user cancelled the modal vs actual error
+				if (web3Error.message && (
+					web3Error.message.includes('User cancelled') ||
+					web3Error.message.includes('User rejected') ||
+					web3Error.message.includes('Modal closed') ||
+					web3Error.message.includes('dismissed') ||
+					web3Error.message.includes('User denied') ||
+					web3Error.message.includes('Connection timeout') ||
+					web3Error.message.includes('user may have cancelled modal')
+				)) {
+					// User cancelled modal - reset to initial state
+					console.log('[Cartridge] User cancelled connection modal')
+					statusText.value = 'Ready to connect'
+					statusText.color = '#cccccc'
+					return
+				}
 
 				// Try alternative method using world.connectCartridge (if available)
 				if (world.connectCartridge) {
@@ -302,16 +325,33 @@ async function connect() {
 		console.error('[Cartridge] ❌ REAL CARTRIDGE CONNECTION FAILED:', error)
 		console.error('[Cartridge] This is a real cartridge integration error - check browser environment')
 
+		// Check if this is a modal cancellation
+		if (error.message && (
+			error.message.includes('User cancelled') ||
+			error.message.includes('User rejected') ||
+			error.message.includes('Modal closed') ||
+			error.message.includes('dismissed') ||
+			error.message.includes('User denied') ||
+			error.message.includes('Connection timeout') ||
+			error.message.includes('user may have cancelled modal')
+		)) {
+			// User cancelled - reset to ready state
+			console.log('[Cartridge] Connection cancelled by user')
+			statusText.value = 'Ready to connect'
+			statusText.color = '#cccccc'
+			return
+		}
+
 		statusText.value = 'Real cartridge connection failed'
 		statusText.color = '#ef4444'
 
 		// Don't auto-retry for real cartridge errors - user action required
 		setTimeout(() => {
 			if (!cartridgeState.connected) {
-				statusText.value = 'Cartridge connection required'
-				statusText.color = '#dc2626'
+				statusText.value = 'Ready to connect'
+				statusText.color = '#cccccc'
 			}
-		}, 5000)
+		}, 2000)
 	}
 }
 

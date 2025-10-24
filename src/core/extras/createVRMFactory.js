@@ -880,9 +880,14 @@ export function createVRMFactory(glb, setupMaterial) {
       springMirrorInit = true
     }
 
+    // Reusable objects for spring bone updates (allocated once)
+    const _springPos = new THREE.Vector3()
+    const _springQuat = new THREE.Quaternion()
+    const _springScl = new THREE.Vector3()
+
     const update = delta => {
       elapsed += delta
-      // If the avatar has springs, always animate every frame for consistent driving
+      // Spring bones need every-frame updates for fluid motion, but we keep performance optimizations
       const doAnim = hasSprings ? true : rateCheck ? elapsed >= rate : true
       if (doAnim) {
         mixer.update(hasSprings ? delta : elapsed)
@@ -997,73 +1002,51 @@ export function createVRMFactory(glb, setupMaterial) {
         skeleton.update = noop
       }
 
-      // DEBUG LOGGING: Log arm bone rotations if enabled (runs every frame, not rate-limited)
-      for (const bone of skeleton.bones) {
-        if (bone.name && (bone.name.includes('arm') || bone.name.includes('hand') || bone.name.includes('shoulder'))) {
-          // Check if debug logging is enabled for any active additive animation
-          let debugEnabled = false
-          for (const [url, anim] of currentAdditiveAnims) {
-            if (anim.debugArmRotations === true) {
-              debugEnabled = true
-              break
-            }
-          }
-
-          if (debugEnabled && Math.random() < 0.02) { // 2% chance per frame to avoid spam
-            const euler = new THREE.Euler().setFromQuaternion(bone.quaternion)
-            console.log(`[VRM-ARM] ${bone.name}: x=${euler.x.toFixed(3)}, y=${euler.y.toFixed(3)}, z=${euler.z.toFixed(3)}`)
-          }
-        }
-      }
-
-      // DEBUG: Check if debug flag is being detected
-      if (Math.random() < 0.01) { // 1% chance per frame
-        let debugEnabled = false
-        for (const [url, anim] of currentAdditiveAnims) {
-          if (anim.debugArmRotations === true) {
-            debugEnabled = true
-            break
-          }
-        }
-        // console.log(`[VRM-DEBUG] Debug flag enabled: ${debugEnabled}, additiveAnims: ${currentAdditiveAnims.size}`)
-      }
-
-      // DEBUG: Log all bone names to help identify the correct patterns
-      if (Math.random() < 0.001) { // 0.1% chance per frame to avoid spam
-        // console.log(`[VRM-DEBUG] All bone names:`, skeleton.bones.map(bone => bone.name).filter(name => name).slice(0, 20))
-      }
-
-      // spring bones per frame (not rate-limited): drive orig with clone pose, simulate, mirror back
+      // Optimized spring bone updates (every frame for fluidity, but optimized)
       if (!springMirrorInit) initSpringMirror()
       if (origVRM && (springPairs.length || drivePairs.length)) {
-        const _pos = new THREE.Vector3()
-        const _quat = new THREE.Quaternion()
-        const _scl = new THREE.Vector3()
-        vrm.scene.matrix.decompose(_pos, _quat, _scl)
-        origVRM.scene.position.copy(_pos)
-        origVRM.scene.quaternion.copy(_quat)
-        origVRM.scene.scale.copy(_scl)
+        // Use pre-allocated objects instead of creating new ones each frame
+        vrm.scene.matrix.decompose(_springPos, _springQuat, _springScl)
+        origVRM.scene.position.copy(_springPos)
+        origVRM.scene.quaternion.copy(_springQuat)
+        origVRM.scene.scale.copy(_springScl)
         origVRM.scene.updateMatrixWorld(true)
-        // copy clone bone rotations into original skeleton so springs have correct inputs
+
+        // Batch copy clone bone rotations to minimize matrix updates
+        const bonesNeedingUpdate = []
         for (const [cloneBone, origBone] of drivePairs) {
           if (origBone && cloneBone) {
             // many VRM spring bones have matrixAutoUpdate=false; force local matrix rebuild
             origBone.quaternion.copy(cloneBone.quaternion)
             origBone.updateMatrix()
-            origBone.updateMatrixWorld(true)
+            bonesNeedingUpdate.push(origBone)
           }
         }
+
+        // Batch update matrix world operations
+        for (const bone of bonesNeedingUpdate) {
+          bone.updateMatrixWorld(true)
+        }
+
         // advance VRM systems (includes node constraints + spring bones)
-        origVRM.update(delta)
-        // mirror spring joints back to clone only
+        origVRM.update(delta) // Use current frame delta time for fluid motion
+
+        // Batch mirror spring joints back to clone only
+        const clonesNeedingUpdate = []
         for (const [src, dst] of springPairs) {
           if (dst) {
             dst.quaternion.copy(src.quaternion)
             dst.updateMatrix()
-            dst.updateMatrixWorld(true)
+            clonesNeedingUpdate.push(dst)
           }
         }
-        // ensure skinned mesh bone matrices reflect new spring rotations
+
+        // Batch update clone matrix world operations
+        for (const clone of clonesNeedingUpdate) {
+          clone.updateMatrixWorld(true)
+        }
+
+        // Update skinned mesh bone matrices only once after all spring updates
         for (const m of skinnedMeshes) {
           THREE.Skeleton.prototype.update.call(m.skeleton)
         }
