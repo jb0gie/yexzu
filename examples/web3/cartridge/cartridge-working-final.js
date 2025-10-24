@@ -31,8 +31,8 @@ const mainUI = app.create('ui', {
 	space: 'screen',
 	pivot: 'top-center',
 	position: [0.9, 0.1, 0],
-	width: 250,
-	height: 150,
+	width: 280,
+	height: 220,
 	backgroundColor: 'rgba(0, 0, 0, 0.8)',
 	borderRadius: 12,
 	padding: 16,
@@ -66,10 +66,91 @@ const statusText = app.create('uitext', {
 	textAlign: 'center'
 })
 
+// Create user info container (shown when connected)
+const userInfoContainer = app.create('ui', {
+	width: 250,
+	height: 120,
+	flexDirection: 'column',
+	gap: 8,
+	visible: false // Hidden initially
+})
+
+// Username display
+const usernameText = app.create('uitext', {
+	value: '',
+	color: '#ffffff',
+	fontSize: 16,
+	fontWeight: 'bold',
+	textAlign: 'center'
+})
+
+// Wallet info container
+const walletInfoContainer = app.create('ui', {
+	width: 250,
+	height: 60,
+	flexDirection: 'column',
+	gap: 4
+})
+
+// Wallet address with copy button container
+const walletAddressContainer = app.create('ui', {
+	width: 250,
+	height: 30,
+	flexDirection: 'row',
+	justifyContent: 'space-between',
+	alignItems: 'center'
+})
+
+// Wallet address text
+const walletAddressText = app.create('uitext', {
+	value: '',
+	color: '#94a3b8',
+	fontSize: 12,
+	textAlign: 'left'
+})
+
+// Copy wallet button
+const copyButton = app.create('uiview', {
+	width: 60,
+	height: 25,
+	backgroundColor: '#3b82f6',
+	borderRadius: 4,
+	justifyContent: 'center',
+	alignItems: 'center'
+})
+
+const copyButtonText = app.create('uitext', {
+	value: 'Copy',
+	color: '#ffffff',
+	fontSize: 11,
+	fontWeight: 'bold',
+	textAlign: 'center'
+})
+
+// Balance display
+const balanceText = app.create('uitext', {
+	value: '',
+	color: '#10b981',
+	fontSize: 14,
+	textAlign: 'center'
+})
+
+// Assemble wallet info
+copyButton.add(copyButtonText)
+walletAddressContainer.add(walletAddressText)
+walletAddressContainer.add(copyButton)
+walletInfoContainer.add(walletAddressContainer)
+walletInfoContainer.add(balanceText)
+
+// Assemble user info
+userInfoContainer.add(usernameText)
+userInfoContainer.add(walletInfoContainer)
+
 // Add components
 connectButton.add(buttonText)
 mainUI.add(connectButton)
 mainUI.add(statusText)
+mainUI.add(userInfoContainer)
 app.add(mainUI)
 
 // Event handlers
@@ -85,11 +166,73 @@ connectButton.onPointerOver = () => {
 	}
 }
 
+// Copy button functionality
+copyButton.onPointerDown = () => {
+	if (cartridgeState.address) {
+		// Copy to clipboard
+		if (typeof navigator !== 'undefined' && navigator.clipboard) {
+			navigator.clipboard.writeText(cartridgeState.address).then(() => {
+				copyButtonText.value = 'Copied!'
+				copyButton.backgroundColor = '#10b981'
+				setTimeout(() => {
+					copyButtonText.value = 'Copy'
+					copyButton.backgroundColor = '#3b82f6'
+				}, 2000)
+			}).catch(err => {
+				console.error('[Cartridge] Failed to copy address:', err)
+			})
+		}
+	}
+}
+
+copyButton.onPointerOver = () => {
+	copyButton.backgroundColor = '#2563eb'
+}
+
+copyButton.onPointerOut = () => {
+	copyButton.backgroundColor = '#3b82f6'
+}
+
 connectButton.onPointerOut = () => {
 	if (cartridgeState.connected) {
 		connectButton.backgroundColor = '#ef4444'
 	} else {
 		connectButton.backgroundColor = app.config?.buttonColor || '#10b981'
+	}
+}
+
+// Fetch username for the connected wallet
+async function fetchUsername(address) {
+	try {
+		// Try to get username from cartridge controller or account
+		if (cartridgeState.cartridge && cartridgeState.cartridge.getUsername) {
+			const username = await cartridgeState.cartridge.getUsername()
+			return username || `Cartridge User`
+		}
+
+		// Fallback: use first part of address as temporary name
+		return `User ${address.slice(0, 6)}`
+	} catch (error) {
+		console.log('[Cartridge] Could not fetch username:', error.message)
+		return `User ${address.slice(0, 6)}`
+	}
+}
+
+// Fetch token balance for the connected wallet
+async function fetchBalance(address) {
+	try {
+		if (world.web3 && world.web3.account) {
+			// Try to get ETH balance from the connected account
+			// Note: This is a simplified balance check - real implementation would need proper StarkNet token contracts
+			const balance = await world.web3.account.getBalance()
+			return balance ? `${parseFloat(balance).toFixed(4)} ETH` : '0.0000 ETH'
+		}
+
+		// Fallback for now - would need real balance fetching implementation
+		return 'Loading...'
+	} catch (error) {
+		console.log('[Cartridge] Could not fetch balance:', error.message)
+		return 'Balance unavailable'
 	}
 }
 
@@ -122,7 +265,7 @@ async function connect() {
 					cartridgeState.connected = true
 					cartridgeState.address = result.address
 					cartridgeState.cartridge = world.web3.controller
-					onConnectionSuccess()
+					await onConnectionSuccess(result)
 				} else {
 					throw new Error('No account address returned from world.web3')
 				}
@@ -139,7 +282,7 @@ async function connect() {
 						cartridgeState.connected = true
 						cartridgeState.address = cartridgeResult.address
 						cartridgeState.cartridge = cartridgeResult.controller
-						onConnectionSuccess()
+						await onConnectionSuccess(cartridgeResult)
 					} else {
 						throw new Error('No address returned from world.connectCartridge')
 					}
@@ -172,22 +315,50 @@ async function connect() {
 	}
 }
 
-function onConnectionSuccess() {
+async function onConnectionSuccess(connectionResult) {
 	console.log('[Cartridge] ✅ REAL CARTRIDGE CONNECTION SUCCESSFUL:', cartridgeState.address)
 	console.log('[Cartridge] Integration: Real @cartridge/controller')
 	console.log('[Cartridge] Engine Status: OPERATIONAL')
 
-	statusText.value = 'Real Cartridge: ' + cartridgeState.address.slice(0, 6) + '...' + cartridgeState.address.slice(-4)
-	statusText.color = '#10b981'
+	// Hide status text and show user info container
+	statusText.visible = false
+	userInfoContainer.visible = true
+
+	// Update button to show disconnect
 	buttonText.value = 'Disconnect'
 	connectButton.backgroundColor = '#ef4444'
+
+	// Fetch and display additional user info
+	try {
+		// Get username
+		const username = await fetchUsername(cartridgeState.address)
+		usernameText.value = username
+
+		// Display wallet address (shortened)
+		const shortAddress = cartridgeState.address.slice(0, 6) + '...' + cartridgeState.address.slice(-4)
+		walletAddressText.value = shortAddress
+
+		// Fetch and display balance (show loading initially)
+		balanceText.value = 'Loading balance...'
+
+		// Try to fetch the actual balance
+		const balance = await fetchBalance(cartridgeState.address)
+		balanceText.value = 'Balance: ' + balance
+
+	} catch (error) {
+		console.log('[Cartridge] Error fetching user info:', error.message)
+		usernameText.value = 'Cartridge User'
+		walletAddressText.value = cartridgeState.address.slice(0, 6) + '...' + cartridgeState.address.slice(-4)
+		balanceText.value = 'Balance: Loading...'
+	}
 
 	// Emit event for other apps
 	app.emit('cartridgeConnected', {
 		connected: true,
 		address: cartridgeState.address,
 		integration: 'REAL_CARTRIDGE_CONTROLLER',
-		engineFeature: 'ACTIVE'
+		engineFeature: 'ACTIVE',
+		connectionResult
 	})
 }
 
@@ -208,8 +379,15 @@ async function disconnect() {
 		// Update UI
 		statusText.value = 'Disconnected'
 		statusText.color = '#cccccc'
+		statusText.visible = true
+		userInfoContainer.visible = false
 		buttonText.value = app.config?.buttonText || 'Connect Cartridge'
 		connectButton.backgroundColor = app.config?.buttonColor || '#10b981'
+
+		// Clear user info
+		usernameText.value = ''
+		walletAddressText.value = ''
+		balanceText.value = ''
 
 		// Emit event
 		app.emit('cartridgeDisconnected', {})
@@ -230,8 +408,15 @@ async function disconnect() {
 
 		statusText.value = 'Disconnected'
 		statusText.color = '#cccccc'
+		statusText.visible = true
+		userInfoContainer.visible = false
 		buttonText.value = app.config?.buttonText || 'Connect Cartridge'
 		connectButton.backgroundColor = app.config?.buttonColor || '#10b981'
+
+		// Clear user info
+		usernameText.value = ''
+		walletAddressText.value = ''
+		balanceText.value = ''
 	}
 }
 
