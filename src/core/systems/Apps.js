@@ -54,6 +54,10 @@ export class Apps extends System {
       prefs(entity) {
         return world.prefs
       },
+      // Expose world.web3 to apps for cartridge integration
+      web3(entity) {
+        return world.web3
+      },
     }
     this.worldSetters = {
       // ...
