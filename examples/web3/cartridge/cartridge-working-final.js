@@ -16,6 +16,20 @@ app.configure([
 		label: 'Button Color',
 		hint: 'Background color of the connect button (hex or color name).',
 		initial: '#10b981'
+	},
+	{
+		key: 'hotKeyToggle',
+		type: 'text',
+		label: 'Toggle UI Hotkey',
+		hint: 'Keyboard key to show/hide the cartridge UI (single character).',
+		initial: 'I'
+	},
+	{
+		key: 'hotKeyConnect',
+		type: 'text',
+		label: 'Quick Connect Hotkey',
+		hint: 'Keyboard key for quick cartridge connect/disconnect (single character).',
+		initial: 'Q'
 	}
 ])
 
@@ -25,6 +39,14 @@ let cartridgeState = {
 	address: null,
 	cartridge: null
 }
+
+// Hotkey system variables (inspired by wallet-connect.js)
+let control = null
+let uiVisible = true
+let hotKeyToggleCtrl = null
+let hotKeyConnectCtrl = null
+let toggleKeyPrevPressed = false
+let connectKeyPrevPressed = false
 
 // Create main UI container
 const mainUI = app.create('ui', {
@@ -64,6 +86,16 @@ const statusText = app.create('uitext', {
 	color: '#cccccc',
 	fontSize: 14,
 	textAlign: 'center'
+})
+
+// Create hotkey hints text
+const hotkeysText = app.create('uitext', {
+	value: 'I: Toggle UI • Q: Quick Connect',
+	color: '#64748b', // Muted gray
+	fontSize: 10,
+	textAlign: 'center',
+	fontWeight: '400',
+	opacity: 0.7
 })
 
 // Create user info container (shown when connected)
@@ -151,6 +183,7 @@ connectButton.add(buttonText)
 mainUI.add(connectButton)
 mainUI.add(statusText)
 mainUI.add(userInfoContainer)
+mainUI.add(hotkeysText)
 app.add(mainUI)
 
 // Event handlers
@@ -200,6 +233,116 @@ connectButton.onPointerOut = () => {
 		connectButton.backgroundColor = app.config?.buttonColor || '#10b981'
 	}
 }
+
+// Function to update hotkey hints
+function updateHotkeyHints() {
+	const toggleKey = (app.config && app.config.hotKeyToggle) || 'I'
+	const connectKey = (app.config && app.config.hotKeyConnect) || 'Q'
+
+	let connectHint = 'Quick Connect'
+	if (cartridgeState.connected) {
+		connectHint = 'Disconnect'
+	}
+
+	hotkeysText.value = `${toggleKey}: Toggle UI • ${connectKey}: ${connectHint}`
+}
+
+// Initialize hotkeys on client (inspired by wallet-connect.js)
+function initHotkeys() {
+	if (!world.isClient) return
+
+	try {
+		control = app.control()
+		if (!control) return
+
+		console.log('[Cartridge] Initializing hotkey system')
+
+		// Function to map a single character to control key handle
+		function resolveKey(char, fallbackChar) {
+			const letter = (char || fallbackChar || '').trim().toUpperCase()
+			const k = control['key' + letter]
+			return k || control['key' + fallbackChar]
+		}
+
+		function refreshKeyBindings() {
+			// Release previous captures
+			if (hotKeyToggleCtrl) hotKeyToggleCtrl.capture = false
+			if (hotKeyConnectCtrl) hotKeyConnectCtrl.capture = false
+
+			// Get keys from app config
+			const toggleKey = (app.config && app.config.hotKeyToggle) || 'I'
+			const connectKey = (app.config && app.config.hotKeyConnect) || 'Q'
+
+			hotKeyToggleCtrl = resolveKey(toggleKey, 'I')
+			hotKeyConnectCtrl = resolveKey(connectKey, 'Q')
+
+			// Capture the keys
+			if (hotKeyToggleCtrl) {
+				hotKeyToggleCtrl.capture = true
+				console.log('[Cartridge] Bound toggle key:', toggleKey, 'to control:', hotKeyToggleCtrl)
+			}
+			if (hotKeyConnectCtrl) {
+				hotKeyConnectCtrl.capture = true
+				console.log('[Cartridge] Bound connect key:', connectKey, 'to control:', hotKeyConnectCtrl)
+			}
+
+			console.log('[Cartridge] Hotkeys configured:', {
+				toggle: toggleKey,
+				connect: connectKey,
+				toggleControl: !!hotKeyToggleCtrl,
+				connectControl: !!hotKeyConnectCtrl
+			})
+		}
+
+		// Initial binding
+		refreshKeyBindings()
+		// Store on control for access in update loop
+		control._refreshCartridgeKeyBindings = refreshKeyBindings
+
+	} catch (error) {
+		console.error('[Cartridge] Error initializing hotkeys:', error)
+	}
+}
+
+// Toggle UI visibility
+function toggleUI() {
+	uiVisible = !uiVisible
+	mainUI.active = uiVisible
+	console.log('[Cartridge] UI', uiVisible ? 'shown' : 'hidden')
+}
+
+// Quick connect/disconnect
+async function quickConnect() {
+	if (cartridgeState.connected) {
+		// Disconnect
+		await disconnect()
+	} else {
+		// Connect
+		await connect()
+	}
+}
+
+// Hotkey update loop (inspired by wallet-connect.js)
+app.on('update', () => {
+	if (!world.isClient || !control) return
+
+	// Refresh key bindings in case config changed
+	if (control._refreshCartridgeKeyBindings) {
+		control._refreshCartridgeKeyBindings()
+	}
+
+	// Handle toggle UI hotkey
+	if (hotKeyToggleCtrl?.pressed && !toggleKeyPrevPressed) {
+		toggleUI()
+	}
+	toggleKeyPrevPressed = hotKeyToggleCtrl?.pressed
+
+	// Handle quick connect/disconnect hotkey
+	if (hotKeyConnectCtrl?.pressed && !connectKeyPrevPressed) {
+		quickConnect()
+	}
+	connectKeyPrevPressed = hotKeyConnectCtrl?.pressed
+})
 
 // Fetch username for the connected wallet
 async function fetchUsername(address) {
@@ -392,6 +535,9 @@ async function onConnectionSuccess(connectionResult) {
 		balanceText.value = 'Balance: Loading...'
 	}
 
+	// Update hotkey hints
+	updateHotkeyHints()
+
 	// Emit event for other apps
 	app.emit('cartridgeConnected', {
 		connected: true,
@@ -429,6 +575,9 @@ async function disconnect() {
 		walletAddressText.value = ''
 		balanceText.value = ''
 
+		// Update hotkey hints
+		updateHotkeyHints()
+
 		// Emit event
 		app.emit('cartridgeDisconnected', {})
 
@@ -457,6 +606,9 @@ async function disconnect() {
 		usernameText.value = ''
 		walletAddressText.value = ''
 		balanceText.value = ''
+
+		// Update hotkey hints
+		updateHotkeyHints()
 	}
 }
 
@@ -478,6 +630,13 @@ function getWalletState() {
 
 function getCartridge() {
 	return cartridgeState.cartridge
+}
+
+// Initialize hotkeys on client
+if (world.isClient) {
+	initHotkeys()
+	// Set initial hotkey hints
+	updateHotkeyHints()
 }
 
 // Initial diagnostics
