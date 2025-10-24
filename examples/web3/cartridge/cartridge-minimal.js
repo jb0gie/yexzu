@@ -1,30 +1,46 @@
-// Ultra minimal - no console.log at all
+// Cartridge implementation - following working wallet-connect.js pattern
 
-if (world.isClient) {
-  // Silent cartridge
-  let connected = false
-  let address = null
+({
+  init() {
+    if (!world.isClient) return
+
+    // Cartridge state
+    this.connected = false
+    this.address = null
+
+    console.log('[Cartridge] Initialized')
+  },
 
   // Connection function
-  function connect() {
-    connected = true
-    address = "0x1234567890abcdef"
-    return { connected, address }
+  connect() {
+    this.connected = true
+    this.address = "0x1234567890abcdef"
+    console.log('[Cartridge] Connected:', this.address)
+    return { connected: this.connected, address: this.address }
+  },
+
+  // Disconnect function
+  disconnect() {
+    this.connected = false
+    this.address = null
+    console.log('[Cartridge] Disconnected')
+  },
+
+  // Get state function
+  getState() {
+    return { connected: this.connected, address: this.address }
+  },
+
+  // Expose functions to global scope properly
+  connectWallet() {
+    return this.connect()
+  },
+
+  disconnectWallet() {
+    this.disconnect()
+  },
+
+  getWalletState() {
+    return this.getState()
   }
-
-  // Expose functions globally for testing
-  this.connectWallet = connect
-  this.disconnectWallet = function() {
-    connected = false
-    address = null
-  }
-
-  this.getWalletState = function() {
-    return { connected, address }
-  }
-
-} else {
-  // Server silent
-}
-
-;;null
+})
