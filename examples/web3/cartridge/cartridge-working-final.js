@@ -15,7 +15,7 @@ app.configure([
 		type: 'color',
 		label: 'Button Color',
 		hint: 'Background color of the connect button (hex or color name).',
-		initial: '#10b981'
+		initial: '#8b5cf6' // Cartridge purple
 	},
 	{
 		key: 'hotKeyToggle',
@@ -48,28 +48,36 @@ let hotKeyConnectCtrl = null
 let toggleKeyPrevPressed = false
 let connectKeyPrevPressed = false
 
-// Create main UI container
+// Create main UI container with Cartridge branding
 const mainUI = app.create('ui', {
 	space: 'screen',
 	pivot: 'top-center',
 	position: [0.9, 0.1, 0],
 	width: 280,
 	height: 220,
-	backgroundColor: 'rgba(0, 0, 0, 0.8)',
-	borderRadius: 12,
+	backgroundColor: 'rgba(17, 24, 39, 0.95)', // Dark slate with higher opacity
+	borderRadius: 16,
 	padding: 16,
 	flexDirection: 'column',
-	gap: 12
+	gap: 12,
+	borderWidth: 2,
+	borderColor: 'rgba(139, 92, 246, 0.6)', // Cartridge purple border
+	shadowColor: 'rgba(139, 92, 246, 0.3)', // Purple glow
+	shadowBlur: 8
 })
 
-// Create connect button
+// Create connect button with Cartridge styling
 const connectButton = app.create('uiview', {
 	width: 220,
-	height: 45,
-	backgroundColor: app.config?.buttonColor || '#10b981',
-	borderRadius: 8,
+	height: 48,
+	backgroundColor: app.config?.buttonColor || '#8b5cf6', // Cartridge purple
+	borderRadius: 12,
 	justifyContent: 'center',
-	alignItems: 'center'
+	alignItems: 'center',
+	borderWidth: 1,
+	borderColor: 'rgba(168, 85, 247, 0.4)', // Lighter purple border
+	shadowColor: 'rgba(139, 92, 246, 0.4)', // Purple shadow
+	shadowBlur: 6
 })
 
 const buttonText = app.create('uitext', {
@@ -98,13 +106,18 @@ const hotkeysText = app.create('uitext', {
 	opacity: 0.7
 })
 
-// Create user info container (shown when connected)
+// Create user info container (shown when connected) with Cartridge styling
 const userInfoContainer = app.create('ui', {
 	width: 250,
 	height: 120,
 	flexDirection: 'column',
 	gap: 8,
-	visible: false // Hidden initially
+	visible: false, // Hidden initially
+	backgroundColor: 'rgba(139, 92, 246, 0.1)', // Subtle purple background
+	borderRadius: 12,
+	padding: 12,
+	borderWidth: 1,
+	borderColor: 'rgba(168, 85, 247, 0.3)' // Light purple border
 })
 
 // Username display
@@ -141,14 +154,16 @@ const walletAddressText = app.create('uitext', {
 	textAlign: 'left'
 })
 
-// Copy wallet button
+// Copy wallet button with Cartridge styling
 const copyButton = app.create('uiview', {
 	width: 60,
-	height: 25,
-	backgroundColor: '#3b82f6',
-	borderRadius: 4,
+	height: 28,
+	backgroundColor: 'rgba(168, 85, 247, 0.8)', // Cartridge purple
+	borderRadius: 8,
 	justifyContent: 'center',
-	alignItems: 'center'
+	alignItems: 'center',
+	borderWidth: 1,
+	borderColor: 'rgba(196, 181, 253, 0.4)' // Light purple border
 })
 
 const copyButtonText = app.create('uitext', {
@@ -178,9 +193,21 @@ walletInfoContainer.add(balanceText)
 userInfoContainer.add(usernameText)
 userInfoContainer.add(walletInfoContainer)
 
+// Add Cartridge title/branding
+const cartridgeTitle = app.create('uitext', {
+	value: '⚡ CARTRIDGE',
+	color: '#a855f7', // Bright purple
+	fontSize: 12,
+	fontWeight: 'bold',
+	textAlign: 'center',
+	letterSpacing: 2,
+	opacity: 0.8
+})
+
 // Add components
 connectButton.add(buttonText)
 mainUI.add(connectButton)
+mainUI.add(cartridgeTitle)
 mainUI.add(statusText)
 mainUI.add(userInfoContainer)
 mainUI.add(hotkeysText)
@@ -193,9 +220,9 @@ connectButton.onPointerDown = () => {
 
 connectButton.onPointerOver = () => {
 	if (cartridgeState.connected) {
-		connectButton.backgroundColor = '#dc2626'
+		connectButton.backgroundColor = '#dc2626' // Darker red for disconnect
 	} else {
-		connectButton.backgroundColor = '#059669'
+		connectButton.backgroundColor = 'rgba(168, 85, 247, 0.9)' // Lighter Cartridge purple on hover
 	}
 }
 
@@ -206,10 +233,10 @@ copyButton.onPointerDown = () => {
 		if (typeof navigator !== 'undefined' && navigator.clipboard) {
 			navigator.clipboard.writeText(cartridgeState.address).then(() => {
 				copyButtonText.value = 'Copied!'
-				copyButton.backgroundColor = '#10b981'
+				copyButton.backgroundColor = '#10b981' // Green for success
 				setTimeout(() => {
 					copyButtonText.value = 'Copy'
-					copyButton.backgroundColor = '#3b82f6'
+					copyButton.backgroundColor = 'rgba(168, 85, 247, 0.8)' // Back to Cartridge purple
 				}, 2000)
 			}).catch(err => {
 				console.error('[Cartridge] Failed to copy address:', err)
@@ -219,18 +246,18 @@ copyButton.onPointerDown = () => {
 }
 
 copyButton.onPointerOver = () => {
-	copyButton.backgroundColor = '#2563eb'
+	copyButton.backgroundColor = 'rgba(196, 181, 253, 0.9)' // Lighter purple on hover
 }
 
 copyButton.onPointerOut = () => {
-	copyButton.backgroundColor = '#3b82f6'
+	copyButton.backgroundColor = 'rgba(168, 85, 247, 0.8)' // Back to normal Cartridge purple
 }
 
 connectButton.onPointerOut = () => {
 	if (cartridgeState.connected) {
-		connectButton.backgroundColor = '#ef4444'
+		connectButton.backgroundColor = '#ef4444' // Red for disconnect
 	} else {
-		connectButton.backgroundColor = app.config?.buttonColor || '#10b981'
+		connectButton.backgroundColor = app.config?.buttonColor || '#8b5cf6' // Cartridge purple
 	}
 }
 
