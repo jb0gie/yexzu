@@ -40,6 +40,23 @@ export class Client extends System {
             } catch (_) {}
             return []
           },
+          bones: {
+            toggle: enabled => {
+              try {
+                const inst = this.world.entities.player?.avatar?.instance
+                if (inst && inst.setBonesVisible) {
+                  inst.setBonesVisible(enabled)
+                  console.log(`🦴 Bones visibility: ${enabled ? 'ON' : 'OFF'}`)
+                  return true
+                }
+                console.log('❌ No VRM found with bone visibility support')
+                return false
+              } catch (e) {
+                console.error('Error toggling bone visibility:', e)
+                return false
+              }
+            },
+          },
         }),
         configurable: true,
       })
