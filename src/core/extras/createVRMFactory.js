@@ -769,8 +769,13 @@ export function createVRMFactory(glb, setupMaterial) {
       }
       try {
         hasSprings = spring.joints && spring.joints.size > 0
-        // optional global tuning (neutral by default; use hooks.springTuning to tweak)
-        const tuning = hooks.springTuning || { stiffness: 1.0, dragForce: 1.0, gravityPower: 1.0, hitRadius: 1.0 }
+        // Gentle spring bone physics tuning to prevent spazzing
+        const tuning = hooks.springTuning || {
+          stiffness: 1.2,      // Slightly increased responsiveness, but not too high
+          dragForce: 1.0,      // Keep at 1.0 for stable movement
+          gravityPower: 1.0,   // Keep at 1.0 for natural gravity
+          hitRadius: 1.0       // Default collision radius
+        }
         try {
           spring.joints.forEach(joint => {
             const s = joint.settings
@@ -785,10 +790,37 @@ export function createVRMFactory(glb, setupMaterial) {
             }
           })
         } catch (_) { }
-        // re-init after tuning/collider changes so initial state is consistent
+        // Enhanced spring initialization with stability checks
         try {
+          // Set initial state before applying tuning
           spring.setInitState()
-        } catch (_) { }
+
+          // Apply per-joint optimization for different body parts
+          spring.joints.forEach(joint => {
+            const s = joint.settings
+            if (!s) return
+
+            // Subtle enhancements for different bone types to prevent instability
+            const boneName = joint.bone?.name?.toLowerCase() || ''
+            if (boneName.includes('hair') || boneName.includes('tail')) {
+              // Only very slight increase for hair/tail to prevent spazzing
+              s.stiffness *= 1.05  // Minimal increase (5%)
+            }
+
+            // Keep chest/spine bones at default stability
+            // No modifications to prevent instability
+
+            // Ensure minimum threshold values to prevent dead springs
+            s.stiffness = Math.max(s.stiffness, 0.5)
+            s.dragForce = Math.max(s.dragForce, 0.1)
+            s.gravityPower = Math.max(s.gravityPower, 0.1)
+          })
+
+          // Re-initialize with optimized settings
+          spring.setInitState()
+        } catch (e) {
+          console.warn('[VRM] Spring bone initialization failed:', e)
+        }
         // build spring joint pairs (orig -> clone) using clone skeleton lookup by name
         spring.joints.forEach(joint => {
           const src = joint.bone
@@ -866,14 +898,35 @@ export function createVRMFactory(glb, setupMaterial) {
           spring.setInitState()
         } catch (_) { }
         console.log(
-          '[vrmFactory] spring mapping counts',
+          '[vrmFactory] Enhanced spring bone system initialized',
           'springs:',
           spring.joints.size,
           'pairs:',
           springPairs.length,
           'drive:',
-          drivePairs.length
+          drivePairs.length,
+          'tuning:',
+          JSON.stringify({
+            stiffness: tuning.stiffness?.toFixed(2),
+            dragForce: tuning.dragForce?.toFixed(2),
+            gravityPower: tuning.gravityPower?.toFixed(2)
+          })
         )
+
+        // Log spring bone configuration for debugging
+        let activeSprings = 0
+        spring.joints.forEach(joint => {
+          if (joint.settings && joint.bone) {
+            activeSprings++
+            if (activeSprings <= 5) { // Log first 5 for debugging
+              console.log(`[VRM] Spring ${joint.bone.name}:`, {
+                stiffness: joint.settings.stiffness?.toFixed(3),
+                dragForce: joint.settings.dragForce?.toFixed(3),
+                gravityPower: joint.settings.gravityPower?.toFixed(3)
+              })
+            }
+          }
+        })
       } catch (_) {
         // ignore
       }
@@ -1028,8 +1081,9 @@ export function createVRMFactory(glb, setupMaterial) {
           bone.updateMatrixWorld(true)
         }
 
-        // advance VRM systems (includes node constraints + spring bones)
-        origVRM.update(delta) // Use current frame delta time for fluid motion
+        // Simple, stable spring bone physics update
+        const physicsDelta = Math.min(delta, 0.020) // Clamp to 50fps to prevent instability
+        origVRM.update(physicsDelta)
 
         // Batch mirror spring joints back to clone only
         const clonesNeedingUpdate = []
@@ -1050,6 +1104,9 @@ export function createVRMFactory(glb, setupMaterial) {
         for (const m of skinnedMeshes) {
           THREE.Skeleton.prototype.update.call(m.skeleton)
         }
+
+        // Update bone helpers for debugging visualization
+        updateBoneHelpers()
       }
     }
 
@@ -1588,6 +1645,117 @@ export function createVRMFactory(glb, setupMaterial) {
       firstPersonActive = active
     }
 
+    // Bone visibility system for debugging
+    let bonesVisible = false
+    const boneHelpers = new Map()
+    const boneLines = new Map()
+
+    const setBonesVisible = (visible) => {
+      if (bonesVisible === visible) return
+      bonesVisible = visible
+
+      if (visible) {
+        console.log('[VRM] Showing bone helpers for debugging')
+        skeleton.bones.forEach(bone => {
+          if (!bone) return
+
+          // Create bone sphere helper if doesn't exist
+          if (!boneHelpers.has(bone)) {
+            const geometry = new THREE.SphereGeometry(0.03, 6, 4) // Much smaller spheres
+            const material = new THREE.MeshBasicMaterial({
+              color: 0x00ff00, // Bright green color
+              depthTest: false, // Render on top
+              depthWrite: false,
+              transparent: true,
+              opacity: 0.9
+            })
+            const helper = new THREE.Mesh(geometry, material)
+            helper.matrixAutoUpdate = false
+            helper.renderOrder = 9999 // Render last/on top
+            boneHelpers.set(bone, helper)
+          }
+
+          const helper = boneHelpers.get(bone)
+          helper.matrix.copy(bone.matrixWorld)
+          helper.visible = true
+          vrm.scene.add(helper)
+
+          // Create bone connection lines to parent
+          if (bone.parent && bone.parent.isBone && !boneLines.has(bone)) {
+            const lineGeometry = new THREE.BufferGeometry()
+            const lineMaterial = new THREE.LineBasicMaterial({
+              color: 0xffff00, // Yellow lines
+              depthTest: false, // Render on top
+              depthWrite: false,
+              transparent: true,
+              opacity: 0.6
+            })
+            const line = new THREE.Line(lineGeometry, lineMaterial)
+            line.renderOrder = 9998 // Just below spheres
+            line.matrixAutoUpdate = false
+            boneLines.set(bone, line)
+          }
+
+          const line = boneLines.get(bone)
+          if (line) {
+            // Update line vertices
+            const positions = new Float32Array(6) // 2 points * 3 coordinates
+            const bonePos = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld)
+            const parentPos = new THREE.Vector3().setFromMatrixPosition(bone.parent.matrixWorld)
+
+            positions[0] = parentPos.x
+            positions[1] = parentPos.y
+            positions[2] = parentPos.z
+            positions[3] = bonePos.x
+            positions[4] = bonePos.y
+            positions[5] = bonePos.z
+
+            line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+            line.visible = true
+            vrm.scene.add(line)
+          }
+        })
+      } else {
+        console.log('[VRM] Hiding bone helpers')
+        boneHelpers.forEach(helper => {
+          vrm.scene.remove(helper)
+        })
+        boneLines.forEach(line => {
+          vrm.scene.remove(line)
+        })
+      }
+    }
+
+    // Update bone helpers and lines to follow bones
+    const updateBoneHelpers = () => {
+      if (!bonesVisible) return
+
+      // Update bone sphere positions
+      boneHelpers.forEach((helper, bone) => {
+        if (bone && helper) {
+          helper.matrix.copy(bone.matrixWorld)
+        }
+      })
+
+      // Update bone connection lines
+      boneLines.forEach((line, bone) => {
+        if (bone && line && bone.parent && bone.parent.isBone) {
+          const positions = new Float32Array(6)
+          const bonePos = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld)
+          const parentPos = new THREE.Vector3().setFromMatrixPosition(bone.parent.matrixWorld)
+
+          positions[0] = parentPos.x
+          positions[1] = parentPos.y
+          positions[2] = parentPos.z
+          positions[3] = bonePos.x
+          positions[4] = bonePos.y
+          positions[5] = bonePos.z
+
+          line.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+        }
+      })
+    }
+
     return {
       raw: vrm,
       height,
@@ -1620,6 +1788,7 @@ export function createVRMFactory(glb, setupMaterial) {
         blinkingEnabled = !!active
       },
       setFirstPerson,
+      setBonesVisible, // Toggle bone visibility for debugging
       update,
       updateRate,
       getBoneTransform,
@@ -1694,6 +1863,17 @@ export function createVRMFactory(glb, setupMaterial) {
         rateCheck = false
       },
       destroy() {
+        // Clean up bone helpers and lines
+        boneHelpers.forEach(helper => {
+          vrm.scene.remove(helper)
+        })
+        boneHelpers.clear()
+
+        boneLines.forEach(line => {
+          vrm.scene.remove(line)
+        })
+        boneLines.clear()
+
         hooks.scene.remove(vrm.scene)
         // world.updater.remove(update)
         hooks.octree?.remove(sItem)

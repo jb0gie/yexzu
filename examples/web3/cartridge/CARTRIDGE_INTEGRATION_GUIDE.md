@@ -145,8 +145,7 @@ if (world.isClient && world.web3) {
 
 - **System**: `/src/core/systems/ClientWeb3.js` (185 lines - production code)
 - **Registration**: `/src/core/createClientWorld.js` (line 47)
-- **Examples**: `/examples/web3/cartridge/cartridge-integration.js`
-- **Diagnostic**: `/examples/web3/cartridge/cartridge-system-diagnostic.js`
+- **Example**: `/examples/web3/cartridge/cartridge.js`
 
 ## Dependencies
 
@@ -195,9 +194,8 @@ This means:
 ❌ **Cannot connect real cartridge wallets** (SES sandbox limitation)
 
 ### Working Files Created:
-1. **`cartridge-minimal.js`** - Minimal test implementation (fixes TypeError#6)
-2. **`cartridge-working-final.js`** - Complete UI implementation with real integration
-3. **Updated `CARTRIDGE_INTEGRATION_GUIDE.md`** - Comprehensive documentation
+1. **`cartridge.js`** - Complete production implementation with Cartridge branding
+2. **Updated `CARTRIDGE_INTEGRATION_GUIDE.md`** - Comprehensive documentation
 
 ### Key Technical Breakthrough:
 The main issue was **SES sandbox compatibility**. In Hyperfy's SES environment:
