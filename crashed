@@ -30,4 +30,38 @@ bash: command not found: TypeError#1
 [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at Object.exec (file:///home/blank/Work/hyperfy/src/core/systems/Scripts.js:70:16)
 [?2004lbash: syntax error near unexpected token `('
 ]0;blank@uzxey:~/Work/hyperfy[?2004h
-[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///hom
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)^C[?2004l[?2004h[?2004l
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m l[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [Cs[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [C[C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m s[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [Cl[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [C[C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m l[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [Cs[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m✗[0m [C[C
+[?2004l[4mPermissions[0m [4mSize[0m [4mUser[0m  [4mDate Modified[0m [4mName[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m29 Oct 09:16[0m  [34m [1mapps[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m30 Oct 16:00[0m  [34m󱧼 [1mbuild[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m25 Oct 11:18[0m  [34m [1mcode_search_index[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m30 Oct 15:13[0m  [34m [1mdocs[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m30 Oct 15:13[0m  [34m [1mexamples[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m30 Oct 15:32[0m  [34m [1mnode_modules[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m 4 Oct 09:34[0m  [34m [1mscripts[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m 4 Oct 09:34[0m  [34m󰣞 [1msrc[0m
+[1;34md[33mr[31mw[32mx[0m[33mr[1;90m-[0m[32mx[33mr[1;90m-[0m[32mx[0m     [1;90m-[0m [1;33mblank[0m [34m30 Oct 16:05[0m  [34m [1mworld[0m
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m1.4k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   agent.mjs
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m261k[0m [1;33mblank[0m [34m29 Oct 09:22[0m   bun.lock
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m   [1;32m19k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   CHANGELOG.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m7.2k[0m [1;33mblank[0m [34m25 Oct 11:18[0m   CLAUDE.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m5.1k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   CODE_OF_CONDUCT.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m3.9k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   CONTRIBUTING.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m4.1k[0m [1;33mblank[0m [34m30 Oct 15:47[0m  󰡯 crashed
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m   [32m888[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   DOCKER.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m1.0k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m  [33m [1;4mDockerfile[0m
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m   [32m885[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   ISSUE_TEMPLATE.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m   [1;32m35k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   LICENSE
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m   [32m524[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   MIGRATIONS.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m221k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m  [35m overview.png[0m
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m493k[0m [1;33mblank[0m [34m30 Oct 15:32[0m   package-lock.json
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m2.9k[0m [1;33mblank[0m [34m30 Oct 15:32[0m  [33m [1;4mpackage.json[0m
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m1.2k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m   PULL_REQUEST_TEMPLATE.md
+.[1;33mr[31mw[90m-[0m[33mr[1;90m--[0m[33mr[1;90m--[0m  [1;32m3.8k[0m [1;33mblank[0m [34m 4 Oct 09:34[0m  [33m󰂺 [1;4mREADME.md[0m
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m c[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [Cl[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [C[Cear
+[?2004l[H[2J[3J]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m c[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [Cl[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [C[Ca[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [C[C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [C[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m [1m❯[0m 
+Script done on 2025-10-30 16:25:29+00:00 [COMMAND_EXIT_CODE="0"]
