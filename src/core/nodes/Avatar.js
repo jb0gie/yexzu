@@ -134,9 +134,9 @@ export class Avatar extends Node {
   }
 
   addBoneRotation(boneName, euler) {
-    console.log('[avatar] addBoneRotation called for bone:', boneName, 'instance exists:', !!this.instance)
+    // console.log('[avatar] addBoneRotation called for bone:', boneName, 'instance exists:', !!this.instance)
     const result = this.instance?.addBoneRotation?.(boneName, euler)
-    console.log('[avatar] addBoneRotation result:', result)
+    // console.log('[avatar] addBoneRotation result:', result)
     return result
   }
 

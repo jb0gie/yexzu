@@ -28,13 +28,13 @@ export class ClientWeb3 extends System {
 
   async init(options = {}) {
     try {
-      console.log('[ClientWeb3] Initializing Web3 system...')
-      console.log('[ClientWeb3] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Unknown')
+      // console.log('[ClientWeb3] Initializing Web3 system...')
+      // console.log('[ClientWeb3] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Unknown')
 
       // We operate at the system level, not inside SES sandbox
       this.isInitializing = true
       this.initWeb3({})
-      console.log('[ClientWeb3] Web3 system initialized successfully')
+      // console.log('[ClientWeb3] Web3 system initialized successfully')
     } catch (error) {
       console.error('[ClientWeb3] Failed to initialize Web3 system:', error)
       this.initError = error
@@ -52,8 +52,8 @@ export class ClientWeb3 extends System {
     keychainUrl = 'https://x.cartridge.gg',
     requireCartridge = true, // Make cartridge requirement explicit
   } = {}) {
-    console.log('[ClientWeb3] ===== CARTRIDGE ENGINE FEATURE INITIALIZATION =====')
-    console.log('[ClientWeb3] Forcing cartridge initialization as engine requirement...')
+    // console.log('[ClientWeb3] ===== CARTRIDGE ENGINE FEATURE INITIALIZATION =====')
+    // console.log('[ClientWeb3] Forcing cartridge initialization as engine requirement...')
 
     // Cartridge is now a required engine feature - fail fast if not available
     if (typeof window === 'undefined') {
@@ -85,20 +85,20 @@ export class ClientWeb3 extends System {
       ]
     }
 
-    console.log('[ClientWeb3] Environment Validation:')
-    console.log('[ClientWeb3] ✅ window:', typeof window !== 'undefined')
-    console.log('[ClientWeb3] ✅ localStorage:', typeof localStorage !== 'undefined')
-    console.log('[ClientWeb3] ✅ WebSocket:', typeof WebSocket !== 'undefined')
+    // console.log('[ClientWeb3] Environment Validation:')
+    // console.log('[ClientWeb3] ✅ window:', typeof window !== 'undefined')
+    // console.log('[ClientWeb3] ✅ localStorage:', typeof localStorage !== 'undefined')
+    // console.log('[ClientWeb3] ✅ WebSocket:', typeof WebSocket !== 'undefined')
 
     // === ENGINE FEATURE: CARTRIDGE CONTROLLER INITIALIZATION ===
-    console.log('[ClientWeb3] ===== INITIALIZING CARTRIDGE CONTROLLER (ENGINE LEVEL) =====')
-    console.log('[ClientWeb3] Configuration:', config)
+    // console.log('[ClientWeb3] ===== INITIALIZING CARTRIDGE CONTROLLER (ENGINE LEVEL) =====')
+    // console.log('[ClientWeb3] Configuration:', config)
 
     try {
       this.controller = new ControllerProvider(config)
-      console.log('[ClientWeb3] ✅ Cartridge Controller initialized successfully!')
-      console.log('[ClientWeb3] ✅ Engine feature ready: Cartridge Controller v0.10.7')
-      console.log('[ClientWeb3] ✅ Available commands: connect(), disconnect(), execute()')
+      // console.log('[ClientWeb3] ✅ Cartridge Controller initialized successfully!')
+      // console.log('[ClientWeb3] ✅ Engine feature ready: Cartridge Controller v0.10.7')
+      // console.log('[ClientWeb3] ✅ Available commands: connect(), disconnect(), execute()')
     } catch (error) {
       // ===== ENGINE FAILURE: CARTRIDGE FEATURE NOT INITIALIZED =====
       console.error('[ClientWeb3] ======================================================')
@@ -124,19 +124,19 @@ export class ClientWeb3 extends System {
     }
 
     // ===== SUCCESS: CARTRIDGE ENGINE FEATURE INITIALIZED =====
-    console.log('[ClientWeb3] ======================================================')
-    console.log('[ClientWeb3] ✅ CARTRIDGE ENGINE FEATURE INITIALIZED SUCCESSFULLY')
-    console.log('[ClientWeb3] ======================================================')
-    console.log('[ClientWeb3] Engine Status: OPERATIONAL')
-    console.log('[ClientWeb3] Feature: Cartridge Controller v0.10.7')
-    console.log('[ClientWeb3] Environment: Browser Client')
-    console.log('[ClientWeb3] Networks: Sepolia + Mainnet Ready')
-    console.log('[ClientWeb3] API: world.web3 available for apps')
-    console.log('[ClientWeb3] ======================================================')
+    // console.log('[ClientWeb3] ======================================================')
+    // console.log('[ClientWeb3] ✅ CARTRIDGE ENGINE FEATURE INITIALIZED SUCCESSFULLY')
+    // console.log('[ClientWeb3] ======================================================')
+    // console.log('[ClientWeb3] Engine Status: OPERATIONAL')
+    // console.log('[ClientWeb3] Feature: Cartridge Controller v0.10.7')
+    // console.log('[ClientWeb3] Environment: Browser Client')
+    // console.log('[ClientWeb3] Networks: Sepolia + Mainnet Ready')
+    // console.log('[ClientWeb3] API: world.web3 available for apps')
+    // console.log('[ClientWeb3] ======================================================')
 
     // Create the world.web3 API with proper binding
     this.createWorldWeb3API()
-    console.log('[ClientWeb3] ✅ World API attached: world.web3')
+    // console.log('[ClientWeb3] ✅ World API attached: world.web3')
   }
 
   getControllerInitError() {
@@ -211,13 +211,13 @@ export class ClientWeb3 extends System {
   }
 
   createWorldWeb3API() {
-    console.log('[ClientWeb3] 🔧 CREATING WORLD WEB3 API - REAL CARTRIDGE INTEGRATION')
-    console.log('[ClientWeb3] ======================================================')
-    console.log('[ClientWeb3] ✅ Engine Feature: Cartridge Controller v0.10.7')
-    console.log('[ClientWeb3] ✅ Integration: Real @cartridge/controller')
-    console.log('[ClientWeb3] ✅ Networks: StarkNet Sepolia + Mainnet')
-    console.log('[ClientWeb3] ✅ API: Real transaction execution')
-    console.log('[ClientWeb3] ======================================================')
+    // console.log('[ClientWeb3] 🔧 CREATING WORLD WEB3 API - REAL CARTRIDGE INTEGRATION')
+    // console.log('[ClientWeb3] ======================================================')
+    // console.log('[ClientWeb3] ✅ Engine Feature: Cartridge Controller v0.10.7')
+    // console.log('[ClientWeb3] ✅ Integration: Real @cartridge/controller')
+    // console.log('[ClientWeb3] ✅ Networks: StarkNet Sepolia + Mainnet')
+    // console.log('[ClientWeb3] ✅ API: Real transaction execution')
+    // console.log('[ClientWeb3] ======================================================')
 
     // Create the real world.web3 API with actual cartridge integration
     this.world.web3 = {
@@ -259,7 +259,7 @@ export class ClientWeb3 extends System {
       })
     }
 
-    console.log('[ClientWeb3] ✅ WORLD WEB3 API CREATED - Real cartridge integration ready')
+    // console.log('[ClientWeb3] ✅ WORLD WEB3 API CREATED - Real cartridge integration ready')
   }
 
   connect = async () => {

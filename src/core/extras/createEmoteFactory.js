@@ -11,7 +11,7 @@ export function createEmoteFactory(glb, url) {
 
   // Safety check: ensure GLB has children before accessing scale
   if (!glb.scene.children || glb.scene.children.length === 0) {
-    console.error(`[createEmoteFactory] GLB has no children, cannot process emote. URL: ${url}`)
+    // console.error(`[createEmoteFactory] GLB has no children, cannot process emote. URL: ${url}`)
     // Return a minimal factory that returns empty clips
     return {
       toClip() {
@@ -60,13 +60,13 @@ export function createEmoteFactory(glb, url) {
     const mixamoRigName = trackSplitted[0]
     const mixamoRigNode = glb.scene.getObjectByName(mixamoRigName)
     if (!mixamoRigNode) {
-      console.warn(`[createEmoteFactory] Could not find bone: ${mixamoRigName} in ${url}`)
+      // console.warn(`[createEmoteFactory] Could not find bone: ${mixamoRigName} in ${url}`)
       return
     }
     mixamoRigNode.getWorldQuaternion(restRotationInverse).invert()
     const parent = mixamoRigNode.parent
     if (!parent) {
-      console.warn(`[createEmoteFactory] Bone ${mixamoRigName} has no parent in ${url}`)
+      // console.warn(`[createEmoteFactory] Bone ${mixamoRigName} has no parent in ${url}`)
       return
     }
     parent.getWorldQuaternion(parentRestWorldRotation)

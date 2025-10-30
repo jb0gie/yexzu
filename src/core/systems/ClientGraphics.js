@@ -52,7 +52,7 @@ export class ClientGraphics extends System {
   }
 
   async init({ viewport }) {
-    console.log('[ClientGraphics] init() called with viewport:', !!viewport)
+    // console.log('[ClientGraphics] init() called with viewport:', !!viewport)
     this.viewport = viewport
     this.width = this.viewport.offsetWidth
     this.height = this.viewport.offsetHeight
@@ -163,7 +163,7 @@ export class ClientGraphics extends System {
       // Update the render pass with the new camera
       if (this.renderPass && camera?.camera) {
         this.renderPass.camera = camera.camera
-        console.log('ClientGraphics: Updated render pass camera')
+        // console.log('ClientGraphics: Updated render pass camera')
       }
     })
   }
@@ -325,7 +325,7 @@ export class ClientGraphics extends System {
   onSettingsChange = changes => {
     if (changes.ao) {
       this.aoPass.enabled = changes.ao.value && this.world.prefs.ao
-      console.log(this.aoPass.enabled)
+      // console.log(this.aoPass.enabled)
     }
   }
 

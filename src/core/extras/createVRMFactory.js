@@ -211,7 +211,7 @@ export function createVRMFactory(glb, setupMaterial) {
     const origVRM = glb.userData.vrm
     try {
       const sm = origVRM?.springBoneManager
-      console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
+      // console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
     } catch (_) { }
     const expressionManager = origVRM?.expressionManager || null
     // expressions from the cloned scene (fallback path if no manager)
@@ -406,7 +406,7 @@ export function createVRMFactory(glb, setupMaterial) {
     function filterWeaponBones(affectedBones) {
       const weaponBones = new Set()
 
-      console.log(`[VRM] All affected bones from animation:`, Array.from(affectedBones).sort())
+      // console.log(`[VRM] All affected bones from animation:`, Array.from(affectedBones).sort())
 
       // Allow upper body bones for weapon animations - exclude lower body to prevent conflicts with locomotion
       const allowedBonePatterns = [
@@ -459,13 +459,13 @@ export function createVRMFactory(glb, setupMaterial) {
 
         if (isAllowed) {
           weaponBones.add(bone)
-          console.log(`[VRM] Allowed weapon bone: ${bone}`)
+          // console.log(`[VRM] Allowed weapon bone: ${bone}`)
         } else {
-          console.log(`[VRM] Filtered out bone (preserving locomotion): ${bone}`)
+          // console.log(`[VRM] Filtered out bone (preserving locomotion): ${bone}`)
         }
       }
 
-      console.log(`[VRM] Final weapon bones (${weaponBones.size}):`, Array.from(weaponBones).sort())
+      // console.log(`[VRM] Final weapon bones (${weaponBones.size}):`, Array.from(weaponBones).sort())
       return weaponBones
     }
 
@@ -485,7 +485,7 @@ export function createVRMFactory(glb, setupMaterial) {
         return originalClip // Return original if no tracks remain
       }
 
-      console.log(`[VRM] Filtered clip: ${originalClip.tracks.length} -> ${filteredTracks.length} tracks`)
+      // console.log(`[VRM] Filtered clip: ${originalClip.tracks.length} -> ${filteredTracks.length} tracks`)
 
       // Debug: Show which tracks were kept vs filtered out
       const keptTracks = filteredTracks.map(track => track.name.split('.')[0])
@@ -493,8 +493,8 @@ export function createVRMFactory(glb, setupMaterial) {
         .filter(track => !filteredTracks.includes(track))
         .map(track => track.name.split('.')[0])
 
-      console.log(`[VRM] Kept tracks (${keptTracks.length}):`, [...new Set(keptTracks)].slice(0, 10))
-      console.log(`[VRM] Filtered out tracks (${filteredOutTracks.length}):`, [...new Set(filteredOutTracks)].slice(0, 10))
+      // console.log(`[VRM] Kept tracks (${keptTracks.length}):`, [...new Set(keptTracks)].slice(0, 10))
+      // console.log(`[VRM] Filtered out tracks (${filteredOutTracks.length}):`, [...new Set(filteredOutTracks)].slice(0, 10))
       return new THREE.AnimationClip(originalClip.name, originalClip.duration, filteredTracks)
     }
 
@@ -897,21 +897,21 @@ export function createVRMFactory(glb, setupMaterial) {
         try {
           spring.setInitState()
         } catch (_) { }
-        console.log(
-          '[vrmFactory] Enhanced spring bone system initialized',
-          'springs:',
-          spring.joints.size,
-          'pairs:',
-          springPairs.length,
-          'drive:',
-          drivePairs.length,
-          'tuning:',
-          JSON.stringify({
-            stiffness: tuning.stiffness?.toFixed(2),
-            dragForce: tuning.dragForce?.toFixed(2),
-            gravityPower: tuning.gravityPower?.toFixed(2)
-          })
-        )
+        // console.log(
+        //   '[vrmFactory] Enhanced spring bone system initialized',
+        //   'springs:',
+        //   spring.joints.size,
+        //   'pairs:',
+        //   springPairs.length,
+        //   'drive:',
+        //   drivePairs.length,
+        //   'tuning:',
+        //   JSON.stringify({
+        //     stiffness: tuning.stiffness?.toFixed(2),
+        //     dragForce: tuning.dragForce?.toFixed(2),
+        //     gravityPower: tuning.gravityPower?.toFixed(2)
+        //   })
+        // )
 
         // Log spring bone configuration for debugging
         let activeSprings = 0
@@ -919,11 +919,11 @@ export function createVRMFactory(glb, setupMaterial) {
           if (joint.settings && joint.bone) {
             activeSprings++
             if (activeSprings <= 5) { // Log first 5 for debugging
-              console.log(`[VRM] Spring ${joint.bone.name}:`, {
-                stiffness: joint.settings.stiffness?.toFixed(3),
-                dragForce: joint.settings.dragForce?.toFixed(3),
-                gravityPower: joint.settings.gravityPower?.toFixed(3)
-              })
+              // console.log(`[VRM] Spring ${joint.bone.name}:`, {
+              //   stiffness: joint.settings.stiffness?.toFixed(3),
+              //   dragForce: joint.settings.dragForce?.toFixed(3),
+              //   gravityPower: joint.settings.gravityPower?.toFixed(3)
+              // })
             }
           }
         })
@@ -967,7 +967,7 @@ export function createVRMFactory(glb, setupMaterial) {
 
           // Debug: Log when additive animations are active (reduced frequency)
           if (anim.weight > 0.01 && Math.random() < 0.005) { // 0.5% chance per frame
-            console.log(`[VRM] Additive animation active: ${url.split('/').pop()}, weight: ${anim.weight.toFixed(2)}, bones: ${Array.from(anim.affectedBones).slice(0, 5).join(', ')}...`)
+            // console.log(`[VRM] Additive animation active: ${url.split('/').pop()}, weight: ${anim.weight.toFixed(2)}, bones: ${Array.from(anim.affectedBones).slice(0, 5).join(', ')}...`)
           }
 
           // Remove if fully faded out
@@ -1305,7 +1305,7 @@ export function createVRMFactory(glb, setupMaterial) {
 
           // Debug logging for conflict resolution (1% chance per frame)
           if (Math.random() < 0.01) {
-            console.log(`[VRM] Bone conflict resolved for ${bone.name}: mode=${conflictResolutionMode}, locoWeight=${locomotionWeight.toFixed(2)}, additiveWeight=${additiveWeight.toFixed(2)}, finalBlendWeight=${blendWeight.toFixed(2)}`)
+            // console.log(`[VRM] Bone conflict resolved for ${bone.name}: mode=${conflictResolutionMode}, locoWeight=${locomotionWeight.toFixed(2)}, additiveWeight=${additiveWeight.toFixed(2)}, finalBlendWeight=${blendWeight.toFixed(2)}`)
           }
         } else {
           // Debug logging when no conflict (1% chance per frame)
@@ -1386,12 +1386,12 @@ export function createVRMFactory(glb, setupMaterial) {
 
           // Debug logging for arm bones
           if ((isLeftArm || isRightArm) && Math.random() < 0.02) { // 2% chance per frame
-            console.log(`[VRM] ${isLeftArm ? 'Left' : 'Right'} arm bone ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)}, max=${maxAngle.toFixed(2)} (${maxAngleDegrees}°)`)
+            // console.log(`[VRM] ${isLeftArm ? 'Left' : 'Right'} arm bone ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)}, max=${maxAngle.toFixed(2)} (${maxAngleDegrees}°)`)
           }
 
           // Clamp extreme rotations
           if (Math.abs(euler.x) > maxAngle || Math.abs(euler.y) > maxAngle || Math.abs(euler.z) > maxAngle) {
-            console.log(`[VRM] Clamping over-rotation for ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
+            // console.log(`[VRM] Clamping over-rotation for ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
 
             // Clamp the angles
             euler.x = THREE.MathUtils.clamp(euler.x, -maxAngle, maxAngle)
@@ -1403,7 +1403,7 @@ export function createVRMFactory(glb, setupMaterial) {
             finalTargetRotation.copy(bone.userData.restRotation).multiply(clampedQuat)
           } else if ((isLeftArm || isRightArm) && Math.random() < 0.01) {
             // Debug: Show when rotations are within limits
-            console.log(`[VRM] ${bone.name} within limits: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
+            // console.log(`[VRM] ${bone.name} within limits: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
           }
 
           // Apply the scaled rotation difference to the final target rotation
@@ -1613,7 +1613,7 @@ export function createVRMFactory(glb, setupMaterial) {
         setEmote(Emotes.FLIP)
       } else if (mode === Modes.BACKFLIP) {
         // play the dedicated backflip emote for backward double jumps
-        console.log('[VRM] Triggering BACKFLIP animation')
+        // console.log('[VRM] Triggering BACKFLIP animation')
         setEmote(Emotes.BACKFLIP)
       } else if (mode === Modes.GRINDING) {
         poses.grinding.target = 1
@@ -1655,7 +1655,7 @@ export function createVRMFactory(glb, setupMaterial) {
       bonesVisible = visible
 
       if (visible) {
-        console.log('[VRM] Showing bone helpers for debugging')
+        // console.log('[VRM] Showing bone helpers for debugging')
         skeleton.bones.forEach(bone => {
           if (!bone) return
 
@@ -1716,7 +1716,7 @@ export function createVRMFactory(glb, setupMaterial) {
           }
         })
       } else {
-        console.log('[VRM] Hiding bone helpers')
+        // console.log('[VRM] Hiding bone helpers')
         boneHelpers.forEach(helper => {
           vrm.scene.remove(helper)
         })
@@ -1795,7 +1795,7 @@ export function createVRMFactory(glb, setupMaterial) {
       setLocomotion,
       // Bone rotation manipulation methods
       addBoneRotation(boneName, euler) {
-        console.log(`[VRM] addBoneRotation called for bone: ${boneName}`)
+        // console.log(`[VRM] addBoneRotation called for bone: ${boneName}`)
         if (!skeleton || !skeleton.bones) {
           console.warn('[VRM] No skeleton available for bone rotation')
           return false
@@ -1812,11 +1812,11 @@ export function createVRMFactory(glb, setupMaterial) {
         bone.quaternion.multiply(rotationQuat)
         bone.updateMatrixWorld()
 
-        console.log(`[VRM] Applied rotation to bone: ${boneName}`)
+        // console.log(`[VRM] Applied rotation to bone: ${boneName}`)
         return true
       },
       resetBoneRotation(boneName) {
-        console.log(`[VRM] resetBoneRotation called for bone: ${boneName}`)
+        // console.log(`[VRM] resetBoneRotation called for bone: ${boneName}`)
         if (!skeleton || !skeleton.bones) {
           console.warn('[VRM] No skeleton available for bone reset')
           return false
@@ -1832,11 +1832,11 @@ export function createVRMFactory(glb, setupMaterial) {
         bone.quaternion.set(0, 0, 0, 1)
         bone.updateMatrixWorld()
 
-        console.log(`[VRM] Reset rotation for bone: ${boneName}`)
+        // console.log(`[VRM] Reset rotation for bone: ${boneName}`)
         return true
       },
       resetAllBoneRotations() {
-        console.log(`[VRM] resetAllBoneRotations called`)
+        // console.log(`[VRM] resetAllBoneRotations called`)
         if (!skeleton || !skeleton.bones) {
           console.warn('[VRM] No skeleton available for bone reset')
           return false
@@ -1847,7 +1847,7 @@ export function createVRMFactory(glb, setupMaterial) {
           bone.updateMatrixWorld()
         })
 
-        console.log(`[VRM] Reset all bone rotations`)
+        // console.log(`[VRM] Reset all bone rotations`)
         return true
       },
       setVisible(visible) {

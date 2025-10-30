@@ -555,7 +555,7 @@ if (control && control.keyEscape) {
 }
 
 app.on('update', () => {
-  if (control?.keyEscape.pressed) {
+  if (control?.keyEscape?.pressed) {
     suiteUI.active = false
   }
 })

@@ -747,7 +747,7 @@ export class PlayerLocal extends Entity {
           const moveRad = Math.atan2(this.axis.x, -this.axis.z)
           const moveDeg = ((moveRad * 180) / Math.PI + 360) % 360
           this.isBackflip = moveDeg >= 112.5 && moveDeg < 247.5 // Backward range
-          console.log(`[Double Jump] moveDeg: ${moveDeg}, isBackflip: ${this.isBackflip}, axis:`, this.axis)
+          // console.log(`[Double Jump] moveDeg: ${moveDeg}, isBackflip: ${this.isBackflip}, axis:`, this.axis)
           // lock flip pose for a short, deterministic duration
           this.flipStartAt = this.world.time
           this.flipUntil = this.flipStartAt + this.flipDuration
@@ -1056,7 +1056,7 @@ export class PlayerLocal extends Entity {
       const flipElapsed = this.world.time - this.flipStartAt
       const unlockForFall = this.falling && flipElapsed > Math.min(0.45, this.flipDuration * 0.7)
       mode = unlockForFall ? null : this.isBackflip ? Modes.BACKFLIP : Modes.FLIP
-      if (!unlockForFall) console.log(`[Locomotion] Mode: ${this.isBackflip ? 'BACKFLIP' : 'FLIP'}`)
+      // console.log(`[Locomotion] Mode: ${this.isBackflip ? 'BACKFLIP' : 'FLIP'}`)
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {

@@ -50,7 +50,7 @@ export class World extends EventEmitter {
           return this.defaultCameraNode.camera
         }
         // Last resort: create a temporary camera (shouldn't happen)
-        console.warn('No camera available - this should not happen')
+        // console.warn('No camera available - this should not happen')
         return new THREE.PerspectiveCamera(73, 1, 0.2, 1200)
       },
     })
@@ -119,7 +119,7 @@ export class World extends EventEmitter {
   }
 
   createDefaultCamera() {
-    console.log('World: Creating default camera node')
+    // console.log('World: Creating default camera node')
 
     // Only create default camera if no other cameras exist
     if (!this.cameraManager?.cameras?.size) {
@@ -159,9 +159,9 @@ export class World extends EventEmitter {
         this.rig.add(this.defaultCameraNode.camera)
       }
 
-      console.log('World: Default camera node created and activated')
+      // console.log('World: Default camera node created and activated')
     } else {
-      console.log('World: Skipping default camera - other cameras exist')
+      // console.log('World: Skipping default camera - other cameras exist')
     }
   }
 
