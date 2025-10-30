@@ -56,7 +56,7 @@ export class ClientAudio extends System {
       while (this.queue.length) {
         this.queue.pop()()
       }
-      console.log('[audio] unlocked')
+      // console.log('[audio] unlocked')
     }
     const unlock = async () => {
       try {
@@ -86,7 +86,7 @@ export class ClientAudio extends System {
     document.addEventListener('click', unlock)
     document.addEventListener('touchstart', unlock)
     document.addEventListener('keydown', unlock)
-    console.log('[audio] suspended, waiting for interact...')
+    // console.log('[audio] suspended, waiting for interact...')
   }
 
   async init() {

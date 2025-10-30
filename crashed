@@ -1,0 +1,33 @@
+Script started on 2025-10-30 15:06:39+00:00 [TERM="xterm-256color" TTY="/dev/pts/0" COLUMNS="93" LINES="9"]
+(TypeError#1)
+TypeError#1: Cannot read properties of undefined (reading 'bind')
+    at control (file:///home/blank/Work/hyperfy/src/core/systems/Apps.js:367:41)
+    at Proxy.<anonymous> (file:///home/blank/Work/hyperfy/src/core/entities/App.js:483:24)
+    at eval (eval at <anonymous> (eval at makeEvaluate (file:///home/blank/Work/hyperfy/node_modules/ses/src/make-evaluate.js:92:27)), <anonymous>:343:21)
+    at Object.exec (file:///home/blank/Work/hyperfy/src/core/systems/Scripts.js:70:16)
+    at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m❯[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m❯[0m (TypeError#1)
+[?2004l[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for sozo: [~/.tool-versions] sozo@1.7.2: sozo not found in mise tool registry
+[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for katana: [~/.tool-versions] katana@1.7.0: katana not found in mise tool registry
+[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for cairo-coverage: [~/.tool-versions] cairo-coverage@0.5.0: cairo-coverage not found in mise tool registry
+[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for torii: [~/.tool-versions] torii@1.8.7: torii not found in mise tool registry
+[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for cairo-profiler: [~/.tool-versions] cairo-profiler@0.9.0: cairo-profiler not found in mise tool registry
+[33mmise[0m [33mWARN[0m  Failed to resolve tool version list for starknet-devnet: [~/.tool-versions] starknet-devnet@0.4.3: starknet-devnet not found in mise tool registry
+bash: command not found: TypeError#1
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m TypeError#1: Cannot read properties of undefined (reading 'bind')
+[?2004lbash: syntax error near unexpected token `('
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at control (file:///home/blank/Work/hyperfy/src/core/systems/Apps.js:367:41)
+[?2004lbash: syntax error near unexpected token `('
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at Proxy.<anonymous> (file:///home/blank/Work/hyperfy/src/core/entities/App.js:483:24)
+[?2004lbash: syntax error near unexpected token `('
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at eval (eval at <anonymous> (eval at makeEvaluate (file:///home/blank/Work/hyperfy/node_modules/ses/src/make-evaluate.js:92:27)), <anonymous>:343:21)
+[?2004lbash: syntax error near unexpected token `('
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at Object.exec (file:///home/blank/Work/hyperfy/src/core/systems/Scripts.js:70:16)
+[?2004lbash: syntax error near unexpected token `('
+]0;blank@uzxey:~/Work/hyperfy[?2004h
+[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m [1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///home/blank/Work/hyperfy/src/core/entities/App.js:129:21)[K[A[K[1;36mhyperfy[0m [3;36mcrtrdg[0m [36m ? [1m✗[0m     at App.build (file:///hom

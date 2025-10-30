@@ -558,7 +558,7 @@ if (control && control.keyEscape) {
 
 app.on('update', () => {
   // ESC to close
-  if (control?.keyEscape.pressed) {
+  if (control?.keyEscape?.pressed) {
     dashboardUI.active = false
   }
 

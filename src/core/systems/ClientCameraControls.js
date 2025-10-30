@@ -82,7 +82,7 @@ export class ClientCameraControls extends System {
   }
 
   init() {
-    console.log('ClientCameraControls: Initializing with default settings')
+    // console.log('ClientCameraControls: Initializing with default settings')
 
     // Use the exact same settings as the reset command
     // These are the defaults that make the camera look correct
@@ -239,7 +239,7 @@ export class ClientCameraControls extends System {
           //   this.control.mouseRight.capture = true
           // }
           if (this.debugDOF) {
-            console.log('ADS: Started aiming')
+            // console.log('ADS: Started aiming')
           }
         }
       } else {
@@ -534,7 +534,7 @@ export class ClientCameraControls extends System {
   raycastFocusDistance() {
     if (!this.world.camera || !this.world.stage) {
       if (this.debugDOF) {
-        console.log('DOF Debug: Camera or stage not ready')
+        // console.log('DOF Debug: Camera or stage not ready')
       }
       return null
     }
@@ -542,7 +542,7 @@ export class ClientCameraControls extends System {
     // Check if viewport is ready (required for raycast)
     if (!this.world.stage.viewport) {
       if (this.debugDOF) {
-        console.log('DOF Debug: Stage viewport not ready')
+        // console.log('DOF Debug: Stage viewport not ready')
       }
       return null
     }
@@ -1272,6 +1272,6 @@ cam.help() - Show this help message
       },
     }
 
-    console.log('Camera controls ready for admins. Type cam.help() for commands.')
+    // console.log('Camera controls ready for admins. Type cam.help() for commands.')
   }
 }

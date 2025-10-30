@@ -17,6 +17,17 @@ app.configure([
     initial: '#fbbf24',
   },
   {
+    key: 'hotkeysEnabled',
+    type: 'switch',
+    label: 'Keyboard Hotkeys',
+    hint: 'Enable keyboard shortcuts for UI control and wallet connection.',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' }
+    ],
+    initial: 'disabled',
+  },
+  {
     key: 'hotKeyToggle',
     type: 'text',
     label: 'Toggle UI Hotkey',
@@ -41,6 +52,28 @@ app.configure([
     ],
     initial: 'screen',
   },
+  {
+    key: 'triggerZone',
+    type: 'switch',
+    label: 'Trigger Zone UI Control',
+    hint: 'Show/hide UI when player enters the trigger zone.',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' },
+    ],
+    initial: 'enabled',
+  },
+  {
+    key: 'triggerMeshVisibility',
+    type: 'switch',
+    label: 'Trigger Mesh Visibility',
+    hint: 'Show/hide the trigger zone mesh.',
+    options: [
+      { label: 'Visible', value: 'visible' },
+      { label: 'Invisible', value: 'invisible' }
+    ],
+    initial: 'invisible',
+  },
 ])
 
 // Cartridge state
@@ -48,10 +81,18 @@ app.state.connected = false
 app.state.address = null
 app.state.cartridge = null
 
-// Get Rigid Body
+// Get Rigid Bodies
 const cartridgeBody = app.get('CartridgeLogo')
+const triggerBody = app.get('AreaTrigger')
+const triggerMesh = app.get('Sphere') // Or whatever your trigger mesh is named
 
-// Create main UI container
+// Trigger mesh visibility control
+if (triggerMesh && app.props.triggerMeshVisibility === 'invisible') {
+  triggerMesh.active = false
+}
+
+console.log('[Cartridge] Trigger mesh visibility:', app.props.triggerMeshVisibility)
+console.log('[Cartridge] Trigger mesh found:', !!triggerMesh)
 const mainUI = app.create('ui', {
   space: 'screen', // Start with screen space, update in updateUIPosition
   pivot: 'top-center',
@@ -149,6 +190,62 @@ mainUI.add(userInfoContainer)
 mainUI.add(hotkeysText)
 cartridgeBody.add(mainUI)
 
+// Initialize trigger zone variables and handlers (after UI creation)
+let originalUIState = false // Default to hidden for trigger zones
+let isPlayerNearby = false
+
+// Set initial UI state - hide by default when trigger zone is enabled
+const initialState = app.props.triggerZone === 'enabled' ? false : true
+mainUI.active = initialState
+originalUIState = initialState
+console.log('[Cartridge] Initial UI state:', initialState, '(trigger zone:', app.props.triggerZone + ')')
+
+// Get the local player for comparison
+const localPlayer = world.getPlayer()
+console.log('[Cartridge] Local player ID:', localPlayer?.id)
+
+// Area trigger event handlers (client only)
+if (triggerBody && app.props.triggerZone === 'enabled') {
+  console.log('[Cartridge] Setting up trigger zone handlers')
+
+  triggerBody.onTriggerEnter = (e) => {
+    console.log('[Cartridge] onTriggerEnter fired:', e)
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
+      if (isLocalPlayer) {
+        isPlayerNearby = true
+        originalUIState = mainUI.active
+        mainUI.active = true
+        console.log('[Cartridge] LOCAL player entered trigger zone - UI shown, previous state:', originalUIState)
+      } else {
+        console.log('[Cartridge] Non-local player entered trigger zone - ignoring')
+      }
+    }
+  }
+
+  triggerBody.onTriggerLeave = (e) => {
+    console.log('[Cartridge] onTriggerLeave fired:', e)
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
+      if (isLocalPlayer) {
+        isPlayerNearby = false
+        mainUI.active = originalUIState
+        console.log('[Cartridge] LOCAL player left trigger zone - UI restored to:', originalUIState)
+      } else {
+        console.log('[Cartridge] Non-local player left trigger zone - ignoring')
+      }
+    }
+  }
+} else {
+  console.log('[Cartridge] Trigger zone disabled or trigger body not found')
+  console.log('[Cartridge] triggerZone prop:', app.props.triggerZone)
+  console.log('[Cartridge] triggerBody exists:', !!triggerBody)
+}
+
 // Event handlers
 connectButton.onPointerDown = () => {
   if (app.state.connected) {
@@ -181,6 +278,7 @@ async function connectCartridge() {
     statusText.color = '#f59e0b'
 
     if (world.web3) {
+      console.log('[Cartridge] Attempting to connect...')
       const result = await world.web3.connect()
 
       if (result && result.address) {
@@ -285,6 +383,37 @@ async function connectCartridge() {
       return
     }
 
+    // Check for Cartridge service errors (HTTP 500, OAuth issues)
+    if (
+      error.message && (
+        error.message.includes('HTTP error! status: 500') ||
+        error.message.includes('Could not establish connection') ||
+        error.message.includes('Receiving end does not exist') ||
+        error.message.includes('api.cartridge.gg') ||
+        error.message.includes('Turnkey')
+      )
+    ) {
+      console.error('[Cartridge] Cartridge service error:', error.message)
+      statusText.value = 'Cartridge service unavailable'
+      statusText.color = '#f59e0b'
+
+      setTimeout(() => {
+        if (!app.state.connected) {
+          statusText.value = 'Try again later'
+          statusText.color = '#f59e0b'
+        }
+      }, 3000)
+
+      setTimeout(() => {
+        if (!app.state.connected) {
+          statusText.value = 'Ready to connect'
+          statusText.color = '#cccccc'
+        }
+      }, 8000)
+
+      return
+    }
+
     // Real connection error
     console.error('[Cartridge] Connection failed:', error)
     statusText.value = 'Connection failed'
@@ -334,9 +463,12 @@ async function disconnectCartridge() {
   }
 }
 
-// Initialize hotkeys
-const control = app.control()
-if (control) {
+// Initialize hotkeys (optional)
+if (app.props.hotkeysEnabled === 'enabled' && world.isClient) {
+  const control = app.control()
+  if (!control) {
+    console.log('[Cartridge] Controls not available - controls not initialized on client')
+  } else {
   const toggleKey = app.props.hotKeyToggle || 'I'
   const connectKey = app.props.hotKeyConnect || 'Q'
 
@@ -356,8 +488,17 @@ if (control) {
   app.on('update', () => {
     // Toggle UI
     if (hotKeyToggleCtrl?.pressed && !toggleKeyPressed) {
-      mainUI.active = !mainUI.active
-      console.log('[Cartridge] UI', mainUI.active ? 'shown' : 'hidden')
+      if (isPlayerNearby) {
+        // When in trigger zone, toggle normally but update the stored original state
+        mainUI.active = !mainUI.active
+        originalUIState = mainUI.active
+        console.log('[Cartridge] UI toggled in trigger zone to:', originalUIState)
+      } else {
+        // Normal toggle when not in trigger zone
+        mainUI.active = !mainUI.active
+        originalUIState = mainUI.active
+        console.log('[Cartridge] UI', mainUI.active ? 'shown' : 'hidden')
+      }
     }
     toggleKeyPressed = hotKeyToggleCtrl?.pressed
 
@@ -371,6 +512,11 @@ if (control) {
     }
     connectKeyPressed = hotKeyConnectCtrl?.pressed
   })
+
+    console.log('[Cartridge] Hotkeys enabled (Toggle:', toggleKey, 'Connect:', connectKey, ')')
+  }
+} else {
+  console.log('[Cartridge] Hotkeys disabled')
 }
 
 // Update UI position and properties based on space
@@ -409,3 +555,8 @@ app.on('update', () => {
 console.log('[Cartridge] App initialized')
 console.log('[Cartridge] Running on:', world.isClient ? 'Client' : 'Server')
 console.log('[Cartridge] UI Space:', app.props.uiSpace || 'screen')
+console.log('[Cartridge] Trigger Zone:', app.props.triggerZone === 'enabled' ? 'Enabled' : 'Disabled')
+console.log('[Cartridge] Trigger Mesh Visibility:', app.props.triggerMeshVisibility)
+console.log('[Cartridge] Hotkeys:', app.props.hotkeysEnabled === 'enabled' ? 'Enabled' : 'Disabled')
+console.log('[Cartridge] AreaTrigger Found:', !!triggerBody)
+console.log('[Cartridge] Trigger Mesh Found:', !!triggerMesh)

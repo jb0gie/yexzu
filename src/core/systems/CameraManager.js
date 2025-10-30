@@ -49,7 +49,7 @@ export class CameraManager extends System {
       this.setActiveCamera(camera)
     }
 
-    console.log(`CameraManager: Registered camera ${camera.id}`)
+    // console.log(`CameraManager: Registered camera ${camera.id}`)
   }
 
   /**
@@ -122,7 +122,7 @@ export class CameraManager extends System {
       this.world.emit('camera-changed', camera)
     }
 
-    console.log(`CameraManager: Activated camera ${camera.id}`)
+    // console.log(`CameraManager: Activated camera ${camera.id}`)
     return true
   }
 

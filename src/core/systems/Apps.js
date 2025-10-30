@@ -364,6 +364,10 @@ export class Apps extends System {
         entity.control?.release()
         // TODO: only allow on user interaction
         // TODO: show UI with a button to release()
+        if (!world.controls) {
+          console.warn('Controls system not available - app running on server or controls not initialized')
+          return null
+        }
         entity.control = world.controls.bind({
           ...options,
           priority: ControlPriorities.APP,

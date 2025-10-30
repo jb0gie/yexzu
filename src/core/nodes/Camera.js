@@ -234,7 +234,7 @@ export class Camera extends Node {
    * Called when node is added to the scene
    */
   mount() {
-    console.log('[Camera] Mounting camera node:', this.name)
+    // console.log('[Camera] Mounting camera node:', this.name)
 
     // Create THREE.js camera with full settings
     this.camera = new THREE.PerspectiveCamera(this.fov, this.aspect, this.near, this.far)
@@ -349,7 +349,7 @@ export class Camera extends Node {
 
     // Register with camera manager
     if (this.ctx?.world?.cameraManager) {
-      console.log('[Camera] Registering with camera manager')
+      // console.log('[Camera] Registering with camera manager')
       this.ctx.world.cameraManager.registerCamera(this)
     } else {
       console.warn('[Camera] No camera manager found in world')
@@ -379,7 +379,7 @@ export class Camera extends Node {
     // - Player camera should auto-activate
     // - Non-player cameras only auto-activate if explicitly requested via data.autoActivate
     if (this._active && (this.isPlayerCamera || this.data?.autoActivate === true)) {
-      console.log('[Camera] Camera marked as active, activating...')
+      // console.log('[Camera] Camera marked as active, activating...')
       // Ensure registration before activation
       if (this.ctx?.world?.cameraManager && !this.ctx.world.cameraManager.cameras.has(this.id)) {
         this.ctx.world.cameraManager.registerCamera(this)
