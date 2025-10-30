@@ -91,8 +91,8 @@ if (triggerMesh && app.props.triggerMeshVisibility === 'invisible') {
   triggerMesh.active = false
 }
 
-console.log('[Cartridge] Trigger mesh visibility:', app.props.triggerMeshVisibility)
-console.log('[Cartridge] Trigger mesh found:', !!triggerMesh)
+// console.log('[Cartridge] Trigger mesh visibility:', app.props.triggerMeshVisibility)
+// console.log('[Cartridge] Trigger mesh found:', !!triggerMesh)
 const mainUI = app.create('ui', {
   space: 'screen', // Start with screen space, update in updateUIPosition
   pivot: 'top-center',
@@ -198,45 +198,45 @@ let isPlayerNearby = false
 const initialState = app.props.triggerZone === 'enabled' ? false : true
 mainUI.active = initialState
 originalUIState = initialState
-console.log('[Cartridge] Initial UI state:', initialState, '(trigger zone:', app.props.triggerZone + ')')
+// console.log('[Cartridge] Initial UI state:', initialState, '(trigger zone:', app.props.triggerZone + ')')
 
 // Get the local player for comparison
 const localPlayer = world.getPlayer()
-console.log('[Cartridge] Local player ID:', localPlayer?.id)
+// console.log('[Cartridge] Local player ID:', localPlayer?.id)
 
 // Area trigger event handlers (client only)
 if (triggerBody && app.props.triggerZone === 'enabled') {
   console.log('[Cartridge] Setting up trigger zone handlers')
 
   triggerBody.onTriggerEnter = (e) => {
-    console.log('[Cartridge] onTriggerEnter fired:', e)
+    // console.log('[Cartridge] onTriggerEnter fired:', e)
     if (e.playerId) {
       const player = world.getPlayer(e.playerId)
       const isLocalPlayer = player && player.id === localPlayer?.id
-      console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
+      // console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
       if (isLocalPlayer) {
         isPlayerNearby = true
         originalUIState = mainUI.active
         mainUI.active = true
-        console.log('[Cartridge] LOCAL player entered trigger zone - UI shown, previous state:', originalUIState)
+        // console.log('[Cartridge] LOCAL player entered trigger zone - UI shown, previous state:', originalUIState)
       } else {
-        console.log('[Cartridge] Non-local player entered trigger zone - ignoring')
+        // console.log('[Cartridge] Non-local player entered trigger zone - ignoring')
       }
     }
   }
 
   triggerBody.onTriggerLeave = (e) => {
-    console.log('[Cartridge] onTriggerLeave fired:', e)
+    // console.log('[Cartridge] onTriggerLeave fired:', e)
     if (e.playerId) {
       const player = world.getPlayer(e.playerId)
       const isLocalPlayer = player && player.id === localPlayer?.id
-      console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
+      // console.log('[Cartridge] Player ID:', e.playerId, 'Local Player ID:', localPlayer?.id, 'IsLocalPlayer:', isLocalPlayer)
       if (isLocalPlayer) {
         isPlayerNearby = false
         mainUI.active = originalUIState
-        console.log('[Cartridge] LOCAL player left trigger zone - UI restored to:', originalUIState)
+        // console.log('[Cartridge] LOCAL player left trigger zone - UI restored to:', originalUIState)
       } else {
-        console.log('[Cartridge] Non-local player left trigger zone - ignoring')
+        // console.log('[Cartridge] Non-local player left trigger zone - ignoring')
       }
     }
   }
@@ -298,7 +298,7 @@ async function connectCartridge() {
 
         // Get username from Cartridge API
         try {
-          console.log('[Cartridge] Looking up username for address:', result.address)
+          // console.log('[Cartridge] Looking up username for address:', result.address)
 
           // Use fetch to call Cartridge API
           const response = await fetch('https://api.cartridge.gg/accounts/lookup', {
@@ -313,36 +313,36 @@ async function connectCartridge() {
 
           if (response.ok) {
             const data = await response.json()
-            console.log('[Cartridge] API response:', data)
+            // console.log('[Cartridge] API response:', data)
 
             if (data && data.results && data.results.length > 0) {
-              console.log('[Cartridge] Processing results array:', data.results)
+              // console.log('[Cartridge] Processing results array:', data.results)
 
               // Find the result that contains our address
               const userResult = data.results.find(apiResult => {
-                console.log('[Cartridge] Checking result:', apiResult)
+                // console.log('[Cartridge] Checking result:', apiResult)
                 return apiResult.addresses && apiResult.addresses.map(a => a.toLowerCase()).includes(result.address.toLowerCase())
               })
 
-              console.log('[Cartridge] Found user result:', userResult)
+              // console.log('[Cartridge] Found user result:', userResult)
 
               if (userResult && userResult.username) {
                 const username = userResult.username
-                console.log('[Cartridge] Setting username text to:', `@${username}`)
-                console.log('[Cartridge] Username text element before:', usernameText.value)
+                // console.log('[Cartridge] Setting username text to:', `@${username}`)
+                // console.log('[Cartridge] Username text element before:', usernameText.value)
 
                 usernameText.value = `@${username}`
 
-                console.log('[Cartridge] Username text element after:', usernameText.value)
-                console.log('[Cartridge] Username text visible:', usernameText.visible)
-                console.log('[Cartridge] Username text parent visible:', usernameText.parent?.visible)
+                // console.log('[Cartridge] Username text element after:', usernameText.value)
+                // console.log('[Cartridge] Username text visible:', usernameText.visible)
+                // console.log('[Cartridge] Username text parent visible:', usernameText.parent?.visible)
               } else {
-                console.log('[Cartridge] No username found in results for address:', result.address)
-                console.log('[Cartridge] User result exists:', !!userResult)
-                console.log('[Cartridge] User result username field:', userResult?.username)
+                // console.log('[Cartridge] No username found in results for address:', result.address)
+                // console.log('[Cartridge] User result exists:', !!userResult)
+                // console.log('[Cartridge] User result username field:', userResult?.username)
               }
             } else {
-              console.log('[Cartridge] No results found in API response')
+              // console.log('[Cartridge] No results found in API response')
             }
           } else {
             console.log('[Cartridge] API request failed:', response.status, response.statusText)
@@ -356,7 +356,7 @@ async function connectCartridge() {
           address: result.address,
         })
 
-        console.log('[Cartridge] Connected:', result.address)
+        // console.log('[Cartridge] Connected:', result.address)
       } else {
         // User cancelled the modal
         console.log('[Cartridge] User cancelled connection')
@@ -513,10 +513,10 @@ if (app.props.hotkeysEnabled === 'enabled' && world.isClient) {
     connectKeyPressed = hotKeyConnectCtrl?.pressed
   })
 
-    console.log('[Cartridge] Hotkeys enabled (Toggle:', toggleKey, 'Connect:', connectKey, ')')
+    // console.log('[Cartridge] Hotkeys enabled (Toggle:', toggleKey, 'Connect:', connectKey, ')')
   }
 } else {
-  console.log('[Cartridge] Hotkeys disabled')
+  // console.log('[Cartridge] Hotkeys disabled')
 }
 
 // Update UI position and properties based on space
@@ -552,11 +552,11 @@ app.on('update', () => {
   updateUIPosition()
 })
 
-console.log('[Cartridge] App initialized')
-console.log('[Cartridge] Running on:', world.isClient ? 'Client' : 'Server')
-console.log('[Cartridge] UI Space:', app.props.uiSpace || 'screen')
-console.log('[Cartridge] Trigger Zone:', app.props.triggerZone === 'enabled' ? 'Enabled' : 'Disabled')
-console.log('[Cartridge] Trigger Mesh Visibility:', app.props.triggerMeshVisibility)
-console.log('[Cartridge] Hotkeys:', app.props.hotkeysEnabled === 'enabled' ? 'Enabled' : 'Disabled')
-console.log('[Cartridge] AreaTrigger Found:', !!triggerBody)
-console.log('[Cartridge] Trigger Mesh Found:', !!triggerMesh)
+// console.log('[Cartridge] App initialized')
+// console.log('[Cartridge] Running on:', world.isClient ? 'Client' : 'Server')
+// console.log('[Cartridge] UI Space:', app.props.uiSpace || 'screen')
+// console.log('[Cartridge] Trigger Zone:', app.props.triggerZone === 'enabled' ? 'Enabled' : 'Disabled')
+// console.log('[Cartridge] Trigger Mesh Visibility:', app.props.triggerMeshVisibility)
+// console.log('[Cartridge] Hotkeys:', app.props.hotkeysEnabled === 'enabled' ? 'Enabled' : 'Disabled')
+// console.log('[Cartridge] AreaTrigger Found:', !!triggerBody)
+// console.log('[Cartridge] Trigger Mesh Found:', !!triggerMesh)
