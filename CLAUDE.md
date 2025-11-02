@@ -36,43 +36,6 @@ npm run world:backup
 
 ## High-Level Architecture
 
-### 🆕 DojoEngine Integration (NEW!)
-
-**DojoEngine + Hyperfy Integration** - Revolutionary blockchain gaming framework:
-- **Hybrid Architecture**: Hyperfy real-time 3D + DojoEngine onchain verifiability
-- **Entity Synchronization**: Automatic sync between Hyperfy entities and Dojo ECS components
-- **Onchain Game Logic**: Smart contract-driven game rules with Cairo
-- **True Asset Ownership**: Persistent blockchain-based item and character ownership
-- **API Access**: `world.dojo` provides full integration capabilities
-
-**Quick Start**:
-```javascript
-// Check DojoEngine availability
-if (world.dojo.isConnected()) {
-  // Create blockchain-synced entity
-  const entity = app.create('box', { position: [0, 1, 0] })
-  entity.add('dojo', {
-    components: ['Position', 'Health', 'Inventory'],
-    syncInterval: 1000
-  })
-
-  // Execute onchain actions
-  await world.dojo.execute([{
-    target: world.dojo.getWorldAddress(),
-    method: 'gameAction',
-    args: [entityId, actionData]
-  }])
-}
-```
-
-**Examples**:
-- `/examples/dojo-integration/dojo-rpg-demo.js` - Full RPG with blockchain integration
-- `/examples/dojo-integration/test-dojo-integration.js` - Integration test suite
-- `/examples/dojo-integration/README.md` - Comprehensive documentation
-
-**Installation**: `npm install @dojoengine/core @dojoengine/torii-client`
-
----
 
 ### Hybrid ECS System Architecture
 
@@ -254,7 +217,6 @@ Apps execute in controlled sandbox with restricted APIs. Always assume limited g
 ### Debugging Tips
 - **Check browser console** - Most reliable feedback source
 - **Use `world.web3.getDebugInfo()`** - Web3 system diagnostics
-- **NEW**: `world.dojo` provides DojoEngine blockchain gaming integration (see above)
 - **Test SES environment** - Try basic operations vs complex ones
 - **Monitor network tab** - Binary protocol debugging
 - **Check server logs** - Backend issues show there
