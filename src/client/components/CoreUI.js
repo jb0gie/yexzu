@@ -1084,9 +1084,9 @@ function ToastMsg({ text }) {
 
 function TouchBtns({ world }) {
   const [action, setAction] = useState(world.actions.current.node)
-  const [adsToggled, setAdsToggled] = useState(false)
-  const [cameraMode, setCameraMode] = useState(0) // 0 = medium 3rd (default), 1 = close 3rd, 2 = first person, 3 = far 3rd
-  const [platformerMode, setPlatformerMode] = useState(0) // Track current platformer mode
+  // const [adsToggled, setAdsToggled] = useState(false) // REMOVED
+  // const [cameraMode, setCameraMode] = useState(0) // REMOVED - 0 = medium 3rd (default), 1 = close 3rd, 2 = first person, 3 = far 3rd
+  // const [platformerMode, setPlatformerMode] = useState(0) // DISABLED - Track current platformer mode
 
   useEffect(() => {
     function onChange(isAction) {
@@ -1098,7 +1098,8 @@ function TouchBtns({ world }) {
     }
   }, [])
 
-  // Track platformer mode changes
+  // Track platformer mode changes - DISABLED
+  {/*
   useEffect(() => {
     const player = world.entities.player
     if (player) {
@@ -1122,8 +1123,10 @@ function TouchBtns({ world }) {
       }
     }
   }, [world])
+  */}
 
-  // Handle ADS toggle state
+  // Handle ADS toggle state - REMOVED
+  {/*
   useEffect(() => {
     if (adsToggled) {
       world.controls.simulateButton('mouseRight', true)
@@ -1131,8 +1134,10 @@ function TouchBtns({ world }) {
       world.controls.simulateButton('mouseRight', false)
     }
   }, [adsToggled, world])
+  */}
 
-  // Handle camera mode changes - Desktop scroll emulation
+  // Handle camera mode changes - Desktop scroll emulation - REMOVED
+  {/*
   useEffect(() => {
     const player = world.entities.player
     if (player) {
@@ -1154,6 +1159,7 @@ function TouchBtns({ world }) {
   const cycleCameraMode = () => {
     setCameraMode(prev => (prev + 1) % 4) // Cycle through 4 modes: 0, 1, 2, 3
   }
+  */}
 
   // lookpad removed
   return (
@@ -1187,6 +1193,7 @@ function TouchBtns({ world }) {
             bottom: 6rem;
             right: 4rem;
           }
+          /* Ads and Camera styles - REMOVED
           &.ads {
             width: 2.5rem;
             height: 2.5rem;
@@ -1237,6 +1244,8 @@ function TouchBtns({ world }) {
               color: #c8c8ff;
             }
           }
+          */
+          /* Platformer styles - DISABLED
           &.platformer {
             width: 2.5rem;
             height: 2.5rem;
@@ -1269,6 +1278,7 @@ function TouchBtns({ world }) {
               color: #00ffaa;
             }
           }
+          */
         }
         /* lookpad removed */
       `}
@@ -1289,7 +1299,8 @@ function TouchBtns({ world }) {
           <HandIcon size='1.5rem' />
         </div>
       )}
-      {/* ADS / Right-click button for mobile - Toggle Mode */}
+      {/* ADS / Right-click button for mobile - REMOVED */}
+      {/*
       <div
         className={cls('touchbtns-btn ads', { active: adsToggled })}
         onPointerDown={e => {
@@ -1301,6 +1312,7 @@ function TouchBtns({ world }) {
         ADS
         {adsToggled && <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', opacity: 0.8 }}>ON</div>}
       </div>
+      */}
       <div
         className='touchbtns-btn jump'
         onPointerDown={e => {
@@ -1319,7 +1331,8 @@ function TouchBtns({ world }) {
         <ChevronDoubleUpIcon size='1.5rem' />
       </div>
 
-      {/* Camera cycle button - Desktop scroll emulation */}
+      {/* Camera cycle button - Desktop scroll emulation - REMOVED */}
+      {/*
       <div
         className={cls('touchbtns-btn camera', {
           'medium-3rd': cameraMode === 0,
@@ -1343,9 +1356,10 @@ function TouchBtns({ world }) {
       >
         <CameraIcon size='1rem' />
       </div>
+      */}
 
-      {/* Platformer Mechanics Buttons */}
-      {/* Climb Button */}
+      {/* Platformer Mechanics Buttons - DISABLED */}
+      {/*
       <div
         className={cls('touchbtns-btn platformer climb', {
           active: platformerMode === 10, // CLIMBING mode
@@ -1360,7 +1374,6 @@ function TouchBtns({ world }) {
         CLIMB
       </div>
 
-      {/* Ledge Grab Button */}
       <div
         className={cls('touchbtns-btn platformer ledge', {
           active: platformerMode === 11, // LEDGE_HANGING mode
@@ -1375,7 +1388,6 @@ function TouchBtns({ world }) {
         LEDGE
       </div>
 
-      {/* Air Dive Button */}
       <div
         className={cls('touchbtns-btn platformer dive', {
           active: platformerMode === 12, // AIR_DIVING mode
@@ -1390,7 +1402,6 @@ function TouchBtns({ world }) {
         DIVE
       </div>
 
-      {/* Platformer Status Display for Mobile */}
       <div
         className='platformer-status'
         css={css`
@@ -1422,6 +1433,7 @@ function TouchBtns({ world }) {
           </div>
         )}
       </div>
+      */}
     </div>
   )
 }
