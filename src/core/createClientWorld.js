@@ -18,6 +18,7 @@ import { ClientActions } from './systems/ClientActions'
 import { ClientTarget } from './systems/ClientTarget'
 import { ClientUI } from './systems/ClientUI'
 import { ClientWeb3 } from './systems/ClientWeb3'
+import { DojoSystem } from './systems/DojoSystem'
 import { LODs } from './systems/LODs'
 import { Nametags } from './systems/Nametags'
 import { Particles } from './systems/Particles'
@@ -45,6 +46,29 @@ export function createClientWorld() {
   world.register('target', ClientTarget)
   world.register('ui', ClientUI)
   world.register('web3', ClientWeb3)
+
+  // Temporarily create minimal Dojo API to bypass DojoSystem issues
+  world.dojo = {
+    isConnected: () => false, // Will be updated by real system
+    getNetwork: () => 'TEMP_FALLBACK',
+    getWorldAddress: () => null,
+    execute: async () => { throw new Error('DojoSystem not initialized - temporary fallback') },
+    syncEntity: async () => { throw new Error('DojoSystem not initialized - temporary fallback') },
+    getDebugInfo: () => ({
+      status: 'TEMPORARY_FALLBACK',
+      message: 'DojoSystem loading bypassed',
+      isConnected: false
+    })
+  }
+
+  try {
+    world.register('dojo', DojoSystem)
+    console.log('[ClientWorld] ✅ DojoSystem registered successfully')
+  } catch (error) {
+    console.warn('[ClientWorld] ❌ DojoSystem registration failed:', error.message)
+    console.warn('[ClientWorld] ⚠️ Using temporary fallback API only')
+  }
+
   world.register('lods', LODs)
   world.register('nametags', Nametags)
   world.register('particles', Particles)
