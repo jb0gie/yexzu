@@ -1,6 +1,6 @@
 import { System } from './System'
-import ControllerProvider from '@cartridge/controller'
-import { constants } from 'starknet'
+// import ControllerProvider from '@cartridge/controller'
+// import { constants } from 'starknet'
 
 /**
  * Client Web3 System
@@ -48,7 +48,7 @@ export class ClientWeb3 extends System {
   initWeb3({
     policies = null,
     chains = null,
-    defaultChainId = constants.StarknetChainId.SN_SEPOLIA,
+    defaultChainId = 'SN_SEPOLIA', // Previously: constants.StarknetChainId.SN_SEPOLIA
     keychainUrl = 'https://x.cartridge.gg',
     requireCartridge = true, // Make cartridge requirement explicit
   } = {}) {
@@ -95,10 +95,10 @@ export class ClientWeb3 extends System {
     // console.log('[ClientWeb3] Configuration:', config)
 
     try {
-      this.controller = new ControllerProvider(config)
-      // console.log('[ClientWeb3] ✅ Cartridge Controller initialized successfully!')
-      // console.log('[ClientWeb3] ✅ Engine feature ready: Cartridge Controller v0.10.7')
-      // console.log('[ClientWeb3] ✅ Available commands: connect(), disconnect(), execute()')
+      // Skip Web3 initialization - dependencies removed
+      console.log('[ClientWeb3] Web3 system disabled - dependencies removed')
+      return
+      // Previously: this.controller = new ControllerProvider(config)
     } catch (error) {
       // ===== ENGINE FAILURE: CARTRIDGE FEATURE NOT INITIALIZED =====
       console.error('[ClientWeb3] ======================================================')
