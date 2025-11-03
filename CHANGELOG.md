@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Created comprehensive strafe-based side flip system with direction detection
+- Added strafe detection using 8-directional analysis (247.5°-292.5° for left, 67.5°-112.5° for right)
+- Built three complete implementation options: strafe emote system, enhanced mobile controls V4, and integration demo
+- Created temporary systems using existing flip animations until strafe-specific .glb files are created
+- Commented out core engine additions (emotes in playerEmotes.js and VRM factory modes) until animations are ready
+- Enhanced physics with directional lateral force calculations for realistic strafe motion
+- Maintained Hypscript compatibility with existing V2/V3 mobile control formats
 
 ### Changed
 

@@ -51,6 +51,9 @@ const Modes = {
   TALK: 6,
   FLIP: 7,
   BACKFLIP: 8,
+  // [ANIMATIONS NEEDED] Uncomment when ready - strafe flip modes:
+  // SIDEFLIP_LEFT: 9,
+  // SIDEFLIP_RIGHT: 10,
 }
 
 export function createVRMFactory(glb, setupMaterial) {
@@ -1615,7 +1618,16 @@ export function createVRMFactory(glb, setupMaterial) {
         // play the dedicated backflip emote for backward double jumps
         // console.log('[VRM] Triggering BACKFLIP animation')
         setEmote(Emotes.BACKFLIP)
-      } else if (mode === Modes.GRINDING) {
+      }
+      // [ANIMATIONS NEEDED] Uncomment when ready - strafe flip emotes:
+      // else if (mode === Modes.SIDEFLIP_LEFT) {
+      //   // play dedicated left strafe flip emote
+      //   setEmote(Emotes.STRAFE_LEFT_FLIP)
+      // } else if (mode === Modes.SIDEFLIP_RIGHT) {
+      //   // play dedicated right strafe flip emote
+      //   setEmote(Emotes.STRAFE_RIGHT_FLIP)
+      // }
+      else if (mode === Modes.GRINDING) {
         poses.grinding.target = 1
       } else if (mode === Modes.CLIMBING) {
         // Use climbIdle as default, will be overridden by platformer mechanics
