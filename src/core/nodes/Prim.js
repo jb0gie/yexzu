@@ -12,11 +12,10 @@ const defaults = {
   size: null,
   color: '#ffffff',
   emissive: null,
-  emissiveIntensity: 1,
+  emissiveIntensity: 0,
   metalness: 0.2,
   roughness: 0.8,
   opacity: 1,
-  transparent: false,
   texture: null,
   castShadow: true,
   receiveShadow: true,
@@ -75,7 +74,7 @@ const getGeometry = (type, size) => {
       case 'sphere':
         {
           const [radius] = size
-          geometry = new THREE.SphereGeometry(radius, 16, 12)
+          geometry = new THREE.SphereGeometry(radius, 20, 12)
         }
         break
       case 'cylinder':
@@ -116,7 +115,7 @@ const materialCache = new Map()
 // Create material with specific properties
 const getMaterial = props => {
   // Create a cache key from material properties
-  const cacheKey = `${props.color}_${props.emissive}_${props.emissiveIntensity}_${props.metalness}_${props.roughness}_${props.opacity}_${props.transparent}_${props.texture}_${props.doubleside}`
+  const cacheKey = `${props.metalness}_${props.roughness}_${props.opacity}_${props.texture}_${props.doubleside}`
 
   // Check cache first
   if (materialCache.has(cacheKey)) {
@@ -124,20 +123,38 @@ const getMaterial = props => {
   }
 
   const material = new THREE.MeshStandardMaterial({
-    color: props.color,
-    emissive: props.emissive,
-    emissiveIntensity: props.emissiveIntensity,
+    color: 0xffffff,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
     metalness: props.metalness,
     roughness: props.roughness,
     opacity: props.opacity,
-    transparent: props.transparent,
+    transparent: props.opacity < 1,
     side: props.doubleside ? THREE.DoubleSide : THREE.FrontSide,
+    shadowSide: THREE.BackSide, // fix csm shadow banding
+
+    // fight z-fighting with fire (especially for AI generated objects)
+    polygonOffset: true,
+    polygonOffsetFactor: Math.random(),
+    polygonOffsetUnits: Math.random(),
   })
 
   // Cache the material
   materialCache.set(cacheKey, material)
 
   return material
+}
+
+let count = 0
+
+if (typeof window !== 'undefined') {
+  window.prims = {
+    material: materialCache,
+    geometry: geometryCache,
+    get count() {
+      return count
+    },
+  }
 }
 
 const applyTexture = (material, textureUrl, loader) => {
@@ -166,7 +183,6 @@ export class Prim extends Node {
     this.metalness = data.metalness
     this.roughness = data.roughness
     this.opacity = data.opacity
-    this.transparent = data.transparent
     this.texture = data.texture
     this.castShadow = data.castShadow
     this.receiveShadow = data.receiveShadow
@@ -209,48 +225,55 @@ export class Prim extends Node {
     this.scaleOffset.fromArray(scaleOffset)
     this.updateMatrixWorldOffset()
 
+    // Create visual if visible
+    if (this._opacity > 0) {
+      // Get unit-sized geometry for this type
+      const geometry = getGeometry(this._type, size)
 
-    // Get unit-sized geometry for this type
-    const geometry = getGeometry(this._type, size)
+      // Get loader if available (client-side only)
+      const loader = this.ctx.world.loader || null
 
-    // Get loader if available (client-side only)
-    const loader = this.ctx.world.loader || null
+      // Create material with current properties
+      const material = getMaterial({
+        // color: this._color,
+        // emissive: this._emissive,
+        // emissiveIntensity: this._emissiveIntensity,
+        metalness: this._metalness,
+        roughness: this._roughness,
+        opacity: quantizeOpacity(this._opacity), // reduce material variations
+        texture: this._texture,
+        doubleside: this._doubleside,
+      })
 
-    // Create material with current properties
-    const material = getMaterial({
-      color: this._color,
-      emissive: this._emissive,
-      emissiveIntensity: this._emissiveIntensity,
-      metalness: this._metalness,
-      roughness: this._roughness,
-      opacity: this._opacity,
-      transparent: this._transparent,
-      texture: this._texture,
-      doubleside: this._doubleside,
-    })
+      if (this._texture && !material._texApplied) {
+        const n = ++this.n
+        await applyTexture(material, this._texture, loader)
+        if (n !== this.n) return // remounted or destroyed
+      }
 
-    if (this._texture && !material._texApplied) {
-      const n = ++this.n
-      await applyTexture(material, this._texture, loader)
-      if (n !== this.n) return // remounted or destroyed
+      // Create mesh
+      this.handle = this.ctx.world.stage.insertLinked({
+        geometry,
+        material,
+        uberShader: true,
+        castShadow: this._castShadow,
+        receiveShadow: this._receiveShadow,
+        matrix: this.matrixWorldOffset,
+        // color: this._color,
+        node: this,
+      })
+      // console.log('FOO', this._color)
+      this.handle.setColor(this._color)
+      this.handle.setEmissive(this._emissive)
+      this.handle.setEmissiveIntensity(this._emissiveIntensity)
+      count++
     }
-
-    // Create mesh
-    this.handle = this.ctx.world.stage.insertPrimitive({
-      geometry,
-      material,
-      castShadow: this._castShadow,
-      receiveShadow: this._receiveShadow,
-      matrix: this.matrixWorldOffset,
-      node: this,
-    })
 
     // Create physics if enabled
     if (this._physics && !this.ctx.moving) {
       this.mountPhysics(size)
     }
   }
-
 
   mountPhysics(size) {
     if (!PHYSX) return
@@ -298,8 +321,15 @@ export class Prim extends Node {
       // Create convex mesh
       pmesh = geometryToPxMesh(this.ctx.world, threeGeometry, true)
       if (pmesh && pmesh.value) {
-        const scale = new PHYSX.PxMeshScale(new PHYSX.PxVec3(_v2.x, _v2.y, _v2.z), new PHYSX.PxQuat(0, 0, 0, 1))
-        pxGeometry = new PHYSX.PxConvexMeshGeometry(pmesh.value, scale)
+        // Create scale and its components explicitly so we can free them
+        const _scaleVec = new PHYSX.PxVec3(_v2.x, _v2.y, _v2.z)
+        const _scaleQuat = new PHYSX.PxQuat(0, 0, 0, 1)
+        const _scale = new PHYSX.PxMeshScale(_scaleVec, _scaleQuat)
+        pxGeometry = new PHYSX.PxConvexMeshGeometry(pmesh.value, _scale)
+        // free temporary PhysX objects
+        PHYSX.destroy(_scale)
+        PHYSX.destroy(_scaleVec)
+        PHYSX.destroy(_scaleQuat)
         this.pmesh = pmesh // Store for cleanup
       } else {
         // TODO: think we can remove this? why would this happen?
@@ -387,6 +417,10 @@ export class Prim extends Node {
       this.actor.release()
       this.actor = null
     }
+    if (this._tm) {
+      PHYSX.destroy(this._tm)
+      this._tm = null
+    }
     if (this.pmesh) {
       this.pmesh.release()
       this.pmesh = null
@@ -439,10 +473,12 @@ export class Prim extends Node {
 
   unmount() {
     this.n++
-    this.handle?.destroy()
-    this.handle = null
+    if (this.handle) {
+      this.handle.destroy()
+      this.handle = null
+      count--
+    }
     this.unmountPhysics()
-
   }
 
   copy(source, recursive) {
@@ -455,7 +491,6 @@ export class Prim extends Node {
     this._metalness = source._metalness
     this._roughness = source._roughness
     this._opacity = source._opacity
-    this._transparent = source._transparent
     this._texture = source._texture
     this._castShadow = source._castShadow
     this._receiveShadow = source._receiveShadow
@@ -484,32 +519,18 @@ export class Prim extends Node {
     this.matrixWorldOffset.compose(_v1, _q1, _v2)
   }
 
-  applyStats(stats) {
-    // Get geometry config with proper size
-    const { size } = getGeometryConfig(this._type, this._size)
-    const geometry = getGeometry(this._type, size)
-    if (geometry && !stats.geometries.has(geometry.uuid)) {
-      stats.geometries.add(geometry.uuid)
-      stats.triangles += getTrianglesFromGeometry(geometry)
-    }
-
-    // Get material with proper properties
-    const material = getMaterial({
-      color: this._color,
-      emissive: this._emissive,
-      emissiveIntensity: this._emissiveIntensity,
-      metalness: this._metalness,
-      roughness: this._roughness,
-      opacity: this._opacity,
-      transparent: this._transparent,
-      texture: this._texture,
-      doubleside: this._doubleside,
-    })
-    if (material && !stats.materials.has(material.uuid)) {
-      stats.materials.add(material.uuid)
-      stats.textureBytes += getTextureBytesFromMaterial(material)
-    }
-  }
+  // applyStats(stats) {
+  //   const geometry = getGeometry(this._type)
+  //   if (geometry && !stats.geometries.has(geometry.uuid)) {
+  //     stats.geometries.add(geometry.uuid)
+  //     stats.triangles += getTrianglesFromGeometry(geometry)
+  //   }
+  //   // const material = getMaterial()
+  //   if (material && !stats.materials.has(material.uuid)) {
+  //     stats.materials.add(material.uuid)
+  //     stats.textureBytes += getTextureBytesFromMaterial(material)
+  //   }
+  // }
 
   get type() {
     return this._type
@@ -521,10 +542,8 @@ export class Prim extends Node {
     }
     if (this._type === value) return
     this._type = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get size() {
@@ -540,10 +559,8 @@ export class Prim extends Node {
     }
     if (isEqual(this._size, value)) return
     this._size = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get color() {
@@ -556,10 +573,7 @@ export class Prim extends Node {
     }
     if (this._color === value) return
     this._color = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.handle?.setColor(value) // no rebuild needed!
   }
 
   get emissive() {
@@ -572,10 +586,7 @@ export class Prim extends Node {
     }
     if (this._emissive === value) return
     this._emissive = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.handle?.setEmissive(value) // no rebuild needed!
   }
 
   get castShadow() {
@@ -588,10 +599,8 @@ export class Prim extends Node {
     }
     if (this._castShadow === value) return
     this._castShadow = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get receiveShadow() {
@@ -604,10 +613,8 @@ export class Prim extends Node {
     }
     if (this._receiveShadow === value) return
     this._receiveShadow = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get emissiveIntensity() {
@@ -620,10 +627,7 @@ export class Prim extends Node {
     }
     if (this._emissiveIntensity === value) return
     this._emissiveIntensity = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.handle?.setEmissiveIntensity(value) // no rebuild needed!
   }
 
   get metalness() {
@@ -636,10 +640,8 @@ export class Prim extends Node {
     }
     if (this._metalness === value) return
     this._metalness = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get roughness() {
@@ -652,10 +654,8 @@ export class Prim extends Node {
     }
     if (this._roughness === value) return
     this._roughness = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get opacity() {
@@ -668,26 +668,8 @@ export class Prim extends Node {
     }
     if (this._opacity === value) return
     this._opacity = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
-  }
-
-  get transparent() {
-    return this._transparent
-  }
-
-  set transparent(value = defaults.transparent) {
-    if (!isBoolean(value)) {
-      throw new Error('[prim] transparent must be boolean')
-    }
-    if (this._transparent === value) return
-    this._transparent = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get texture() {
@@ -700,10 +682,8 @@ export class Prim extends Node {
     }
     if (this._texture === value) return
     this._texture = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get physics() {
@@ -716,10 +696,8 @@ export class Prim extends Node {
     }
     if (this._physics === value) return
     this._physics = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get mass() {
@@ -732,10 +710,8 @@ export class Prim extends Node {
     }
     if (this._mass === value) return
     this._mass = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get linearDamping() {
@@ -748,10 +724,8 @@ export class Prim extends Node {
     }
     if (this._linearDamping === value) return
     this._linearDamping = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get angularDamping() {
@@ -764,10 +738,8 @@ export class Prim extends Node {
     }
     if (this._angularDamping === value) return
     this._angularDamping = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get staticFriction() {
@@ -780,10 +752,8 @@ export class Prim extends Node {
     }
     if (this._staticFriction === value) return
     this._staticFriction = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get dynamicFriction() {
@@ -796,10 +766,8 @@ export class Prim extends Node {
     }
     if (this._dynamicFriction === value) return
     this._dynamicFriction = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get restitution() {
@@ -812,10 +780,8 @@ export class Prim extends Node {
     }
     if (this._restitution === value) return
     this._restitution = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get layer() {
@@ -828,10 +794,8 @@ export class Prim extends Node {
     }
     if (this._layer === value) return
     this._layer = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get trigger() {
@@ -844,10 +808,8 @@ export class Prim extends Node {
     }
     if (this._trigger === value) return
     this._trigger = value
-    if (this.handle && this._physics) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
 
   get tag() {
@@ -921,12 +883,9 @@ export class Prim extends Node {
     }
     if (this._doubleside === value) return
     this._doubleside = value
-    if (this.handle) {
-      this.needsRebuild = true
-      this.setDirty()
-    }
+    this.needsRebuild = true
+    this.setDirty()
   }
-
 
   getProxy() {
     if (!this.proxy) {
@@ -981,10 +940,11 @@ export class Prim extends Node {
           self.opacity = value
         },
         get transparent() {
-          return self.transparent
+          // return self.transparent
         },
         set transparent(value) {
-          self.transparent = value
+          console.warn('prim.transparent deprecated')
+          // self.transparent = value
         },
         get texture() {
           return self.texture
@@ -1166,7 +1126,6 @@ function getGeometryConfig(type, requestedSize) {
       break
     }
 
-
     default: {
       size = [1, 1, 1]
       scaleOffset = [1, 1, 1]
@@ -1174,4 +1133,14 @@ function getGeometryConfig(type, requestedSize) {
   }
 
   return { size, scaleOffset }
+}
+
+function quantizeOpacity(opacity) {
+  // For fully opaque, keep it exact
+  if (opacity >= 0.99) return 1
+  // For nearly transparent, keep it at 0
+  if (opacity <= 0.01) return 0
+  // Quantize to 20 steps (0.05 increments)
+  // This gives smooth enough transitions while limiting materials to ~20 variants
+  return Math.round(opacity * 20) / 20
 }
