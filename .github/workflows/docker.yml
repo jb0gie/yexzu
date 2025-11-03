@@ -8,8 +8,7 @@ on:
       - 'main'
       - 'dev'
       - 'solana-v2'
-      - 'refinedCtrls'
-      - 'crtrdg'
+      - 'ai'
     tags:
       - 'v*.*.*'
 

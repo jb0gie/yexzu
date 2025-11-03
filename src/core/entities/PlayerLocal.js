@@ -1,6 +1,7 @@
 import { Entity } from './Entity'
 import { clamp } from '../utils'
 import * as THREE from '../extras/three'
+import { XRControllerModelFactory } from 'three/addons'
 import { Layers } from '../extras/Layers'
 import { DEG2RAD, RAD2DEG } from '../extras/general'
 import { createNode } from '../extras/createNode'
@@ -52,13 +53,6 @@ const Modes = {
   FALL: 4,
   FLY: 5,
   TALK: 6,
-  FLIP: 7, // air-jump / acrobatic mid-air move
-  BACKFLIP: 8, // backward air-jump
-  GRINDING: 9, // grinding on rails
-  CLIMBING: 10, // climbing walls
-  LEDGE_HANGING: 11, // hanging from ledges
-  AIR_DIVING: 12, // air diving
-  WALL_SLIDING: 13, // sliding down walls
 }
 
 export class PlayerLocal extends Entity {
@@ -67,15 +61,6 @@ export class PlayerLocal extends Entity {
     this.isPlayer = true
     this.isLocal = true
     this.init()
-  }
-
-  // External touch-look input for mobile UI lookpad
-  applyTouchLookDelta(dx, dy) {
-    const sens = this.world.prefs?.touchLookSensitivity ?? 1
-    const signY = this.world.prefs?.touchInvertY ? -1 : 1
-    this.cam.rotation.x += signY * -dy * PAN_LOOK_SPEED * sens * (1 / 60)
-    this.cam.rotation.y += -dx * PAN_LOOK_SPEED * sens * (1 / 60)
-    this.cam.rotation.z = 0
   }
 
   async init() {
@@ -104,11 +89,6 @@ export class PlayerLocal extends Entity {
 
     this.fallTimer = 0
     this.falling = false
-    // coyote time and jump buffering for robust jumping
-    this.coyoteTime = 0.12
-    this.coyoteTimer = 0
-    this.jumpBufferTime = 0.12
-    this.jumpBufferTimer = 0
 
     this.moveDir = new THREE.Vector3()
     this.moving = false
@@ -121,16 +101,16 @@ export class PlayerLocal extends Entity {
     this.flyDrag = 300
     this.flyDir = new THREE.Vector3()
 
-    // flip state timing
-    this.flipStartAt = 0
-    this.flipUntil = 0
-    this.flipDuration = 0.6
-    this.isBackflip = false
-
     this.platform = {
       actor: null,
       prevTransform: new THREE.Matrix4(),
     }
+
+    this.xrRig = new THREE.Object3D()
+    this.xrRig.rotation.reorder('YXZ')
+    this.xrControllerFactory = null
+    this.xrControllerLeft = null
+    this.xrControllerRight = null
 
     this.mode = Modes.IDLE
     this.axis = new THREE.Vector3()
@@ -140,25 +120,12 @@ export class PlayerLocal extends Entity {
 
     this.lastSendAt = 0
 
-    // Platformer mechanics state
-    this.platformerMode = Modes.IDLE
-    this.stamina = 100
-    this.grindRail = null
-    this.grindProgress = 0
-    this.grindSpeed = 0
-    this.climbWall = null
-    this.climbDirection = 0
-    this.ledgeHanging = false
-    this.ledgePosition = null
-    this.airDiving = false
-    this.diveMomentum = new THREE.Vector3()
-    this.wallSliding = false
-    this.wallNormal = new THREE.Vector3()
-    this.wallSlideSpeed = 0
-
     this.base = createNode('group')
     this.base.position.fromArray(this.data.position)
     this.base.quaternion.fromArray(this.data.quaternion)
+
+    this.hmdDelta = new THREE.Vector3()
+    this.hmdLast = new THREE.Vector3()
 
     this.aura = createNode('group')
 
@@ -218,25 +185,8 @@ export class PlayerLocal extends Entity {
     this.initControl()
 
     this.world.setHot(this, true)
+    this.world.on('xrSession', this.onXRSession)
     this.world.emit('ready', true)
-
-    // Track if a weapon is controlling zoom
-    this.weaponControlledZoom = false
-
-    // Listen for weapon zoom control requests
-    this.world.on('weapon:take-zoom-control', (data) => {
-      if (data.playerId === this.id) {
-        this.weaponControlledZoom = true
-        console.log('[PlayerLocal] Weapon took zoom control:', data.source)
-      }
-    })
-
-    this.world.on('weapon:release-zoom-control', (data) => {
-      if (data.playerId === this.id) {
-        this.weaponControlledZoom = false
-        console.log('[PlayerLocal] Weapon released zoom control:', data.source)
-      }
-    })
   }
 
   getAvatarUrl() {
@@ -291,11 +241,11 @@ export class PlayerLocal extends Entity {
       Layers.player.group,
       Layers.player.mask,
       PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
-      PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
-      PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
-      PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
-      PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
-      PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
+        PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
+        PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS |
+        PHYSX.PxPairFlagEnum.eDETECT_CCD_CONTACT |
+        PHYSX.PxPairFlagEnum.eSOLVE_CONTACT |
+        PHYSX.PxPairFlagEnum.eDETECT_DISCRETE_CONTACT,
       0
     )
     shape.setContactOffset(0.08) // just enough to fire contacts (because we muck with velocity sometimes standing on a thing doesn't contact)
@@ -366,16 +316,65 @@ export class PlayerLocal extends Entity {
     this.control.camera.write = true
     this.control.camera.position.copy(this.cam.position)
     this.control.camera.quaternion.copy(this.cam.quaternion)
-
-    // Only set zoom if no weapon is controlling it
-    if (!this.weaponControlledZoom) {
-      this.control.camera.zoom = this.cam.zoom
-    } else {
-      // When weapon controls zoom, sync our internal cam.zoom with control.camera.zoom
-      this.cam.zoom = this.control.camera.zoom
-    }
+    this.control.camera.zoom = this.cam.zoom
     // this.control.setActions([{ type: 'space', label: 'Jump / Double-Jump' }])
     // this.control.setActions([{ type: 'escape', label: 'Menu' }])
+  }
+
+  onXRSession = session => {
+    if (session) {
+      if (!this.xrControllerFactory) {
+        this.xrControllerFactory = new XRControllerModelFactory()
+        this.xrControllerLeft = this.world.graphics.renderer.xr.getControllerGrip(0)
+        this.xrControllerLeft.add(this.xrControllerFactory.createControllerModel(this.xrControllerLeft))
+        this.xrRig.add(this.xrControllerLeft)
+        this.xrControllerRight = this.world.graphics.renderer.xr.getControllerGrip(1)
+        this.xrControllerRight.add(this.xrControllerFactory.createControllerModel(this.xrControllerRight))
+        this.xrRig.add(this.xrControllerRight)
+      }
+      this.world.stage.scene.add(this.xrRig)
+      this.xrRig.add(this.world.camera)
+      this.cam.zoom = 0
+      this.control.camera.write = false
+      this.isXR = true
+    } else {
+      this.world.stage.scene.remove(this.xrRig)
+      this.world.rig.add(this.world.camera)
+      this.world.camera.position.set(0, 0, 0)
+      this.world.camera.rotation.set(0, 0, 0)
+      this.cam.zoom = 1
+      this.control.camera.write = true
+      this.isXR = false
+    }
+  }
+
+  setXRPlayerPosition(position) {
+    const parent = this.xrRig
+    const child = this.world.camera
+    const feetWorldPos = child.getWorldPosition(v2)
+    feetWorldPos.y -= child.position.y
+    const offset = v1.subVectors(position, feetWorldPos)
+    parent.position.add(offset)
+
+    // const offset = v1.copy(position)
+    // const offset = v1.copy(position)
+    // offset.x -= parent.position.x + child.position.x
+    // offset.y -= parent.position.y
+    // offset.z -= parent.position.z + child.position.z
+    // parent.position.add(offset)
+  }
+
+  turnXRRigAtPlayer(degrees) {
+    const parent = this.xrRig
+    const child = this.world.camera
+    // console.log(child.getWorldPosition(new THREE.Vector3()))
+    const pivotWorld = new THREE.Vector3()
+    child.getWorldPosition(pivotWorld)
+    parent.rotateOnAxis(UP, degrees * THREE.MathUtils.DEG2RAD)
+    const offset = child.position.clone()
+    offset.applyQuaternion(parent.quaternion)
+    parent.position.copy(pivotWorld).sub(offset)
+    // console.log(child.getWorldPosition(new THREE.Vector3()))
   }
 
   toggleFlying(value) {
@@ -421,6 +420,7 @@ export class PlayerLocal extends Entity {
   }
 
   fixedUpdate(delta) {
+    const xr = this.isXR
     const freeze = this.data.effect?.freeze
     const anchor = this.getAnchorMatrix()
     const snare = this.data.effect?.snare || 0
@@ -441,9 +441,6 @@ export class PlayerLocal extends Entity {
        *
        */
     } else if (!this.flying) {
-      // timers for jump responsiveness
-      if (this.coyoteTimer > 0) this.coyoteTimer -= delta
-      if (this.jumpBufferTimer > 0) this.jumpBufferTimer -= delta
       /**
        *
        * STANDARD MODE
@@ -531,17 +528,11 @@ export class PlayerLocal extends Entity {
         this.grounded = true
         this.groundNormal.copy(sweepHit.normal)
         this.groundAngle = UP.angleTo(this.groundNormal) * RAD2DEG
-        // Reset backflip state when landing
-        this.isBackflip = false
       } else {
         this.justLeftGround = !!this.grounded
         this.grounded = false
         this.groundNormal.copy(UP)
         this.groundAngle = 0
-        // started falling this frame: start coyote timer
-        if (this.justLeftGround) {
-          this.coyoteTimer = this.coyoteTime
-        }
       }
 
       // if on a steep slope, unground and track slipping
@@ -713,15 +704,10 @@ export class PlayerLocal extends Entity {
       }
 
       // ground/air jump
-      const bufferedJump = this.jumpBufferTimer > 0
-      const hasCoyote = this.coyoteTimer > 0
       const shouldJump =
-        (this.grounded || hasCoyote) &&
-        !this.jumping &&
-        bufferedJump &&
-        !this.data.effect?.snare &&
-        !this.data.effect?.freeze
-      const shouldAirJump = !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
+        this.grounded && !this.jumping && this.jumpDown && !this.data.effect?.snare && !this.data.effect?.freeze
+      const shouldAirJump =
+        false && !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled // temp: disabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -733,8 +719,6 @@ export class PlayerLocal extends Entity {
         // ground jump init (we haven't left the ground yet)
         if (shouldJump) {
           this.jumped = true
-          this.coyoteTimer = 0
-          this.jumpBufferTimer = 0
         }
         // air jump init
         if (shouldAirJump) {
@@ -743,14 +727,6 @@ export class PlayerLocal extends Entity {
           this.jumping = true
           this.airJumped = true
           this.airJumping = true
-          // Check if moving backward for backflip
-          const moveRad = Math.atan2(this.axis.x, -this.axis.z)
-          const moveDeg = ((moveRad * 180) / Math.PI + 360) % 360
-          this.isBackflip = moveDeg >= 112.5 && moveDeg < 247.5 // Backward range
-          // console.log(`[Double Jump] moveDeg: ${moveDeg}, isBackflip: ${this.isBackflip}, axis:`, this.axis)
-          // lock flip pose for a short, deterministic duration
-          this.flipStartAt = this.world.time
-          this.flipUntil = this.flipStartAt + this.flipDuration
         }
       }
     } else {
@@ -782,14 +758,15 @@ export class PlayerLocal extends Entity {
       const zeroAngular = v4.set(0, 0, 0)
       this.capsule.setAngularVelocity(zeroAngular.toPxVec3())
 
-      // if not in build mode, cancel flying
-      if (!this.world.builder?.enabled) {
+      // if non-xr and not in build mode, cancel flying
+      if (!this.world.builder?.enabled && !this.isXR) {
         this.toggleFlying()
       }
     }
 
-    // double jump in build, mode toggle flying
-    if (this.jumpPressed && this.world.builder?.enabled) {
+    // double jump in build mode, toggle flying
+    // double jump in xr and "can" build, toggle flying
+    if (this.jumpPressed && (this.world.builder?.enabled || (this.isXR && this.world.builder?.canBuild()))) {
       if (this.world.time - this.lastJumpAt < 0.4) {
         this.toggleFlying()
       }
@@ -801,24 +778,54 @@ export class PlayerLocal extends Entity {
   }
 
   update(delta) {
-    const isXR = this.world.xr?.session
+    const xr = this.isXR
     const freeze = this.data.effect?.freeze
     const anchor = this.getAnchorMatrix()
 
+    // if (xr) return
+    // console.log('update')
+
+    if (xr) {
+      // move the rig so that the ground underneath the camera aligns with the base player
+      this.setXRPlayerPosition(this.base.position)
+      // fetch any physical movement delta
+      this.world.camera.getWorldPosition(v1)
+      v1.y = 0
+      v2.copy(this.xrRig.position)
+      v2.y = 0
+      v3.copy(v1).sub(v2)
+      this.hmdDelta.copy(v3).sub(this.hmdLast)
+      this.hmdLast.copy(v3)
+      // apply physical movement delta to capsule so physics stays with us if we wander
+      const pose = this.capsule.getGlobalPose()
+      v2.copy(pose.p).add(this.hmdDelta)
+      v2.toPxVec3(pose.p)
+      this.capsule.setGlobalPose(pose)
+    }
+
     // update cam look direction
-    if (isXR) {
+    if (xr) {
       // in xr clear camera rotation (handled internally)
       // in xr we only track turn here, which is added to the xr camera later on
-      this.cam.rotation.x = 0
-      this.cam.rotation.z = 0
+      // this.cam.rotation.x = 0
+      // this.cam.rotation.z = 0
       if (this.control.xrRightStick.value.x === 0 && this.didSnapTurn) {
         this.didSnapTurn = false
       } else if (this.control.xrRightStick.value.x > 0 && !this.didSnapTurn) {
-        this.cam.rotation.y -= 45 * DEG2RAD
+        this.turnXRRigAtPlayer(-45)
         this.didSnapTurn = true
       } else if (this.control.xrRightStick.value.x < 0 && !this.didSnapTurn) {
-        this.cam.rotation.y += 45 * DEG2RAD
+        this.turnXRRigAtPlayer(45)
         this.didSnapTurn = true
+      }
+      // if we did snap turn, we need to refresh the hmd position to cancel it out
+      if (this.didSnapTurn) {
+        this.world.camera.getWorldPosition(v1)
+        v1.y = 0
+        v2.copy(this.xrRig.position)
+        v2.y = 0
+        v3.copy(v1).sub(v2)
+        this.hmdLast.copy(v3)
       }
     } else if (this.control.pointer.locked) {
       // or pointer lock, rotate camera with pointer movement
@@ -826,47 +833,21 @@ export class PlayerLocal extends Entity {
       this.cam.rotation.y += -this.control.pointer.delta.x * POINTER_LOOK_SPEED * delta
       this.cam.rotation.z = 0
     } else if (this.pan) {
-      // or when touch panning (mobile look)
-      const sens = this.world.prefs?.touchLookSensitivity ?? 1
-      const signY = this.world.prefs?.touchInvertY ? -1 : 1
-      // Default (not inverted): swipe up looks up (negative pitch)
-      this.cam.rotation.x += signY * -this.pan.delta.y * PAN_LOOK_SPEED * sens * delta
-      this.cam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * sens * delta
+      // or when touch panning
+      this.cam.rotation.x += -this.pan.delta.y * PAN_LOOK_SPEED * delta
+      this.cam.rotation.y += -this.pan.delta.x * PAN_LOOK_SPEED * delta
       this.cam.rotation.z = 0
     }
 
-    // Check if a free-flying camera is active (used multiple times below)
-    const activeCamera = this.world.systems.CameraManager?.activeCamera
-
     // ensure we can't look too far up/down
-    if (!isXR) {
+    if (!xr) {
       this.cam.rotation.x = clamp(this.cam.rotation.x, -89 * DEG2RAD, 89 * DEG2RAD)
     }
 
-    // zoom camera if scrolling wheel (skip if free-flying camera is active or weapon has custom zoom)
-    let hasCustomZoom = false
-    this.world.emit('elemental-core:has-custom-zoom', this.id, (result) => {
-      hasCustomZoom = result
-    })
-
-    // Debug log once per second
-    if (hasCustomZoom && (!this._lastCustomZoomLog || Date.now() - this._lastCustomZoomLog > 1000)) {
-      console.log('[PlayerLocal] Skipping scroll zoom - weapon has custom zoom')
-      this._lastCustomZoomLog = Date.now()
-    }
-
-    if (!isXR && !activeCamera?.freeFlying && !hasCustomZoom) {
+    // zoom camera if scrolling wheel
+    if (!xr) {
       this.cam.zoom += -this.control.scrollDelta.value * ZOOM_SPEED * delta
       this.cam.zoom = clamp(this.cam.zoom, MIN_ZOOM, MAX_ZOOM)
-    }
-
-    // force zoom in xr to trigger first person (below)
-    if (isXR && !this.xrActive) {
-      this.cam.zoom = 0
-      this.xrActive = true
-    } else if (!isXR && this.xrActive) {
-      this.cam.zoom = 1
-      this.xrActive = false
     }
 
     // transition in and out of first person
@@ -886,52 +867,42 @@ export class PlayerLocal extends Entity {
     }
 
     // watch jump presses to either fly or air-jump
-    this.jumpDown = isXR ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
-    // capture jump press for buffering
-    const pressed = isXR ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed
-    if (pressed) {
+    this.jumpDown = xr ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
+    if (xr ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed) {
       this.jumpPressed = true
-      this.jumpBufferTimer = this.jumpBufferTime
     }
-
-    // Platformer mechanics input handling
-    this.handlePlatformerInput()
 
     // get our movement direction
     this.moveDir.set(0, 0, 0)
-
-    // Skip ALL player movement if a free-flying camera is active
-    if (!activeCamera?.freeFlying) {
-      if (isXR) {
-        // in xr use controller input
-        this.moveDir.x = this.control.xrLeftStick.value.x
-        this.moveDir.z = this.control.xrLeftStick.value.z
-      } else if (this.stick?.active) {
-        // if we have a touch joystick use that
-        const touchX = this.stick.touch.position.x
-        const touchY = this.stick.touch.position.y
-        const centerX = this.stick.center.x
-        const centerY = this.stick.center.y
-        const dx = centerX - touchX
-        const dy = centerY - touchY
-        const distance = Math.sqrt(dx * dx + dy * dy)
-        const moveRadius = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
-        if (distance > moveRadius) {
-          this.stick.center.x = touchX + (moveRadius * dx) / distance
-          this.stick.center.y = touchY + (moveRadius * dy) / distance
-        }
-        const stickX = (touchX - this.stick.center.x) / moveRadius
-        const stickY = (touchY - this.stick.center.y) / moveRadius
-        this.moveDir.x = stickX
-        this.moveDir.z = stickY
-        this.world.emit('stick', this.stick)
-      } else {
-        // otherwise use keyboard
-        if (this.control.keyW.down || this.control.arrowUp.down) this.moveDir.z -= 1
-        if (this.control.keyS.down || this.control.arrowDown.down) this.moveDir.z += 1
-        if (this.control.keyA.down || this.control.arrowLeft.down) this.moveDir.x -= 1
-        if (this.control.keyD.down || this.control.arrowRight.down) this.moveDir.x += 1
+    if (xr) {
+      // in xr use controller input
+      this.moveDir.x = this.control.xrLeftStick.value.x
+      this.moveDir.z = this.control.xrLeftStick.value.z
+    } else if (this.stick?.active) {
+      // if we have a touch joystick use that
+      const touchX = this.stick.touch.position.x
+      const touchY = this.stick.touch.position.y
+      const centerX = this.stick.center.x
+      const centerY = this.stick.center.y
+      const dx = centerX - touchX
+      const dy = centerY - touchY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const moveRadius = STICK_OUTER_RADIUS - STICK_INNER_RADIUS
+      if (distance > moveRadius) {
+        this.stick.center.x = touchX + (moveRadius * dx) / distance
+        this.stick.center.y = touchY + (moveRadius * dy) / distance
       }
+      const stickX = (touchX - this.stick.center.x) / moveRadius
+      const stickY = (touchY - this.stick.center.y) / moveRadius
+      this.moveDir.x = stickX
+      this.moveDir.z = stickY
+      this.world.emit('stick', this.stick)
+    } else {
+      // otherwise use keyboard
+      if (this.control.keyW.down || this.control.arrowUp.down) this.moveDir.z -= 1
+      if (this.control.keyS.down || this.control.arrowDown.down) this.moveDir.z += 1
+      if (this.control.keyA.down || this.control.arrowLeft.down) this.moveDir.x -= 1
+      if (this.control.keyD.down || this.control.arrowRight.down) this.moveDir.x += 1
     }
 
     // we're moving if direction is set
@@ -949,11 +920,9 @@ export class PlayerLocal extends Entity {
     }
 
     // determine if we're "running"
-    if (this.stick?.active || isXR) {
-      // touch/xr joysticks at full extent (auto-sprint)
-      const threshold = this.world.prefs?.autoSprintThreshold ?? 0.9
-      const mag = this.moveDir.length()
-      this.running = this.moving && mag > threshold
+    if (this.stick?.active || xr) {
+      // touch/xr joysticks at full extent
+      this.running = this.moving && this.moveDir.length() > 0.9
     } else {
       // or keyboard shift key
       this.running = this.moving && (this.control.shiftLeft.down || this.control.shiftRight.down)
@@ -963,9 +932,10 @@ export class PlayerLocal extends Entity {
     this.moveDir.normalize()
 
     // flying direction
-    if (isXR) {
+    if (xr) {
       this.flyDir.copy(this.moveDir)
-      this.flyDir.applyQuaternion(this.world.xr.camera.quaternion)
+      this.world.camera.getWorldQuaternion(q1)
+      this.flyDir.applyQuaternion(q1)
     } else {
       this.flyDir.copy(this.moveDir)
       this.flyDir.applyQuaternion(this.cam.quaternion)
@@ -989,9 +959,11 @@ export class PlayerLocal extends Entity {
     if (moveDeg < 0) moveDeg += 360
 
     // rotate direction to face camera Y direction
-    if (isXR) {
-      e1.copy(this.world.xr.camera.rotation).reorder('YXZ')
-      e1.y += this.cam.rotation.y
+    if (xr) {
+      this.world.camera.getWorldQuaternion(q1)
+      e1.setFromQuaternion(q1).reorder('YXZ')
+      // e1.y += this.xrRig.rotation.y
+      // e1.y += this.cam.rotation.y // why not world.camera now?
       const yQuaternion = q1.setFromAxisAngle(UP, e1.y)
       this.moveDir.applyQuaternion(yQuaternion)
     } else {
@@ -1002,9 +974,11 @@ export class PlayerLocal extends Entity {
     // get initial facing angle matching camera
     let rotY = 0
     let applyRotY
-    if (isXR) {
-      e1.copy(this.world.xr.camera.rotation).reorder('YXZ')
-      rotY = e1.y + this.cam.rotation.y
+    if (xr) {
+      this.world.camera.getWorldQuaternion(q1)
+      e1.setFromQuaternion(q1).reorder('YXZ')
+      rotY = e1.y
+      // rotY = e1.y + this.cam.rotation.y
     } else {
       rotY = this.cam.rotation.y
     }
@@ -1022,54 +996,40 @@ export class PlayerLocal extends Entity {
       this.base.quaternion.slerp(q1, alpha)
     }
 
-    // apply emote (defer emote while flipping unless explicitly allowed with ?af=1)
+    // apply emote
     let emote
     if (this.data.effect?.emote) {
-      const url = this.data.effect.emote
-      const allowDuringFlip = (() => {
-        try {
-          const u = new URL(url)
-          return u.searchParams.get('af') === '1'
-        } catch (_) {
-          return false
-        }
-      })()
-      const aerial = this.world.time < this.flipUntil
-      if (!aerial || allowDuringFlip) emote = url
+      emote = this.data.effect.emote
     }
-    if (this.emote !== emote) this.emote = emote
+    if (this.emote !== emote) {
+      this.emote = emote
+    }
     this.avatar?.setEmote(this.emote)
-    // pass speaking state to animation system for blending
-    this.avatar?.instance?.setSpeaking(this.speaking)
 
     // get locomotion mode
     let mode
     if (this.data.effect?.emote) {
       // emote = this.data.effect.emote
-    } else if (this.platformerMode !== Modes.IDLE) {
-      // Platformer mechanics take priority
-      mode = this.platformerMode
     } else if (this.flying) {
       mode = Modes.FLY
-    } else if (this.world.time < this.flipUntil) {
-      // keep FLIP/BACKFLIP exclusive while locked, unless we have clearly transitioned into falling
-      const flipElapsed = this.world.time - this.flipStartAt
-      const unlockForFall = this.falling && flipElapsed > Math.min(0.45, this.flipDuration * 0.7)
-      mode = unlockForFall ? null : this.isBackflip ? Modes.BACKFLIP : Modes.FLIP
-      // console.log(`[Locomotion] Mode: ${this.isBackflip ? 'BACKFLIP' : 'FLIP'}`)
+    } else if (this.airJumping) {
+      mode = Modes.FLIP
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
       mode = this.fallDistance > 1.6 ? Modes.FALL : Modes.JUMP
     } else if (this.moving) {
       mode = this.running ? Modes.RUN : Modes.WALK
+    } else if (this.speaking) {
+      mode = Modes.TALK
     }
     if (!mode) mode = Modes.IDLE
     this.mode = mode
 
     // set gaze direction
-    if (isXR) {
-      this.gaze.copy(FORWARD).applyQuaternion(this.world.xr.camera.quaternion)
+    if (xr) {
+      this.world.camera.getWorldQuaternion(q1)
+      this.gaze.copy(FORWARD).applyQuaternion(q1)
     } else {
       this.gaze.copy(FORWARD).applyQuaternion(this.cam.quaternion)
       if (!this.firstPerson) {
@@ -1077,6 +1037,11 @@ export class PlayerLocal extends Entity {
         v1.copy(gazeTiltAxis).applyQuaternion(this.cam.quaternion) // tilt in cam space
         this.gaze.applyAxisAngle(v1, gazeTiltAngle) // positive for upward tilt
       }
+    }
+
+    if (xr) {
+      // hint to controls that xr rig is in a new position
+      this.world.controls.applyXRRig(this.xrRig)
     }
 
     // apply locomotion
@@ -1146,8 +1111,12 @@ export class PlayerLocal extends Entity {
   }
 
   lateUpdate(delta) {
-    const isXR = this.world.xr?.session
+    const xr = this.isXR
     const anchor = this.getAnchorMatrix()
+
+    // if (xr) return
+    // console.log('lateUpdate')
+
     // if we're anchored, force into that pose
     if (anchor) {
       this.base.position.setFromMatrixPosition(anchor)
@@ -1158,7 +1127,7 @@ export class PlayerLocal extends Entity {
     }
     // make camera follow our position horizontally
     this.cam.position.copy(this.base.position)
-    if (isXR) {
+    if (xr) {
       // ...
     } else {
       // and vertically at our vrm model height
@@ -1170,18 +1139,13 @@ export class PlayerLocal extends Entity {
         this.cam.position.add(right.multiplyScalar(0.3))
       }
     }
-
-    // SKIP camera updates if a free-flying camera is active
-    const activeCamera = this.world.systems.CameraManager?.activeCamera
-    if (!activeCamera?.freeFlying) {
-      if (this.world.xr?.session) {
-        // in vr snap camera
-        this.control.camera.position.copy(this.cam.position)
-        this.control.camera.quaternion.copy(this.cam.quaternion)
-      } else {
-        // otherwise interpolate camera towards target
-        simpleCamLerp(this.world, this.control.camera, this.cam, delta)
-      }
+    if (xr) {
+      // in vr snap camera
+      // this.control.camera.position.copy(this.cam.position)
+      // this.control.camera.quaternion.copy(this.cam.quaternion)
+    } else {
+      // otherwise interpolate camera towards target
+      simpleCamLerp(this.world, this.control.camera, this.cam, delta)
     }
     if (this.avatar) {
       const matrix = this.avatar.getBoneTransform('head')
@@ -1205,15 +1169,12 @@ export class PlayerLocal extends Entity {
       q: this.base.quaternion.toArray(),
       t: true,
     })
-    // snap camera (unless a free-flying camera is active)
-    const activeCamera = this.world.systems.CameraManager?.activeCamera
-    if (!activeCamera?.freeFlying) {
-      this.cam.position.copy(this.base.position)
-      this.cam.position.y += this.camHeight
-      if (hasRotation) this.cam.rotation.y = rotationY
-      this.control.camera.position.copy(this.cam.position)
-      this.control.camera.quaternion.copy(this.cam.quaternion)
-    }
+    // snap camera
+    this.cam.position.copy(this.base.position)
+    this.cam.position.y += this.camHeight
+    if (hasRotation) this.cam.rotation.y = rotationY
+    this.control.camera.position.copy(this.cam.position)
+    this.control.camera.quaternion.copy(this.cam.quaternion)
   }
 
   setEffect(effect, onEnd) {
@@ -1321,104 +1282,5 @@ export class PlayerLocal extends Entity {
     if (changed) {
       this.world.emit('player', this)
     }
-  }
-
-  // Platformer mechanics input handling
-  handlePlatformerInput() {
-    if (!this.world.platformerMechanics) return
-
-    // Skip if a free-flying camera is active
-    const activeCamera = this.world.systems.CameraManager?.activeCamera
-    if (activeCamera?.freeFlying) return
-
-    const isXR = this.world.xr?.session
-
-    // Climbing input (W/S keys or XR stick)
-    if (this.platformerMode === Modes.CLIMBING) {
-      if (isXR) {
-        this.climbDirection = this.control.xrLeftStick.value.z
-      } else {
-        this.climbDirection = 0
-        if (this.control.keyW.down || this.control.arrowUp.down) this.climbDirection = 1
-        if (this.control.keyS.down || this.control.arrowDown.down) this.climbDirection = -1
-      }
-    }
-
-    // Ledge hanging input (A/D keys or XR stick)
-    if (this.platformerMode === Modes.LEDGE_HANGING) {
-      if (isXR) {
-        this.climbDirection = this.control.xrLeftStick.value.x
-      } else {
-        this.climbDirection = 0
-        if (this.control.keyA.down || this.control.arrowLeft.down) this.climbDirection = -1
-        if (this.control.keyD.down || this.control.arrowRight.down) this.climbDirection = 1
-      }
-    }
-
-    // Attempt to start platformer mechanics
-    if (this.platformerMode === Modes.IDLE) {
-      // Climbing (F key or XR button)
-      if ((!isXR && this.control.keyF.pressed) || (isXR && this.control.xrRightBtn1.pressed)) {
-        this.world.platformerMechanics.attemptClimbStart(this.data.id)
-      }
-
-      // Ledge grab (G key or XR button)
-      if ((!isXR && this.control.keyG.pressed) || (isXR && this.control.xrLeftBtn1.pressed)) {
-        this.world.platformerMechanics.attemptLedgeGrab(this.data.id)
-      }
-
-      // Air dive (H key or XR button)
-      if ((!isXR && this.control.keyH.pressed) || (isXR && this.control.xrRightBtn2.pressed)) {
-        this.world.platformerMechanics.attemptAirDive(this.data.id)
-      }
-
-      // Wall slide (automatic when touching wall while falling)
-      if (!this.grounded && this.falling) {
-        this.world.platformerMechanics.attemptWallSlide(this.data.id)
-      }
-    }
-
-    // Send input to platformer mechanics system
-    this.world.platformerMechanics.handlePlayerInput(this.data.id, {
-      climbUp: this.climbDirection > 0,
-      climbDown: this.climbDirection < 0,
-      moveLeft: this.climbDirection < 0,
-      moveRight: this.climbDirection > 0,
-    })
-  }
-
-  // Platformer mechanics state management
-  setPlatformerMode(mode) {
-    this.platformerMode = mode
-  }
-
-  getStamina() {
-    return this.stamina
-  }
-
-  setStamina(stamina) {
-    this.stamina = Math.max(0, Math.min(100, stamina))
-  }
-
-  // Apply additive animation that layers over locomotion
-  applyAdditiveAnimation(url, options = {}) {
-    if (!this.avatar?.instance?.setAdditiveAnimation) {
-      console.warn('[Player] Additive animations not supported by avatar')
-      return
-    }
-
-    return this.avatar.instance.setAdditiveAnimation(url, options)
-  }
-
-  // Stop additive animation
-  stopAdditiveAnimation(url, options = {}) {
-    if (!this.avatar?.instance?.stopAdditiveAnimation) return
-    this.avatar.instance.stopAdditiveAnimation(url, options?.fadeDuration)
-  }
-
-  // Clear all additive animations
-  clearAdditiveAnimations(options = {}) {
-    if (!this.avatar?.instance?.setAdditiveAnimation) return
-    this.avatar.instance.setAdditiveAnimation(null, options)
   }
 }
