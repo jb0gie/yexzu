@@ -919,7 +919,7 @@ export class Camera extends Node {
   }
 
   /**
-   * Perform autofocus
+   * Perform autofocus with enhanced reticle support for first-person
    */
   performAutofocus(delta) {
     // Early exit if camera is disposed or DOF is not available
@@ -928,33 +928,103 @@ export class Camera extends Node {
     // Safety check: ensure effect hasn't been disposed
     if (!this.effects.dof.circleOfConfusionMaterial) return
 
-    // Get center of screen target
-    const raycaster = new THREE.Raycaster()
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
+    // Check if we're in first-person mode (no avatar available)
+    const player = this.ctx?.world?.entities?.player
+    const isFirstPerson = player?.firstPerson === true
 
-    // Cast ray into scene
-    const scene = this.ctx?.world?.stage?.scene
-    if (!scene) return
+    if (isFirstPerson) {
+      console.log('[Camera-Autofocus] First-person mode detected, using enhanced reticle-based focus')
+    } else {
+      console.log('[Camera-Autofocus] Third-person mode detected, checking for avatar availability')
+    }
 
-    const intersects = raycaster.intersectObjects(scene.children, true)
+    // Priority 1: Head bone raycast for VR/head-tracking accuracy (only in third-person)
+    let targetDistance = null
+    const avatar = this.ctx?.world?.avatar
 
-    if (intersects.length > 0) {
-      // Ultra-responsive autofocus with dramatic focus pulls
-      const targetDistance = intersects[0].distance
-      const speed = this.dof.autofocusSpeed * delta * 3 // Triple the speed for instant response
+    if (!isFirstPerson && avatar && player) {
+      const headMatrix = avatar.getBoneTransform('head')
+      if (headMatrix) {
+        const headPos = new THREE.Vector3().setFromMatrixPosition(headMatrix)
+        const headQuat = new THREE.Quaternion().setFromRotationMatrix(headMatrix)
+        const headDir = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat)
+
+        const raycaster = new THREE.Raycaster()
+        raycaster.set(headPos, headDir)
+
+        // Get intersectable objects from both stage scene and viewport
+        const scene = this.ctx?.world?.stage?.scene
+        const viewport = this.ctx?.world?.viewport
+        const intersectables = scene || viewport
+
+        if (intersectables) {
+          const intersects = raycaster.intersectObjects(intersectables.children || [], true)
+          if (intersects.length > 0) {
+            targetDistance = intersects[0].distance
+            console.log(`[Camera-HeadBone] Head focus: ${targetDistance.toFixed(2)}m`)
+          }
+        }
+      } else {
+        console.log('[Camera-Autofocus] No head bone available in third-person mode')
+      }
+    }
+
+    // Priority 2: Enhanced reticle raycast for first-person (more precise than camera center)
+    if (targetDistance === null && isFirstPerson) {
+      // Use the existing reticle raycast system for more accurate first-person focusing
+      const reticleHits = this.ctx?.world?.stage?.raycastReticle()
+      if (reticleHits && reticleHits.length > 0) {
+        targetDistance = reticleHits[0].distance
+        console.log(`[Camera-FirstPerson] Reticle focus: ${targetDistance.toFixed(2)}m`)
+      } else {
+        // If reticle fails, fall back to camera center raycast
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
+
+        const scene = this.ctx?.world?.stage?.scene
+        if (scene) {
+          const intersects = raycaster.intersectObjects(scene.children, true)
+          if (intersects.length > 0) {
+            targetDistance = intersects[0].distance
+            console.log(`[Camera-FirstPerson] Camera center focus: ${targetDistance.toFixed(2)}m`)
+          }
+        }
+      }
+    }
+
+    // Priority 3: Center screen raycast (fallback for third-person)
+    if (targetDistance === null) {
+      const raycaster = new THREE.Raycaster()
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
+
+      // Cast ray into scene
+      const scene = this.ctx?.world?.stage?.scene
+      if (scene) {
+        const intersects = raycaster.intersectObjects(scene.children, true)
+        if (intersects.length > 0) {
+          targetDistance = intersects[0].distance
+          console.log(`[Camera-${isFirstPerson ? 'ThirdPerson' : 'Center'}] Camera center focus: ${targetDistance.toFixed(2)}m`)
+        }
+      }
+    }
+
+    // Apply focus if we found a target
+    if (targetDistance !== null && targetDistance > 0) {
+      // Ultra-responsive autofocus with dramatic focus pulls for first-person
+      const speed = this.dof.autofocusSpeed * delta * (isFirstPerson ? 4 : 3) // Even faster for first-person
       const smoothness = this.dof.autofocusSmoothness
 
       // Use aggressive exponential smoothing for instant focus snaps
       const lerpFactor = 1 - Math.exp(-speed * (2 + smoothness))
 
-      // Add overshoot for more dramatic focus pulls
-      const overshoot = 1.05 // 5% overshoot
+      // Add more dramatic overshoot for first-person (10% overshoot)
+      const overshoot = isFirstPerson ? 1.10 : 1.05 // More dramatic in first-person
       const newDistance = THREE.MathUtils.lerp(this.dof.focusDistance, targetDistance * overshoot, lerpFactor)
 
       // Clamp back to target for final value
-      this.dof.focusDistance = THREE.MathUtils.lerp(newDistance, targetDistance, 0.1)
+      this.dof.focusDistance = THREE.MathUtils.lerp(newDistance, targetDistance, isFirstPerson ? 0.15 : 0.1) // Slightly slower return in first-person
 
-      // Update DOF effect with ultra-aggressive focus
+      // Enhanced DOF effect with more dramatic focus for first-person
       if (this.effects.dof && this.effects.dof.circleOfConfusionMaterial) {
         const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
         if (uniforms) {
@@ -963,21 +1033,23 @@ export class Camera extends Node {
             uniforms.focusDistance.value = this.dof.focusDistance / this.far
           }
 
-          // Also adjust f-stop dynamically for more dramatic effect
-          const distanceNormalized = Math.min(targetDistance / 15, 1) // Closer range
-          const dynamicFStop = this.dof.fStop * (0.5 + distanceNormalized * 0.5)
+          // More aggressive f-stop adjustment for first-person
+          const distanceNormalized = Math.min(targetDistance / (isFirstPerson ? 10 : 15), 1)
+          const dynamicFStop = this.dof.fStop * (0.3 + distanceNormalized * 0.7) // More sensitive in first-person
           if (uniforms.fStop) {
             uniforms.fStop.value = dynamicFStop
           }
         }
 
-        // Update bokeh scale if supported
+        // More dramatic bokeh for first-person
         if (this.effects.dof.bokehScale !== undefined) {
-          const distanceNormalized = Math.min(targetDistance / 15, 1)
-          const dynamicBokeh = this.dof.maxBlur * (1 + (1 - distanceNormalized) * 1.0)
-          this.effects.dof.bokehScale = dynamicBokeh * 120
+          const distanceNormalized = Math.min(targetDistance / (isFirstPerson ? 10 : 15), 1)
+          const dynamicBokeh = this.dof.maxBlur * (1 + (1 - distanceNormalized) * (isFirstPerson ? 1.5 : 1.0)) // More dramatic bokeh in first-person
+          this.effects.dof.bokehScale = dynamicBokeh * (isFirstPerson ? 150 : 120)
         }
       }
+    } else {
+      console.log('[Camera-Autofocus] No valid target found, maintaining current focus')
     }
   }
 

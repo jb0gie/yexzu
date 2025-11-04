@@ -117,7 +117,7 @@
   const rayDirection = new THREE.Vector3()
 
   /**
-   * Enhanced head bone raycast system
+   * Enhanced head bone raycast system (respects first-person mode)
    */
   function performHeadBoneRaycast() {
     if (!app.props.enabled || !dofState.useHeadBoneRaycast) return null
@@ -127,7 +127,14 @@
 
     if (!player || !avatar) return null
 
-    // Use existing head bone transform system
+    // Check if we're in first-person mode
+    const isFirstPerson = player.firstPerson === true
+    if (isFirstPerson) {
+      console.log('[EnhancedDoF-HeadBone] First-person mode detected, skipping head bone raycast')
+      return null
+    }
+
+    // Use existing head bone transform system (only in third-person)
     const headMatrix = avatar.getBoneTransform('head')
     if (!headMatrix) return null
 
@@ -142,8 +149,8 @@
     // Perform raycast using existing world infrastructure
     raycaster.set(rayOrigin, rayDirection)
 
-    // Get intersectable objects
-    const intersectables = world.stage?.getIntersectables() || world.viewport
+    // Get intersectable objects (world.scene contains all objects for raycasting)
+    const intersectables = world.stage?.scene || world.viewport
     if (!intersectables) return null
 
     const intersects = raycaster.intersectObjects(intersectables.children || [], true)

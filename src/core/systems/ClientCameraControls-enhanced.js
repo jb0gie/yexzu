@@ -86,11 +86,11 @@ export class ClientCameraControls extends System {
       // Use existing raycast infrastructure from Stage.js
       this.raycaster.set(headPos, forward)
 
-      // Get intersectable objects (reuse existing Stage infrastructure)
-      const intersectables = this.world.stage.getIntersectables()
+      // Get intersectable objects (world.scene contains all objects for raycasting)
+      const intersectables = this.world.stage?.scene || this.world.viewport
 
       // Perform raycast using existing system
-      const intersects = this.raycaster.intersectObjects(intersectables.children, true)
+      const intersects = this.raycaster.intersectObjects(intersectables?.children || [], true)
 
       if (intersects.length > 0) {
         const targetDistance = intersects[0].distance
@@ -251,8 +251,8 @@ export class ClientCameraControls extends System {
 
     this.raycaster.set(headPos, direction)
 
-    const intersectables = this.world.stage.getIntersectables()
-    const intersects = this.raycaster.intersectObjects(intersectables.children, true)
+    const intersectables = this.world.stage?.scene || this.world.viewport
+    const intersects = this.raycaster.intersectObjects(intersectables?.children || [], true)
 
     return intersects.length > 0 ? intersects[0].distance : null
   }
