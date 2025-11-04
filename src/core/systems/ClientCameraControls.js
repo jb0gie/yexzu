@@ -377,23 +377,46 @@ export class ClientCameraControls extends System {
       this.setDOFFocusDistance(this.currentFocusDistance)
     }
 
-    // Reticle autofocus (use head raycast for consistency)
+    // Enhanced reticle autofocus with first-person reticle support
     if (this.reticleAutofocus && !this.dynamicDOF) {
-      const raycastDist = this.raycastFromPlayerHead() || this.raycastFocusDistance()
+      const player = this.world.entities?.player
+      const isFirstPerson = player?.firstPerson === true
 
-      if (raycastDist !== null) {
-        // Check if we're looking at a new target
-        if (Math.abs(raycastDist - (this.lastReticleTarget || 0)) > 0.5) {
-          // New target, reset timer
-          this.reticleFocusTimer = 0
-          this.lastReticleTarget = raycastDist
+      let raycastDist = null
+
+      if (isFirstPerson) {
+        // In first-person, prioritize reticle-based focusing
+        raycastDist = this.raycastFromFirstPersonReticle()
+        if (raycastDist !== null) {
+          // Use immediately without delay for more responsive first-person focusing
+          this.targetFocusDistance = raycastDist
+          console.log(`[ClientCameraControls-FirstPerson] Immediate reticle focus: ${raycastDist.toFixed(2)}m`)
         } else {
-          // Same target, increment timer
-          this.reticleFocusTimer += delta
-
-          // After delay, start focusing
-          if (this.reticleFocusTimer >= this.reticleFocusDelay) {
+          // Fallback to camera center raycast for first-person
+          raycastDist = this.raycastFocusDistance()
+          if (raycastDist !== null) {
             this.targetFocusDistance = raycastDist
+            console.log(`[ClientCameraControls-FirstPerson] Fallback camera focus: ${raycastDist.toFixed(2)}m`)
+          }
+        }
+      } else {
+        // In third-person, keep existing reticle behavior with head raycast priority
+        raycastDist = this.raycastFromPlayerHead() || this.raycastFocusDistance()
+
+        if (raycastDist !== null) {
+          // Check if we're looking at a new target
+          if (Math.abs(raycastDist - (this.lastReticleTarget || 0)) > 0.5) {
+            // New target, reset timer
+            this.reticleFocusTimer = 0
+            this.lastReticleTarget = raycastDist
+          } else {
+            // Same target, increment timer
+            this.reticleFocusTimer += delta
+
+            // After delay, start focusing
+            if (this.reticleFocusTimer >= this.reticleFocusDelay) {
+              this.targetFocusDistance = raycastDist
+            }
           }
         }
       }
@@ -614,44 +637,88 @@ export class ClientCameraControls extends System {
     return cameraWorldPos.distanceTo(playerPos)
   }
 
-  // Raycast from player head position towards camera look direction
-  raycastFromPlayerHead() {
-    if (!this.world.entities?.player || !this.world.camera || !this.world.scene) {
+  // Enhanced first-person reticle-based focus
+  raycastFromFirstPersonReticle() {
+    if (!this.world.entities?.player || !this.world.camera) {
       return null
     }
 
     const player = this.world.entities.player
-    if (!player.entity?.position) return null
+    if (!player?.firstPerson) return null // Only works in first-person mode
 
-    // Get player head position
-    const headPos = player.entity.position.clone()
-    headPos.y += 1.6 // Standard eye height
-
-    // Get camera direction
-    const cameraDir = new THREE.Vector3()
-    this.world.camera.getWorldDirection(cameraDir)
-
-    // Set up raycaster from player head in camera direction
-    this.raycaster.set(headPos, cameraDir)
-
-    // Get all meshes in the scene
-    const intersectables = []
-    this.world.scene.traverse(object => {
-      if (object.isMesh && object.visible && object !== player.entity) {
-        intersectables.push(object)
-      }
-    })
-
-    // Perform raycast
-    const intersects = this.raycaster.intersectObjects(intersectables, false)
-
-    if (intersects.length > 0) {
-      // Return distance from camera to intersection
-      const cameraWorldPos = new THREE.Vector3()
-      this.world.camera.getWorldPosition(cameraWorldPos)
-      return cameraWorldPos.distanceTo(intersects[0].point)
+    // Use direct reticle raycast for more responsive first-person focusing
+    const reticleHits = this.world.stage.raycastReticle()
+    if (reticleHits && reticleHits.length > 0) {
+      const targetDistance = reticleHits[0].distance
+      console.log(`[ClientCameraControls-FirstPerson] Reticle focus: ${targetDistance.toFixed(2)}m`)
+      return targetDistance
     }
 
+    return null
+  }
+
+  // Raycast from player head position towards camera look direction (third-person only)
+  raycastFromPlayerHead() {
+    if (!this.world.entities?.player || !this.world.camera) {
+      return null
+    }
+
+    const player = this.world.entities.player
+    const isFirstPerson = player?.firstPerson === true
+
+    if (isFirstPerson) {
+      return null // Don't use head bone in first-person, use reticle method instead
+    }
+
+    const avatar = this.world.avatar
+
+    // Try to use actual head bone if available (only in third-person)
+    let headPos = null
+    let headDir = null
+
+    if (avatar && avatar.getBoneTransform) {
+      const headMatrix = avatar.getBoneTransform('head')
+      if (headMatrix) {
+        headPos = new THREE.Vector3().setFromMatrixPosition(headMatrix)
+        const headQuat = new THREE.Quaternion().setFromRotationMatrix(headMatrix)
+        headDir = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat)
+        console.log(`[ClientCameraControls-HeadBone] Using head bone raycast in third-person`)
+      }
+    }
+
+    // Fallback to simplified head position + camera direction
+    if (!headPos) {
+      if (!player.entity?.position) return null
+
+      headPos = player.entity.position.clone()
+      headPos.y += 1.6 // Standard eye height
+
+      // Get camera direction (for simplified head raycast in third-person)
+      headDir = new THREE.Vector3()
+      this.world.camera.getWorldDirection(headDir)
+      console.log(`[ClientCameraControls-HeadBone] Using simplified position for third-person`)
+    }
+
+    // Set up raycaster from player head in head direction
+    this.raycaster.set(headPos, headDir)
+
+    // Get intersectable objects from stage scene
+    const scene = this.world.stage?.scene
+    const viewport = this.world.viewport
+    const intersectables = scene || viewport
+
+    if (!intersectables) return null
+
+    // Perform raycast
+    const intersects = this.raycaster.intersectObjects(intersectables.children || [], true)
+
+    if (intersects.length > 0) {
+      const targetDistance = intersects[0].distance
+      console.log(`[ClientCameraControls-HeadBone] Head focus: ${targetDistance.toFixed(2)}m`)
+      return targetDistance
+    }
+
+    console.log('[ClientCameraControls-HeadBone] No intersections found in third-person')
     return null
   }
 
