@@ -199,6 +199,50 @@
     }, currentPhysics.timing)
   }
 
+  // Strafe flip execution with directional physics
+  function executeStrafeFlip(direction = 'left') {
+    const now = Date.now()
+    if (now - lastFlipTime < 800) return // Shared cooldown with regular flips
+    lastFlipTime = now
+
+    if (!playerController) return
+
+    console.log(`[UniversalFlipSystem] Executing ${direction} strafe flip`)
+
+    // Get physics based on current preset but adapt for strafe
+    let physics = currentPhysics
+
+    // Add lateral component for strafe flips (left/right movement)
+    const lateralMultiplier = direction === 'left' ? -1 : 1
+    const lateralForce = physics.forward * 0.6 * lateralMultiplier
+
+    // Get player direction
+    const playerQuat = playerController.rotation || new Quaternion()
+    const upForce = new Vector3(0, physics.up * 0.9, 0) // Slightly reduced vertical
+    const forwardDir = new Vector3(0, 0, -physics.forward).applyQuaternion(playerQuat)
+    const lateralDir = new Vector3(lateralForce, 0, 0).applyQuaternion(playerQuat)
+
+    const totalForce = upForce.add(forwardDir).add(lateralDir)
+
+    // Apply launch force
+    setTimeout(() => {
+      playerController.player.push(totalForce)
+      createLaunchEffect(playerController.position)
+    }, 50)
+
+    // Use the new strafe flip animations
+    setTimeout(() => {
+      const flipMode = direction === 'left' ? 'SIDEFLIP_LEFT' : 'SIDEFLIP_RIGHT'
+
+      // Set player to strafe flip mode (this will trigger the new animations)
+      if (playerController.player.locomotion) {
+        playerController.player.locomotion.setMode(flipMode)
+      }
+
+      console.log(`[UniversalFlipSystem] ${direction.toUpperCase()} strafe flip completed with new ${flipMode} animation`)
+    }, physics.timing)
+  }
+
   // Mobile button interface
   function createMobileFlipInterface() {
     if (!platformDetection.isMobile || !app.props.mobileButtons) return
@@ -369,8 +413,14 @@
     control.keyB.capture = true  // Backflip
     control.keySpace.capture = true  // Contextual flip
 
+    // Add strafe flip controls (Q/E for strafe left/right)
+    control.keyQ.capture = true  // Left strafe flip
+    control.keyE.capture = true  // Right strafe flip
+
     control.keyF.onPress = () => executeFlip('forward')
     control.keyB.onPress = () => executeFlip('backflip')
+    control.keyQ.onPress = () => executeStrafeFlip('left')
+    control.keyE.onPress = () => executeStrafeFlip('right')
     control.keySpace.onPress = () => {
       // Contextual: jump + double-tap space = flip
       const now = Date.now()

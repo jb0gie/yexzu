@@ -53,6 +53,17 @@ const Modes = {
   FALL: 4,
   FLY: 5,
   TALK: 6,
+  FLIP: 7,
+  BACKFLIP: 8,
+  SIDEFLIP_LEFT: 9,
+  SIDEFLIP_RIGHT: 10,
+  STRAFE_JUMP_LEFT: 11,
+  STRAFE_JUMP_RIGHT: 12,
+  GRINDING: 13,
+  CLIMBING: 14,
+  LEDGE_HANGING: 15,
+  AIR_DIVING: 16,
+  WALL_SLIDING: 17,
 }
 
 export class PlayerLocal extends Entity {
@@ -707,7 +718,7 @@ export class PlayerLocal extends Entity {
       const shouldJump =
         this.grounded && !this.jumping && this.jumpDown && !this.data.effect?.snare && !this.data.effect?.freeze
       const shouldAirJump =
-        false && !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled // temp: disabled
+        !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -1013,7 +1024,23 @@ export class PlayerLocal extends Entity {
     } else if (this.flying) {
       mode = Modes.FLY
     } else if (this.airJumping) {
-      mode = Modes.FLIP
+      // Smart flip mode detection - intuitive like existing front/back flip system
+      const flipMode = this.detectSmartFlipMode()
+      console.log('[FLIP DEBUG] Air jump detected, flip mode:', flipMode, 'axis:', this.axis.toArray())
+
+      if (flipMode === 'left') {
+        mode = Modes.SIDEFLIP_LEFT      // Left strafe flip
+        console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_LEFT')
+      } else if (flipMode === 'right') {
+        mode = Modes.SIDEFLIP_RIGHT     // Right strafe flip
+        console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_RIGHT')
+      } else if (flipMode === 'back') {
+        mode = Modes.BACKFLIP           // Back flip for pure backward
+        console.log('[FLIP DEBUG] Setting mode to BACKFLIP')
+      } else {
+        mode = Modes.FLIP               // Default front flip for forward/any direction
+        console.log('[FLIP DEBUG] Setting mode to FLIP (front)')
+      }
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
@@ -1102,12 +1129,55 @@ export class PlayerLocal extends Entity {
     }
 
     // effect duration
-    if (this.data.effect?.duration) {
-      this.data.effect.duration -= delta
+    if (this.data.effect?.duration) {;
+      this.data.effect.duration -= delta;
       if (this.data.effect.duration <= 0) {
-        this.setEffect(null)
+        this.setEffect(null);
       }
     }
+  }
+
+  detectSmartFlipMode() {
+    // Detect flip direction based on movement patterns - intuitive like existing front/back flip system
+    const axis = this.axis
+    if (!axis || axis.length() === 0) return 'front'  // Default front flip when still
+
+    let moveRad = Math.atan2(axis.x, -axis.z)
+    let moveDeg = moveRad * (180 / Math.PI)
+    if (moveDeg < 0) moveDeg += 360
+
+    console.log('[DIRECTION DEBUG] Axis:', axis.toArray(), 'MoveRad:', moveRad.toFixed(3), 'MoveDeg:', moveDeg.toFixed(1))
+
+    // Check for pure strafe movements (±22.5° from 90°/270°)
+    if (moveDeg >= 67.5 && moveDeg <= 112.5) {
+      console.log('[DIRECTION DEBUG] Returning RIGHT strafe (90°±22.5° range)')
+      return 'right'  // Pure right strafe
+    }
+    if (moveDeg >= 247.5 && moveDeg <= 292.5) {
+      console.log('[DIRECTION DEBUG] Returning LEFT strafe (270°±22.5° range)')
+      return 'left'   // Pure left strafe
+    }
+
+    // Test coordinate system: In case D key gives different axis values
+    console.log('[DIRECTION DEBUG] Testing axis.x for positive X (right key)')
+    if (axis.x > 0.5) {
+      console.log('[DIRECTION DEBUG] Positive X detected → Returning RIGHT')
+      return 'right'
+    }
+    if (axis.x < -0.5) {
+      console.log('[DIRECTION DEBUG] Negative X detected → Returning LEFT')
+      return 'left'
+    }
+
+    // Check for pure backward movement (±22.5° from 180°)
+    if (moveDeg >= 157.5 && moveDeg <= 202.5) {
+      console.log('[DIRECTION DEBUG] Returning BACK (180°±22.5° range)')
+      return 'back'   // Pure backward
+    }
+
+    console.log('[DIRECTION DEBUG] Returning FRONT (all other directions)')
+    // All other movements default to front flip (including diagonals)
+    return 'front'    // Default front flip for all other directions
   }
 
   lateUpdate(delta) {

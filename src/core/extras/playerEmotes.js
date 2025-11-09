@@ -17,9 +17,12 @@ export const Emotes = {
   FLY: 'asset://emote-float.glb',
   FLIP: 'asset://emote-flip.glb?s=1.1&l=0',
   BACKFLIP: 'asset://emote-backflip.glb?s=2.2&l=0',
-  // [ANIMATIONS NEEDED] Strafe flip emotes - uncomment when ready:
-  // STRAFE_LEFT_FLIP: 'asset://emote-strafe-left-flip.glb?s=1.1&l=0',
-  // STRAFE_RIGHT_FLIP: 'asset://emote-strafe-right-flip.glb?s=1.1&l=0',
+  // [STRAFE FLIP EMOTES] New strafe flip animations integrated:
+  STRAFE_LEFT_FLIP: 'asset://emote-flip-left.glb?s=1.1&l=0',
+  STRAFE_RIGHT_FLIP: 'asset://emote-flip-right.glb?s=1.5&l=0',
+  // [STRAFE JUMP EMOTES] Side jump animations for non-flip jumping:
+  STRAFE_JUMP_LEFT: 'asset://emote-jump-left.glb?s=1.0&l=0',
+  STRAFE_JUMP_RIGHT: 'asset://emote-jump-right.glb?s=1.0&l=0',
   TALK: 'asset://emote-talk.glb',
   // Platformer Mechanics Animations
   GRINDING: 'asset://mp-grinding.glb?s=1.0',
@@ -51,9 +54,10 @@ export const emoteUrls = [
   Emotes.FLY,
   Emotes.FLIP,
   Emotes.BACKFLIP,
-  // [ANIMATIONS NEEDED] Uncomment when ready:
-  // Emotes.STRAFE_LEFT_FLIP,
-  // Emotes.STRAFE_RIGHT_FLIP,
+  Emotes.STRAFE_LEFT_FLIP,
+  Emotes.STRAFE_RIGHT_FLIP,
+  Emotes.STRAFE_JUMP_LEFT,
+  Emotes.STRAFE_JUMP_RIGHT,
   Emotes.TALK,
   // Platformer Mechanics Animations
   Emotes.GRINDING,
