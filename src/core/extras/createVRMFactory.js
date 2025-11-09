@@ -6,6 +6,7 @@ import { getTrianglesFromGeometry } from './getTrianglesFromGeometry'
 import { getTextureBytesFromMaterial } from './getTextureBytesFromMaterial'
 import { Emotes } from './playerEmotes'
 
+
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
@@ -51,9 +52,16 @@ const Modes = {
   TALK: 6,
   FLIP: 7,
   BACKFLIP: 8,
-  // [ANIMATIONS NEEDED] Uncomment when ready - strafe flip modes:
-  // SIDEFLIP_LEFT: 9,
-  // SIDEFLIP_RIGHT: 10,
+  // [STRAFE FLIP EMOTES] New strafe flip modes:
+  SIDEFLIP_LEFT: 9,
+  SIDEFLIP_RIGHT: 10,
+  STRAFE_JUMP_LEFT: 11,
+  STRAFE_JUMP_RIGHT: 12,
+  GRINDING: 13,
+  CLIMBING: 14,
+  LEDGE_HANGING: 15,
+  AIR_DIVING: 16,
+  WALL_SLIDING: 17,
 }
 
 export function createVRMFactory(glb, setupMaterial) {
@@ -636,7 +644,9 @@ export function createVRMFactory(glb, setupMaterial) {
     const setEmote = (url, options = {}) => {
       const { crossFade = true, fadeDuration = 0.15, warp = true } = options
 
-      if (currentEmote?.url === url) return
+      if (currentEmote?.url === url) {
+        return
+      }
 
       const prevEmote = currentEmote
 
@@ -663,7 +673,6 @@ export function createVRMFactory(glb, setupMaterial) {
 
           // Use crossFadeTo if requested and there's a previous emote playing
           if (crossFade && prevEmote?.action?.isRunning()) {
-            console.log(`[VRM] Using crossFadeTo for emote transition (duration: ${fadeDuration}s)`)
             currentEmote.action.reset().play()
             prevEmote.action.crossFadeTo(currentEmote.action, fadeDuration, warp)
           } else {
@@ -713,6 +722,8 @@ export function createVRMFactory(glb, setupMaterial) {
             }
             clearLocomotion()
           }
+        }).catch(error => {
+          console.error('Failed to load emote:', url, error)
         })
       }
     }
@@ -1613,20 +1624,33 @@ export function createVRMFactory(glb, setupMaterial) {
         poses.talk.target = 1
       } else if (mode === Modes.FLIP) {
         // play the dedicated flip emote; locomotion poses will be cleared by setEmote
+        console.log('[VRM DEBUG] Triggering FLIP animation')
         setEmote(Emotes.FLIP)
       } else if (mode === Modes.BACKFLIP) {
         // play the dedicated backflip emote for backward double jumps
-        // console.log('[VRM] Triggering BACKFLIP animation')
+        console.log('[VRM DEBUG] Triggering BACKFLIP animation')
         setEmote(Emotes.BACKFLIP)
       }
-      // [ANIMATIONS NEEDED] Uncomment when ready - strafe flip emotes:
-      // else if (mode === Modes.SIDEFLIP_LEFT) {
-      //   // play dedicated left strafe flip emote
-      //   setEmote(Emotes.STRAFE_LEFT_FLIP)
-      // } else if (mode === Modes.SIDEFLIP_RIGHT) {
-      //   // play dedicated right strafe flip emote
-      //   setEmote(Emotes.STRAFE_RIGHT_FLIP)
-      // }
+      // [STRAFE FLIP EMOTES] New strafe flip emotes integrated:
+      else if (mode === Modes.SIDEFLIP_LEFT) {
+        // play dedicated left strafe flip emote
+        console.log('[VRM DEBUG] Triggering SIDEFLIP_LEFT animation → Emote:', Emotes.STRAFE_LEFT_FLIP)
+        setEmote(Emotes.STRAFE_LEFT_FLIP)
+      } else if (mode === Modes.SIDEFLIP_RIGHT) {
+        // play dedicated right strafe flip emote
+        console.log('[VRM DEBUG] Triggering SIDEFLIP_RIGHT animation → Emote:', Emotes.STRAFE_RIGHT_FLIP)
+        setEmote(Emotes.STRAFE_RIGHT_FLIP)
+      }
+      // [STRAFE JUMP EMOTES] New strafe jump emotes:
+      else if (mode === Modes.STRAFE_JUMP_LEFT) {
+        // play dedicated left strafe jump emote
+        console.log('[VRM DEBUG] Triggering STRAFE_JUMP_LEFT animation → Emote:', Emotes.STRAFE_JUMP_LEFT)
+        setEmote(Emotes.STRAFE_JUMP_LEFT)
+      } else if (mode === Modes.STRAFE_JUMP_RIGHT) {
+        // play dedicated right strafe jump emote
+        console.log('[VRM DEBUG] Triggering STRAFE_JUMP_RIGHT animation → Emote:', Emotes.STRAFE_JUMP_RIGHT)
+        setEmote(Emotes.STRAFE_JUMP_RIGHT)
+      }
       else if (mode === Modes.GRINDING) {
         poses.grinding.target = 1
       } else if (mode === Modes.CLIMBING) {
