@@ -9,6 +9,7 @@ on:
       - 'dev'
       - 'solana-v2'
       - 'ai'
+      - 'crtrdg'
     tags:
       - 'v*.*.*'
 
