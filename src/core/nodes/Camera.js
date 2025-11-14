@@ -111,23 +111,23 @@ export class Camera extends Node {
     this._freeActor = null
     this._freeLogTimer = 0
 
-    // Ultra-cinematic DOF settings for dramatic bokeh
+    // Realistic cinematic DOF settings (based on actual camera lenses)
     this.dof = {
       enabled: data.dof?.enabled ?? true,
       focusDistance: data.dof?.focusDistance ?? 10,
-      focalLength: data.dof?.focalLength ?? 35,
-      fStop: data.dof?.fStop ?? 0.5, // Ultra shallow DOF (professional cinema lens)
-      maxBlur: data.dof?.maxBlur ?? 0.08, // Maximum bokeh blur
-      luminanceThreshold: data.dof?.luminanceThreshold ?? 0.2, // Even lower threshold
-      luminanceGain: data.dof?.luminanceGain ?? 5, // Strong gain for bright bokeh
-      bias: data.dof?.bias ?? 0.05, // Very sharp focus transition
-      fringe: data.dof?.fringe ?? 1.5, // Strong chromatic aberration
+      focalLength: data.dof?.focalLength ?? 50,
+      fStop: data.dof?.fStop ?? 1.8, // Realistic: f/1.4-f/2.8 typical for sharp + bokeh
+      maxBlur: data.dof?.maxBlur ?? 0.06, // Reduced for more realistic blur
+      luminanceThreshold: data.dof?.luminanceThreshold ?? 0.6, // Higher threshold for natural bokeh
+      luminanceGain: data.dof?.luminanceGain ?? 2.5, // Reduced gain for realism
+      bias: data.dof?.bias ?? 0.08, // Smoother focus transition
+      fringe: data.dof?.fringe ?? 0.8, // Reduced chromatic aberration
       dithering: data.dof?.dithering ?? 0.0001,
-      pentagon: data.dof?.pentagon ?? true,
-      shapeBlur: data.dof?.shapeBlur ?? 2.0, // Maximum bokeh shape
-      autofocus: data.dof?.autofocus ?? false, // Default OFF to avoid unexpected focus shifts
-      autofocusSpeed: data.dof?.autofocusSpeed ?? 8, // Very fast focus pulls
-      autofocusSmoothness: data.dof?.autofocusSmoothness ?? 0.08, // Ultra snappy focus
+      pentagon: data.dof?.pentagon ?? false, // Use circular bokeh (realistic)
+      shapeBlur: data.dof?.shapeBlur ?? 0.8, // Reduced for circular bokeh
+      autofocus: data.dof?.autofocus ?? true,
+      autofocusSpeed: data.dof?.autofocusSpeed ?? 1.0, // Slower, more realistic
+      autofocusSmoothness: data.dof?.autofocusSmoothness ?? 0.15, // Smoother focus changes
     }
 
     // Enhanced bloom for cinematic glow
@@ -796,9 +796,16 @@ export class Camera extends Node {
         height: 480, // Resolution for DOF
       })
 
-      // Configure DOF effect
+      // Configure DOF effect with realistic parameters
       const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
       if (uniforms.fStop) uniforms.fStop.value = this.dof.fStop
+      if (uniforms.maxBlur) uniforms.maxBlur.value = this.dof.maxBlur
+      if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = this.dof.luminanceThreshold
+      if (uniforms.luminanceGain) uniforms.luminanceGain.value = this.dof.luminanceGain
+      if (uniforms.bias) uniforms.bias.value = this.dof.bias
+      if (uniforms.fringe) uniforms.fringe.value = this.dof.fringe
+      if (uniforms.pentagon) uniforms.pentagon.value = this.dof.pentagon
+      if (uniforms.shapeBlur) uniforms.shapeBlur.value = this.dof.shapeBlur
 
       enabledEffects.push(this.effects.dof)
     }
