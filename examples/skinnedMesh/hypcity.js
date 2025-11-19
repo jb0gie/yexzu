@@ -182,10 +182,17 @@ function validateAnimationTracks(template) {
 
 // Helper function to discover and play animations
 function discoverAndPlayAnimations(template) {
+	// Get configurable animation names
+	const animNames = [
+		CONFIG.spinningAnimation1 || 'Spin1',
+		CONFIG.spinningAnimation2 || 'Spin2',
+		CONFIG.spinningAnimation3 || 'Spin3'
+	]
+
 	// Just play the animations directly
 	template.traverse(node => {
 		if (node.anims) {
-			['Spin1', 'Spin2', 'Spin3'].forEach(animName => {
+			animNames.forEach(animName => {
 				if (node.anims.includes(animName)) {
 					try {
 						node.play({
@@ -194,6 +201,13 @@ function discoverAndPlayAnimations(template) {
 							fade: 0.5
 						})
 						console.log('[HypCity] Successfully played', animName, 'on:', node.name || 'unnamed')
+
+						// Store the animation info
+						spinningAnimations.set(node, {
+							animationName: animName,
+							animations: node.anims,
+							node: node
+						})
 					} catch (error) {
 						console.error('[HypCity] Error playing', animName, ':', error)
 					}
@@ -454,6 +468,9 @@ async function createBuilding(x, z, zoneType) {
 	const rotation = rotationIndex * Math.PI / 2
 	building.rotation.y = rotation
 
+	// Set up spinning skinned meshes for this cloned building
+	setupSpinningSkinnedMeshes(building)
+
 	return building
 }
 
@@ -488,12 +505,6 @@ async function generateCityTile(tileX, tileZ) {
 						// Clone the entire building structure
 						const building = template.clone(true)
 
-						// Set up spinning skinned meshes for this building
-						// Try to discover and play animations with a small delay
-						setTimeout(() => {
-							discoverAndPlayAnimations(building)
-						}, 100)
-
 						const height = getBuildingHeight(zoneType, worldX, worldZ)
 						const scale = getBuildingScale(zoneType, worldX, worldZ)
 						const offsetX = (noise(worldX, worldZ, 7000) - 0.5) * 0.3
@@ -512,7 +523,12 @@ async function generateCityTile(tileX, tileZ) {
 						const rotationIndex = Math.floor(noise(worldX, worldZ, 9000) * 4)
 						const rotation = rotationIndex * Math.PI / 2
 						building.rotation.y = rotation
+
+						// Add building to tile first so it's in the scene
 						tile.add(building)
+
+						// Set up spinning skinned meshes for this cloned building
+						setupSpinningSkinnedMeshes(building)
 					} else {
 						const building = await createBuilding(worldX, worldZ, zoneType)
 						if (building) {
@@ -749,6 +765,13 @@ function setupSpinningSkinnedMeshes(building) {
 	// Search for spinning skinned meshes in the cloned building
 	const spinningSkinnedMeshes = findSpinningSkinnedMeshes(building)
 
+	// Get configurable animation names
+	const animNames = [
+		CONFIG.spinningAnimation1 || 'Spin1',
+		CONFIG.spinningAnimation2 || 'Spin2',
+		CONFIG.spinningAnimation3 || 'Spin3'
+	]
+
 	// Set up animations for each spinning skinned mesh
 	spinningSkinnedMeshes.forEach(({ node, animations, name }) => {
 		// Safety checks
@@ -760,17 +783,23 @@ function setupSpinningSkinnedMeshes(building) {
 		// Map the rig name to the appropriate animation
 		let animationName = null
 		if (name.includes('SpinRig1') || name.includes('Spin1')) {
-			animationName = 'Spin1'
+			animationName = animNames[0]
 		} else if (name.includes('SpinRig2') || name.includes('Spin2')) {
-			animationName = 'Spin2'
+			animationName = animNames[1]
 		} else if (name.includes('SpinRig3') || name.includes('Spin3')) {
-			animationName = 'Spin3'
+			animationName = animNames[2]
 		}
 
-		console.log('[HypCity] Processing spinning mesh:', name, 'animationName:', animationName, 'animations keys:', Object.keys(animations))
+		// Try to find the animation in the node's anims array or animations object
+		const availableAnims = node.anims || (animations && Object.keys(animations)) || []
 
-		if (animationName && animations[animationName]) {
-			// Play the animation with loop (like in big-door.js)
+		// Check if animation exists in available animations
+		const hasAnimation = availableAnims.includes(animationName) ||
+			(animations && animations[animationName]) ||
+			(node.anims && node.anims.includes(animationName))
+
+		if (animationName && hasAnimation) {
+			// Play the animation with loop
 			try {
 				node.play({
 					name: animationName,
@@ -789,9 +818,15 @@ function setupSpinningSkinnedMeshes(building) {
 				console.error('[HypCity] Error playing animation', animationName, 'on node:', name, ':', error)
 			}
 		} else {
-			console.log('[HypCity] Animation', animationName, 'not found in animations for node:', name)
+			// Try to discover and play any available spinning animations
+			discoverAndPlayAnimations(node)
 		}
 	})
+
+	// Also try the direct discovery approach as fallback
+	if (spinningSkinnedMeshes.length === 0) {
+		discoverAndPlayAnimations(building)
+	}
 }
 
 // Helper function to update spinning animations

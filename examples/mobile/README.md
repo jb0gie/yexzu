@@ -1,68 +1,117 @@
-# Mobile Controls App
+# Mobile Controls Examples - Simple Pattern
 
-A standalone mobile touch controls app for Hyperfy that extracts the hardcoded mobile UI from CoreUI.js into a configurable system.
+## Overview
 
-## Features
+This directory contains examples of the **simple mobile control pattern** for Hyperfy. Each app has **its own mobile button** directly in the app (like `emotes.js`).
 
-- **Jump Button**: Primary action/touch button (maps to `touchA`)
-- **Action Button**: Secondary action button (maps to `touchB`) - only shows when actions are available
-- **ADS Toggle**: Toggle for right-click/aim-down-sights mode
-- **Camera Cycle**: Cycle through camera views (Medium 3rd → Close 3rd → First Person → Far 3rd)
-- **Platformer Buttons**: Specialized controls for platformer mechanics
-  - **Climb**: Trigger climb mode (F key)
-  - **Ledge**: Trigger ledge grab (G key)
-  - **Dive**: Trigger air dive (L key)
+## Key Files
 
-## Configuration
+### **mobile-app-template.js**
+Copy this template to add mobile support to any app:
+- Has its own mobile button
+- Configurable position and style
+- Works with keyboard AND mobile
+- Simple pattern: `app.create('ui', { onPointerDown: action })`
 
-The app provides the following configuration options:
+### **SIMPLE_MOBILE_PATTERN.md**
+Complete guide showing:
+- How to add mobile buttons to any app
+- Code examples
+- Positioning tips (top-right corner!)
+- Best practices
 
-- **Show Mobile Controls**: Toggle all mobile controls on/off
-- **Show Platformer Buttons**: Toggle platformer-specific buttons
-- **Show Camera Button**: Toggle camera cycling button
-- **Show ADS Button**: Toggle ADS toggle button
+## Working Examples
 
-## Usage
+### **dash.js** (`examples/essentials/dash.js`)
+- "DASH" button (top-right, native theme)
+- Position: `[-30, 100]`
+- Works with keyboard (F) and mobile
 
-Add this app to your world to enable mobile touch controls on touch devices:
+### **Pistol** (`examples/elementals/elemental-item-pistol.js`)
+- "SHOOT" button (top-right, native theme)
+- "ADS" button (top-right, below shoot)
+- Full pistol functionality on mobile
+
+## How It Works
 
 ```javascript
-{
-  id: 'mobile-controls',
-  src: 'examples/mobile/mobile-controls.js'
+if (config.showMobileButton) {
+  const btn = app.create('ui', {
+    space: 'screen',
+    width: 50,
+    height: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',  // Native theme
+    borderRadius: 25,
+    pivot: 'top-right',
+    position: [1, 0],
+    offset: [-30, 100],
+    cursor: 'pointer',
+    onPointerDown: () => doAction(),
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+  const label = app.create('uitext', {
+    value: 'ACTION',
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold'
+  })
+  btn.add(label)
+  app.add(btn)
 }
 ```
 
-## Platform Integration
+## Positioning Strategy
 
-The mobile controls automatically integrate with:
+**IMPORTANT: Avoid Native Mobile Controls**
 
-- **Player Actions**: Shows action button when interactive objects are available
-- **Platformer System**: Updates button states based on player's current platformer mode
-- **Camera System**: Provides visual feedback for current camera mode
-- **Touch Control System**: Uses `world.controls.setTouchBtn()` for proper touch integration
+**Native Hyperfy Controls:**
+- **Left side**: Virtual joystick (movement)
+- **Bottom-right**: Jump (A) + Action (B) buttons
 
-## Button Layout
+**Your Buttons (Top-Right Corner):**
+- Stack vertically with 60px spacing
+- No overlap with native controls
 
+**Button Layout:**
 ```
-┌─────────────────────────────────┐
-│                                 │
-│         CLIMB LEDGE DIVE         │  ← Platformer buttons (top right)
-│                                 │
-│           ACTION                │  ← Action button (appears when needed)
-│             ADS                 │  ← ADS toggle button
-│                                 │
-│    CAMERA                       │  ← Camera cycle button (bottom center)
-│                                 │
-│                     JUMP        │  ← Jump button (bottom right)
-└─────────────────────────────────┘
+Y: 280   [ACTION - template]
+Y: 220   [ADS - pistol]
+Y: 160   [SHOOT - pistol]
+Y: 100   [DASH - dash]
 ```
 
-## Technical Details
+## Benefits
 
-- Uses Hyperfy's UI system for touch-friendly controls
-- Integrates with `world.controls` for proper input handling
-- Automatically detects touch devices via `isTouch` utility
-- Handles pointer capture for reliable touch events
-- Visual feedback through color changes for active states
-- Respect safe area insets for modern mobile devices
+✅ **No universal controls needed**
+✅ **No signal system**
+✅ **Each app is independent**
+✅ **Simple to implement**
+✅ **50x50 perfect size**
+✅ **Avoids native controls**
+
+## When to Use
+
+Use this pattern when:
+- ✅ App has a simple action (dash, shoot, interact)
+- ✅ You want mobile support
+- ✅ You want to avoid native controls
+- ✅ You want simplicity
+
+## Documentation
+
+- **SIMPLE_MOBILE_PATTERN.md** - Full implementation guide
+- **TESTING_CHECKLIST.md** - How to test mobile controls
+- **QUICK_START.md** - Quick start guide
+
+## Test
+
+1. Add `dash.js` to a world
+2. Add pistol to the world
+3. Load on mobile device
+4. Buttons appear in **top-right corner** (stacked vertically)
+5. Tap buttons or use keyboard (F for dash, mouse for pistol)
+
+## Result
+
+**Simple mobile controls that work immediately!** 🎯

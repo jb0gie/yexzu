@@ -35,6 +35,17 @@ export class ClientCameraControls extends System {
     // Zoom control
     this.zoomSpeed = 5
     this.enableScrollZoom = false // Off by default
+    this.enablePinchZoom = true // Enabled by default for mobile
+
+    // Pinch-to-zoom state
+    this.isPinching = false
+    this.pinchStartDistance = 0
+    this.pinchCurrentDistance = 0
+    this.pinchZoomLevel = 0
+    this.pinchCenterX = 0
+    this.pinchCenterY = 0
+    this.pinchMinDistance = 50 // Minimum pinch distance to trigger zoom
+    this.pinchSensitivity = 0.5 // Sensitivity multiplier
 
     // Dynamic DOF compensation
     this.dynamicDOF = false // Auto-adjust DOF based on zoom
@@ -157,6 +168,11 @@ export class ClientCameraControls extends System {
     // Initialize dynamic DOF state based on current camera
     const currentCam = this.world.cameraManager?.activeCamera || this.world.defaultCameraNode
     this.dynamicDOF = !!currentCam?.isPlayerCamera
+
+    // Set up touch event listeners for pinch-to-zoom (client-side only)
+    if (typeof window !== 'undefined' && this.enablePinchZoom) {
+      this.setupPinchZoom()
+    }
   }
 
   resetCamera() {
@@ -186,6 +202,11 @@ export class ClientCameraControls extends System {
     this.world.prefs.off('change', this.onPrefsChange)
     this.control?.release()
     this.control = null
+
+    // Clean up pinch zoom event listeners
+    if (this.pinchEventListenersAttached) {
+      this.removePinchZoomListeners()
+    }
   }
 
   onPrefsChange = changes => {
@@ -809,6 +830,127 @@ export class ClientCameraControls extends System {
 
     if (this.debugDOF) {
       console.log(`Focal length zoom: ${newFocalLength.toFixed(0)}mm`)
+    }
+  }
+
+  // Pinch-to-zoom methods (mobile camera control)
+  setupPinchZoom() {
+    // Track if listeners are attached
+    this.pinchEventListenersAttached = false
+
+    // Bind event handlers
+    this.handleTouchStart = this.handleTouchStart.bind(this)
+    this.handleTouchMove = this.handleTouchMove.bind(this)
+    this.handleTouchEnd = this.handleTouchEnd.bind(this)
+
+    // Attach event listeners
+    window.addEventListener('touchstart', this.handleTouchStart, { passive: false })
+    window.addEventListener('touchmove', this.handleTouchMove, { passive: false })
+    window.addEventListener('touchend', this.handleTouchEnd, { passive: false })
+    window.addEventListener('touchcancel', this.handleTouchEnd, { passive: false })
+
+    this.pinchEventListenersAttached = true
+    console.log('[ClientCameraControls] Pinch-to-zoom enabled (center of screen only)')
+  }
+
+  removePinchZoomListeners() {
+    if (this.pinchEventListenersAttached) {
+      window.removeEventListener('touchstart', this.handleTouchStart)
+      window.removeEventListener('touchmove', this.handleTouchMove)
+      window.removeEventListener('touchend', this.handleTouchEnd)
+      window.removeEventListener('touchcancel', this.handleTouchEnd)
+      this.pinchEventListenersAttached = false
+      console.log('[ClientCameraControls] Pinch-to-zoom disabled')
+    }
+  }
+
+  // Calculate distance between two touch points
+  getTouchDistance(touches) {
+    if (touches.length < 2) return 0
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  // Calculate center point of two touches
+  getTouchCenter(touches) {
+    if (touches.length < 2) return { x: 0, y: 0 }
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2
+    }
+  }
+
+  // Check if pinch is in center zone (middle 30% of screen)
+  isInCenterZone(touch) {
+    const centerX = window.innerWidth / 2
+    const centerY = window.innerHeight / 2
+    const zoneRadius = Math.min(window.innerWidth, window.innerHeight) * 0.3
+
+    const dx = touch.clientX - centerX
+    const dy = touch.clientY - centerY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    return distance < zoneRadius
+  }
+
+  handleTouchStart(event) {
+    if (!this.enablePinchZoom || event.touches.length !== 2) return
+
+    event.preventDefault()
+
+    // Check if pinch starts in center zone
+    const center = this.getTouchCenter(event.touches)
+    if (!this.isInCenterZone(center)) {
+      // console.log('[ClientCameraControls] Pinch outside center zone, ignoring')
+      return
+    }
+
+    // Start pinch
+    this.isPinching = true
+    this.pinchStartDistance = this.getTouchDistance(event.touches)
+    this.pinchCurrentDistance = this.pinchStartDistance
+    this.pinchZoomLevel = this.world.prefs.focalLength || 24
+
+    // console.log('[ClientCameraControls] Pinch started, distance:', this.pinchStartDistance.toFixed(1))
+  }
+
+  handleTouchMove(event) {
+    if (!this.enablePinchZoom || !this.isPinching || event.touches.length !== 2) return
+
+    event.preventDefault()
+
+    const currentDistance = this.getTouchDistance(event.touches)
+    const distanceDelta = currentDistance - this.pinchCurrentDistance
+
+    // Only zoom if distance changed significantly
+    if (Math.abs(distanceDelta) > this.pinchMinDistance) {
+      // Convert pinch delta to scroll delta
+      const scrollDelta = -distanceDelta * this.pinchSensitivity
+
+      // Apply zoom using focal length adjustment (works independently of scroll zoom setting)
+      const currentFocalLength = this.world.prefs.focalLength || 50
+      const change = -scrollDelta * this.zoomSpeed
+      const newFocalLength = Math.max(10, Math.min(200, currentFocalLength + change))
+
+      this.setFocalLength(newFocalLength)
+
+      if (this.debugDOF) {
+        console.log(`Pinch zoom: ${newFocalLength.toFixed(0)}mm`)
+      }
+
+      // Update current distance
+      this.pinchCurrentDistance = currentDistance
+    }
+  }
+
+  handleTouchEnd(event) {
+    if (!this.isPinching) return
+
+    // Check if pinch actually ended (less than 2 touches)
+    if (event.touches.length < 2) {
+      this.isPinching = false
+      // console.log('[ClientCameraControls] Pinch ended')
     }
   }
 

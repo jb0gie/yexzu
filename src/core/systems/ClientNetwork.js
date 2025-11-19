@@ -92,6 +92,12 @@ export class ClientNetwork extends System {
   }
 
   onSnapshot(data) {
+    // console.log('[ClientNetwork] onSnapshot received:', {
+    //   blueprintsCount: data.blueprints?.length || 0,
+    //   hasSimpleControls: data.blueprints?.some(b => b.name === 'simple-controls'),
+    //   sampleBlueprints: data.blueprints?.slice(0, 3).map(b => ({ name: b.name, id: b.id }))
+    // })
+
     this.id = data.id
     this.serverTimeOffset = data.serverTime - performance.now()
     this.apiUrl = data.apiUrl
@@ -106,6 +112,7 @@ export class ClientNetwork extends System {
       this.world.loader.preload('avatar', data.settings.avatar.url)
     }
     // preload some blueprints
+    // console.log('[ClientNetwork] Preloading blueprints:', data.blueprints?.length || 0)
     for (const item of data.blueprints) {
       if (item.preload && !item.disabled) {
         if (item.model) {
@@ -139,7 +146,11 @@ export class ClientNetwork extends System {
     this.world.settings.setHasAdminCode(data.hasAdminCode)
     this.world.chat.deserialize(data.chat)
     this.world.ai.deserialize(data.ai)
+
+    // console.log('[ClientNetwork] Deserializing blueprints:', data.blueprints?.length || 0)
     this.world.blueprints.deserialize(data.blueprints)
+    // console.log('[ClientNetwork] Blueprints.items size after deserialize:', this.world.blueprints.items.size)
+
     this.world.entities.deserialize(data.entities)
     this.world.livekit?.deserialize(data.livekit)
     storage.set('authToken', data.authToken)
@@ -234,7 +245,7 @@ export class ClientNetwork extends System {
       createdAt: moment().toISOString(),
     })
     this.world.emit('disconnect', code || true)
-    console.log('disconnect', code)
+    // console.log('disconnect', code)
   }
 
   destroy() {

@@ -1026,20 +1026,20 @@ export class PlayerLocal extends Entity {
     } else if (this.airJumping) {
       // Smart flip mode detection - intuitive like existing front/back flip system
       const flipMode = this.detectSmartFlipMode()
-      console.log('[FLIP DEBUG] Air jump detected, flip mode:', flipMode, 'axis:', this.axis.toArray())
+      // console.log('[FLIP DEBUG] Air jump detected, flip mode:', flipMode, 'axis:', this.axis.toArray())
 
       if (flipMode === 'left') {
         mode = Modes.SIDEFLIP_LEFT      // Left strafe flip
-        console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_LEFT')
+        // console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_LEFT')
       } else if (flipMode === 'right') {
         mode = Modes.SIDEFLIP_RIGHT     // Right strafe flip
-        console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_RIGHT')
+        // console.log('[FLIP DEBUG] Setting mode to SIDEFLIP_RIGHT')
       } else if (flipMode === 'back') {
         mode = Modes.BACKFLIP           // Back flip for pure backward
-        console.log('[FLIP DEBUG] Setting mode to BACKFLIP')
+        // console.log('[FLIP DEBUG] Setting mode to BACKFLIP')
       } else {
         mode = Modes.FLIP               // Default front flip for forward/any direction
-        console.log('[FLIP DEBUG] Setting mode to FLIP (front)')
+        // console.log('[FLIP DEBUG] Setting mode to FLIP (front)')
       }
     } else if (this.jumping) {
       mode = Modes.JUMP
@@ -1146,36 +1146,36 @@ export class PlayerLocal extends Entity {
     let moveDeg = moveRad * (180 / Math.PI)
     if (moveDeg < 0) moveDeg += 360
 
-    console.log('[DIRECTION DEBUG] Axis:', axis.toArray(), 'MoveRad:', moveRad.toFixed(3), 'MoveDeg:', moveDeg.toFixed(1))
+    // console.log('[DIRECTION DEBUG] Axis:', axis.toArray(), 'MoveRad:', moveRad.toFixed(3), 'MoveDeg:', moveDeg.toFixed(1))
 
     // Check for pure strafe movements (±22.5° from 90°/270°)
     if (moveDeg >= 67.5 && moveDeg <= 112.5) {
-      console.log('[DIRECTION DEBUG] Returning RIGHT strafe (90°±22.5° range)')
+      // console.log('[DIRECTION DEBUG] Returning RIGHT strafe (90°±22.5° range)')
       return 'right'  // Pure right strafe
     }
     if (moveDeg >= 247.5 && moveDeg <= 292.5) {
-      console.log('[DIRECTION DEBUG] Returning LEFT strafe (270°±22.5° range)')
+      // console.log('[DIRECTION DEBUG] Returning LEFT strafe (270°±22.5° range)')
       return 'left'   // Pure left strafe
     }
 
     // Test coordinate system: In case D key gives different axis values
-    console.log('[DIRECTION DEBUG] Testing axis.x for positive X (right key)')
+    // console.log('[DIRECTION DEBUG] Testing axis.x for positive X (right key)')
     if (axis.x > 0.5) {
-      console.log('[DIRECTION DEBUG] Positive X detected → Returning RIGHT')
+      // console.log('[DIRECTION DEBUG] Positive X detected → Returning RIGHT')
       return 'right'
     }
     if (axis.x < -0.5) {
-      console.log('[DIRECTION DEBUG] Negative X detected → Returning LEFT')
+      // console.log('[DIRECTION DEBUG] Negative X detected → Returning LEFT')
       return 'left'
     }
 
     // Check for pure backward movement (±22.5° from 180°)
     if (moveDeg >= 157.5 && moveDeg <= 202.5) {
-      console.log('[DIRECTION DEBUG] Returning BACK (180°±22.5° range)')
+      // console.log('[DIRECTION DEBUG] Returning BACK (180°±22.5° range)')
       return 'back'   // Pure backward
     }
 
-    console.log('[DIRECTION DEBUG] Returning FRONT (all other directions)')
+    // console.log('[DIRECTION DEBUG] Returning FRONT (all other directions)')
     // All other movements default to front flip (including diagonals)
     return 'front'    // Default front flip for all other directions
   }

@@ -31,20 +31,28 @@ app.configure([
     label: 'Audio File',
   },
   {
-    key: 'defaultVolume',
+    key: 'loop',
     type: 'switch',
-    label: 'Default Volume',
+    label: 'Loop Audio',
     options: [
-      { label: 'Low', value: 1 },
-      { label: 'Medium', value: 5 },
-      { label: 'High', value: 8 },
+      { label: 'Yes', value: true },
+      { label: 'No', value: false },
     ],
-    initial: 5,
+    initial: true,
+  },
+  {
+    type: 'range',
+    key: 'volume',
+    label: 'Volume',
+    min: 0,
+    max: 1,
+    step: 0.1,
+    initial: 1,
   },
   {
     key: 'isSpatial',
     type: 'switch',
-    label: 'Audio Type',
+    label: 'Spatial Audio',
     options: [
       { label: 'Spatial (3D)', value: true },
       { label: 'Global', value: false },
@@ -52,9 +60,20 @@ app.configure([
     initial: true,
   },
   {
+    key: 'distanceModel',
+    type: 'switch',
+    label: 'Distance Model',
+    options: [
+      { label: 'Linear', value: 'linear' },
+      { label: 'Inverse', value: 'inverse' },
+      { label: 'Exponential', value: 'exponential' },
+    ],
+    initial: 'inverse',
+  },
+  {
     key: 'audioType',
     type: 'switch',
-    label: 'Audio Type',
+    label: 'Audio Group',
     options: [
       { label: 'Music', value: 'music' },
       { label: 'Sound Effect', value: 'sfx' },
@@ -133,9 +152,15 @@ const mesh = app.get('Sphere')
 const rigidBody = app.get('AreaTrigger')
 const collider = app.get('Collider')
 
-// Configure mesh visibility
+// Configure mesh visibility - use update loop to ensure proper initialization
 if (mesh) {
-  mesh.active = showMesh
+  app.on('update', () => {
+    const shouldShow = props.showMesh === 'visible'
+    if (mesh.active !== shouldShow) {
+      mesh.active = shouldShow
+      console.log(`[AudioZone] Mesh visibility: ${shouldShow ? 'visible' : 'invisible'}`)
+    }
+  })
 }
 
 // Create and configure spatial audio
@@ -144,6 +169,7 @@ const audio = app.create('audio', {
   src: props.audio?.url,
   group: props.audioType || 'music',
   loop: props.loop !== false,
+  volume: props.volume || 1,
   spatial: props.isSpatial !== false,
   distanceModel: props.distanceModel || 'inverse',
   refDistance: props.minDistance || 1,

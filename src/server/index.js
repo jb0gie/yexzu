@@ -68,11 +68,11 @@ await fs.ensureDir(worldDir)
 // init assets
 await assets.init({ rootDir, worldDir })
 
-// init collections
-await collections.init({ rootDir, worldDir })
-
-// init db
+// init db BEFORE collections so it can save blueprints
 const db = await getDB({ worldDir })
+
+// init collections
+await collections.init({ rootDir, worldDir, db })
 
 // init cleaner
 await cleaner.init({ db })

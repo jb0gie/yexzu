@@ -46,7 +46,6 @@ if (world.isServer) {
     const inv = getInv(playerId)
     const key = `elemental-core:items:${playerId}`
     world.set(key, inv)
-    console.log('saving', playerId, inv)
   }
   // when players enter send them their inventory
   world.on('enter', e => {
@@ -138,6 +137,16 @@ if (world.isServer) {
     if (!item) return
     app.emit(`elemental-core:drop:${item.id}`, playerId)
   })
+  // listen to player dropping items from specific slot (mobile)
+  app.on('drop-slot', (slotIdx, playerId) => {
+    const inv = getInv(playerId)
+    const item = inv.items[slotIdx]
+    if (!item) return
+    app.emit(`elemental-core:drop:${item.id}`, playerId)
+    inv.items[slotIdx] = null
+    app.sendTo(playerId, 'setItem', [slotIdx, null])
+    save(playerId)
+  })
   // listen to items wanting to give items to players
   world.on('elemental-item:give', ([playerId, id, qty]) => {
     const inv = getInv(playerId)
@@ -186,9 +195,7 @@ if (world.isServer) {
     const { playerId, itemId, ammo, maxAmmo } = data
     const ammoData = getAmmoCounts(playerId)
     ammoData[itemId] = { ammo, maxAmmo }
-    console.log(`[core] Ammo update for ${playerId}: ${itemId} = ${ammo}/${maxAmmo}`)
 
-    // Send updated ammo count to client
     app.sendTo(playerId, 'ammoUpdate', { itemId, ammo, maxAmmo })
   })
   world.on('elemental-item:take', ([playerId, itemId, qty]) => {
@@ -268,41 +275,38 @@ if (world.isServer) {
     }
   }
 
-  // Add clear storage function
   app.on('clear-storage', playerId => {
-    console.log('[core] Clearing storage for player:', playerId)
     const key = `elemental-core:items:${playerId}`
     world.set(key, null)
 
-    // Reset to empty inventory
     const emptyInv = {
       active: 0,
       items: new Array(20).fill(null),
     }
     invs[playerId] = emptyInv
 
-    // Send updated inventory to client
     app.sendTo(playerId, 'init', {
       specs,
       ...emptyInv,
     })
-
-    console.log('[core] Storage cleared for player:', playerId)
   })
   app.on('give', playerId => {
     // Give button functionality - could be used for testing
-    console.log('[core] Give button pressed for player:', playerId)
   })
 }
 
 if (world.isClient) {
+  const barWidth = 260
+  const barHeight = 56
+  const slotSize = 46
+
   const $bar = app.create('ui', {
     space: 'screen',
     pivot: 'bottom-center',
     position: [0.5, 1, 0],
     offset: [0, -40, 0],
-    width: 330,
-    height: 70,
+    width: barWidth,
+    height: barHeight,
     padding: 5,
     borderRadius: 10,
     flexDirection: 'row',
@@ -312,8 +316,8 @@ if (world.isClient) {
   const slots = []
   for (let i = 0; i < 5; i++) {
     const $item = app.create('uiview', {
-      width: 70 - 5 - 5,
-      height: 70 - 5 - 5,
+      width: slotSize,
+      height: slotSize,
       backgroundColor: 'rgba(255,255,255,0.07)',
       borderRadius: 6,
       borderWidth: 1,
@@ -322,7 +326,7 @@ if (world.isClient) {
     })
     $item.onPointerEnter = () => ($item.backgroundColor = 'rgba(255,255,255,0.1)')
     $item.onPointerLeave = () => ($item.backgroundColor = 'rgba(255,255,255,0.07)')
-    $item.onPointerDown = () => select(i)
+    $item.onPointerDown = () => handleSlotTap(i)
     $bar.add($item)
     const $img = app.create('uiimage', {
       // width: 70-5-5-1-1,
@@ -334,37 +338,42 @@ if (world.isClient) {
     $item.add($img)
     const $qty = app.create('uitext', {
       absolute: true,
-      right: 5,
-      bottom: 5,
-      width: 20,
-      height: 20,
+      right: 4,
+      bottom: 4,
+      width: 18,
+      height: 18,
       color: 'white',
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: 600,
       value: '',
     })
     $item.add($qty)
     slots.push({ $item, $img, $qty })
   }
-  world.add($bar)
+  app.add($bar)
+  const backpackWidth = 180
+  const backpackHeight = 95
+  const backpackSlotSize = 38
+
   const $backpack = app.create('ui', {
     space: 'screen',
     pivot: 'bottom-center',
     position: [0.5, 1, 0],
-    offset: [0, -40 - 70 - 4, 0],
-    width: 330,
-    height: 200,
+    offset: [0, -40 - barHeight - 4, 0],
+    width: backpackWidth,
+    height: backpackHeight,
     padding: 5,
     borderRadius: 10,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 5,
+    overflow: 'hidden',
     backgroundColor: 'black',
   })
-  for (let i = 5; i < 20; i++) {
+  for (let i = 5; i < 13; i++) {
     const $item = app.create('uiview', {
-      width: 70 - 5 - 5,
-      height: 70 - 5 - 5,
+      width: backpackSlotSize,
+      height: backpackSlotSize,
       backgroundColor: 'rgba(255,255,255,0.07)',
       borderRadius: 6,
       borderWidth: 1,
@@ -373,7 +382,7 @@ if (world.isClient) {
     })
     $item.onPointerEnter = () => ($item.backgroundColor = 'rgba(255,255,255,0.1)')
     $item.onPointerLeave = () => ($item.backgroundColor = 'rgba(255,255,255,0.07)')
-    $item.onPointerDown = () => select(i)
+    $item.onPointerDown = () => handleSlotTap(i)
     $backpack.add($item)
     const $img = app.create('uiimage', {
       // width: 70-5-5-1-1,
@@ -385,18 +394,19 @@ if (world.isClient) {
     $item.add($img)
     const $qty = app.create('uitext', {
       absolute: true,
-      right: 5,
-      bottom: 5,
-      width: 20,
-      height: 20,
+      right: 4,
+      bottom: 4,
+      width: 18,
+      height: 18,
       color: 'white',
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: 600,
       value: '',
     })
     $item.add($qty)
     slots.push({ $item, $img, $qty })
   }
+
   let init
   let specs
   let items
@@ -405,6 +415,170 @@ if (world.isClient) {
   let control
   let selected = null
   let ammoCounts = {}
+  let lastTap = null
+  let tapFrameCount = 0
+
+  const $toggleBtn = app.create('ui', {
+    space: 'screen',
+    width: 50,
+    height: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 25,
+    pivot: 'bottom-right',
+    position: [1, 1],
+    offset: [-50, -35, 0],
+    cursor: 'pointer',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+  const toggleLabel = app.create('uitext', {
+    value: 'BAG',
+    color: 'white',
+    fontSize: 9,
+    fontWeight: 'bold'
+  })
+  $toggleBtn.add(toggleLabel)
+  $toggleBtn.onPointerDown = () => {
+    toggleBackpack()
+  }
+
+  app.add($toggleBtn)
+
+  const $actions = app.create('ui', {
+    space: 'screen',
+    pivot: 'bottom-center',
+    position: [0.5, 1, 0],
+    offset: [0, -40 - backpackHeight - 56, 0],
+    width: backpackWidth,
+    height: 40,
+    padding: 5,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 5,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  })
+
+  const clearBtn = app.create('uiview', {
+    width: 80,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: null,
+    cursor: 'pointer',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+  clearBtn.onPointerEnter = () => (clearBtn.backgroundColor = 'rgba(255,255,255,0.2)')
+  clearBtn.onPointerLeave = () => (clearBtn.backgroundColor = 'rgba(255,255,255,0.1)')
+  clearBtn.onPointerDown = () => {
+    if (selected !== null) {
+      slots[selected].$item.borderColor = selected === active ? 'rgba(255,255,255,0.4)' : null
+      selected = null
+    }
+  }
+  const clearLabel = app.create('uitext', {
+    value: 'CLEAR',
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 600,
+  })
+  clearBtn.add(clearLabel)
+
+  const dropBtn = app.create('uiview', {
+    width: 80,
+    height: 30,
+    backgroundColor: 'rgba(255,100,100,0.2)',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: null,
+    cursor: 'pointer',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+  dropBtn.onPointerEnter = () => (dropBtn.backgroundColor = 'rgba(255,100,100,0.4)')
+  dropBtn.onPointerLeave = () => (dropBtn.backgroundColor = 'rgba(255,100,100,0.2)')
+  dropBtn.onPointerDown = () => {
+    if (selected !== null) {
+      app.send('drop-slot', selected)
+    }
+  }
+  const dropLabel = app.create('uitext', {
+    value: 'DROP',
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 600,
+  })
+  dropBtn.add(dropLabel)
+
+  $actions.add(clearBtn)
+  $actions.add(dropBtn)
+
+  const $help = app.create('ui', {
+    space: 'screen',
+    pivot: 'top-center',
+    position: [0.5, 0, 0],
+    offset: [0, 20, 0],
+    width: 260,
+    height: 42,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+  const helpText = app.create('uitext', {
+    value: 'Tap: Select | Double-tap: Use | CLEAR/DROP: Buttons',
+    color: 'white',
+    fontSize: 9,
+    textAlign: 'center',
+  })
+  $help.add(helpText)
+
+  let actionsVisible = false
+  let helpVisible = false
+  let toggleBtnVisible = true
+
+  app.on('update', () => {
+    if (open && !actionsVisible) {
+      app.add($actions)
+      actionsVisible = true
+    } else if (!open && actionsVisible) {
+      app.remove($actions)
+      actionsVisible = false
+    }
+
+    if (open && !helpVisible) {
+      app.add($help)
+      helpVisible = true
+    } else if (!open && helpVisible) {
+      app.remove($help)
+      helpVisible = false
+    }
+
+    if (lastTap !== null) {
+      tapFrameCount++
+      if (tapFrameCount >= 18) {
+        lastTap = null
+        tapFrameCount = 0
+      }
+    }
+  })
+
+  function handleSlotTap(idx) {
+    if (lastTap !== null && lastTap === idx && tapFrameCount < 18) {
+      if (idx < 5) {
+        setActive(idx)
+      }
+      lastTap = null
+      tapFrameCount = 0
+    } else {
+      lastTap = idx
+      tapFrameCount = 0
+      select(idx)
+    }
+  }
   function setActive(idx) {
     if (selected) {
       slots[selected].$item.borderColor = null
@@ -421,10 +595,10 @@ if (world.isClient) {
     select(null)
     open = !open
     if (open) {
-      world.add($backpack)
+      app.add($backpack)
       control.pointer.unlock()
     } else {
-      world.remove($backpack)
+      app.remove($backpack)
       control.pointer.lock()
     }
   }
@@ -438,6 +612,10 @@ if (world.isClient) {
     else if (selected === null && idx !== null && items[idx]) {
       selected = idx
       slots[idx].$item.borderColor = 'white'
+    }
+    // if tapping empty slot with no selection, just return
+    else if (selected === null && idx !== null && !items[idx]) {
+      return
     }
     // if second selection is same, deselect!
     else if (selected !== null && idx !== null && selected === idx) {
@@ -453,17 +631,13 @@ if (world.isClient) {
   }
   app.on('init', data => {
     init = true
-    console.log('<- init', data)
     specs = data.specs
     items = data.items
     active = data.active
     ammoCounts = data.ammoCounts || {}
     for (let i = 0; i < items.length; i++) {
       const slot = slots[i]
-      if (!slot) {
-        console.warn('todo: slot', i)
-        continue
-      }
+      if (!slot) continue
       const item = items[i]
       if (item) {
         const spec = specs[item.id]
@@ -498,7 +672,6 @@ if (world.isClient) {
   })
   app.on('spec', spec => {
     if (!init) return
-    console.log('<- spec', spec)
     specs[spec.id] = spec
     for (let i = 0; i < 20; i++) {
       const item = items[i]
@@ -509,7 +682,6 @@ if (world.isClient) {
   })
   app.on('setItem', ([idx, item]) => {
     if (!init) return
-    console.log('setItem', idx, item)
     items[idx] = item
     if (item) {
       const spec = specs[item.id]
@@ -517,9 +689,7 @@ if (world.isClient) {
         slots[idx].$img.src = spec.icon
       } else {
         slots[idx].$img.src = null
-        console.warn('[core] No spec or icon found for item:', item.id)
       }
-      // Show ammo count for weapons, regular quantity for other items
       const ammoData = ammoCounts[item.id]
       if (ammoData && spec && spec.showAmmoCount) {
         slots[idx].$qty.value = `${ammoData.ammo}/${ammoData.maxAmmo}`
@@ -530,14 +700,11 @@ if (world.isClient) {
       slots[idx].$img.src = null
       slots[idx].$qty.value = ''
     }
-    console.log('items', items)
   })
   app.on('ammoUpdate', ({ itemId, ammo, maxAmmo }) => {
     if (!init) return
-    console.log('ammoUpdate', itemId, ammo, maxAmmo)
     ammoCounts[itemId] = { ammo, maxAmmo }
 
-    // Update all slots that have this item
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item && item.id === itemId) {
@@ -568,557 +735,3 @@ app.configure([
     },
   },
 ])
-
-return
-
-if (world.isClient) {
-  const inv = createInventory()
-  // wait for server to give us inventory
-  app.on('init', data => {
-    inv.init(data)
-    console.log('init', data)
-    const control = app.control()
-    // number keys to switch active item
-    control.digit1.onPress = () => {
-      inv.setActive(0)
-      app.send('active', 0)
-    }
-    control.digit2.onPress = () => {
-      inv.setActive(1)
-      app.send('active', 1)
-    }
-    control.digit3.onPress = () => {
-      inv.setActive(2)
-      app.send('active', 2)
-    }
-    control.digit4.onPress = () => {
-      inv.setActive(3)
-      app.send('active', 3)
-    }
-    control.digit5.onPress = () => {
-      inv.setActive(4)
-      app.send('active', 4)
-    }
-    // B to toggle bag
-    control.keyB.onPress = () => {
-      inv.toggleBag()
-    }
-    // Q to request item drop
-    control.keyQ.onPress = () => {
-      app.send('drop')
-    }
-  })
-  // listen to item changes from server and update UI
-  app.on('setItem', ([idx, item]) => {
-    inv.setItem(idx, item)
-  })
-}
-
-function createInventory() {
-  const bar = app.create('ui', {
-    space: 'screen',
-    width: 400,
-    height: 100,
-    pivot: 'bottom-center',
-    position: [0.5, 1, 0],
-    offset: [0, -20, 0],
-    flexDirection: 'row',
-  })
-  app.add(bar)
-  const bagBtn = app.create('ui', {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 10,
-    space: 'screen',
-    width: 50,
-    height: 50,
-    pivot: 'bottom-right',
-    position: [1, 1, 0],
-    offset: [-50, -45, 0],
-    cursor: 'pointer',
-  })
-  bagBtn.onPointerEnter = () => {
-    bagBtn.backgroundColor = 'rgba(0, 0, 0, 0.8)'
-  }
-  bagBtn.onPointerLeave = () => {
-    bagBtn.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-  }
-  bagBtn.onPointerDown = () => {
-    toggleBag()
-  }
-  // app.add(bagBtn)
-  const bag = app.create('ui', {
-    backgroundColor: 'rgba(0, 0, 0, 1)',
-    borderRadius: 10,
-    space: 'screen',
-    width: 315,
-    height: 390,
-    padding: 10,
-    pivot: 'bottom-right',
-    position: [1, 1, 0],
-    offset: [-50, -110, 0],
-    flexWrap: 'wrap',
-    gap: 5,
-  })
-  // app.add(bag) // debug open
-  const slots = []
-  for (let idx = 0; idx < 25; idx++) {
-    if (idx < 5) {
-      const slot = addBarSlot({ parent: bar, idx })
-      slots.push(slot)
-    } else {
-      const slot = addBagSlot({ parent: bag, idx })
-      slots.push(slot)
-    }
-  }
-  function init(data) {
-    setActive(data.active)
-    for (let idx = 0; idx < data.items.length; idx++) {
-      const item = data.items[idx]
-      slots[idx].setItem(item)
-    }
-  }
-  let active = null
-  function setActive(idx) {
-    if (active === idx) return
-    active = idx
-    for (let idx = 0; idx < 5; idx++) {
-      slots[idx].setActive(false)
-    }
-    slots[idx].setActive(true)
-  }
-  let bagVisible = false
-  function toggleBag(value) {
-    value = value === true || value === false ? value : !bagVisible
-    if (bagVisible === value) return
-    bagVisible = value
-    if (bagVisible) {
-      world.add(bag)
-    } else {
-      world.remove(bag)
-    }
-  }
-  function setItem(idx, item) {
-    slots[idx].setItem(item)
-  }
-  return {
-    init,
-    setActive,
-    setItem,
-    toggleBag,
-  }
-}
-
-function addBarSlot({ parent, idx }) {
-  let active = false
-  const labelValue = idx + 1
-  const root = app.create('uiview', {
-    // backgroundColor: 'blue',
-    width: 70,
-    height: 90,
-    margin: 5,
-  })
-  parent.add(root)
-  const square = app.create('uiview', {
-    width: 70,
-    height: 70,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 10,
-    cursor: 'pointer',
-    borderWidth: 1,
-    // borderColor: 'rgba(255, 255, 255, 1)',
-  })
-  square.onPointerEnter = () => {
-    square.backgroundColor = 'rgba(0, 0, 0, 0.8)'
-  }
-  square.onPointerLeave = () => {
-    square.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-  }
-  // square.onPointerDown = () => {
-  //   onClick(idx)
-  // }
-  root.add(square)
-  const img = app.create('uiimage', {
-    width: 66,
-    height: 66,
-    src: null,
-    borderRadius: 8,
-  })
-  square.add(img)
-  const btm = app.create('uiview', {
-    // backgroundColor: 'black',
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  })
-  root.add(btm)
-  const label = app.create('uitext', {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 500,
-    value: labelValue,
-  })
-  btm.add(label)
-  return {
-    setActive: value => {
-      if (active === value) return
-      active = value
-      square.borderColor = active ? 'rgba(255, 255, 255, 1)' : null
-    },
-    setItem: item => {
-      // console.log('setItem', idx, item)
-      img.src = item?.icon || null
-    },
-  }
-}
-
-function addBagSlot({ parent, idx }) {
-  const square = app.create('uiview', {
-    width: 70,
-    height: 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    // borderWidth: 1,
-    // borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10,
-    cursor: 'pointer',
-    borderWidth: 1,
-    // borderColor: 'rgba(255, 255, 255, 1)',
-  })
-  square.onPointerEnter = () => {
-    square.backgroundColor = 'rgba(255, 255, 255, 0.1)'
-  }
-  square.onPointerLeave = () => {
-    square.backgroundColor = 'rgba(255, 255, 255, 0.07)'
-  }
-  // square.onPointerDown = () => {
-  //   onClick(idx)
-  // }
-  parent.add(square)
-  const img = app.create('uiimage', {
-    width: 66,
-    height: 66,
-    src: null,
-    borderRadius: 8,
-  })
-  square.add(img)
-  return {
-    setItem: item => {
-      // ...
-    },
-  }
-}
-
-// ===== PROCEDURAL LOCOMOTION & AIMING API =====
-if (world.isClient) {
-  console.log('[locomotion-api] ✓ Initializing locomotion API system')
-
-  const locomotionAPI = {
-    // Active aiming states per player
-    aimingStates: new Map(), // playerId -> { active, intensity, targetBones }
-
-    // Camera zoom/ADS system
-    zoomStates: new Map(), // playerId -> { current, target, levels, levelIndex }
-
-    /**
-     * Initialize locomotion system for a player
-     * @param {string} playerId - Player ID
-     */
-    init(playerId) {
-      if (!this.aimingStates.has(playerId)) {
-        this.aimingStates.set(playerId, {
-          active: false,
-          intensity: 0,
-          targetIntensity: 0,
-          targetBones: {}
-        })
-      }
-
-      if (!this.zoomStates.has(playerId)) {
-        this.zoomStates.set(playerId, {
-          current: 1.5, // Default third-person distance
-          target: 1.5,
-          levels: [1.5, 1.0, 0.5, 0.3], // Configurable zoom levels
-          levelIndex: 0,
-          transitionSpeed: 8.0
-        })
-      }
-    },
-
-    /**
-     * Set zoom levels for a player
-     * @param {string} playerId - Player ID  
-     * @param {Array<number>} levels - Array of zoom distances
-     */
-    setZoomLevels(playerId, levels) {
-      const state = this.zoomStates.get(playerId)
-      if (state) {
-        state.levels = [...levels]
-        state.levelIndex = 0
-        state.target = state.levels[0]
-      }
-    },
-
-    /**
-     * Cycle to next zoom level
-     * @param {string} playerId - Player ID
-     * @returns {number} New zoom level
-     */
-    cycleZoom(playerId) {
-      const state = this.zoomStates.get(playerId)
-      if (!state) return 1.5
-
-      state.levelIndex = (state.levelIndex + 1) % state.levels.length
-      state.target = state.levels[state.levelIndex]
-
-      return state.target
-    },
-
-    /**
-     * Get current zoom level
-     * @param {string} playerId - Player ID
-     * @returns {number} Current zoom distance
-     */
-    getZoom(playerId) {
-      const state = this.zoomStates.get(playerId)
-      return state ? state.current : 1.5
-    },
-
-    /**
-     * Update zoom (called in update loop)
-     * @param {string} playerId - Player ID
-     * @param {number} delta - Delta time
-     */
-    updateZoom(playerId, delta) {
-      const state = this.zoomStates.get(playerId)
-      if (!state) return
-
-      // Smooth interpolation to target zoom
-      const diff = state.target - state.current
-      if (Math.abs(diff) > 0.001) {
-        state.current += diff * state.transitionSpeed * delta
-      } else {
-        state.current = state.target
-      }
-
-      // Update camera zoom (control.camera.zoom)
-      const player = world.getPlayer(playerId)
-      if (player) {
-        const control = app.control()
-        if (control && control.camera) {
-          control.camera.zoom = state.current
-        }
-      }
-    },
-
-    /**
-     * Start aiming for a player
-     * @param {string} playerId - Player ID
-     * @param {Object} config - Aiming configuration
-     *   - bones: Array of bone names to manipulate
-     *   - maxRotations: Object with max rotation per bone (in radians)
-     *   - transitionSpeed: Speed of aim transition
-     */
-    startAiming(playerId, config = {}) {
-      const state = this.aimingStates.get(playerId)
-      if (!state) return
-
-      state.active = true
-      state.targetIntensity = 1.0
-      state.config = {
-        bones: config.bones || ['spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm'],
-        maxRotations: config.maxRotations || {
-          spine: { x: 0.1, y: 0.2 },
-          chest: { x: 0.15, y: 0.25 },
-          neck: { x: 0.1, y: 0.15 },
-          head: { x: 0.2, y: 0.3 },
-          leftUpperArm: { x: -0.3, y: 0 },
-          rightUpperArm: { x: -0.3, y: 0 }
-        },
-        transitionSpeed: config.transitionSpeed || 5.0
-      }
-    },
-
-    /**
-     * Stop aiming for a player
-     * @param {string} playerId - Player ID
-     */
-    stopAiming(playerId) {
-      const state = this.aimingStates.get(playerId)
-      if (!state) return
-
-      state.targetIntensity = 0.0
-      // Will transition out, then set active = false when intensity reaches 0
-    },
-
-    /**
-     * Set aiming intensity (0-1)
-     * @param {string} playerId - Player ID
-     * @param {number} intensity - Target intensity (0-1)
-     */
-    setAimIntensity(playerId, intensity) {
-      const state = this.aimingStates.get(playerId)
-      if (!state) return
-
-      state.targetIntensity = Math.max(0, Math.min(1, intensity))
-    },
-
-    /**
-     * Update aiming bones (called in update loop)
-     * @param {string} playerId - Player ID
-     * @param {number} delta - Delta time
-     */
-    updateAiming(playerId, delta) {
-      const state = this.aimingStates.get(playerId)
-      if (!state) return
-
-      const player = world.getPlayer(playerId)
-      if (!player) return
-
-      // Smooth intensity transition
-      const intensityDiff = state.targetIntensity - state.intensity
-      if (Math.abs(intensityDiff) > 0.001) {
-        state.intensity += intensityDiff * (state.config?.transitionSpeed || 5.0) * delta
-      } else {
-        state.intensity = state.targetIntensity
-      }
-
-      // If fully transitioned out, deactivate and reset bones
-      if (state.intensity <= 0.001 && state.targetIntensity === 0) {
-        state.active = false
-        state.intensity = 0
-        // Reset all bone rotations to original
-        if (state.config && state.config.bones) {
-          for (const boneName of state.config.bones) {
-            player.resetBoneRotation(boneName)
-          }
-        }
-        return
-      }
-
-      if (!state.active || state.intensity <= 0) return
-
-      // Get camera direction for aiming
-      const control = app.control()
-      if (!control || !control.camera) return
-
-      const cameraDir = new Vector3(0, 0, -1)
-      cameraDir.applyQuaternion(control.camera.quaternion)
-
-      // Calculate aim angles from camera direction
-      const aimYaw = Math.atan2(cameraDir.x, cameraDir.z)
-      const aimPitch = Math.asin(-cameraDir.y)
-
-      // Get player base rotation
-      const playerYaw = Math.atan2(player.quaternion.x, player.quaternion.w) * 2
-
-      // Calculate relative aim angles
-      let relativeYaw = aimYaw - playerYaw
-      // Normalize to -PI to PI
-      while (relativeYaw > Math.PI) relativeYaw -= Math.PI * 2
-      while (relativeYaw < -Math.PI) relativeYaw += Math.PI * 2
-
-      const relativePitch = aimPitch
-
-      // Apply bone rotations based on config
-      if (state.config && state.config.bones) {
-        // Debug log once per second
-        if (!state._lastDebugLog || Date.now() - state._lastDebugLog > 1000) {
-          console.log('[locomotion-api] Applying aim rotations - intensity:', state.intensity.toFixed(2))
-          console.log('  relativePitch:', (relativePitch * 180 / Math.PI).toFixed(1), 'deg')
-          console.log('  relativeYaw:', (relativeYaw * 180 / Math.PI).toFixed(1), 'deg')
-          state._lastDebugLog = Date.now()
-        }
-
-        for (const boneName of state.config.bones) {
-          const maxRot = state.config.maxRotations[boneName]
-          if (!maxRot) continue
-
-          // Calculate target rotation for this bone
-          const targetX = relativePitch * maxRot.x * state.intensity
-          const targetY = relativeYaw * maxRot.y * state.intensity
-
-          // Create Euler rotation
-          const euler = new Euler(targetX, targetY, 0, 'YXZ')
-
-          // Apply additive bone rotation
-          const result = player.addBoneRotation(boneName, euler)
-
-          // Debug first application
-          if (!state._debuggedBones) state._debuggedBones = new Set()
-          if (!state._debuggedBones.has(boneName)) {
-            console.log(`[locomotion-api] Applied rotation to ${boneName}:`, result ? 'SUCCESS' : 'FAILED')
-            console.log(`  targetX: ${(targetX * 180 / Math.PI).toFixed(1)}°, targetY: ${(targetY * 180 / Math.PI).toFixed(1)}°`)
-            state._debuggedBones.add(boneName)
-          }
-
-          // Store target rotations for debugging
-          if (!state.targetBones[boneName]) {
-            state.targetBones[boneName] = { x: 0, y: 0, z: 0 }
-          }
-
-          state.targetBones[boneName].x = targetX
-          state.targetBones[boneName].y = targetY
-        }
-      }
-    },
-
-    /**
-     * Get target bone rotations for a player
-     * @param {string} playerId - Player ID
-     * @returns {Object} Bone rotations object
-     */
-    getBoneRotations(playerId) {
-      const state = this.aimingStates.get(playerId)
-      return state ? state.targetBones : {}
-    }
-  }
-
-  // Expose locomotion API globally for weapons to use
-  world.on('elemental-core:get-locomotion-api', (callback) => {
-    callback(locomotionAPI)
-  })
-
-  // Track which players have custom zoom control
-  locomotionAPI.customZoomPlayers = new Set()
-
-  // World configuration for default zoom behavior
-  world.on('elemental-core:disable-default-zoom', (playerId) => {
-    locomotionAPI.customZoomPlayers.add(playerId)
-    console.log('[locomotion-api] ✓ Disabled default zoom for player:', playerId)
-    console.log('[locomotion-api] Custom zoom players:', Array.from(locomotionAPI.customZoomPlayers))
-  })
-
-  world.on('elemental-core:enable-default-zoom', (playerId) => {
-    locomotionAPI.customZoomPlayers.delete(playerId)
-    console.log('[locomotion-api] ✓ Enabled default zoom for player:', playerId)
-    console.log('[locomotion-api] Custom zoom players:', Array.from(locomotionAPI.customZoomPlayers))
-  })
-
-  // Check if a player has custom zoom control (for PlayerLocal to query)
-  world.on('elemental-core:has-custom-zoom', (playerId, callback) => {
-    const hasCustom = locomotionAPI.customZoomPlayers.has(playerId)
-    console.log('[locomotion-api] Query has-custom-zoom for', playerId, '→', hasCustom)
-    callback(hasCustom)
-  })
-
-  // Handle focal length requests from weapons
-  world.on('pistol:set-focal-length', (data) => {
-    console.log('[locomotion-api] Received focal length request:', data.focalLength, 'mm from', data.source)
-    if (world.prefs && world.prefs.setFocalLength) {
-      world.prefs.setFocalLength(data.focalLength)
-      console.log('[locomotion-api] Applied focal length via world.prefs:', data.focalLength, 'mm')
-    } else {
-      console.warn('[locomotion-api] Could not access world.prefs.setFocalLength')
-    }
-  })
-
-  // Auto-update for all players
-  app.on('update', (delta) => {
-    const players = world.getPlayers()
-    for (const player of players) {
-      if (locomotionAPI.aimingStates.has(player.id)) {
-        locomotionAPI.updateAiming(player.id, delta)
-        locomotionAPI.updateZoom(player.id, delta)
-      }
-    }
-  })
-}

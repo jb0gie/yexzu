@@ -36,6 +36,8 @@ createItem(({ player, hooks }) => {
   let ammo = props.maxAmmo || 100 // Start with full ammo
   const projectiles = new Map() // Track active bullets
   const projectileUpdateHandlers = new Map() // Track update handlers for cleanup
+  let mobileShootBtn = null // Mobile shoot button UI element
+  let mobileAdsBtn = null // Mobile ADS button UI element
 
 
   // Helper function to check if player has ammunition available
@@ -929,6 +931,131 @@ createItem(({ player, hooks }) => {
           }
         }
 
+        // Create mobile buttons
+        if (props.showMobileButtons && player.local) {
+          console.log('[pistol] Creating mobile buttons')
+
+          if (props.mobileShootButton) {
+            mobileShootBtn = app.create('ui', {
+              space: 'screen',
+              width: 50,
+              height: 50,
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: 25,
+              pivot: 'top-right',
+              position: [1, 1],
+              offset: [-90, -160],
+              cursor: 'pointer',
+              onPointerDown: () => {
+                const now = world.getTime()
+                const canFire = now - lastFireTime > FIRE_RATE
+
+                if (!canFire) return
+
+                if (ammo <= 0) {
+                  debugLog('Cannot fire - no ammo')
+                  return
+                }
+
+                let dir
+                if (control.camera && control.camera.quaternion) {
+                  dir = v1.set(0, 0, -1).applyQuaternion(control.camera.quaternion)
+                } else {
+                  const e1 = new Euler(0, 0, 0, 'YXZ')
+                  e1.setFromQuaternion(player.quaternion)
+                  const q1 = new Quaternion()
+                  q1.setFromEuler(e1)
+                  dir = v1.set(0, 0, -1).applyQuaternion(q1)
+                }
+
+                let origin = player.position.clone()
+                origin.y += 1.5
+
+                if (muzzleBone && muzzleBone.matrixWorld) {
+                  origin.setFromMatrixPosition(muzzleBone.matrixWorld)
+                  const forwardOffset = dir.clone().multiplyScalar(0.3)
+                  origin.add(forwardOffset)
+                }
+
+                hooks.call('fire', {
+                  origin: origin.toArray(),
+                  dir: dir.toArray(),
+                  ammo,
+                })
+                lastFireTime = now
+
+                ammo -= 1
+                if (props.showAmmoCount) {
+                  world.emit('elemental-item:ammo-update', {
+                    playerId: player.id,
+                    itemId: props.id,
+                    ammo: ammo,
+                    maxAmmo: props.maxAmmo || 100
+                  })
+                }
+
+                playPistolAnimation('EmoteShoot')
+                playSound('fireSound')
+                createMuzzleFlash()
+                createShellEjection()
+
+                const fireUrl = getAnimationUrl('fire')
+                if (fireUrl) {
+                  setPistolState('firing')
+                }
+              },
+              alignItems: 'center',
+              justifyContent: 'center',
+            })
+            const shootLabel = app.create('uitext', {
+              value: 'SHOOT',
+              color: 'white',
+              fontSize: 9,
+              fontWeight: 'bold'
+            })
+            mobileShootBtn.add(shootLabel)
+            app.add(mobileShootBtn)
+            console.log('[pistol] Mobile shoot button created')
+          }
+
+          if (props.mobileAdsButton) {
+            mobileAdsBtn = app.create('ui', {
+              space: 'screen',
+              width: 50,
+              height: 50,
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: 25,
+              pivot: 'top-right',
+              position: [1, 1],
+              offset: [-145, -160],
+              cursor: 'pointer',
+              onPointerDown: () => {
+                isAiming = !isAiming
+                debugLog('ADS toggled (mobile):', isAiming ? 'Aiming' : 'Not aiming')
+
+                if (isAiming) {
+                  setPistolState('aiming')
+                  playAimAnimation()
+                } else {
+                  setPistolState('equipped')
+                  playPistolGripAnimation()
+                }
+              },
+              alignItems: 'center',
+              justifyContent: 'center',
+            })
+            const adsLabel = app.create('uitext', {
+              value: 'ADS',
+              color: 'white',
+              fontSize: 10,
+              fontWeight: 'bold'
+            })
+            mobileAdsBtn.add(adsLabel)
+            app.add(mobileAdsBtn)
+            console.log('[pistol] Mobile ADS button created')
+          }
+        }
+
         // Clear any existing additive animations before equipping
         if (player.clearAdditiveAnimations) {
           console.log('[pistol] Clearing existing additive animations before equip')
@@ -1475,6 +1602,18 @@ createItem(({ player, hooks }) => {
         }
 
         control?.release()
+
+        // Remove mobile buttons if they exist
+        if (mobileShootBtn) {
+          app.remove(mobileShootBtn)
+          mobileShootBtn = null
+          console.log('[pistol] Removed mobile shoot button')
+        }
+        if (mobileAdsBtn) {
+          app.remove(mobileAdsBtn)
+          mobileAdsBtn = null
+          console.log('[pistol] Removed mobile ADS button')
+        }
 
         // Clean up all active projectiles to prevent memory leaks
         for (const [projectileId, projectile] of projectiles) {
@@ -2118,6 +2257,30 @@ app.configure([
     min: 0.1,
     max: 3,
     step: 0.1,
+  },
+
+  // ===== Mobile Controls =====
+  { type: 'section', key: 'mobileSection', label: 'Mobile Controls' },
+  {
+    key: 'showMobileButtons',
+    type: 'toggle',
+    label: 'Show Mobile Buttons',
+    initial: true,
+    hint: 'Show Shoot and ADS buttons on mobile'
+  },
+  {
+    key: 'mobileShootButton',
+    type: 'toggle',
+    label: 'Show Shoot Button',
+    initial: true,
+    hint: 'Show mobile shoot button (bottom-right)'
+  },
+  {
+    key: 'mobileAdsButton',
+    type: 'toggle',
+    label: 'Show ADS Button',
+    initial: true,
+    hint: 'Show mobile ADS button (bottom-right)'
   },
 
   // ===== Admin Tools =====
