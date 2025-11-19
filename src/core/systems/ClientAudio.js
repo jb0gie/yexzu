@@ -71,10 +71,10 @@ export class ClientAudio extends System {
           .then(() => {
             video.pause()
             video.remove()
-            console.log('[audio] video played')
+            // console.log('[audio] video played')
           })
           .catch(err => {
-            console.log('[audio] video failed')
+            // console.log('[audio] video failed')
           })
       } catch (err) {
         console.error(err)

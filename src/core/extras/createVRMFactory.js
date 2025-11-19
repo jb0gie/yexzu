@@ -638,6 +638,9 @@ export function createVRMFactory(glb, setupMaterial) {
           } catch (_) { }
           currentEmote = null
           locomotionDisabled = false // Re-enable locomotion when emote finishes
+
+          // Stop facial expressions when TALK emote finishes
+          setSpeaking(false)
         }
       }
     })
@@ -650,12 +653,18 @@ export function createVRMFactory(glb, setupMaterial) {
 
       const prevEmote = currentEmote
 
+      // Stop speaking if switching from TALK to a different emote
+      if (prevEmote?.url === Emotes.TALK && url !== Emotes.TALK) {
+        setSpeaking(false)
+      }
+
       if (!url) {
         if (currentEmote) {
           currentEmote.action?.fadeOut(fadeDuration)
           currentEmote = null
         }
         locomotionDisabled = false // Re-enable locomotion when clearing emote
+        setSpeaking(false) // Stop facial expressions when clearing emote
         return
       }
 
@@ -684,6 +693,11 @@ export function createVRMFactory(glb, setupMaterial) {
           }
           locomotionDisabled = true // Regular emotes disable locomotion
           clearLocomotion()
+
+          // Auto-activate facial expressions for TALK emote
+          if (url === Emotes.TALK) {
+            setSpeaking(true)
+          }
         }
       } else {
         const emote = {
@@ -721,6 +735,11 @@ export function createVRMFactory(glb, setupMaterial) {
               action.fadeIn(fadeDuration).play()
             }
             clearLocomotion()
+
+            // Auto-activate facial expressions for TALK emote
+            if (url === Emotes.TALK) {
+              setSpeaking(true)
+            }
           }
         }).catch(error => {
           console.error('Failed to load emote:', url, error)
@@ -1624,31 +1643,31 @@ export function createVRMFactory(glb, setupMaterial) {
         poses.talk.target = 1
       } else if (mode === Modes.FLIP) {
         // play the dedicated flip emote; locomotion poses will be cleared by setEmote
-        console.log('[VRM DEBUG] Triggering FLIP animation')
+        // console.log('[VRM DEBUG] Triggering FLIP animation')
         setEmote(Emotes.FLIP)
       } else if (mode === Modes.BACKFLIP) {
         // play the dedicated backflip emote for backward double jumps
-        console.log('[VRM DEBUG] Triggering BACKFLIP animation')
+        // console.log('[VRM DEBUG] Triggering BACKFLIP animation')
         setEmote(Emotes.BACKFLIP)
       }
       // [STRAFE FLIP EMOTES] New strafe flip emotes integrated:
       else if (mode === Modes.SIDEFLIP_LEFT) {
         // play dedicated left strafe flip emote
-        console.log('[VRM DEBUG] Triggering SIDEFLIP_LEFT animation → Emote:', Emotes.STRAFE_LEFT_FLIP)
+        // console.log('[VRM DEBUG] Triggering SIDEFLIP_LEFT animation → Emote:', Emotes.STRAFE_LEFT_FLIP)
         setEmote(Emotes.STRAFE_LEFT_FLIP)
       } else if (mode === Modes.SIDEFLIP_RIGHT) {
         // play dedicated right strafe flip emote
-        console.log('[VRM DEBUG] Triggering SIDEFLIP_RIGHT animation → Emote:', Emotes.STRAFE_RIGHT_FLIP)
+        // console.log('[VRM DEBUG] Triggering SIDEFLIP_RIGHT animation → Emote:', Emotes.STRAFE_RIGHT_FLIP)
         setEmote(Emotes.STRAFE_RIGHT_FLIP)
       }
       // [STRAFE JUMP EMOTES] New strafe jump emotes:
       else if (mode === Modes.STRAFE_JUMP_LEFT) {
         // play dedicated left strafe jump emote
-        console.log('[VRM DEBUG] Triggering STRAFE_JUMP_LEFT animation → Emote:', Emotes.STRAFE_JUMP_LEFT)
+        // console.log('[VRM DEBUG] Triggering STRAFE_JUMP_LEFT animation → Emote:', Emotes.STRAFE_JUMP_LEFT)
         setEmote(Emotes.STRAFE_JUMP_LEFT)
       } else if (mode === Modes.STRAFE_JUMP_RIGHT) {
         // play dedicated right strafe jump emote
-        console.log('[VRM DEBUG] Triggering STRAFE_JUMP_RIGHT animation → Emote:', Emotes.STRAFE_JUMP_RIGHT)
+        // console.log('[VRM DEBUG] Triggering STRAFE_JUMP_RIGHT animation → Emote:', Emotes.STRAFE_JUMP_RIGHT)
         setEmote(Emotes.STRAFE_JUMP_RIGHT)
       }
       else if (mode === Modes.GRINDING) {

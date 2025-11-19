@@ -35,20 +35,37 @@ export class ServerNetwork extends System {
     this.queue = []
   }
 
-  init({ db }) {
+  init({ db, collections }) {
     this.db = db
+    this.collections = collections
   }
 
   async start() {
     // get spawn
     const spawnRow = await this.db('config').where('key', 'spawn').first()
     this.spawn = JSON.parse(spawnRow?.value || defaultSpawn)
-    // hydrate blueprints
+
+    // Add blueprints from collections FIRST
+    // console.log(`[ServerNetwork] Loading ${this.collections?.length || 0} collections`)
+    if (this.collections) {
+      for (const collection of this.collections) {
+        // console.log(`[ServerNetwork] Loading collection: ${collection.name} with ${collection.blueprints.length} blueprints`)
+        for (const blueprint of collection.blueprints) {
+          // console.log(`[ServerNetwork] Adding blueprint: ${blueprint.name}`)
+          this.world.blueprints.add(blueprint, true)
+        }
+      }
+    }
+
+    // hydrate blueprints from database
     const blueprints = await this.db('blueprints')
+    // console.log(`[ServerNetwork] Hydrating ${blueprints.length} blueprints from database`)
     for (const blueprint of blueprints) {
       const data = JSON.parse(blueprint.data)
       this.world.blueprints.add(data, true)
     }
+    // console.log(`[ServerNetwork] Total blueprints loaded: ${this.world.blueprints.items.size}`)
+
     // hydrate entities
     const entities = await this.db('entities')
     for (const entity of entities) {
@@ -278,6 +295,12 @@ export class ServerNetwork extends System {
       )
 
       // send snapshot
+      const blueprints = this.world.blueprints.serialize()
+      // console.log(`[ServerNetwork] Sending snapshot to ${socket.id}:`, {
+      //   blueprintsCount: blueprints.length,
+      //   hasSimpleControls: blueprints.some(b => b.name === 'simple-controls'),
+      //   sampleBlueprints: blueprints.slice(0, 3).map(b => ({ name: b.name, id: b.id }))
+      // })
       socket.send('snapshot', {
         id: socket.id,
         serverTime: performance.now(),
@@ -288,7 +311,7 @@ export class ServerNetwork extends System {
         settings: this.world.settings.serialize(),
         chat: this.world.chat.serialize(),
         ai: this.world.ai.serialize(),
-        blueprints: this.world.blueprints.serialize(),
+        blueprints: blueprints,
         entities: this.world.entities.serialize(),
         livekit,
         authToken,

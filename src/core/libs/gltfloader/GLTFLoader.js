@@ -3022,11 +3022,31 @@ class GLTFParser {
 		// If present, GLB container is required to be the first buffer.
 		if ( bufferDef.uri === undefined && bufferIndex === 0 ) {
 
-			return Promise.resolve( this.extensions[ EXTENSIONS.KHR_BINARY_GLTF ].body );
+			const binaryExtension = this.extensions[ EXTENSIONS.KHR_BINARY_GLTF ];
+			if ( binaryExtension && binaryExtension.body ) {
+
+				return Promise.resolve( binaryExtension.body );
+
+			}
 
 		}
 
 		const options = this.options;
+
+		// HYP_SERVER_FIX: Handle embedded base64 data URIs
+		if ( bufferDef.uri && bufferDef.uri.startsWith( 'data:' ) ) {
+
+			return Promise.reject( new Error( 'THREE.GLTFLoader: Embedded base64 buffer data is not supported on server.' ) );
+
+		}
+
+		// If URI is missing/empty, this might be an embedded buffer that needs to be provided externally
+		// Return a rejected promise to indicate the buffer cannot be loaded from a URI
+		if ( !bufferDef.uri || bufferDef.uri === '' ) {
+
+			return Promise.reject( new Error( 'THREE.GLTFLoader: Buffer URI is missing or empty - buffer must be external or GLB.' ) );
+
+		}
 
 		return new Promise( function ( resolve, reject ) {
 
@@ -3303,10 +3323,21 @@ class GLTFParser {
 
 			sourceURI = parser.getDependency( 'bufferView', sourceDef.bufferView ).then( function ( bufferView ) {
 
-				isObjectURL = true;
-				const blob = new Blob( [ bufferView ], { type: sourceDef.mimeType } );
-				sourceURI = URL.createObjectURL( blob );
-				return sourceURI;
+				// HYP_SERVER_FIX: Check if URL.createObjectURL is available (browser only)
+				if ( URL && URL.createObjectURL ) {
+
+					isObjectURL = true;
+					const blob = new Blob( [ bufferView ], { type: sourceDef.mimeType } );
+					sourceURI = URL.createObjectURL( blob );
+					return sourceURI;
+
+				} else {
+
+					// On server or environments without URL.createObjectURL support
+					// Return the buffer data directly
+					return bufferView;
+
+				}
 
 			} );
 
@@ -3317,6 +3348,33 @@ class GLTFParser {
 		}
 
 		const promise = Promise.resolve( sourceURI ).then( function ( sourceURI ) {
+
+			// HYP_SERVER_FIX: Handle ArrayBuffer data directly (server-side)
+			if ( sourceURI instanceof ArrayBuffer ) {
+
+				return new Promise( function ( resolve, reject ) {
+
+					let onLoad = resolve;
+
+					if ( loader.isImageBitmapLoader === true ) {
+
+						onLoad = function ( imageBitmap ) {
+
+							const texture = new Texture( imageBitmap );
+							texture.needsUpdate = true;
+
+							resolve( texture );
+
+						};
+
+					}
+
+					// Load from ArrayBuffer directly
+					loader.load( sourceURI, onLoad, undefined, reject );
+
+				} );
+
+			}
 
 			return new Promise( function ( resolve, reject ) {
 
@@ -3343,7 +3401,7 @@ class GLTFParser {
 
 			// Clean up resources and configure Texture.
 
-			if ( isObjectURL === true ) {
+			if ( isObjectURL === true && typeof sourceURI === 'string' && sourceURI.startsWith( 'blob:' ) ) {
 
 				URL.revokeObjectURL( sourceURI );
 
