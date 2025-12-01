@@ -314,7 +314,7 @@ export class SkinnedMesh extends Node {
   }
 
   getProxy() {
-    var self = this
+    const self = this
     if (!this.proxy) {
       let proxy = {
         get anims() {

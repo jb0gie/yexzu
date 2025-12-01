@@ -65,7 +65,7 @@ export function curveManager({ curve, width, height, xLabel, yLabel, yMin = 0, y
     .attr('fill', 'currentColor')
     .text(yLabel)
 
-  let g = svg
+  const g = svg
     .append('g')
     .attr('fill', 'none')
     .attr('stroke', 'black')

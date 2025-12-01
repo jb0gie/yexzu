@@ -412,7 +412,7 @@ function createPlayerScreen({ world, playerId, targetId, track, participant }) {
      * will hit play just until we get the data needed, then pause.
      */
     return new Promise(async resolve => {
-      let playing = false
+      const playing = false
       let data = false
       elem.addEventListener(
         'loadeddata',

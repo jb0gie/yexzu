@@ -69,7 +69,7 @@ export class Controller extends Node {
     for (let i = 0; i < shapesCount; i++) {
       const shape = shapeBuffer.get(i)
       const layer = Layers[this._layer]
-      let pairFlags =
+      const pairFlags =
         PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_FOUND |
         PHYSX.PxPairFlagEnum.eNOTIFY_TOUCH_LOST |
         PHYSX.PxPairFlagEnum.eNOTIFY_CONTACT_POINTS

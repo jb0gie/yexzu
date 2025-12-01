@@ -66,6 +66,7 @@ export function Client({ wsUrl, onSetup }) {
           pointer-events: none;
           user-select: none;
           display: ${ui.visible ? 'block' : 'none'};
+          z-index: 10;
         }
       `}
     >

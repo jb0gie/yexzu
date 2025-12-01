@@ -150,8 +150,8 @@ if (world.isServer) {
 		let visible = true
 		let collision = true
 		let health = MAX_HEALTH
-		let position = ctrl.position
-		let quaternion = avatar.quaternion
+		const position = ctrl.position
+		const quaternion = avatar.quaternion
 		let emote = Emotes.IDLE
 
 		const aggro = createAggroSphere(ctrl, props.aggroDistance)
@@ -649,7 +649,7 @@ function createNametag(name, health, maxHealth) {
 function createThreatTable() {
 	const map = new Map() // playerId => threat
 	const ignored = new Set()
-	let target = { playerId: null, threat: 0 }
+	const target = { playerId: null, threat: 0 }
 	const check = () => {
 		target.playerId = null
 		target.threat = 0

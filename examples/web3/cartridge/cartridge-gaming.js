@@ -558,7 +558,7 @@ async function toggleSessionKey() {
 }
 
 // Game time tracking
-let gameStartTime = Date.now()
+const gameStartTime = Date.now()
 
 function updateGameTime() {
   if (app.props.gameMode === 'menu' && gameplayTime) {

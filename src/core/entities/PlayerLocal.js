@@ -466,7 +466,7 @@ export class PlayerLocal extends Entity {
         origin.y += 0.2
         const hitMask = Layers.environment.group | Layers.prop.group
         const hit = this.world.physics.raycast(origin, DOWN, 2, hitMask)
-        let actor = hit?.handle?.actor || null
+        const actor = hit?.handle?.actor || null
         // if we found a new platform, set it up for tracking
         if (this.platform.actor !== actor) {
           this.platform.actor = actor
@@ -649,8 +649,8 @@ export class PlayerLocal extends Entity {
       // apply drag, orientated to ground normal
       // this prevents ice-skating & yeeting us upward when going up ramps
       const dragCoeff = 10 * delta
-      let perpComponent = v2.copy(this.groundNormal).multiplyScalar(velocity.dot(this.groundNormal))
-      let parallelComponent = v3.copy(velocity).sub(perpComponent)
+      const perpComponent = v2.copy(this.groundNormal).multiplyScalar(velocity.dot(this.groundNormal))
+      const parallelComponent = v3.copy(velocity).sub(perpComponent)
       parallelComponent.multiplyScalar(1 - dragCoeff)
       velocity.copy(parallelComponent.add(perpComponent))
       // cancel out velocity in ground normal direction (up oriented to ground normal)
@@ -1142,7 +1142,7 @@ export class PlayerLocal extends Entity {
     const axis = this.axis
     if (!axis || axis.length() === 0) return 'front'  // Default front flip when still
 
-    let moveRad = Math.atan2(axis.x, -axis.z)
+    const moveRad = Math.atan2(axis.x, -axis.z)
     let moveDeg = moveRad * (180 / Math.PI)
     if (moveDeg < 0) moveDeg += 360
 

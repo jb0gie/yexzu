@@ -25,7 +25,7 @@ export class BufferedLerpVector3 {
     // if snapshot changed, reset all three to new value
     if (this.snapToken !== snapToken) {
       this.snapToken = snapToken
-      for (let samp of this.samples) {
+      for (const samp of this.samples) {
         if (Array.isArray(inV)) {
           samp.value.fromArray(inV)
         } else {
@@ -60,7 +60,7 @@ export class BufferedLerpVector3 {
     let tOlder = -Infinity,
       tNewer = Infinity
 
-    for (let samp of this.samples) {
+    for (const samp of this.samples) {
       const t = samp.time
       if (t <= tRender && t > tOlder) {
         tOlder = t
@@ -93,7 +93,7 @@ export class BufferedLerpVector3 {
   snap() {
     // find the sample with max time
     let latest = this.samples[0]
-    for (let samp of this.samples) {
+    for (const samp of this.samples) {
       if (samp.time > latest.time) latest = samp
     }
     this.localTime = latest.time + this.buffer

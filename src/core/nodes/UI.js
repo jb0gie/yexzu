@@ -363,7 +363,7 @@ export class UI extends Node {
         // calculate scale factor based on the distance
         // When distance is at min, scale is 1.0 (or some other base scale)
         // When distance is at max, scale adjusts proportionally
-        let scaleFactor = (baseScale * (worldToScreenFactor * clampedDistance)) / this._size
+        const scaleFactor = (baseScale * (worldToScreenFactor * clampedDistance)) / this._size
         // if (world.xr.session) scaleFactor *= 0.3 // roughly matches desktop fov etc
         sca.setScalar(scaleFactor)
       }
@@ -807,7 +807,7 @@ export class UI extends Node {
 
   getProxy() {
     if (!this.proxy) {
-      var self = this
+      const self = this
       let proxy = {
         get space() {
           return self.space
@@ -961,7 +961,7 @@ export class UI extends Node {
   }
 }
 
-function pivotGeometry(pivot, geometry, width, height) {
+export function pivotGeometry(pivot, geometry, width, height) {
   const halfWidth = width / 2
   const halfHeight = height / 2
   switch (pivot) {
@@ -995,7 +995,7 @@ function pivotGeometry(pivot, geometry, width, height) {
   }
 }
 
-function pivotCanvas(pivot, canvas, width, height) {
+export function pivotCanvas(pivot, canvas, width, height) {
   // const halfWidth = width / 2
   // const halfHeight = height / 2
   switch (pivot) {
@@ -1044,7 +1044,7 @@ function isSpace(value) {
 
 // pivotOffset == ( - pivotX, - pivotY )
 // i.e., the negative of whatever pivotGeometry just did.
-function getPivotOffset(pivot, width, height) {
+export function getPivotOffset(pivot, width, height) {
   // The top-left corner is originally (-halfW, +halfH).
   // Then pivotGeometry adds the following translation:
   const halfW = width / 2

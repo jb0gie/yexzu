@@ -400,7 +400,7 @@ export class Audio extends Node {
   }
 
   getProxy() {
-    var self = this
+    const self = this
     if (!this.proxy) {
       let proxy = {
         get src() {

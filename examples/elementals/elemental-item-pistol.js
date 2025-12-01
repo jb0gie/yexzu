@@ -29,7 +29,7 @@ createItem(({ player, hooks }) => {
   let muzzleBone // Gun_Muzzle bone for muzzle flash position
   let ejectBone // Gun_VFX_Eject bone for shell casing ejection
   let gripBone // Gun_GripR bone for hand attachment
-  let gripOffset = new Vector3() // Cached grip bone offset (local space)
+  const gripOffset = new Vector3() // Cached grip bone offset (local space)
 
   let control
   let lastFireTime = 0
@@ -968,7 +968,7 @@ createItem(({ player, hooks }) => {
                   dir = v1.set(0, 0, -1).applyQuaternion(q1)
                 }
 
-                let origin = player.position.clone()
+                const origin = player.position.clone()
                 origin.y += 1.5
 
                 if (muzzleBone && muzzleBone.matrixWorld) {
@@ -1203,7 +1203,7 @@ createItem(({ player, hooks }) => {
             }
 
             // Get muzzle position from bone (like tackle.js - project forward to avoid self-hits)
-            let origin = player.position.clone()
+            const origin = player.position.clone()
             origin.y += 1.5 // Fallback height
 
             if (muzzleBone && muzzleBone.matrixWorld) {

@@ -74,7 +74,7 @@ export class ServerNetwork extends System {
       this.world.entities.add(data, true)
     }
     // hydrate settings
-    let settingsRow = await this.db('config').where('key', 'settings').first()
+    const settingsRow = await this.db('config').where('key', 'settings').first()
     try {
       const settings = JSON.parse(settingsRow?.value || '{}')
       this.world.settings.deserialize(settings)
@@ -236,8 +236,8 @@ export class ServerNetwork extends System {
 
       // check connection params
       let authToken = params.authToken
-      let name = params.name
-      let avatar = params.avatar
+      const name = params.name
+      const avatar = params.avatar
 
       // get or create user
       let user

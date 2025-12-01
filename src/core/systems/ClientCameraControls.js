@@ -351,14 +351,14 @@ export class ClientCameraControls extends System {
       const baseBokeh = Math.max(0.2, Math.min(2.0, lerp(s0.bokeh, s1.bokeh, t)))
 
       // Choose focus center
-      let playerDist = this.getFocusDistanceToPlayer()
+      const playerDist = this.getFocusDistanceToPlayer()
       if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
         // Blend between player distance and stop-based focus according to zoom
         const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
         this.targetFocusDistance = playerDist * (1 - blend) + baseFocus * blend
       } else {
         // Blend with reticle raycast if available (low influence to avoid jumpiness)
-        let raycastDistance = this.raycastFocusDistance()
+        const raycastDistance = this.raycastFocusDistance()
         if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
           this.targetFocusDistance = raycastDistance * 0.25 + baseFocus * 0.75
         } else {

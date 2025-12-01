@@ -399,7 +399,7 @@ export function createVRMFactory(glb, setupMaterial) {
       //   fadeSpeed: Number - how fast to fade in/out
       // }
     }
-    let currentAdditiveAnims = new Map() // Currently playing additive animations
+    const currentAdditiveAnims = new Map() // Currently playing additive animations
 
     // Detect which bones an animation clip affects
     function getAffectedBones(clip) {
@@ -858,7 +858,7 @@ export function createVRMFactory(glb, setupMaterial) {
         spring.joints.forEach(joint => {
           const src = joint.bone
           if (!src || !src.name) return
-          let dst = skeleton.getBoneByName(src.name)
+          const dst = skeleton.getBoneByName(src.name)
           if (dst) springPairs.push([src, dst])
         })
         // build drive pairs (clone skeleton -> original bones) for joint ancestors
@@ -1301,8 +1301,8 @@ export function createVRMFactory(glb, setupMaterial) {
         if (isBoneInConflict) {
           // Get configuration for bone conflict resolution
           let conflictResolutionMode = 'additive_priority' // Default: pistol takes precedence
-          let locomotionWeight = baseLocomotionWeight
-          let additiveWeight = 1.0 - baseLocomotionWeight
+          const locomotionWeight = baseLocomotionWeight
+          const additiveWeight = 1.0 - baseLocomotionWeight
 
           // Check for weapon-specific configuration
           for (const [url, anim] of currentAdditiveAnims) {
@@ -1944,7 +1944,7 @@ function cloneGLB(glb) {
 }
 
 function getSkinnedMeshes(scene) {
-  let meshes = []
+  const meshes = []
   scene.traverse(o => {
     if (o.isSkinnedMesh) {
       meshes.push(o)
@@ -1960,7 +1960,7 @@ function createCapsule(radius, height) {
   return geometry
 }
 
-let queryParams = {}
+const queryParams = {}
 function getQueryParams(url) {
   if (!queryParams[url]) {
     url = new URL(url)

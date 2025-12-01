@@ -136,10 +136,10 @@ let mechanics = {
   airDiveAreas: []
 }
 let editMode = false
-let savedLevels = []
+const savedLevels = []
 
 // Platform type configurations
-let platformConfigs = {
+const platformConfigs = {
   small: { width: 2, depth: 2, height: 0.5, node: 'Pltfrm', falling: false },
   medium: { width: 4, depth: 3, height: 0.5, node: 'MedPltfrm', falling: false },
   large: { width: 6, depth: 4, height: 0.5, node: 'LrgPltfrm', falling: false },
@@ -171,7 +171,7 @@ function generateLevel() {
   const props = app.props
   const seed = Date.now()
   Math.seedrandom = Math.seedrandom || function(seed) {
-    let x = Math.sin(seed++) * 10000
+    const x = Math.sin(seed++) * 10000
     return x - Math.floor(x)
   }
 
@@ -186,7 +186,7 @@ function generateLevel() {
 
   console.log(`[LevelGenerator] Generating level: diff=${difficulty}, len=${length}`)
 
-  let currentPos = new THREE.Vector3(0, 0, 0)
+  const currentPos = new THREE.Vector3(0, 0, 0)
   const pathPoints = []
 
   for (let i = 0; i < length; i++) {

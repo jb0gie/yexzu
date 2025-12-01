@@ -58,14 +58,14 @@ class PRNG {
 
     // swap if min > max
     if (min > max) {
-      let t = max
+      const t = max
       max = min
       min = t
     }
 
-    let offset = min
+    const offset = min
 
-    let bits = ~~this._log2(max - offset) + 1
+    const bits = ~~this._log2(max - offset) + 1
     let random
     do {
       random = this.lfsr.seq(bits)
@@ -160,7 +160,7 @@ class LFSR {
     this.register = seed & mask
   }
   shift() {
-    let tapsNum = this.taps.length
+    const tapsNum = this.taps.length
     let i
     let bit = this.register >> (this.n - this.taps[0])
     for (let i = 1; i < tapsNum; i++) {
@@ -185,7 +185,7 @@ class LFSR {
     return seq
   }
   maxSeqLen() {
-    let initialState = this.register
+    const initialState = this.register
     let counter = 0
     do {
       this.shift()
@@ -195,7 +195,7 @@ class LFSR {
   }
   _defaultSeed(n) {
     if (!n) throw new Error('n is required')
-    let lfsr = new LFSR(8, 92914)
+    const lfsr = new LFSR(8, 92914)
     return lfsr.seq(n)
   }
 }

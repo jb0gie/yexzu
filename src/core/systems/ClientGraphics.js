@@ -30,6 +30,7 @@ function getRenderer() {
     renderer = new THREE.WebGLRenderer({
       powerPreference: 'high-performance',
       antialias: true,
+      alpha: true,
       // logarithmicDepthBuffer: true,
       // reverseDepthBuffer: true,
     })
@@ -59,7 +60,11 @@ export class ClientGraphics extends System {
     this.aspect = this.width / this.height
     this.renderer = getRenderer()
     this.renderer.setSize(this.width, this.height)
+    this.renderer.setSize(this.width, this.height)
     this.renderer.setClearColor(0xffffff, 0)
+    this.renderer.domElement.style.position = 'absolute'
+    this.renderer.domElement.style.top = '0'
+    this.renderer.domElement.style.left = '0'
     this.renderer.setPixelRatio(this.world.prefs.dpr)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -69,7 +74,7 @@ export class ClientGraphics extends System {
     this.renderer.xr.enabled = true
     this.maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy()
     THREE.Texture.DEFAULT_ANISOTROPY = this.maxAnisotropy
-    this.usePostprocessing = this.world.prefs.postprocessing
+    this.usePostprocessing = false // this.world.prefs.postprocessing
 
     // Initialize CSS3D renderer for WebViews
     this.css3dScene = new THREE.Scene()
@@ -79,8 +84,12 @@ export class ClientGraphics extends System {
     this.css3dRenderer.domElement.style.top = '0'
     this.css3dRenderer.domElement.style.left = '0'
     this.css3dRenderer.domElement.style.pointerEvents = 'none'
-    this.css3dRenderer.domElement.style.zIndex = '1'
+    this.css3dRenderer.domElement.style.pointerEvents = 'none'
+    this.css3dRenderer.domElement.style.zIndex = '-1'
     this.viewport.appendChild(this.css3dRenderer.domElement)
+
+    // Ensure WebGL renderer is on top (default z-index is auto/0)
+    this.renderer.domElement.style.zIndex = ''
 
     const context = this.renderer.getContext()
     const maxMultisampling = context.getParameter(context.MAX_SAMPLES)

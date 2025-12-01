@@ -27,6 +27,20 @@ export class ClientPointer extends System {
     this.control = this.world.controls.bind({
       priority: ControlPriorities.POINTER,
     })
+    // Track mouse/touch position globally for manual raycasting when canvas pointer-events are disabled
+    this.mousePosition = { x: 0, y: 0 }
+    this.onMouseMove = (e) => {
+      this.mousePosition.x = e.clientX
+      this.mousePosition.y = e.clientY
+    }
+    this.onTouchMove = (e) => {
+      if (e.touches.length > 0) {
+        this.mousePosition.x = e.touches[0].clientX
+        this.mousePosition.y = e.touches[0].clientY
+      }
+    }
+    window.addEventListener('mousemove', this.onMouseMove)
+    window.addEventListener('touchmove', this.onTouchMove)
   }
 
   update(delta) {
@@ -50,6 +64,41 @@ export class ClientPointer extends System {
       released = this.control.mouseLeft.released
     }
     this.pointerState.update(hit, pressed, released)
+
+    // Handle WebView interaction (DOM behind Canvas)
+    const renderer = this.world.graphics.renderer
+    if (renderer && renderer.domElement) {
+      let isWebView = false
+
+      if (this.control.pointer.locked || this.control.xrLeftTrigger.value || this.control.xrRightTrigger.value) {
+        // Locked or XR mode: use the hit detected by the input system (reticle or controller ray)
+        // In these modes, we generally want the canvas to capture events (for reticle/controller logic),
+        // but we might want to visualize hover. However, for actual interaction (clicking iframe),
+        // the user typically needs to unlock the cursor.
+        // Per user request: "webview should only be useable when the pointer is not locked"
+        isWebView = false // Force false to ensure pointerEvents stays 'auto'
+      } else {
+        // Unlocked / Cursor mode (Desktop or Mobile Touch)
+        // Always manually raycast to detect WebView, as screenHit is only for screen-space UI
+        const hits = this.world.stage.raycastPointer(this.mousePosition)
+        const hit = hits[0]
+        isWebView = hit && hit.node && hit.node.name === 'webview'
+      }
+
+      if (isWebView) {
+        if (renderer.domElement.style.pointerEvents !== 'none') {
+
+          renderer.domElement.style.pointerEvents = 'none'
+        }
+      } else {
+        if (renderer.domElement.style.pointerEvents !== 'auto') {
+
+          renderer.domElement.style.pointerEvents = 'auto'
+        }
+      }
+
+
+    }
   }
 
   setScreenHit(screenHit) {
@@ -59,6 +108,12 @@ export class ClientPointer extends System {
   }
 
   destroy() {
+    if (this.onMouseMove) {
+      window.removeEventListener('mousemove', this.onMouseMove)
+    }
+    if (this.onTouchMove) {
+      window.removeEventListener('touchmove', this.onTouchMove)
+    }
     this.control?.release()
     this.control = null
   }
@@ -157,7 +212,7 @@ class PointerState {
           try {
             node.onPointerDown(this.event)
           } catch (err) {
-            console.error(err)
+            // console.error(err)
           }
           this.pressedNodes.add(node)
           if (this.event._propagationStopped) break

@@ -58,7 +58,7 @@ app.configure([
 ])
 
 // Global state
-let mechanicApps = {}
+const mechanicApps = {}
 let levelGenerator = null
 let currentSeed = 0
 let frameCount = 0

@@ -56,7 +56,7 @@ export class Curve {
     let lo = -1
     let hi = this.keyframes.length
     while (hi - lo > 1) {
-      let mid = Math.round((lo + hi) / 2)
+      const mid = Math.round((lo + hi) / 2)
       if (this.keyframes[mid].time <= t) lo = mid
       else hi = mid
     }
@@ -177,24 +177,24 @@ export class Curve {
 
     const [lo, hi] = this.getClosest(t)
 
-    var i0 = lo
-    var i1 = i0 + 1
+    const i0 = lo
+    let i1 = i0 + 1
 
     if (i0 > n - 1) throw new Error('Out of bounds')
     if (i0 === n - 1) i1 = i0
 
-    var scale = keyframes[i1].time - keyframes[i0].time
+    const scale = keyframes[i1].time - keyframes[i0].time
 
     t = (t - keyframes[i0].time) / scale
 
-    var t2 = t * t
-    var it = 1 - t
-    var it2 = it * it
-    var tt = 2 * t
-    var h00 = (1 + tt) * it2
-    var h10 = t * it2
-    var h01 = t2 * (3 - tt)
-    var h11 = t2 * (t - 1)
+    const t2 = t * t
+    const it = 1 - t
+    const it2 = it * it
+    const tt = 2 * t
+    const h00 = (1 + tt) * it2
+    const h10 = t * it2
+    const h01 = t2 * (3 - tt)
+    const h11 = t2 * (t - 1)
 
     const x =
       h00 * keyframes[i0].time +

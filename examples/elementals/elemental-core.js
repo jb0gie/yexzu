@@ -296,9 +296,13 @@ if (world.isServer) {
 }
 
 if (world.isClient) {
-  const barWidth = 260
-  const barHeight = 56
-  const slotSize = 46
+  const isMobile =
+    typeof navigator !== 'undefined' && navigator.userAgent
+      ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      : false
+  const barWidth = isMobile ? 160 : 260
+  const barHeight = isMobile ? 32 : 56
+  const slotSize = isMobile ? 24 : 46
 
   const $bar = app.create('ui', {
     space: 'screen',
@@ -351,9 +355,9 @@ if (world.isClient) {
     slots.push({ $item, $img, $qty })
   }
   app.add($bar)
-  const backpackWidth = 180
-  const backpackHeight = 95
-  const backpackSlotSize = 38
+  const backpackWidth = isMobile ? 120 : 180
+  const backpackHeight = isMobile ? 60 : 95
+  const backpackSlotSize = isMobile ? 20 : 38
 
   const $backpack = app.create('ui', {
     space: 'screen',
@@ -420,13 +424,13 @@ if (world.isClient) {
 
   const $toggleBtn = app.create('ui', {
     space: 'screen',
-    width: 50,
-    height: 50,
+    width: 30,
+    height: 30,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 25,
+    borderRadius: 15,
     pivot: 'bottom-right',
     position: [1, 1],
-    offset: [-50, -35, 0],
+    offset: [-175, -170, 0],
     cursor: 'pointer',
     alignItems: 'center',
     justifyContent: 'center',
@@ -434,12 +438,32 @@ if (world.isClient) {
   const toggleLabel = app.create('uitext', {
     value: 'BAG',
     color: 'white',
-    fontSize: 9,
-    fontWeight: 'bold'
+    fontSize: isMobile ? 7 : 9,
+    fontWeight: 'bold',
   })
   $toggleBtn.add(toggleLabel)
   $toggleBtn.onPointerDown = () => {
-    toggleBackpack()
+    if (lastTap !== null && tapFrameCount < 18) {
+      toggleHotbar()
+      lastTap = null
+      tapFrameCount = 0
+    } else {
+      lastTap = 'bag'
+      tapFrameCount = 0
+      if (hotbarVisible) {
+        toggleBackpack()
+      } else {
+        toggleHotbar()
+      }
+    }
+  }
+  function toggleHotbar() {
+    hotbarVisible = !hotbarVisible
+    if (hotbarVisible) {
+      app.add($bar)
+    } else {
+      app.remove($bar)
+    }
   }
 
   app.add($toggleBtn)
@@ -448,10 +472,10 @@ if (world.isClient) {
     space: 'screen',
     pivot: 'bottom-center',
     position: [0.5, 1, 0],
-    offset: [0, -40 - backpackHeight - 56, 0],
+    offset: [0, -40 - backpackHeight - (isMobile ? 40 : 56), 0],
     width: backpackWidth,
-    height: 40,
-    padding: 5,
+    height: isMobile ? 30 : 40,
+    padding: isMobile ? 3 : 5,
     borderRadius: 8,
     flexDirection: 'row',
     gap: 5,
@@ -460,8 +484,8 @@ if (world.isClient) {
   })
 
   const clearBtn = app.create('uiview', {
-    width: 80,
-    height: 30,
+    width: isMobile ? 60 : 80,
+    height: isMobile ? 22 : 30,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 6,
     borderWidth: 1,
@@ -481,14 +505,14 @@ if (world.isClient) {
   const clearLabel = app.create('uitext', {
     value: 'CLEAR',
     color: 'white',
-    fontSize: 10,
+    fontSize: isMobile ? 8 : 10,
     fontWeight: 600,
   })
   clearBtn.add(clearLabel)
 
   const dropBtn = app.create('uiview', {
-    width: 80,
-    height: 30,
+    width: isMobile ? 60 : 80,
+    height: isMobile ? 22 : 30,
     backgroundColor: 'rgba(255,100,100,0.2)',
     borderRadius: 6,
     borderWidth: 1,
@@ -507,7 +531,7 @@ if (world.isClient) {
   const dropLabel = app.create('uitext', {
     value: 'DROP',
     color: 'white',
-    fontSize: 10,
+    fontSize: isMobile ? 8 : 10,
     fontWeight: 600,
   })
   dropBtn.add(dropLabel)
@@ -520,25 +544,28 @@ if (world.isClient) {
     pivot: 'top-center',
     position: [0.5, 0, 0],
     offset: [0, 20, 0],
-    width: 260,
-    height: 42,
-    padding: 8,
+    width: isMobile ? 200 : 260,
+    height: isMobile ? 32 : 42,
+    padding: isMobile ? 5 : 8,
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
   })
   const helpText = app.create('uitext', {
-    value: 'Tap: Select | Double-tap: Use | CLEAR/DROP: Buttons',
+    value: isMobile
+      ? 'Double-tap BAG to hide/show hotbar | Tap: Select | Double-tap slot: Use'
+      : 'Tap: Select | Double-tap: Use | CLEAR/DROP: Buttons',
     color: 'white',
-    fontSize: 9,
+    fontSize: isMobile ? 7 : 9,
     textAlign: 'center',
   })
   $help.add(helpText)
 
   let actionsVisible = false
   let helpVisible = false
-  let toggleBtnVisible = true
+  let hotbarVisible = true
+  const toggleBtnVisible = true
 
   app.on('update', () => {
     if (open && !actionsVisible) {

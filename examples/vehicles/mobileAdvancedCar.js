@@ -9,7 +9,7 @@ app.configure([
     label: 'Acceleration',
     initial: 10,
     min: 0,
-    hint: 'The maximum amount of force applied when accelerating.'
+    hint: 'The maximum amount of force applied when accelerating.',
   },
   {
     key: 'decel',
@@ -17,7 +17,7 @@ app.configure([
     label: 'Deceleration',
     initial: 6,
     min: 0,
-    hint: 'The maximum amount of force applied when decelerating.'
+    hint: 'The maximum amount of force applied when decelerating.',
   },
   {
     key: 'handbrake',
@@ -25,7 +25,7 @@ app.configure([
     label: 'Handbrake',
     initial: 6,
     min: 0,
-    hint: 'The amount of force applied when hand braking.'
+    hint: 'The amount of force applied when hand braking.',
   },
   {
     key: 'maxSpeed',
@@ -33,7 +33,7 @@ app.configure([
     label: 'Max Speed',
     initial: 180,
     min: 1,
-    hint: 'The maximum speed, in kilometers per hour.'
+    hint: 'The maximum speed, in kilometers per hour.',
   },
   {
     key: 'maxHealth',
@@ -41,7 +41,7 @@ app.configure([
     label: 'Max Health',
     initial: 100,
     min: 1,
-    hint: 'Maximum vehicle health before breakdown.'
+    hint: 'Maximum vehicle health before breakdown.',
   },
   {
     key: 'driveTrain',
@@ -52,7 +52,7 @@ app.configure([
       { label: 'RWD', value: 'rwd' },
       { label: '4WD', value: '4wd' },
     ],
-    hint: 'The wheels that exert power when accelerating/decelerating.'
+    hint: 'The wheels that exert power when accelerating/decelerating.',
   },
   {
     key: 'steering',
@@ -62,38 +62,38 @@ app.configure([
       { label: 'Front', value: 'front' },
       { label: 'Rear', value: 'rear' },
     ],
-    hint: 'The wheels that steer when turning.'
+    hint: 'The wheels that steer when turning.',
   },
   // Curve configurations
   {
     key: 'power',
     type: 'curve',
     label: 'Power',
-    hint: 'Acceleration power based on speed. X axis is the speed ratio (0 to 1 of max speed) and Y axis is the amount of full acceleration/deceleration that should be applied.'
+    hint: 'Acceleration power based on speed. X axis is the speed ratio (0 to 1 of max speed) and Y axis is the amount of full acceleration/deceleration that should be applied.',
   },
   {
     key: 'turn',
     type: 'curve',
     label: 'Turn',
-    hint: 'Turning based on speed. X axis is the speed ratio (0 to 1 of max speed) and Y axis is the amount of turning to apply.'
+    hint: 'Turning based on speed. X axis is the speed ratio (0 to 1 of max speed) and Y axis is the amount of turning to apply.',
   },
   {
     key: 'frontGrip',
     type: 'curve',
     label: 'Front Grip',
-    hint: 'Front wheel grip. X axis is the amount of sideways force where 0 is none and 1 is full. Y axis is the amount of grip the wheel has.'
+    hint: 'Front wheel grip. X axis is the amount of sideways force where 0 is none and 1 is full. Y axis is the amount of grip the wheel has.',
   },
   {
     key: 'rearGrip',
     type: 'curve',
     label: 'Rear Grip',
-    hint: 'Rear wheel grip. X axis is the amount of sideways force where 0 is none and 1 is full. Y axis is the amount of grip the wheel has.'
+    hint: 'Rear wheel grip. X axis is the amount of sideways force where 0 is none and 1 is full. Y axis is the amount of grip the wheel has.',
   },
   {
     key: 'longGrip',
     type: 'curve',
     label: 'Long Grip',
-    hint: 'Longitudinal grip curve for powered wheels. X-axis is the slip ratio and Y-axis is the grip from 0 (no traction) to 1 (full traction).'
+    hint: 'Longitudinal grip curve for powered wheels. X-axis is the slip ratio and Y-axis is the grip from 0 (no traction) to 1 (full traction).',
   },
   // Suspension
   {
@@ -102,7 +102,7 @@ app.configure([
     label: 'Spring Strength',
     initial: 10,
     min: 1,
-    hint: 'The spring suspension strength.'
+    hint: 'The spring suspension strength.',
   },
   {
     key: 'springDamper',
@@ -110,7 +110,7 @@ app.configure([
     label: 'Spring Damper',
     initial: 2,
     min: 1,
-    hint: 'Damping applied to spring suspension.'
+    hint: 'Damping applied to spring suspension.',
   },
   // Assets
   {
@@ -118,7 +118,7 @@ app.configure([
     type: 'file',
     kind: 'emote',
     label: 'Sit Emote',
-    hint: 'Emote used when sitting in the vehicle.'
+    hint: 'Emote used when sitting in the vehicle.',
   },
   // Seat Position Adjustments
   {
@@ -128,7 +128,7 @@ app.configure([
     initial: 0,
     dp: 2,
     step: 0.01,
-    hint: 'Vertical position offset for Seat1 (driver seat) in meters.'
+    hint: 'Vertical position offset for Seat1 (driver seat) in meters.',
   },
   {
     key: 'seat2YOffset',
@@ -137,7 +137,7 @@ app.configure([
     initial: 0,
     dp: 2,
     step: 0.01,
-    hint: 'Vertical position offset for Seat2 (passenger seat) in meters.'
+    hint: 'Vertical position offset for Seat2 (passenger seat) in meters.',
   },
   // Enhanced Audio System
   {
@@ -145,54 +145,54 @@ app.configure([
     type: 'file',
     kind: 'audio',
     label: 'Engine Idle Sound',
-    hint: 'Low RPM engine sound.'
+    hint: 'Low RPM engine sound.',
   },
   {
     key: 'engineRev',
     type: 'file',
     kind: 'audio',
     label: 'Engine Rev Sound',
-    hint: 'High RPM engine sound.'
+    hint: 'High RPM engine sound.',
   },
   {
     key: 'brakeSound',
     type: 'file',
     kind: 'audio',
     label: 'Brake Sound',
-    hint: 'Sound when braking.'
+    hint: 'Sound when braking.',
   },
   {
     key: 'skidSound',
     type: 'file',
     kind: 'audio',
     label: 'Skid Sound',
-    hint: 'Sound when tires are sliding.'
+    hint: 'Sound when tires are sliding.',
   },
   {
     key: 'crashSound',
     type: 'file',
     kind: 'audio',
     label: 'Crash Sound',
-    hint: 'Sound when vehicle takes damage.'
+    hint: 'Sound when vehicle takes damage.',
   },
   // Visual effects
   {
     key: 'treadmark',
     type: 'file',
     kind: 'texture',
-    label: 'Treadmark'
+    label: 'Treadmark',
   },
   {
     key: 'smoke',
     type: 'file',
     kind: 'texture',
-    label: 'Smoke'
+    label: 'Smoke',
   },
   {
     key: 'exhaust',
     type: 'file',
     kind: 'texture',
-    label: 'Exhaust Smoke'
+    label: 'Exhaust Smoke',
   },
   // Turret System
   {
@@ -200,7 +200,7 @@ app.configure([
     type: 'file',
     kind: 'emote',
     label: 'Turret Seat Emote',
-    hint: 'Animation for turret seat (Seat3).'
+    hint: 'Animation for turret seat (Seat3).',
   },
   {
     key: 'turretOverheatThreshold',
@@ -208,7 +208,7 @@ app.configure([
     label: 'Turret Overheat Threshold',
     initial: 100,
     min: 1,
-    hint: 'Number of shots before turret overheats.'
+    hint: 'Number of shots before turret overheats.',
   },
   {
     key: 'turretCooldownTime',
@@ -217,7 +217,7 @@ app.configure([
     initial: 5,
     min: 0.1,
     dp: 1,
-    hint: 'Seconds to cool down after overheating.'
+    hint: 'Seconds to cool down after overheating.',
   },
   {
     key: 'turretFireRate',
@@ -226,7 +226,7 @@ app.configure([
     initial: 0.1,
     min: 0.01,
     dp: 2,
-    hint: 'Minimum time between shots in seconds.'
+    hint: 'Minimum time between shots in seconds.',
   },
   {
     key: 'turretMinDamage',
@@ -234,7 +234,7 @@ app.configure([
     label: 'Turret Min Damage',
     initial: 20,
     min: 1,
-    hint: 'Minimum damage per shot.'
+    hint: 'Minimum damage per shot.',
   },
   {
     key: 'turretMaxDamage',
@@ -242,7 +242,7 @@ app.configure([
     label: 'Turret Max Damage',
     initial: 40,
     min: 1,
-    hint: 'Maximum damage per shot.'
+    hint: 'Maximum damage per shot.',
   },
   {
     key: 'turretCritChance',
@@ -253,7 +253,7 @@ app.configure([
     max: 1,
     step: 0.01,
     dp: 2,
-    hint: 'Critical hit chance (0-1).'
+    hint: 'Critical hit chance (0-1).',
   },
   {
     key: 'turretCritMultiplier',
@@ -262,7 +262,7 @@ app.configure([
     initial: 1.8,
     min: 1,
     dp: 1,
-    hint: 'Critical damage multiplier.'
+    hint: 'Critical damage multiplier.',
   },
   {
     key: 'turretRange',
@@ -270,7 +270,7 @@ app.configure([
     label: 'Turret Range',
     initial: 100,
     min: 1,
-    hint: 'Maximum shooting range in meters.'
+    hint: 'Maximum shooting range in meters.',
   },
   {
     key: 'turretRotationSpeed',
@@ -279,22 +279,22 @@ app.configure([
     initial: 3,
     min: 0.1,
     dp: 1,
-    hint: 'Turret rotation interpolation speed (higher = faster).'
+    hint: 'Turret rotation interpolation speed (higher = faster).',
   },
   {
     key: 'turretFireSound',
     type: 'file',
     kind: 'audio',
     label: 'Turret Fire Sound',
-    hint: 'Sound when turret fires.'
+    hint: 'Sound when turret fires.',
   },
   {
     key: 'turretOverheatSound',
     type: 'file',
     kind: 'audio',
     label: 'Turret Overheat Sound',
-    hint: 'Sound when turret overheats.'
-  }
+    hint: 'Sound when turret overheats.',
+  },
 ])
 
 // Enhanced constants and utilities
@@ -329,7 +329,7 @@ let lastTurretSend = 0
 const LOD_DISTANCES = {
   FULL: 50,
   MEDIUM: 150,
-  LOW: 300
+  LOW: 300,
 }
 
 // Camera modes
@@ -337,7 +337,7 @@ const CAMERA_MODES = {
   FOLLOW: 'follow',
   COCKPIT: 'cockpit',
   HOOD: 'hood',
-  CINEMATIC: 'cinematic'
+  CINEMATIC: 'cinematic',
 }
 
 const WHEEL_MASS = 0.05
@@ -365,7 +365,7 @@ function validateConfiguration() {
   return true
 }
 
-function safeExecute(fn, fallback = () => { }) {
+function safeExecute(fn, fallback = () => {}) {
   try {
     return fn()
   } catch (error) {
@@ -387,9 +387,10 @@ const seatNodes = [
   safeExecute(() => app.get('Seat1')),
   safeExecute(() => app.get('Seat2')),
   safeExecute(() => app.get('Seat3')),
-  safeExecute(() => app.get('Seat4'))
+  safeExecute(() => app.get('Seat4')),
 ]
 const gunnerCam = safeExecute(() => app.get('GunnerCam'))
+console.log('[DEBUG] gunnerCam retrieved:', gunnerCam, 'position:', gunnerCam?.position)
 
 // Declare turret bone variables
 let turretBaseBone = null
@@ -405,7 +406,7 @@ turretMuzzleBone = safeExecute(() => body.getBone('TurretMuzzle'))
 
 if (!car || !body) {
   console.error('Critical car components missing')
-  return
+  throw new Error('Critical car components missing: Car or Body node not found')
 }
 
 if (!turretBaseBone || !turretGunBone || !turretMuzzleBone) {
@@ -449,21 +450,21 @@ function createCurve(propValue, defaultKeyframes) {
 // Default curve keyframes (time, value, inTangent, outTangent)
 const defaultPowerCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
-  { time: 1, value: 0.5, inTangent: 0, outTangent: 0 }
+  { time: 1, value: 0.5, inTangent: 0, outTangent: 0 },
 ]
 const defaultTurnCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
-  { time: 1, value: 0.3, inTangent: 0, outTangent: 0 }
+  { time: 1, value: 0.3, inTangent: 0, outTangent: 0 },
 ]
 const defaultGripCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
-  { time: 1, value: 0.2, inTangent: 0, outTangent: 0 }
+  { time: 1, value: 0.2, inTangent: 0, outTangent: 0 },
 ]
 const defaultLongGripCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
   { time: 0.1, value: 1, inTangent: 0, outTangent: 0 },
   { time: 0.5, value: 0.8, inTangent: 0, outTangent: 0 },
-  { time: 1, value: 0.3, inTangent: 0, outTangent: 0 }
+  { time: 1, value: 0.3, inTangent: 0, outTangent: 0 },
 ]
 
 // Configuration values
@@ -507,34 +508,34 @@ const audioSources = {
     group: 'sfx',
     loop: true,
     volume: 0.8,
-    spatial: true
+    spatial: true,
   }),
   revving: app.create('audio', {
     src: props.engineRev?.url,
     group: 'sfx',
     loop: true,
     volume: 0,
-    spatial: true
+    spatial: true,
   }),
   braking: app.create('audio', {
     src: props.brakeSound?.url,
     group: 'sfx',
     volume: 0.6,
-    spatial: true
+    spatial: true,
   }),
   skidding: app.create('audio', {
     src: props.skidSound?.url,
     group: 'sfx',
     loop: true,
     volume: 0,
-    spatial: true
+    spatial: true,
   }),
   crash: app.create('audio', {
     src: props.crashSound?.url,
     group: 'sfx',
     volume: 0.8,
-    spatial: true
-  })
+    spatial: true,
+  }),
 }
 
 // Add audio sources to car
@@ -559,7 +560,7 @@ const wheels = [
     turns: steering === 'front',
     gripCurve: frontGripCurve,
     temperature: 0,
-    speed: 0
+    speed: 0,
   },
   {
     idx: 1,
@@ -574,7 +575,7 @@ const wheels = [
     turns: steering === 'front',
     gripCurve: frontGripCurve,
     temperature: 0,
-    speed: 0
+    speed: 0,
   },
   {
     idx: 2,
@@ -589,7 +590,7 @@ const wheels = [
     turns: steering === 'rear',
     gripCurve: rearGripCurve,
     temperature: 0,
-    speed: 0
+    speed: 0,
   },
   {
     idx: 3,
@@ -604,8 +605,8 @@ const wheels = [
     turns: steering === 'rear',
     gripCurve: rearGripCurve,
     temperature: 0,
-    speed: 0
-  }
+    speed: 0,
+  },
 ]
 
 // Enhanced wheel setup with particles and lights
@@ -638,7 +639,7 @@ for (const wheel of wheels) {
       color: 'black',
       alpha: '0.5~0.8',
       alphaOverLife: '0,1|0.7,1|1,0',
-      image: treadmarkUrl
+      image: treadmarkUrl,
     })
     skid.position.y -= wheel.radius - 0.05
     wheel.skid = skid
@@ -658,7 +659,7 @@ for (const wheel of wheels) {
       alphaOverLife: '0,0|0.03,1|0.3,0.4|1,0',
       sizeOverLife: '0,1|1,3',
       direction: 0.7,
-      image: smokeUrl
+      image: smokeUrl,
     })
     smoke.position.y -= wheel.radius - 0.05
     wheel.smoke = smoke
@@ -680,7 +681,7 @@ const exhaustParticles = app.create('particles', {
   alpha: '0.3~0.6',
   alphaOverLife: '0,0.8|1,0',
   sizeOverLife: '0,0.5|1,2',
-  image: exhaustUrl
+  image: exhaustUrl,
 })
 
 // Position exhaust at rear of vehicle
@@ -691,7 +692,7 @@ car.add(exhaustParticles)
 const lights = {
   headlights: [],
   taillights: [],
-  brakelights: []
+  brakelights: [],
 }
 
 // Create basic lighting (if light nodes exist)
@@ -736,13 +737,21 @@ let zoom = 7
 // Vehicle state
 let health = maxHealth
 let isSeated = false
-let isDriving = false
+const isDriving = false
 let isDamaged = false
 let lastSend = 0
+
+// Exit cooldown to prevent accidental exits
+const EXIT_COOLDOWN = 0.5 // seconds
+let lastExitTime = 0
 
 // Mobile touch controls
 let touchControls = null
 let isMobile = false
+
+// Touch panning for camera look-around (right side of screen)
+let touchPan = null
+const PAN_LOOK_SPEED = 0.4
 
 // Turret state
 let isInTurretSeat = false
@@ -778,7 +787,7 @@ const info = {
     { offset: 0, turn: 0, rotate: 0, temperature: 0 },
     { offset: 0, turn: 0, rotate: 0, temperature: 0 },
     { offset: 0, turn: 0, rotate: 0, sliding: false, temperature: 0 },
-    { offset: 0, turn: 0, rotate: 0, sliding: false, temperature: 0 }
+    { offset: 0, turn: 0, rotate: 0, sliding: false, temperature: 0 },
   ],
   turretBaseRotation: 0,
   turretGunRotation: 0,
@@ -794,7 +803,8 @@ const info = {
     // Read bone rotations directly from bones (simpler and more accurate)
     this.turretBaseRotation = turretBaseBone && turretBaseBone.rotation ? turretBaseBone.rotation.y : turretBaseRotation
     this.turretGunRotation = turretGunBone && turretGunBone.rotation ? turretGunBone.rotation.x : turretGunRotation
-    this.turretBarrelRotation = turretBarrelBone && turretBarrelBone.rotation ? turretBarrelBone.rotation.z : turretBarrelRotation
+    this.turretBarrelRotation =
+      turretBarrelBone && turretBarrelBone.rotation ? turretBarrelBone.rotation.z : turretBarrelRotation
     this.turretHeat = turretHeat
     this.isTurretOverheated = isTurretOverheated
 
@@ -875,7 +885,41 @@ const info = {
     // Check if turret data is included (driver sends without, gunner sends with)
     const hasTurretData = data.length >= 33 // Base data (28) + turret data (5)
 
-    const [px, py, pz, qx, qy, qz, qw, h, dmg, exh, w0o, w0t, w0r, w0temp, w1o, w1t, w1r, w1temp, w2o, w2t, w2r, w2s, w2temp, w3o, w3t, w3r, w3s, w3temp, tbr, tgr, tbarrelr, th, toh] = data
+    const [
+      px,
+      py,
+      pz,
+      qx,
+      qy,
+      qz,
+      qw,
+      h,
+      dmg,
+      exh,
+      w0o,
+      w0t,
+      w0r,
+      w0temp,
+      w1o,
+      w1t,
+      w1r,
+      w1temp,
+      w2o,
+      w2t,
+      w2r,
+      w2s,
+      w2temp,
+      w3o,
+      w3t,
+      w3r,
+      w3s,
+      w3temp,
+      tbr,
+      tgr,
+      tbarrelr,
+      th,
+      toh,
+    ] = data
 
     this.position.set(px || 0, py || 0, pz || 0)
     this.quaternion.set(qx || 0, qy || 0, qz || 0, qw !== undefined ? qw : 1)
@@ -929,8 +973,13 @@ const info = {
   },
   serialize(includeTurret = true) {
     const baseData = [
-      this.position.x, this.position.y, this.position.z,
-      this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.w,
+      this.position.x,
+      this.position.y,
+      this.position.z,
+      this.quaternion.x,
+      this.quaternion.y,
+      this.quaternion.z,
+      this.quaternion.w,
       this.health,
       this.isDamaged,
       this.exhaustEmitting,
@@ -951,7 +1000,7 @@ const info = {
       wheels[3]?.hub?.rotation.y || 0,
       wheels[3]?.tire?.rotation.x || 0,
       wheels[3]?.skid?.emitting || false,
-      wheels[3]?.temperature || 0
+      wheels[3]?.temperature || 0,
     ]
 
     if (includeTurret) {
@@ -961,7 +1010,7 @@ const info = {
         this.turretGunRotation || 0,
         this.turretBarrelRotation || 0,
         this.turretHeat || 0,
-        this.isTurretOverheated || false
+        this.isTurretOverheated || false,
       ]
     }
 
@@ -974,7 +1023,7 @@ const info = {
       this.turretGunRotation || 0,
       this.turretBarrelRotation || 0,
       this.turretHeat || 0,
-      this.isTurretOverheated || false
+      this.isTurretOverheated || false,
     ]
   },
   deserializeTurretOnly(data) {
@@ -989,7 +1038,7 @@ const info = {
     this.turretHeat = th !== undefined ? th : this.turretHeat || 0
     this.isTurretOverheated = toh !== undefined ? toh : this.isTurretOverheated || false
     return this
-  }
+  },
 }
 
 // Simplified HUD/Dashboard system
@@ -997,9 +1046,13 @@ let dashboard = null
 let speedometer = null
 
 function createHUD() {
-  if (!control) return
+  if (!control) {
+    console.log('[DEBUG] createHUD - no control, returning early')
+    return
+  }
 
   safeExecute(() => {
+    console.log('[DEBUG] Creating HUD elements')
     dashboard = app.create('ui', {
       space: 'screen',
       width: 300,
@@ -1008,17 +1061,18 @@ function createHUD() {
       borderRadius: 10,
       pivot: 'bottom-center',
       position: [0, 0],
-      offset: [0, 20]
+      offset: [0, 20],
     })
 
     // Simple speedometer
     speedometer = app.create('uitext', {
       value: '0 KM/H',
       color: '#00ff00',
-      fontSize: 24
+      fontSize: 24,
     })
     dashboard.add(speedometer)
     app.add(dashboard)
+    console.log('[DEBUG] HUD created and added:', dashboard, 'speedometer:', speedometer)
   })
 }
 
@@ -1050,15 +1104,13 @@ function createTurretMuzzleFlash() {
     direction: 1,
     rate: 0,
     max: 40,
-    bursts: [
-      { time: 0, count: 40 }
-    ],
+    bursts: [{ time: 0, count: 40 }],
     color: '#ffaa00',
     size: '0.08~0.2',
     alphaOverLife: '1,1|1,0',
     emissive: '10',
     speed: '3~7',
-    life: '0.1~0.3'
+    life: '0.1~0.3',
   })
 
   const muzzlePos = new Vector3()
@@ -1084,7 +1136,7 @@ function createTurretBulletTrail(startPos, direction) {
     life: '0.05~0.15',
     size: '0.008~0.02',
     alphaOverLife: '1,1|1,0',
-    emissive: '8'
+    emissive: '8',
   })
 
   trail.position.copy(startPos)
@@ -1099,16 +1151,14 @@ function createTurretImpactSparks(position) {
     direction: 1,
     rate: 0,
     max: 20,
-    bursts: [
-      { time: 0, count: 20 }
-    ],
+    bursts: [{ time: 0, count: 20 }],
     color: '#ff8800',
     size: '0.03~0.1',
     alphaOverLife: '1,1|1,0',
     emissive: '10',
     speed: '1~5',
     life: '0.1~0.4',
-    force: new Vector3(0, -5, 0)
+    force: new Vector3(0, -5, 0),
   })
 
   sparks.position.copy(position)
@@ -1122,9 +1172,13 @@ function createTurretImpactSparks(position) {
 }
 
 function createTurretHUD() {
-  if (!control || turretHUD) return
+  if (!control || turretHUD) {
+    console.log('[DEBUG] createTurretHUD - no control or HUD already exists, returning early')
+    return
+  }
 
   safeExecute(() => {
+    console.log('[DEBUG] Creating turret HUD elements')
     turretHUD = app.create('ui', {
       space: 'screen',
       width: 250,
@@ -1133,14 +1187,14 @@ function createTurretHUD() {
       borderRadius: 10,
       pivot: 'bottom-center',
       position: [0, 0],
-      offset: [0, 100]
+      offset: [0, 100],
     })
 
     const heatLabel = app.create('uitext', {
       value: 'HEAT',
       color: '#ffffff',
       fontSize: 14,
-      fontWeight: 'bold'
+      fontWeight: 'bold',
     })
     turretHUD.add(heatLabel)
 
@@ -1148,11 +1202,12 @@ function createTurretHUD() {
       value: '0%',
       color: '#00ff00',
       fontSize: 20,
-      fontWeight: 'bold'
+      fontWeight: 'bold',
     })
     turretHUD.add(turretHeatBar)
 
     app.add(turretHUD)
+    console.log('[DEBUG] Turret HUD created and added:', turretHUD, 'heatBar:', turretHeatBar)
   })
 }
 
@@ -1224,21 +1279,17 @@ let driverPassengerMobileControls = null
 let driverPassengerExitButton = null
 
 function setupTouchControls() {
-  // Check if navigator is available (may not be in SES environment)
-  isMobile = typeof navigator !== 'undefined' && navigator.userAgent
-    ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    : false
+  isMobile =
+    typeof navigator !== 'undefined' && navigator.userAgent
+      ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      : false
   if (!control) return
 
   safeExecute(() => {
-    // Remove existing controls if any
     removeDriverPassengerMobileControls()
 
-    // Track buttons in an array for easy cleanup
     driverPassengerMobileControls = []
 
-    // Exit button - always shown for driver/passenger seats (all platforms)
-    // Match turret exit button position exactly (same spot for all seats)
     driverPassengerExitButton = app.create('ui', {
       space: 'screen',
       width: 40,
@@ -1257,25 +1308,23 @@ function setupTouchControls() {
         app.send('unmount')
       },
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
     })
     const exitLabel = app.create('uitext', {
       value: 'EXIT',
       color: 'white',
       fontSize: 9,
-      fontWeight: 'bold'
+      fontWeight: 'bold',
     })
     driverPassengerExitButton.add(exitLabel)
     app.add(driverPassengerExitButton)
     driverPassengerMobileControls.push(driverPassengerExitButton)
 
-    // Note: Mobile joystick support is handled via world.on('stick') event listener
-    // The joystick input is read directly from the stick event and converted to vehicle controls
     if (isMobile) {
       const mobileNotice = app.create('uitext', {
         value: 'Mobile: Use joystick to drive',
         color: '#ffaa00',
-        fontSize: 16
+        fontSize: 16,
       })
 
       const noticeUI = app.create('ui', {
@@ -1284,12 +1333,15 @@ function setupTouchControls() {
         backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 5,
         position: [0, 3, -4],
-        billboard: 'full'
+        billboard: 'full',
       })
 
       noticeUI.add(mobileNotice)
       touchControls = noticeUI
       car.add(noticeUI)
+      console.log('[DEBUG] Mobile UI created and added to car:', noticeUI, 'touchControls:', touchControls)
+    } else {
+      console.log('[DEBUG] Not mobile, skipping mobile UI creation')
     }
   })
 }
@@ -1319,9 +1371,10 @@ let turretShootButtonPressed = false
 
 function setupTurretMobileControls() {
   // Check if navigator is available (may not be in SES environment)
-  isMobile = typeof navigator !== 'undefined' && navigator.userAgent
-    ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-    : false
+  isMobile =
+    typeof navigator !== 'undefined' && navigator.userAgent
+      ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      : false
   if (!control) return
 
   safeExecute(() => {
@@ -1357,13 +1410,13 @@ function setupTurretMobileControls() {
         turretShootButtonPressed = false
       },
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
     })
     const shootLabel = app.create('uitext', {
       value: 'SHOOT',
       color: 'white',
       fontSize: 9,
-      fontWeight: 'bold'
+      fontWeight: 'bold',
     })
     turretShootButton.add(shootLabel)
     app.add(turretShootButton)
@@ -1388,13 +1441,13 @@ function setupTurretMobileControls() {
         app.send('unmount')
       },
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
     })
     const exitLabel = app.create('uitext', {
       value: 'EXIT',
       color: 'white',
       fontSize: 9,
-      fontWeight: 'bold'
+      fontWeight: 'bold',
     })
     turretExitButton.add(exitLabel)
     app.add(turretExitButton)
@@ -1422,13 +1475,13 @@ function setupTurretMobileControls() {
           accelInput = 0
         },
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
       })
       const accelLabel = app.create('uitext', {
         value: 'GO',
         color: 'white',
         fontSize: 9,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
       })
       turretAccelButton.add(accelLabel)
       app.add(turretAccelButton)
@@ -1454,13 +1507,13 @@ function setupTurretMobileControls() {
           handbrakeInput = false
         },
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
       })
       const ebrakeLabel = app.create('uitext', {
         value: 'BRAKE',
         color: 'white',
         fontSize: 8,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
       })
       turretEBrakeButton.add(ebrakeLabel)
       app.add(turretEBrakeButton)
@@ -1518,7 +1571,7 @@ function takeDamage(amount) {
       color: 'gray',
       alpha: '0.5~0.8',
       alphaOverLife: '0,1|1,0',
-      image: smokeUrl
+      image: smokeUrl,
     })
     damageSmoke.position.set(0, 1, 1)
     car.add(damageSmoke)
@@ -1527,7 +1580,7 @@ function takeDamage(amount) {
 
 // Enhanced collision detection
 if (car.onCollisionEnter) {
-  car.onCollisionEnter = (collision) => {
+  car.onCollisionEnter = collision => {
     const impactForce = collision.impulse ? collision.impulse.length() : 0
     if (impactForce > 10) {
       const damage = Math.min(impactForce * 0.5, 25)
@@ -1600,7 +1653,7 @@ function updateTireTemperature(delta) {
     wheel.temperature = Math.max(0, wheel.temperature - 10 * delta)
 
     // Affect grip based on temperature
-    const tempFactor = Math.max(0.3, 1 - (wheel.temperature / 200))
+    const tempFactor = Math.max(0.3, 1 - wheel.temperature / 200)
     wheel.currentGrip = wheel.baseGrip * tempFactor
   }
 }
@@ -1630,16 +1683,37 @@ function updateLights() {
 
 // Enhanced camera system
 function updateCamera(delta) {
-  if (!control || !control.camera) return
+  if (!control || !control.camera) {
+    console.log('[DEBUG] updateCamera early return: no control or camera')
+    return
+  }
+
+  console.log('[DEBUG] updateCamera called, touchPan:', touchPan ? 'EXISTS' : 'null')
+  if (touchPan) {
+    console.log('[DEBUG] touchPan delta:', touchPan.delta.x, touchPan.delta.y)
+  }
 
   safeExecute(() => {
     // Turret seat uses free camera (positioned at GunnerCam reference, free rotation for aiming)
     if (isInTurretSeat) {
       // Position camera at GunnerCam reference if available, otherwise fallback to seat position
       const cameraPositionNode = gunnerCam || seatNodes[2]
+      console.log(
+        '[DEBUG] Turret camera - isInTurretSeat:',
+        isInTurretSeat,
+        'cameraPositionNode:',
+        cameraPositionNode,
+        'gunnerCam position:',
+        gunnerCam?.position,
+        'seatNodes[2] position:',
+        seatNodes[2]?.position,
+        'car matrixWorld:',
+        car.matrixWorld
+      )
       if (cameraPositionNode) {
         control.camera.position.copy(cameraPositionNode.position)
         control.camera.position.applyMatrix4(car.matrixWorld)
+        console.log('[DEBUG] Camera positioned at:', control.camera.position)
       }
 
       // Initialize camera rotation and zoom to match car's forward direction only once when entering
@@ -1662,8 +1736,16 @@ function updateCamera(delta) {
         }
       }
 
-      // Allow free camera rotation via pointer input (like FOLLOW mode)
-      if (control.pointer && control.pointer.delta) {
+      // Allow free camera rotation via pointer input (mouse) or touch panning (mobile)
+      if (touchPan) {
+        // Mobile touch panning on right side of screen
+        control.camera.rotation.reorder('YXZ')
+        control.camera.rotation.y -= touchPan.delta.x * PAN_LOOK_SPEED * delta
+        control.camera.rotation.x -= touchPan.delta.y * PAN_LOOK_SPEED * delta
+        // Clamp vertical rotation to prevent flipping
+        control.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, control.camera.rotation.x))
+      } else if (control.pointer && control.pointer.delta) {
+        // Mouse pointer delta (for desktop/non-mobile)
         control.camera.rotation.reorder('YXZ')
         control.camera.rotation.y -= control.pointer.delta.x * 0.1 * delta
         control.camera.rotation.x -= control.pointer.delta.y * 0.1 * delta
@@ -1686,7 +1768,16 @@ function updateCamera(delta) {
           e2.y = targetY
           q1.setFromEuler(e2)
           control.camera.quaternion.slerp(q1, 4 * delta)
+        }
+
+        // Allow camera rotation via touch panning (mobile) or pointer delta (desktop)
+        if (touchPan) {
+          // Mobile touch panning on right side of screen
+          control.camera.rotation.reorder('YXZ')
+          control.camera.rotation.y -= touchPan.delta.x * PAN_LOOK_SPEED * delta
+          control.camera.rotation.x -= touchPan.delta.y * PAN_LOOK_SPEED * delta
         } else if (control.pointer && control.pointer.delta) {
+          // Mouse pointer delta (for desktop/non-mobile)
           control.camera.rotation.reorder('YXZ')
           control.camera.rotation.y -= control.pointer.delta.x * 0.1 * delta
           control.camera.rotation.x -= control.pointer.delta.y * 0.1 * delta
@@ -1823,7 +1914,7 @@ function updateTurretShooting(delta) {
   const frozenDir = dir.clone()
 
   // Get muzzle position for visual effects (muzzle flash should appear at muzzle bone)
-  let muzzlePos = origin.clone() // Default to camera position
+  const muzzlePos = origin.clone() // Default to camera position
   if (turretMuzzleBone) {
     try {
       const muzzleMatrixWorld = turretMuzzleBone.matrixWorld
@@ -1840,7 +1931,7 @@ function updateTurretShooting(delta) {
     origin: origin.toArray(), // Camera position for bullet origin
     muzzlePos: muzzlePos.toArray(), // Muzzle bone position for muzzle flash
     dir: frozenDir.toArray(),
-    heat: turretHeat
+    heat: turretHeat,
   })
 
   lastTurretFireTime = now
@@ -1892,7 +1983,7 @@ function applyDifferential(leftWheel, rightWheel, torque) {
   if (!leftWheel.hub || !rightWheel.hub) return torque
 
   const speedDiff = Math.abs(leftWheel.speed - rightWheel.speed)
-  const diffRatio = 1.0 - (speedDiff * 0.1) // Simple open differential
+  const diffRatio = 1.0 - speedDiff * 0.1 // Simple open differential
 
   const leftTorque = torque * diffRatio
   const rightTorque = torque * diffRatio
@@ -2007,7 +2098,7 @@ if (world.isServer) {
             playerId: hit.playerId,
             amount,
             crit,
-            position: hit.point.toArray()
+            position: hit.point.toArray(),
           })
         }
       }
@@ -2032,11 +2123,13 @@ if (world.isServer) {
       origin: data.origin, // Camera position for bullet trail
       muzzlePos: data.muzzlePos || data.origin, // Muzzle bone position for muzzle flash (fallback to origin)
       direction: data.dir,
-      hit: hit ? {
-        position: hit.point.toArray(),
-        playerId: hit.playerId,
-        entityId: hit.entityId
-      } : null
+      hit: hit
+        ? {
+            position: hit.point.toArray(),
+            playerId: hit.playerId,
+            entityId: hit.entityId,
+          }
+        : null,
     })
   })
 
@@ -2063,9 +2156,6 @@ if (world.isClient) {
     app.on('init', init)
   }
 
-  // Note: Joystick is now available via control.touchStick.value (populated automatically by ClientControls)
-  // No need to manually listen to stick events anymore
-
   function init(_state_) {
     state = _state_
     world.add(car)
@@ -2087,7 +2177,7 @@ if (world.isClient) {
         onTrigger: () => {
           app.send('mount', seatIdx)
           action.active = false
-        }
+        },
       })
       action.position.y += 0.5
       action.active = !state.sitting[seatIdx]
@@ -2108,7 +2198,7 @@ if (world.isClient) {
         anchor,
         setActive(active) {
           action.active = active
-        }
+        },
       }
     })
 
@@ -2172,21 +2262,85 @@ if (world.isClient) {
       if (playerId === player.id) {
         // We mounted
         const wasInTurretSeat = isInTurretSeat
-        isInTurretSeat = (seatIdx === 2) // Seat3 is index 2
+        isInTurretSeat = seatIdx === 2 // Seat3 is index 2
         justEnteredTurretSeat = isInTurretSeat && !wasInTurretSeat
 
         player.applyEffect({
           anchor: seat.anchor,
-          emote: isInTurretSeat ? turretSeatEmote : sitEmote
+          emote: isInTurretSeat ? turretSeatEmote : sitEmote,
         })
 
         control = app.control()
+        if (!control) {
+          console.warn('Failed to get control system')
+          return
+        }
+
+        // Store screen dimensions BEFORE rebinding (capture in closure)
+        const screenWidth = control.screen?.width || window.innerWidth || 1000
+        const screenHeight = control.screen?.height || window.innerHeight || 1000
+        console.log('[DEBUG] Screen dimensions before rebind:', screenWidth, 'x', screenHeight)
+
+        // Initialize touch panning support
+        // Store original handlers if they exist
+        const originalOnTouch = control.options?.onTouch
+        const originalOnTouchEnd = control.options?.onTouchEnd
+
+        // Re-bind with touch panning support
+        // Use priority -1 to run BEFORE player controls (priority 0)
+        control = world.controls.bind({
+          priority: -1, // HIGHER than player (0) to ensure we get touch events first
+          onTouch: touch => {
+            let consumed = false
+
+            // Call original handler if exists
+            if (originalOnTouch) {
+              consumed = originalOnTouch(touch) || false
+            }
+
+            console.log(
+              '[DEBUG] onTouch called with position:',
+              touch.position.x,
+              touch.position.y,
+              'screen:',
+              screenWidth,
+              'x',
+              screenHeight
+            )
+
+            // Right side of screen = camera look (left side is joystick)
+            // Only handle if not already consumed and on right side
+            if (!consumed && touch.position.x > screenWidth / 2) {
+              touchPan = touch
+              console.log('[DEBUG] Touch pan STARTED on right side', touch.position.x, touch.position.y)
+              return true // Consume the touch event
+            } else if (!consumed) {
+              console.log('[DEBUG] Touch on LEFT side (joystick)', touch.position.x)
+            }
+
+            return consumed
+          },
+          onTouchEnd: touch => {
+            // Call original handler if exists
+            if (originalOnTouchEnd) originalOnTouchEnd(touch)
+
+            if (touchPan === touch) {
+              touchPan = null
+              console.log('[DEBUG] Touch pan ENDED')
+            }
+          },
+        })
 
         // Hide reticle for driver/passenger seats, but keep it visible for turret seat
         if (!isInTurretSeat) {
           control.hideReticle()
         }
-        control.camera.write = true
+
+        // Enable camera writing (ensure camera property exists first)
+        if (control.camera) {
+          control.camera.write = true
+        }
+
         isSeated = true
 
         // Create HUD and touch controls
@@ -2226,9 +2380,25 @@ if (world.isClient) {
       // Mode updates
       mode?.update(delta)
 
-      // Exit input
-      if (isSeated && control?.keyQ?.pressed) {
-        app.send('unmount')
+      // Debug touch pan state
+      if (touchPan && (touchPan.delta.x !== 0 || touchPan.delta.y !== 0)) {
+        console.log('[DEBUG] Active touch pan in update loop - delta:', touchPan.delta.x, touchPan.delta.y)
+      }
+
+      // Exit input - try multiple key options with cooldown
+      if (isSeated && (control?.escape?.pressed || control?.backspace?.pressed || control?.keyQ?.pressed)) {
+        const now = world.getTime()
+        if (now - lastExitTime > EXIT_COOLDOWN) {
+          console.log('[DEBUG] Exit key pressed - unmounting')
+          lastExitTime = now
+          app.send('unmount')
+        }
+      }
+
+      // Debug all available keys
+      if (isSeated && control && !window.keysLogged) {
+        console.log('[DEBUG] Available control keys:', Object.keys(control))
+        window.keysLogged = true
       }
 
       // Camera mode switching
@@ -2298,9 +2468,9 @@ if (world.isClient) {
     })
 
     // Handle turret fire visual effects from server
-    app.on('turret:fire-visual', (data) => {
+    app.on('turret:fire-visual', data => {
       // Get muzzle position directly from turret muzzle bone (ensures perfect sync with turret rotation)
-      let muzzlePos = new Vector3().fromArray(data.muzzlePos || data.origin) // Fallback to network position
+      const muzzlePos = new Vector3().fromArray(data.muzzlePos || data.origin) // Fallback to network position
       if (turretMuzzleBone) {
         try {
           const muzzleMatrixWorld = turretMuzzleBone.matrixWorld
@@ -2321,15 +2491,13 @@ if (world.isClient) {
           direction: 1,
           rate: 0,
           max: 40,
-          bursts: [
-            { time: 0, count: 40 }
-          ],
+          bursts: [{ time: 0, count: 40 }],
           color: '#ffaa00',
           size: '0.08~0.2',
           alphaOverLife: '1,1|1,0',
           emissive: '10',
           speed: '3~7',
-          life: '0.1~0.3'
+          life: '0.1~0.3',
         })
         muzzleFlash.position.copy(muzzlePos)
         world.add(muzzleFlash)
@@ -2348,7 +2516,7 @@ if (world.isClient) {
         const startTime = world.getTime() // Use world time for sync
         const frozenDirArray = dir.toArray() // Store as array for immutability in closure
 
-        const updateHandler = (dt) => {
+        const updateHandler = dt => {
           // Calculate position based on elapsed time since fire (ensures sync across clients)
           const elapsedTime = world.getTime() - startTime
           const traveled = speed * elapsedTime
@@ -2372,7 +2540,7 @@ if (world.isClient) {
       }
     })
 
-    app.on('turret:hit', (data) => {
+    app.on('turret:hit', data => {
       // Could add hit feedback UI here if needed
     })
 
@@ -2450,7 +2618,7 @@ function viewerMode() {
     },
     cancel() {
       // Cleanup viewer mode
-    }
+    },
   }
 }
 
@@ -2477,7 +2645,7 @@ function disabledMode() {
     },
     cancel() {
       // Cleanup disabled mode
-    }
+    },
   }
 }
 
@@ -2560,7 +2728,7 @@ function simulateMode() {
 
       // Enhanced steering with speed-dependent response
       const turnFactor = turnCurve.evaluate(speedRatioAbs)
-      const steerSpeedFactor = 1.0 - (speedRatioAbs * 0.7)
+      const steerSpeedFactor = 1.0 - speedRatioAbs * 0.7
       const adjustedSteerSpeed = steerSpeed * steerSpeedFactor
       const targetSteerAngle = steerInput * (steerAngleMax * DEG2RAD) * turnFactor
       const angleDifference = targetSteerAngle - steerAngle
@@ -2692,42 +2860,29 @@ function simulateMode() {
       if (health <= 0) return // Vehicle is disabled
 
       if (control) {
-        // Enhanced input handling
-        steerInput = 0
-        accelInput = 0
+        // Enhanced input handling - supports both keyboard and mobile joystick
+        // Use direct property access (proxy automatically maps to entries)
+        const stickX = control.touchStick?.value.x || 0
+        const stickZ = control.touchStick?.value.z || 0
+        const isJoystickActive = Math.abs(stickX) > 0.01 || Math.abs(stickZ) > 0.01
 
-        // Check for joystick input (mobile) via control.touchStick API
-        // touchStick.value.x = horizontal (-1 to 1, right is positive)
-        // touchStick.value.z = vertical (-1 to 1, down is positive)
-        if (control.touchStick) {
-          const stickX = control.touchStick.value.x
-          const stickZ = control.touchStick.value.z
-          const magnitude = Math.sqrt(stickX * stickX + stickZ * stickZ)
-
-          if (magnitude > 0.1) { // Dead zone threshold
-            // Map joystick to vehicle controls
-            // For keyboard: keyA (left) → steerInput += 1, keyD (right) → steerInput -= 1
-            // So: positive steerInput = left turn, negative steerInput = right turn
-            // Joystick: stickX > 0 = right, stickX < 0 = left
-            // Therefore: steerInput = -stickX (right stick = negative steerInput = right turn)
-            steerInput = -stickX
-
-            // For keyboard: keyW (forward) → accelInput += 1, keyS (backward) → accelInput -= 1
-            // So: positive accelInput = forward, negative accelInput = backward
-            // Joystick: stickZ < 0 = up (forward), stickZ > 0 = down (backward)
-            // Therefore: accelInput = -stickZ (up stick = negative stickZ = positive accelInput = forward)
-            accelInput = -stickZ
-          }
+        if (isJoystickActive) {
+          // Mobile joystick is being used - prioritize it over keyboard
+          steerInput = -stickX // Inverted for natural feel
+          accelInput = -stickZ // Inverted for correct forward/back direction
         } else {
-          // Fallback to keyboard input
+          // No active joystick - use keyboard input
+          steerInput = 0
           if (control.keyA?.down) steerInput += 1
           if (control.keyD?.down) steerInput -= 1
+
+          accelInput = 0
           if (control.keyW?.down) accelInput += 1
           if (control.keyS?.down) accelInput -= 1
         }
 
         handbrakeInput = control.space?.down
-        brakeInput = (control.keyS?.down || (control.touchStick && accelInput > 0)) && accelInput < 0
+        brakeInput = control.keyS?.down && accelInput < 0
       }
 
       // Network transmission (driver sends vehicle state WITHOUT turret state)
@@ -2744,7 +2899,7 @@ function simulateMode() {
     },
     cancel() {
       // Cleanup simulate mode
-    }
+    },
   }
 }
 
@@ -2758,4 +2913,3 @@ function clamp(value, min, max) {
 }
 
 const DEG2RAD = Math.PI / 180
-
