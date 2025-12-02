@@ -42,6 +42,7 @@ const clientHtmlDest = path.join(rootDir, 'build/public/index.html')
     },
     loader: {
       '.js': 'jsx',
+      '.wasm': 'file',
     },
     alias: {
       react: 'react', // always use our own local react (jsx)

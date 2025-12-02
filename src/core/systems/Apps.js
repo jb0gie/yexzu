@@ -58,6 +58,10 @@ export class Apps extends System {
       web3(entity) {
         return world.web3
       },
+      // Expose world.dojo to apps for DojoEngine integration
+      dojo(entity) {
+        return world.dojo
+      },
     }
     this.worldSetters = {
       // ...
