@@ -6,7 +6,6 @@ import { getTrianglesFromGeometry } from './getTrianglesFromGeometry'
 import { getTextureBytesFromMaterial } from './getTextureBytesFromMaterial'
 import { Emotes } from './playerEmotes'
 
-
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
@@ -223,7 +222,7 @@ export function createVRMFactory(glb, setupMaterial) {
     try {
       const sm = origVRM?.springBoneManager
       // console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
-    } catch (_) { }
+    } catch (_) {}
     const expressionManager = origVRM?.expressionManager || null
     // expressions from the cloned scene (fallback path if no manager)
     // expressions live on the top-level scene of the GLB, not the skinned subtree
@@ -422,50 +421,149 @@ export function createVRMFactory(glb, setupMaterial) {
       // Allow upper body bones for weapon animations - exclude lower body to prevent conflicts with locomotion
       const allowedBonePatterns = [
         // VRM bone naming patterns (most common)
-        'upper_arm.R', 'upper_arm.L', 'upperarm.r', 'upperarm.l',
-        'lower_arm.R', 'lower_arm.L', 'lowerarm.r', 'lowerarm.l',
-        'hand.R', 'hand.L', 'hand.r', 'hand.l',
-        'shoulder.R', 'shoulder.L', 'shoulder.r', 'shoulder.l',
+        'upper_arm.R',
+        'upper_arm.L',
+        'upperarm.r',
+        'upperarm.l',
+        'lower_arm.R',
+        'lower_arm.L',
+        'lowerarm.r',
+        'lowerarm.l',
+        'hand.R',
+        'hand.L',
+        'hand.r',
+        'hand.l',
+        'shoulder.R',
+        'shoulder.L',
+        'shoulder.r',
+        'shoulder.l',
 
         // Alternative VRM patterns
-        'upperarm.r', 'upperarm.l', 'upper_arm.r', 'upper_arm.l',
-        'lowerarm.r', 'lowerarm.l', 'lower_arm.r', 'lower_arm.l',
+        'upperarm.r',
+        'upperarm.l',
+        'upper_arm.r',
+        'upper_arm.l',
+        'lowerarm.r',
+        'lowerarm.l',
+        'lower_arm.r',
+        'lower_arm.l',
 
         // Upper body bones for weapon poses
-        'chest', 'spine', 'neck', 'head',
+        'chest',
+        'spine',
+        'neck',
+        'head',
 
         // Traditional naming patterns
-        'leftupperarm', 'left_upper_arm', 'upperarml', 'upper_arml', 'upperarm_l', 'upper_arm_l', 'upperArmL',
-        'leftlowerarm', 'left_lower_arm', 'lowerarml', 'lower_arml', 'lowerarm_l', 'lower_arm_l', 'lowerArmL',
-        'lefthand', 'left_hand', 'handl', 'hand_l', 'handL', 'leftwrist', 'left_wrist', 'wristl', 'wrist_l', 'wristL',
-        'rightupperarm', 'right_upper_arm', 'upperarmr', 'upper_armr', 'upperarm_r', 'upper_arm_r', 'upperArmR',
-        'rightlowerarm', 'right_lower_arm', 'lowerarmr', 'lower_armr', 'lowerarm_r', 'lower_arm_r', 'lowerArmR',
-        'righthand', 'right_hand', 'handr', 'hand_r', 'handR', 'rightwrist', 'right_wrist', 'wristr', 'wrist_r', 'wristR',
+        'leftupperarm',
+        'left_upper_arm',
+        'upperarml',
+        'upper_arml',
+        'upperarm_l',
+        'upper_arm_l',
+        'upperArmL',
+        'leftlowerarm',
+        'left_lower_arm',
+        'lowerarml',
+        'lower_arml',
+        'lowerarm_l',
+        'lower_arm_l',
+        'lowerArmL',
+        'lefthand',
+        'left_hand',
+        'handl',
+        'hand_l',
+        'handL',
+        'leftwrist',
+        'left_wrist',
+        'wristl',
+        'wrist_l',
+        'wristL',
+        'rightupperarm',
+        'right_upper_arm',
+        'upperarmr',
+        'upper_armr',
+        'upperarm_r',
+        'upper_arm_r',
+        'upperArmR',
+        'rightlowerarm',
+        'right_lower_arm',
+        'lowerarmr',
+        'lower_armr',
+        'lowerarm_r',
+        'lower_arm_r',
+        'lowerArmR',
+        'righthand',
+        'right_hand',
+        'handr',
+        'hand_r',
+        'handR',
+        'rightwrist',
+        'right_wrist',
+        'wristr',
+        'wrist_r',
+        'wristR',
 
         // VRM standard arm bone names
-        'leftUpperArm', 'leftLowerArm', 'leftHand',
-        'rightUpperArm', 'rightLowerArm', 'rightHand',
+        'leftUpperArm',
+        'leftLowerArm',
+        'leftHand',
+        'rightUpperArm',
+        'rightLowerArm',
+        'rightHand',
 
         // Common variations
-        'leftarm', 'left_arm', 'arml', 'arm_l', 'armL',
-        'rightarm', 'right_arm', 'armr', 'arm_r', 'armR',
-        'leftforearm', 'left_forearm', 'forearml', 'forearm_l', 'forearmL',
-        'rightforearm', 'right_forearm', 'forearmr', 'forearm_r', 'forearmR',
+        'leftarm',
+        'left_arm',
+        'arml',
+        'arm_l',
+        'armL',
+        'rightarm',
+        'right_arm',
+        'armr',
+        'arm_r',
+        'armR',
+        'leftforearm',
+        'left_forearm',
+        'forearml',
+        'forearm_l',
+        'forearmL',
+        'rightforearm',
+        'right_forearm',
+        'forearmr',
+        'forearm_r',
+        'forearmR',
 
         // Finger bones for weapon grips
-        'finger', 'thumb', 'index', 'middle', 'ring', 'pinky',
-        'proximal', 'intermediate', 'distal',
-        'leftfinger', 'rightfinger', 'leftthumb', 'rightthumb',
-        'leftindex', 'rightindex', 'leftmiddle', 'rightmiddle',
-        'leftring', 'rightring', 'leftpinky', 'rightpinky'
+        'finger',
+        'thumb',
+        'index',
+        'middle',
+        'ring',
+        'pinky',
+        'proximal',
+        'intermediate',
+        'distal',
+        'leftfinger',
+        'rightfinger',
+        'leftthumb',
+        'rightthumb',
+        'leftindex',
+        'rightindex',
+        'leftmiddle',
+        'rightmiddle',
+        'leftring',
+        'rightring',
+        'leftpinky',
+        'rightpinky',
       ]
 
       for (const bone of affectedBones) {
         const boneLower = bone.toLowerCase()
 
         // Check if bone should be allowed (arm bones only)
-        const isAllowed = allowedBonePatterns.some(pattern =>
-          boneLower.includes(pattern) || pattern.includes(boneLower)
+        const isAllowed = allowedBonePatterns.some(
+          pattern => boneLower.includes(pattern) || pattern.includes(boneLower)
         )
 
         if (isAllowed) {
@@ -509,108 +607,126 @@ export function createVRMFactory(glb, setupMaterial) {
       return new THREE.AnimationClip(originalClip.name, originalClip.duration, filteredTracks)
     }
 
+    // Convert animation clip to delta format for additive blending
+    function convertToDeltaClip(clip, skeleton) {
+      const deltaTracks = []
+
+      for (const track of clip.tracks) {
+        const trackName = track.name
+        const boneName = trackName.split('.')[0]
+        const propertyName = trackName.split('.')[1]
+
+        // Find the bone's bind pose
+        const bone = skeleton.getBoneByName(boneName)
+        if (!bone) {
+          console.warn(`[VRM] Bone not found for delta conversion: ${boneName}`)
+          deltaTracks.push(track.clone()) // Keep original if bone not found
+          continue
+        }
+
+        if (propertyName === 'quaternion' && track instanceof THREE.QuaternionKeyframeTrack) {
+          // Convert quaternion track to delta format
+          const bindRotation = bone.quaternion.clone()
+          const deltaValues = new Float32Array(track.values.length)
+
+          for (let i = 0; i < track.values.length; i += 4) {
+            const keyframeQuat = new THREE.Quaternion(
+              track.values[i],
+              track.values[i + 1],
+              track.values[i + 2],
+              track.values[i + 3]
+            )
+
+            // Calculate delta: delta = keyframe * bindRotation.inverse()
+            const deltaQuat = keyframeQuat.premultiply(bindRotation.clone().invert())
+
+            deltaValues[i] = deltaQuat.x
+            deltaValues[i + 1] = deltaQuat.y
+            deltaValues[i + 2] = deltaQuat.z
+            deltaValues[i + 3] = deltaQuat.w
+          }
+
+          const deltaTrack = new THREE.QuaternionKeyframeTrack(trackName, track.times, deltaValues)
+          deltaTracks.push(deltaTrack)
+        } else if (propertyName === 'position' && track instanceof THREE.VectorKeyframeTrack) {
+          // For position tracks, we typically want to keep them as absolute
+          // or zero them out for pure rotation additive animations
+          deltaTracks.push(track.clone())
+        } else {
+          // Keep other track types as-is
+          deltaTracks.push(track.clone())
+        }
+      }
+
+      return new THREE.AnimationClip(clip.name + '_delta', clip.duration, deltaTracks)
+    }
+
     // Load and setup additive animation
     function loadAdditiveAnimation(url, options = {}) {
       console.log(`[VRM] loadAdditiveAnimation called with url: ${url}, options:`, options)
       const { fadeDuration = 0.15, weight = 1.0 } = options
 
-      // Stop all current additive animations to prevent bone conflicts
-      for (const [currentUrl, currentAnim] of currentAdditiveAnims) {
-        if (currentUrl !== url) {
-          console.log(`[VRM] Stopping conflicting animation: ${currentUrl}`)
-          currentAnim.targetWeight = 0
-          currentAnim.fadeSpeed = 1 / (fadeDuration * 0.3) // Much faster fade out
-        }
-      }
-
       if (additiveAnimations[url]) {
         console.log(`[VRM] Animation already loaded, updating weight`)
-        // Already loaded, just update weight and configuration
+        // Already loaded, just update weight
         const anim = additiveAnimations[url]
         anim.targetWeight = weight
         anim.fadeSpeed = 1 / fadeDuration
-        // Update configuration values
-        anim.configurableSmoothing = options.configurableSmoothing
-        anim.adaptiveSmoothing = options.adaptiveSmoothing
-        anim.baseLocomotionWeight = options.baseLocomotionWeight
-        anim.conflictResolutionMode = options.conflictResolutionMode
-        anim.maxBoneRotation = options.maxBoneRotation
-        anim.disableLeftArm = options.disableLeftArm
-        anim.debugArmRotations = options.debugArmRotations
-        anim.overrideLocomotionBones = options.overrideLocomotionBones
-        anim.boneRotationOffsets = options.boneRotationOffsets
         currentAdditiveAnims.set(url, anim)
         return Promise.resolve(anim)
       }
 
       console.log(`[VRM] Loading new additive animation from: ${url}`)
       // Load new additive animation
-      return hooks.loader.load('emote', url).then(emo => {
-        console.log(`[VRM] Animation loaded, creating clip`)
-        const originalClip = emo.toClip({
-          rootToHips,
-          version,
-          getBoneName,
+      return hooks.loader
+        .load('emote', url)
+        .then(emo => {
+          console.log(`[VRM] Animation loaded, creating clip`)
+          const originalClip = emo.toClip({
+            rootToHips,
+            version,
+            getBoneName,
+          })
+
+          // Filter the clip to only include upper body bones
+          const allAffectedBones = getAffectedBones(originalClip)
+          const filteredBones = filterWeaponBones(allAffectedBones)
+          const filteredClip = createFilteredClip(originalClip, filteredBones)
+
+          // Convert to delta format for proper additive blending
+          const deltaClip = convertToDeltaClip(filteredClip, skeleton)
+
+          console.log(`[VRM] Creating additive action with blend mode:`, THREE.AdditiveAnimationBlendMode)
+          // Create additive action following THREE.js additive blending patterns
+          const action = mixer.clipAction(deltaClip)
+          action.blendMode = THREE.AdditiveAnimationBlendMode
+          action.setLoop(options.loop !== false ? THREE.LoopRepeat : THREE.LoopOnce) // Default to loop unless explicitly set to false
+          action.weight = 0 // Start at 0, fade in
+          action.enabled = true
+          action.clampWhenFinished = false // Allow additive animations to continue
+          action.play()
+
+          const anim = {
+            url,
+            action,
+            affectedBones: filteredBones,
+            weight: 0,
+            targetWeight: weight,
+            fadeSpeed: 1 / fadeDuration,
+          }
+
+          additiveAnimations[url] = anim
+          currentAdditiveAnims.set(url, anim)
+
+          console.log(`[VRM] Loaded additive animation: ${url}`)
+          console.log(`[VRM] Delta clip tracks: ${deltaClip.tracks.length}`)
+          console.log(`[VRM] Filtered bones (${filteredBones.size}):`, Array.from(filteredBones))
+          return anim
         })
-
-        // Filter the clip to only include upper body bones
-        const allAffectedBones = getAffectedBones(originalClip)
-        const filteredBones = filterWeaponBones(allAffectedBones)
-        const clip = createFilteredClip(originalClip, filteredBones)
-
-        console.log(`[VRM] Creating additive action with blend mode:`, THREE.AdditiveAnimationBlendMode)
-        // Create additive action following THREE.js additive blending patterns
-        const action = mixer.clipAction(clip)
-        action.blendMode = THREE.AdditiveAnimationBlendMode
-        action.setLoop(options.loop !== false ? THREE.LoopRepeat : THREE.LoopOnce) // Default to loop unless explicitly set to false
-        action.weight = 0 // Start at 0, fade in
-        action.enabled = true
-        action.clampWhenFinished = false // Allow additive animations to continue
-        action.play()
-
-        const anim = {
-          url,
-          action,
-          affectedBones: filteredBones,
-          weight: 0,
-          targetWeight: weight,
-          fadeSpeed: 1 / fadeDuration,
-          // Store configuration values passed from weapon apps
-          configurableSmoothing: options.configurableSmoothing,
-          adaptiveSmoothing: options.adaptiveSmoothing,
-          baseLocomotionWeight: options.baseLocomotionWeight,
-          conflictResolutionMode: options.conflictResolutionMode,
-          maxBoneRotation: options.maxBoneRotation,
-          disableLeftArm: options.disableLeftArm,
-          debugArmRotations: options.debugArmRotations,
-          overrideLocomotionBones: options.overrideLocomotionBones,
-          boneRotationOffsets: options.boneRotationOffsets,
-        }
-
-        additiveAnimations[url] = anim
-        currentAdditiveAnims.set(url, anim)
-
-        console.log(`[VRM] Loaded additive animation: ${url}`)
-        console.log(`[VRM] Animation clip tracks: ${clip.tracks.length}`)
-        console.log(`[VRM] All affected bones (${allAffectedBones.size}):`, Array.from(allAffectedBones).slice(0, 10))
-        console.log(`[VRM] Filtered bones (${filteredBones.size}):`, Array.from(filteredBones))
-
-        // Debug: Show first few track names
-        const trackNames = clip.tracks.slice(0, 10).map(track => track.name)
-        console.log(`[VRM] First 10 track names:`, trackNames)
-
-        // Debug: Show which bones are actually being animated
-        const animatedBones = new Set()
-        clip.tracks.forEach(track => {
-          const boneName = track.name.split('.')[0]
-          animatedBones.add(boneName)
+        .catch(error => {
+          console.error(`[VRM] Failed to load additive animation: ${url}`, error)
+          throw error
         })
-        console.log(`[VRM] Actually animated bones (${animatedBones.size}):`, Array.from(animatedBones).slice(0, 15))
-        return anim
-      }).catch(error => {
-        console.error(`[VRM] Failed to load additive animation: ${url}`, error)
-        throw error
-      })
     }
 
     // Stop and remove additive animation
@@ -635,7 +751,7 @@ export function createVRMFactory(glb, setupMaterial) {
         if (!currentEmote.loop) {
           try {
             currentEmote.action?.fadeOut?.(0.15)
-          } catch (_) { }
+          } catch (_) {}
           currentEmote = null
           locomotionDisabled = false // Re-enable locomotion when emote finishes
 
@@ -709,41 +825,44 @@ export function createVRMFactory(glb, setupMaterial) {
         }
         emotes[url] = emote
         currentEmote = emote
-        hooks.loader.load('emote', url).then(emo => {
-          const clip = emo.toClip({
-            rootToHips,
-            version,
-            getBoneName,
-          })
-          const action = mixer.clipAction(clip)
-          action.timeScale = speed
-          emote.action = action
-          // if its still this emote, play it!
-          if (currentEmote === emote) {
-            action.clampWhenFinished = !loop
-            action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-            locomotionDisabled = true // Regular emotes disable locomotion
+        hooks.loader
+          .load('emote', url)
+          .then(emo => {
+            const clip = emo.toClip({
+              rootToHips,
+              version,
+              getBoneName,
+            })
+            const action = mixer.clipAction(clip)
+            action.timeScale = speed
+            emote.action = action
+            // if its still this emote, play it!
+            if (currentEmote === emote) {
+              action.clampWhenFinished = !loop
+              action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
+              locomotionDisabled = true // Regular emotes disable locomotion
 
-            // Check if we should crossfade from previous
-            if (crossFade && prevEmote?.action?.isRunning()) {
-              action.play()
-              prevEmote.action.crossFadeTo(action, fadeDuration, warp)
-            } else {
-              if (prevEmote?.action) {
-                prevEmote.action.fadeOut(fadeDuration)
+              // Check if we should crossfade from previous
+              if (crossFade && prevEmote?.action?.isRunning()) {
+                action.play()
+                prevEmote.action.crossFadeTo(action, fadeDuration, warp)
+              } else {
+                if (prevEmote?.action) {
+                  prevEmote.action.fadeOut(fadeDuration)
+                }
+                action.fadeIn(fadeDuration).play()
               }
-              action.fadeIn(fadeDuration).play()
-            }
-            clearLocomotion()
+              clearLocomotion()
 
-            // Auto-activate facial expressions for TALK emote
-            if (url === Emotes.TALK) {
-              setSpeaking(true)
+              // Auto-activate facial expressions for TALK emote
+              if (url === Emotes.TALK) {
+                setSpeaking(true)
+              }
             }
-          }
-        }).catch(error => {
-          console.error('Failed to load emote:', url, error)
-        })
+          })
+          .catch(error => {
+            console.error('Failed to load emote:', url, error)
+          })
       }
     }
 
@@ -804,10 +923,10 @@ export function createVRMFactory(glb, setupMaterial) {
         hasSprings = spring.joints && spring.joints.size > 0
         // Gentle spring bone physics tuning to prevent spazzing
         const tuning = hooks.springTuning || {
-          stiffness: 1.2,      // Slightly increased responsiveness, but not too high
-          dragForce: 1.0,      // Keep at 1.0 for stable movement
-          gravityPower: 1.0,   // Keep at 1.0 for natural gravity
-          hitRadius: 1.0       // Default collision radius
+          stiffness: 1.2, // Slightly increased responsiveness, but not too high
+          dragForce: 1.0, // Keep at 1.0 for stable movement
+          gravityPower: 1.0, // Keep at 1.0 for natural gravity
+          hitRadius: 1.0, // Default collision radius
         }
         try {
           spring.joints.forEach(joint => {
@@ -822,7 +941,7 @@ export function createVRMFactory(glb, setupMaterial) {
               joint.colliderGroups = []
             }
           })
-        } catch (_) { }
+        } catch (_) {}
         // Enhanced spring initialization with stability checks
         try {
           // Set initial state before applying tuning
@@ -837,7 +956,7 @@ export function createVRMFactory(glb, setupMaterial) {
             const boneName = joint.bone?.name?.toLowerCase() || ''
             if (boneName.includes('hair') || boneName.includes('tail')) {
               // Only very slight increase for hair/tail to prevent spazzing
-              s.stiffness *= 1.05  // Minimal increase (5%)
+              s.stiffness *= 1.05 // Minimal increase (5%)
             }
 
             // Keep chest/spine bones at default stability
@@ -929,7 +1048,7 @@ export function createVRMFactory(glb, setupMaterial) {
         // re-initialize springs after mapping (safe if already initialized)
         try {
           spring.setInitState()
-        } catch (_) { }
+        } catch (_) {}
         // console.log(
         //   '[vrmFactory] Enhanced spring bone system initialized',
         //   'springs:',
@@ -951,7 +1070,8 @@ export function createVRMFactory(glb, setupMaterial) {
         spring.joints.forEach(joint => {
           if (joint.settings && joint.bone) {
             activeSprings++
-            if (activeSprings <= 5) { // Log first 5 for debugging
+            if (activeSprings <= 5) {
+              // Log first 5 for debugging
               // console.log(`[VRM] Spring ${joint.bone.name}:`, {
               //   stiffness: joint.settings.stiffness?.toFixed(3),
               //   dragForce: joint.settings.dragForce?.toFixed(3),
@@ -999,7 +1119,8 @@ export function createVRMFactory(glb, setupMaterial) {
           }
 
           // Debug: Log when additive animations are active (reduced frequency)
-          if (anim.weight > 0.01 && Math.random() < 0.005) { // 0.5% chance per frame
+          if (anim.weight > 0.01 && Math.random() < 0.005) {
+            // 0.5% chance per frame
             // console.log(`[VRM] Additive animation active: ${url.split('/').pop()}, weight: ${anim.weight.toFixed(2)}, bones: ${Array.from(anim.affectedBones).slice(0, 5).join(', ')}...`)
           }
 
@@ -1115,7 +1236,7 @@ export function createVRMFactory(glb, setupMaterial) {
         }
 
         // Simple, stable spring bone physics update
-        const physicsDelta = Math.min(delta, 0.020) // Clamp to 50fps to prevent instability
+        const physicsDelta = Math.min(delta, 0.02) // Clamp to 50fps to prevent instability
         origVRM.update(physicsDelta)
 
         // Batch mirror spring joints back to clone only
@@ -1250,201 +1371,32 @@ export function createVRMFactory(glb, setupMaterial) {
           targetRotation.slerp(bone.quaternion, 1.0 - weight)
         }
 
-        // SIMPLIFIED: Just apply the additive animation directly
-        // But still filter out finger bones and other unwanted bones
+        // SIMPLIFIED: Filter out lower body bones and apply additive animation
+        // With proper delta format, THREE.js handles blending natively
 
-        // Check if this bone should be affected by additive animations
         const boneNameLower = bone.name ? bone.name.toLowerCase() : ''
 
-        // Only filter out lower body bones - allow finger bones for weapon grips
-        const isLowerBodyBone = boneNameLower.includes('leg') ||
+        // Only filter out lower body bones - allow everything else for weapon poses
+        const isLowerBodyBone =
+          boneNameLower.includes('leg') ||
           boneNameLower.includes('thigh') ||
           boneNameLower.includes('calf') ||
           boneNameLower.includes('foot') ||
           boneNameLower.includes('toe') ||
           boneNameLower.includes('hip')
 
-        // Skip only lower body bones - allow fingers for weapon poses
         if (isLowerBodyBone) {
           return
         }
 
-        // SIMPLIFIED: Just apply the additive animation - no complex conflict resolution
-        // Determine if locomotion is active (base animations running)
-        const isLocoActive = !locomotionDisabled && (currentEmote === 'none' || currentEmote === 'walk' || currentEmote === 'run')
+        // Apply weight to target rotation
+        if (weight < 1.0) {
+          targetRotation.slerp(bone.quaternion, 1.0 - weight)
+        }
+
+        // Update smooth state and apply to bone
+        smoothState.target.copy(targetRotation)
         const hasActiveAdditiveAnimations = currentAdditiveAnims.size > 0
-
-        // Get base locomotion weight from weapon configuration
-        let baseLocomotionWeight = 0.0
-        for (const [url, anim] of currentAdditiveAnims) {
-          if (anim.baseLocomotionWeight !== undefined) {
-            baseLocomotionWeight = anim.baseLocomotionWeight
-            break
-          }
-        }
-
-        // If base locomotion weight is 0, treat as if locomotion is not active for arm bones
-        const effectiveLocoActive = isLocoActive && baseLocomotionWeight > 0
-
-        // Check if this bone is controlled by both systems (conflict detection)
-        const isBoneInConflict = effectiveLocoActive && hasActiveAdditiveAnimations &&
-          bone.name && (
-            bone.name.includes('spine') || bone.name.includes('chest') ||
-            bone.name.includes('neck') || bone.name.includes('head') ||
-            bone.name.includes('shoulder') || bone.name.includes('arm')
-          )
-
-        // PRIORITIZATION SYSTEM: Resolve bone conflicts
-        let finalTargetRotation = targetRotation
-        let blendWeight = weight
-
-        if (isBoneInConflict) {
-          // Get configuration for bone conflict resolution
-          let conflictResolutionMode = 'additive_priority' // Default: pistol takes precedence
-          let locomotionWeight = baseLocomotionWeight
-          let additiveWeight = 1.0 - baseLocomotionWeight
-
-          // Check for weapon-specific configuration
-          for (const [url, anim] of currentAdditiveAnims) {
-            if (anim.conflictResolutionMode !== undefined) {
-              conflictResolutionMode = anim.conflictResolutionMode
-            }
-            break // Use first animation's configuration
-          }
-
-          // Apply conflict resolution strategy
-          switch (conflictResolutionMode) {
-            case 'locomotion_priority':
-              // Locomotion takes precedence - don't apply additive animation to conflicting bones
-              finalTargetRotation = bone.quaternion // Keep current rotation (controlled by locomotion)
-              blendWeight = 0.0 // Disable additive animation for this bone
-              break
-
-            case 'weighted_blend':
-              // Calculate weighted average between locomotion and additive rotations
-              const additiveRotation = targetRotation.clone()
-              const locomotionRotation = bone.quaternion.clone()
-
-              // Blend the rotations using the configured weights
-              finalTargetRotation.slerpQuaternions(locomotionRotation, additiveRotation, additiveWeight)
-              blendWeight = Math.min(weight, additiveWeight)
-              break
-
-            case 'additive_priority':
-              // Additive animation takes precedence (current behavior)
-              finalTargetRotation = targetRotation
-              break
-          }
-
-          // Debug logging for conflict resolution (1% chance per frame)
-          if (Math.random() < 0.01) {
-            // console.log(`[VRM] Bone conflict resolved for ${bone.name}: mode=${conflictResolutionMode}, locoWeight=${locomotionWeight.toFixed(2)}, additiveWeight=${additiveWeight.toFixed(2)}, finalBlendWeight=${blendWeight.toFixed(2)}`)
-          }
-        } else {
-          // Debug logging when no conflict (1% chance per frame)
-          if (Math.random() < 0.01) {
-            // console.log(`[VRM] No conflict for ${bone.name}: effectiveLocoActive=${effectiveLocoActive}, hasAdditiveAnims=${hasActiveAdditiveAnimations}, baseLocomotionWeight=${baseLocomotionWeight.toFixed(2)}`)
-          }
-        }
-
-        // update smooth state target with resolved rotation
-        smoothState.target.copy(finalTargetRotation)
-
-        // Apply weight to resolved rotation
-        if (blendWeight < 1.0) {
-          finalTargetRotation.slerp(bone.quaternion, 1.0 - blendWeight)
-        }
-
-        // ARM DISABLE: Skip arm bones if disabled in weapon configuration
-        const isLeftArm = bone.name && (bone.name.toLowerCase().includes('l') || bone.name.toLowerCase().includes('left'))
-        const isRightArm = bone.name && (bone.name.toLowerCase().includes('r') || bone.name.toLowerCase().includes('right'))
-        let disableLeftArm = false
-        let disableRightArm = false
-
-        // Check if arms should be disabled
-        for (const [url, anim] of currentAdditiveAnims) {
-          if (anim.disableLeftArm !== undefined) {
-            disableLeftArm = anim.disableLeftArm
-          }
-          if (anim.disableRightArm !== undefined) {
-            disableRightArm = anim.disableRightArm
-          }
-        }
-
-        if ((disableLeftArm && isLeftArm) || (disableRightArm && isRightArm)) {
-          // Skip this bone entirely - don't apply any additive animation
-          return
-        }
-
-        // OVER-ROTATION PREVENTION: Limit extreme rotations to prevent unnatural poses
-        if (bone.name && (bone.name.includes('hand') || bone.name.includes('wrist') || bone.name.includes('lowerarm'))) {
-          // Calculate the rotation difference from rest pose
-          if (!bone.userData.restRotation) {
-            bone.userData.restRotation = bone.quaternion.clone()
-          }
-
-          const rotationDiff = new THREE.Quaternion()
-          rotationDiff.copy(bone.userData.restRotation).invert().multiply(finalTargetRotation)
-
-          // Scale down the rotation intensity to prevent over-rotation
-          let rotationScale = 0.3 // Default 30%
-          for (const [url, anim] of currentAdditiveAnims) {
-            if (anim.rotationScale !== undefined) {
-              rotationScale = anim.rotationScale
-              break
-            }
-          }
-          rotationDiff.slerp(new THREE.Quaternion(), 1.0 - rotationScale)
-
-          // Convert to Euler to check angles
-          const euler = new THREE.Euler().setFromQuaternion(rotationDiff)
-
-          // Special handling for left arm bones - they might need different rotation limits
-          const isLeftArm = bone.name.toLowerCase().includes('l') || bone.name.toLowerCase().includes('left')
-
-          // Get max rotation angle from weapon configuration
-          let maxAngleDegrees = 60 // Default 60 degrees
-          for (const [url, anim] of currentAdditiveAnims) {
-            if (anim.maxBoneRotation !== undefined) {
-              maxAngleDegrees = anim.maxBoneRotation
-              break
-            }
-          }
-          const maxAngle = (maxAngleDegrees * Math.PI) / 180 // Convert to radians
-
-          // Debug: Show max angle setting occasionally
-          if (Math.random() < 0.01) { // 1% chance per frame
-            console.log(`[VRM] Max bone rotation set to: ${maxAngleDegrees}° (${maxAngle.toFixed(3)} rad)`)
-          }
-
-          // Debug logging for arm bones
-          if ((isLeftArm || isRightArm) && Math.random() < 0.02) { // 2% chance per frame
-            // console.log(`[VRM] ${isLeftArm ? 'Left' : 'Right'} arm bone ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)}, max=${maxAngle.toFixed(2)} (${maxAngleDegrees}°)`)
-          }
-
-          // Clamp extreme rotations
-          if (Math.abs(euler.x) > maxAngle || Math.abs(euler.y) > maxAngle || Math.abs(euler.z) > maxAngle) {
-            // console.log(`[VRM] Clamping over-rotation for ${bone.name}: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
-
-            // Clamp the angles
-            euler.x = THREE.MathUtils.clamp(euler.x, -maxAngle, maxAngle)
-            euler.y = THREE.MathUtils.clamp(euler.y, -maxAngle, maxAngle)
-            euler.z = THREE.MathUtils.clamp(euler.z, -maxAngle, maxAngle)
-
-            // Convert back to quaternion and apply to final rotation
-            const clampedQuat = new THREE.Quaternion().setFromEuler(euler)
-            finalTargetRotation.copy(bone.userData.restRotation).multiply(clampedQuat)
-          } else if ((isLeftArm || isRightArm) && Math.random() < 0.01) {
-            // Debug: Show when rotations are within limits
-            // console.log(`[VRM] ${bone.name} within limits: x=${euler.x.toFixed(2)}, y=${euler.y.toFixed(2)}, z=${euler.z.toFixed(2)} (max=${maxAngle.toFixed(2)}/${maxAngleDegrees}°)`)
-          }
-
-          // Apply the scaled rotation difference to the final target rotation
-          finalTargetRotation.copy(bone.userData.restRotation).multiply(rotationDiff)
-        }
-
-        // smoothly interpolate from current to target
-        // Use more responsive smoothing for additive animations (weapon poses)
         let configurableSmoothing = smoothing
         let adaptiveSmoothingEnabled = true
 
@@ -1458,12 +1410,16 @@ export function createVRMFactory(glb, setupMaterial) {
         }
 
         // Apply adaptive smoothing if enabled and additive animations are active
-        const adaptiveSmoothing = (hasActiveAdditiveAnimations && adaptiveSmoothingEnabled) ?
-          Math.min(configurableSmoothing, 0.2) : configurableSmoothing
+        const adaptiveSmoothing =
+          hasActiveAdditiveAnimations && adaptiveSmoothingEnabled
+            ? Math.min(configurableSmoothing, 0.2)
+            : configurableSmoothing
 
         // Debug logging for smoothing adjustments (1% chance per frame)
         if (Math.random() < 0.01 && hasActiveAdditiveAnimations) {
-          console.log(`[VRM] Adaptive smoothing: original=${smoothing.toFixed(2)}, configurable=${configurableSmoothing.toFixed(2)}, adaptive=${adaptiveSmoothingEnabled}, final=${adaptiveSmoothing.toFixed(2)}, additiveAnims=${currentAdditiveAnims.size}`)
+          console.log(
+            `[VRM] Adaptive smoothing: original=${smoothing.toFixed(2)}, configurable=${configurableSmoothing.toFixed(2)}, adaptive=${adaptiveSmoothingEnabled}, final=${adaptiveSmoothing.toFixed(2)}, additiveAnims=${currentAdditiveAnims.size}`
+          )
         }
 
         smoothState.current.slerp(smoothState.target, adaptiveSmoothing)
@@ -1669,8 +1625,7 @@ export function createVRMFactory(glb, setupMaterial) {
         // play dedicated right strafe jump emote
         // console.log('[VRM DEBUG] Triggering STRAFE_JUMP_RIGHT animation → Emote:', Emotes.STRAFE_JUMP_RIGHT)
         setEmote(Emotes.STRAFE_JUMP_RIGHT)
-      }
-      else if (mode === Modes.GRINDING) {
+      } else if (mode === Modes.GRINDING) {
         poses.grinding.target = 1
       } else if (mode === Modes.CLIMBING) {
         // Use climbIdle as default, will be overridden by platformer mechanics
@@ -1688,7 +1643,6 @@ export function createVRMFactory(glb, setupMaterial) {
         const pose = poses[key]
         const weight = THREE.MathUtils.lerp(pose.weight, pose.target, 1 - Math.exp(-lerpSpeed * delta))
         pose.setWeight(weight)
-
       }
     }
 
@@ -1705,7 +1659,7 @@ export function createVRMFactory(glb, setupMaterial) {
     const boneHelpers = new Map()
     const boneLines = new Map()
 
-    const setBonesVisible = (visible) => {
+    const setBonesVisible = visible => {
       if (bonesVisible === visible) return
       bonesVisible = visible
 
@@ -1722,7 +1676,7 @@ export function createVRMFactory(glb, setupMaterial) {
               depthTest: false, // Render on top
               depthWrite: false,
               transparent: true,
-              opacity: 0.9
+              opacity: 0.9,
             })
             const helper = new THREE.Mesh(geometry, material)
             helper.matrixAutoUpdate = false
@@ -1743,7 +1697,7 @@ export function createVRMFactory(glb, setupMaterial) {
               depthTest: false, // Render on top
               depthWrite: false,
               transparent: true,
-              opacity: 0.6
+              opacity: 0.6,
             })
             const line = new THREE.Line(lineGeometry, lineMaterial)
             line.renderOrder = 9998 // Just below spheres
