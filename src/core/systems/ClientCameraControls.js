@@ -71,7 +71,6 @@ export class ClientCameraControls extends System {
   }
 
   init() {
-
     // Use the exact same settings as the reset command
     // These are the defaults that make the camera look correct
     this.baseFocalLength = 24 // Wide landscape preset
@@ -173,7 +172,7 @@ export class ClientCameraControls extends System {
     if (changes.focalLength) {
       this.applyFocalLength(changes.focalLength.value)
     }
-  };
+  }
 
   update(delta) {
     // ADS zoom removed - weapons handle their own zoom
@@ -248,14 +247,14 @@ export class ClientCameraControls extends System {
       const baseBokeh = Math.max(0.2, Math.min(2.0, lerp(s0.bokeh, s1.bokeh, t)))
 
       // Choose focus center
-      let playerDist = this.getFocusDistanceToPlayer()
+      const playerDist = this.getFocusDistanceToPlayer()
       if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
         // Blend between player distance and stop-based focus according to zoom
         const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
         this.targetFocusDistance = playerDist * (1 - blend) + baseFocus * blend
       } else {
         // Blend with reticle raycast if available (low influence to avoid jumpiness)
-        let raycastDistance = this.raycastFocusDistance()
+        const raycastDistance = this.raycastFocusDistance()
         if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
           this.targetFocusDistance = raycastDistance * 0.25 + baseFocus * 0.75
         } else {
@@ -269,14 +268,8 @@ export class ClientCameraControls extends System {
       if (playerDist !== null && isFinite(playerDist)) {
         const extra = Math.abs(this.targetFocusDistance - playerDist) * 1.25
         if (extra > rangeUsed) rangeUsed = Math.min(camFar * 0.45, extra)
-      }
-      this.world.prefs.setDOFFocusRange(rangeUsed)
-      this.world.prefs.setDOFBokehScale(baseBokeh)
-
-      if (this.debugDOF) {
-        console.log(
-          `DOF: Focus=${this.targetFocusDistance.toFixed(2)} Range=${rangeUsed.toFixed(2)} Zoom=${cameraZoom.toFixed(2)} tZoom=${tZoom.toFixed(2)} segT=${t.toFixed(2)} anchor=${this.anchorFocusToPlayer}`
-        )
+        this.world.prefs.setDOFFocusRange(rangeUsed)
+        this.world.prefs.setDOFBokehScale(baseBokeh)
       }
 
       // When the user changes zoom, snap focus to prevent temporary blur
@@ -368,9 +361,6 @@ export class ClientCameraControls extends System {
 
       this.world.camera.far = dynamicFar
       this.world.camera.updateProjectionMatrix()
-
-      if (this.debugDOF) {
-      }
     }
   }
 
@@ -411,15 +401,11 @@ export class ClientCameraControls extends System {
   // Raycast from camera center to get focus distance
   raycastFocusDistance() {
     if (!this.world.camera || !this.world.stage) {
-      if (this.debugDOF) {
-      }
       return null
     }
 
     // Check if viewport is ready (required for raycast)
     if (!this.world.stage.viewport) {
-      if (this.debugDOF) {
-      }
       return null
     }
 
@@ -431,21 +417,10 @@ export class ClientCameraControls extends System {
         const validHits = hits.filter(hit => hit.distance > 0.5)
         if (validHits.length > 0) {
           const distance = validHits[0].distance
-          if (this.debugDOF) {
-            console.log(
-              `DOF Debug: Raycast hit at distance ${distance.toFixed(2)}, object:`,
-              validHits[0].object?.name || 'unknown'
-            )
-          }
           return distance
-        } else if (this.debugDOF) {
         }
-      } else if (this.debugDOF) {
       }
-    } catch (err) {
-      if (this.debugDOF) {
-      }
-    }
+    } catch (err) {}
 
     // No fallback to manual scene traversal since objects are in the octree
     return null
@@ -478,8 +453,6 @@ export class ClientCameraControls extends System {
     // Calculate distance from camera to player head
     return cameraWorldPos.distanceTo(playerPos)
   }
-
-
 
   // Auto-focus on player
 
@@ -522,8 +495,7 @@ export class ClientCameraControls extends System {
     this.world.prefs.setFocusSpeed(this.focusSpeed)
   }
 
-  setReticleFocusDelay(delay) {
-  }
+  setReticleFocusDelay(delay) {}
 
   // Zoom control
   setZoomSpeed(speed) {
@@ -532,86 +504,8 @@ export class ClientCameraControls extends System {
   }
 
   setScrollZoomEnabled(enabled) {
+    this.enableScrollZoom = enabled
     this.world.prefs.setScrollZoomEnabled(enabled)
-  }
-
-  // Handle scroll wheel zoom (focal length only, not camera distance)
-
-  // Pinch-to-zoom methods (mobile camera control)
-    // Track if listeners are attached
-
-    // Bind event handlers
-
-    // Attach event listeners
-
-  }
-
-    }
-  }
-
-  // Calculate distance between two touch points
-    if (touches.length < 2) return 0
-    const dx = touches[0].clientX - touches[1].clientX
-    const dy = touches[0].clientY - touches[1].clientY
-    return Math.sqrt(dx * dx + dy * dy)
-  }
-
-  // Calculate center point of two touches
-    if (touches.length < 2) return { x: 0, y: 0 }
-    return {
-      x: (touches[0].clientX + touches[1].clientX) / 2,
-      y: (touches[0].clientY + touches[1].clientY) / 2,
-    }
-  }
-
-  // Check if pinch is in center zone (middle 30% of screen)
-    const centerX = window.innerWidth / 2
-    const centerY = window.innerHeight / 2
-    const zoneRadius = Math.min(window.innerWidth, window.innerHeight) * 0.3
-
-    const dx = touch.clientX - centerX
-    const dy = touch.clientY - centerY
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    return distance < zoneRadius
-  }
-
-
-    event.preventDefault()
-
-    // Check if pinch starts in center zone
-      return
-    }
-
-    // Start pinch
-
-  }
-
-
-    event.preventDefault()
-
-
-    // Only zoom if distance changed significantly
-      // Convert pinch delta to scroll delta
-
-      // Apply zoom using focal length adjustment (works independently of scroll zoom setting)
-      const currentFocalLength = this.world.prefs.focalLength || 50
-      const change = -scrollDelta * this.zoomSpeed
-      const newFocalLength = Math.max(10, Math.min(200, currentFocalLength + change))
-
-      this.setFocalLength(newFocalLength)
-
-      if (this.debugDOF) {
-      }
-
-      // Update current distance
-    }
-  }
-
-
-    // Check if pinch actually ended (less than 2 touches)
-    if (event.touches.length < 2) {
-    }
   }
 
   // Preset camera settings
@@ -1101,6 +995,5 @@ cam.help() - Show this help message
         `)
       },
     }
-
   }
 }
