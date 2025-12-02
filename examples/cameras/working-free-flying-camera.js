@@ -14,7 +14,7 @@ if (world.isClient) {
   const LERP_FACTOR = 0.35
 
   // State
-  let velocity = new Vector3()
+  const velocity = new Vector3()
   let targetQuat = null
 
   // Get control
@@ -88,7 +88,7 @@ if (world.isClient) {
     if (!control || !control.camera) return
 
     // Calculate movement direction
-    let move = new Vector3()
+    const move = new Vector3()
 
     // WASD for horizontal/forward movement
     if (control.keyW?.down) move.z -= 1
@@ -108,7 +108,7 @@ if (world.isClient) {
     }
 
     // Calculate desired velocity
-    let desiredVelocity = new Vector3()
+    const desiredVelocity = new Vector3()
     if (move.lengthSq() > 0) {
       move.normalize()
       desiredVelocity.copy(move).multiplyScalar(currentSpeed * delta * 60)
@@ -130,7 +130,7 @@ if (world.isClient) {
       const deltaY = control.pointer.delta.y
 
       // Convert to euler for easier pitch/yaw manipulation
-      let euler = new Euler().setFromQuaternion(targetQuat, 'YXZ')
+      const euler = new Euler().setFromQuaternion(targetQuat, 'YXZ')
       euler.y -= deltaX * LOOK_SPEED  // Yaw (left/right)
       euler.x -= deltaY * LOOK_SPEED  // Pitch (up/down)
 

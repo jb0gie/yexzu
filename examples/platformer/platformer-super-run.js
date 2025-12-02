@@ -21,6 +21,7 @@ app.configure([
 ])
 
 const PLAYER_HALF_HEIGHT = 0.8
+const SPRINT_SPEED_THRESHOLD = 5 // Speed in m/s to be considered sprinting
 
 const SUPER_RUN_CONFIG = {
   activationTime: 1,
@@ -34,8 +35,10 @@ const SUPER_RUN_CONFIG = {
 if (world.isClient) {
   const { superRunEmote, deactivationTime } = app.props
 
-  const player = world.getPlayer()
-  const control = app.control()
+  // Declare variables but don't initialize yet
+  let player
+  let debugText
+  let text
 
   let runTime = 0
   let superActive = false
@@ -45,7 +48,8 @@ if (world.isClient) {
   const tempEuler = new Euler(0, 0, 0, 'YXZ')
 
   function getForwardDirection(outVec) {
-    tempEuler.setFromQuaternion(control.camera.quaternion)
+    // Use player rotation instead of control camera
+    tempEuler.setFromQuaternion(player.rotation)
     tempEuler.x = 0
     tempEuler.z = 0
     tempQuat.setFromEuler(tempEuler)
@@ -66,54 +70,69 @@ if (world.isClient) {
       ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
       : false
 
-  const debugText = app.create('ui', {
-    space: 'screen',
-    position: [0, 0],
-    offset: [20, 20],
-    width: 400,
-    height: 150,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 5,
-    padding: 10,
-  })
-  const text = app.create('uitext', {
-    value: 'Debug: Initializing...',
-    color: 'white',
-    fontSize: 10,
-    fontFamily: 'monospace',
-  })
-  debugText.add(text)
-  app.add(debugText)
-
-  function isJoystickForward() {
-    if (!isMobile || !control.touchStick) return false
-    const stickX = control.touchStick.value?.x || 0
-    const stickZ = control.touchStick.value?.z || 0
-    const isJoystickActive = Math.abs(stickX) > 0.01 || Math.abs(stickZ) > 0.01
-    return isJoystickActive && -stickZ > 0.3
+  // Wait for world to be ready
+  if (world.isReady) {
+    init()
+  } else {
+    world.on('ready', init)
   }
 
-  app.on('update', dt => {
-    const joystickForward = isJoystickForward()
-    const grounded = isGrounded()
-    const isSprintingForward =
-      (isMobile ? joystickForward : control.keyW.down && (control.shiftLeft.down || control.shiftRight.down)) && grounded
+  function init() {
+    // NOW it's safe to access player
+    player = world.getPlayer()
 
-    const stickX = control.touchStick?.value?.x || 0
-    const stickZ = control.touchStick?.value?.z || 0
-    const forwardAmount = -stickZ
-    const isActive = Math.abs(stickX) > 0.01 || Math.abs(stickZ) > 0.01
-    
+    if (!player) {
+      console.error('Super Run: Player not available')
+      return
+    }
+
+    // Create debug UI only after world is ready
+    debugText = app.create('ui', {
+      space: 'screen',
+      position: [0, 0],
+      offset: [20, 20],
+      width: 400,
+      height: 150,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderRadius: 5,
+      padding: 10,
+    })
+    text = app.create('uitext', {
+      value: 'Debug: Initializing...',
+      color: 'white',
+      fontSize: 10,
+      fontFamily: 'monospace',
+    })
+    debugText.add(text)
+    app.add(debugText)
+
+    // Start update loop
+    app.on('update', update)
+  }
+
+  function update(dt) {
+    if (!player) return
+
+    // Check player velocity to detect sprinting (passive detection)
+    const velocity = player.getLinearVelocity ? player.getLinearVelocity(new Vector3()) : new Vector3()
+    const speed = velocity.length()
+    const grounded = isGrounded()
+
+    // Detect sprinting based on speed threshold and grounded state
+    const isSprintingForward = speed > SPRINT_SPEED_THRESHOLD && grounded
+
+    // Get joystick data for debug display only
+    const stickX = 0 // Not used for logic, just debug
+    const stickZ = 0
+    const isActive = false
+
     let debugInfo = 'SUPER RUN DEBUG\n'
     debugInfo += 'Mobile: ' + isMobile + '\n'
-    debugInfo += 'Joystick: ' + (control.touchStick ? 'yes' : 'no') + '\n'
-    debugInfo += 'Active: ' + (isActive ? 'YES' : 'no') + '\n'
-    debugInfo += 'X: ' + stickX.toFixed(2) + ' Z: ' + stickZ.toFixed(2) + '\n'
-    debugInfo += 'Forward: ' + forwardAmount.toFixed(2) + ' > 0.3\n'
-    debugInfo += 'isForward: ' + (joystickForward ? 'YES' : 'no') + '\n'
+    debugInfo += 'Speed: ' + speed.toFixed(2) + ' m/s\n'
     debugInfo += 'Grounded: ' + (grounded ? 'YES' : 'no') + '\n'
     debugInfo += 'Sprinting: ' + (isSprintingForward ? 'YES' : 'no') + '\n'
-    debugInfo += 'RunTime: ' + runTime.toFixed(2) + 's'
+    debugInfo += 'RunTime: ' + runTime.toFixed(2) + 's\n'
+    debugInfo += 'SuperActive: ' + (superActive ? 'YES' : 'no')
 
     debugText.children[0].props.value = debugInfo
     debugText.children[0].props.color = isSprintingForward ? '#00ff00' : '#ffffff'
@@ -146,5 +165,5 @@ if (world.isClient) {
       const dir = getForwardDirection(tempVec)
       player.push(dir.multiplyScalar(SUPER_RUN_CONFIG.extraSpeed * dt))
     }
-  })
+  }
 }

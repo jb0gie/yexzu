@@ -2,7 +2,7 @@
 // Multiple cameras with real-time settings adjustment
 
 // Global variables for camera system
-let cameras = []
+const cameras = []
 let control = null
 let currentCameraIndex = 0
 let settingsUI = null

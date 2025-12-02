@@ -8,7 +8,7 @@ const fields = [
 	}
 ]
 
-let anims = [{ label: 'None', value: '' }]
+const anims = [{ label: 'None', value: '' }]
 app.traverse(node => {
 	if (node.anims) {
 		for (const anim of node.anims) {

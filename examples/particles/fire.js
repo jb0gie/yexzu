@@ -876,7 +876,7 @@ if (world.isClient) {
           inactiveSmokeIndices.push(i)
         } else {
           // Gradually increase scale for smoke expansion
-          let smokeScale = smoke.maxScale * (1 + lifeRatio * 0.5)
+          const smokeScale = smoke.maxScale * (1 + lifeRatio * 0.5)
           smoke.scale.set(smokeScale, smokeScale, smokeScale)
 
           // Fade in then out
