@@ -12,7 +12,7 @@ let cameras = {}
 let currentCameraIndex = 0
 let control = null
 let initialized = false
-let cameraSystem = null
+const cameraSystem = null
 
 // Camera presets - simple and working
 const CAMERA_PRESETS = [
