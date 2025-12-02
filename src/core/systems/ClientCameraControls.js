@@ -22,30 +22,15 @@ export class ClientCameraControls extends System {
     this.enabled = true // Camera controls ON by default for ADS to work
 
     // Autofocus state
-    this.reticleAutofocus = false
-    this.playerAutofocus = false
     this.focusSmoothing = true
     this.focusSpeed = 0.1
     this.targetFocusDistance = 10
     this.currentFocusDistance = 10
-    this.reticleFocusTimer = 0
-    this.reticleFocusDelay = 0.5 // seconds before focusing
-    this.lastReticleTarget = null
 
     // Zoom control
     this.zoomSpeed = 5
-    this.enableScrollZoom = false // Off by default
-    this.enablePinchZoom = true // Enabled by default for mobile
 
     // Pinch-to-zoom state
-    this.isPinching = false
-    this.pinchStartDistance = 0
-    this.pinchCurrentDistance = 0
-    this.pinchZoomLevel = 0
-    this.pinchCenterX = 0
-    this.pinchCenterY = 0
-    this.pinchMinDistance = 50 // Minimum pinch distance to trigger zoom
-    this.pinchSensitivity = 0.5 // Sensitivity multiplier
 
     // Dynamic DOF compensation
     this.dynamicDOF = false // Auto-adjust DOF based on zoom
@@ -53,15 +38,9 @@ export class ClientCameraControls extends System {
     this.debugDOF = false // Debug logging
 
     // ADS-style zoom
-    this.adsZoomEnabled = true // Enabled by default
-    this.isAiming = false
     this.baseFocalLength = 24 // Will be set properly in init()
-    this.adsZoomFocalLength = 85 // Zoomed in focal length
     this.currentFocalLength = 24
     this.targetFocalLength = 24
-    this.zoomTransitionSpeed = 0.3
-    this.adsBokehMultiplier = 2.5 // Increase bokeh when zoomed
-    this.normalBokehScale = 1
 
     // How strongly focus distance grows with camera zoom-out (legacy scalar)
     this.zoomDistanceMultiplier = 3
@@ -89,34 +68,24 @@ export class ClientCameraControls extends System {
     this.focusRangeFarFactor = 3.0
 
     // One-click autofocus using right mouse (outside build mode)
-    this.rightClickAutofocus = false // Disabled - let weapons use right-click
   }
 
   init() {
-    // console.log('ClientCameraControls: Initializing with default settings')
 
     // Use the exact same settings as the reset command
     // These are the defaults that make the camera look correct
     this.baseFocalLength = 24 // Wide landscape preset
-    this.adsZoomFocalLength = 85 // Zoomed in focal length for ADS
     this.currentFocalLength = 24
     this.targetFocalLength = 24
 
     // Set all the defaults
     this.enabled = true // Enable camera controls
-    this.adsZoomEnabled = true // Enable ADS by default
-    this.isAiming = false
-    this.normalBokehScale = 1
 
     // Autofocus defaults
-    this.reticleAutofocus = false
-    this.playerAutofocus = false
     this.focusSmoothing = true
     this.focusSpeed = 0.1
-    this.reticleFocusDelay = 0.5
 
     // Other defaults
-    this.enableScrollZoom = false
     this.zoomSpeed = 5
     this.currentFocusDistance = 10
     this.targetFocusDistance = 10
@@ -168,29 +137,20 @@ export class ClientCameraControls extends System {
     // Initialize dynamic DOF state based on current camera
     const currentCam = this.world.cameraManager?.activeCamera || this.world.defaultCameraNode
     this.dynamicDOF = !!currentCam?.isPlayerCamera
-
-    // Set up touch event listeners for pinch-to-zoom (client-side only)
-    if (typeof window !== 'undefined' && this.enablePinchZoom) {
-      this.setupPinchZoom()
-    }
   }
 
   resetCamera() {
     // Reset focal length to base
     this.baseFocalLength = 24
-    this.adsZoomFocalLength = 85
     this.currentFocalLength = this.baseFocalLength
     this.targetFocalLength = this.baseFocalLength
 
     // Reset DOF settings
-    this.normalBokehScale = 1
     if (this.world.prefs) {
       this.world.prefs.setFocalLength(this.baseFocalLength)
-      this.world.prefs.setDOFBokehScale(this.normalBokehScale)
     }
 
     // Reset ADS state
-    this.isAiming = false
 
     // Reset control states
     if (this.control?.mouseRight) {
@@ -202,93 +162,30 @@ export class ClientCameraControls extends System {
     this.world.prefs.off('change', this.onPrefsChange)
     this.control?.release()
     this.control = null
-
-    // Clean up pinch zoom event listeners
-    if (this.pinchEventListenersAttached) {
-      this.removePinchZoomListeners()
-    }
   }
 
   onPrefsChange = changes => {
-    if (changes.reticleAutofocus) this.reticleAutofocus = changes.reticleAutofocus.value
-    if (changes.playerAutofocus) this.playerAutofocus = changes.playerAutofocus.value
     if (changes.focusSmoothing) this.focusSmoothing = changes.focusSmoothing.value
     if (changes.focusSpeed) this.focusSpeed = changes.focusSpeed.value
-    if (changes.reticleFocusDelay) this.reticleFocusDelay = changes.reticleFocusDelay.value
-    if (changes.scrollZoomEnabled) this.enableScrollZoom = changes.scrollZoomEnabled.value
     if (changes.zoomSpeed) this.zoomSpeed = changes.zoomSpeed.value
 
     // Apply focal length changes from apps
     if (changes.focalLength) {
       this.applyFocalLength(changes.focalLength.value)
     }
-  }
+  };
 
   update(delta) {
-    // Handle ADS-style zoom (right mouse button)
-    // Disable ADS if in build mode since right-click is used for building
-    const inBuildMode = this.world.builder?.enabled === true
+    // ADS zoom removed - weapons handle their own zoom
 
-    // If we were aiming but entered build mode, stop aiming immediately
-    if (inBuildMode && this.isAiming) {
-      this.isAiming = false
-      this.targetFocalLength = this.baseFocalLength
-      this.world.prefs.setDOFBokehScale(this.normalBokehScale)
-      if (this.control?.mouseRight?.capture !== undefined) {
-        this.control.mouseRight.capture = false
-      }
-      if (this.debugDOF) {
-        console.log('ADS: Disabled due to build mode')
-      }
-    }
-
-    // DISABLED: Right-click autofocus moved to weapon control
-    // Weapons can implement their own autofocus if needed
-    // if (this.enabled && this.rightClickAutofocus && this.control && !inBuildMode) {
-    //   ... autofocus logic removed ...
-    // }
-
-    // ADS zoom (right-click) - DISABLED - weapons handle their own zoom
-    if (false && this.enabled && this.adsZoomEnabled && this.control && !inBuildMode) {
-      if (this.control.mouseRight?.down) {
-        if (!this.isAiming) {
-          this.isAiming = true
-          this.targetFocalLength = this.adsZoomFocalLength
-          this.world.prefs.setDOFBokehScale(this.adsBokehMultiplier)
-          // Don't capture right-click - let weapons handle it
-          // if (this.control.mouseRight.capture !== undefined) {
-          //   this.control.mouseRight.capture = true
-          // }
-          if (this.debugDOF) {
-            // console.log('ADS: Started aiming')
-          }
-        }
-      } else {
-        if (this.isAiming) {
-          this.isAiming = false
-          this.targetFocalLength = this.baseFocalLength
-          this.world.prefs.setDOFBokehScale(this.normalBokehScale)
-          // Don't capture right-click - let weapons handle it
-          // if (this.control.mouseRight.capture !== undefined) {
-          //   this.control.mouseRight.capture = false
-          // }
-          if (this.debugDOF) {
-            console.log('ADS: Stopped aiming')
-          }
-        }
-      }
-    }
-
-    // Smooth focal length transition (only if not in build mode or if zooming out)
-    if (!inBuildMode || this.targetFocalLength === this.baseFocalLength) {
-      if (Math.abs(this.targetFocalLength - this.currentFocalLength) > 0.1) {
-        this.currentFocalLength += (this.targetFocalLength - this.currentFocalLength) * this.zoomTransitionSpeed
-        this.setFocalLength(this.currentFocalLength)
-      } else if (this.currentFocalLength !== this.targetFocalLength) {
-        // Snap to target if very close
-        this.currentFocalLength = this.targetFocalLength
-        this.setFocalLength(this.currentFocalLength)
-      }
+    // Smooth focal length transition
+    if (Math.abs(this.targetFocalLength - this.currentFocalLength) > 0.1) {
+      this.currentFocalLength += (this.targetFocalLength - this.currentFocalLength) * this.focusSpeed
+      this.setFocalLength(this.currentFocalLength)
+    } else if (this.currentFocalLength !== this.targetFocalLength) {
+      // Snap to target if very close
+      this.currentFocalLength = this.targetFocalLength
+      this.setFocalLength(this.currentFocalLength)
     }
 
     // Removed scroll zoom to avoid conflicting with native camera controls
@@ -320,9 +217,9 @@ export class ClientCameraControls extends System {
         this.zoomStops && this.zoomStops.length >= 2
           ? this.zoomStops
           : [
-            { t: 0, focus: 3, range: 1.0, bokeh: 1.0 },
-            { t: 1, focus: Math.min(60, camFar * 0.5), range: Math.min(18, camFar * 0.4), bokeh: 0.5 },
-          ]
+              { t: 0, focus: 3, range: 1.0, bokeh: 1.0 },
+              { t: 1, focus: Math.min(60, camFar * 0.5), range: Math.min(18, camFar * 0.4), bokeh: 0.5 },
+            ]
       let s0 = stops[0]
       let s1 = stops[stops.length - 1]
       for (let i = 0; i < stops.length - 1; i++) {
@@ -396,59 +293,6 @@ export class ClientCameraControls extends System {
     } else if (!this.focusSmoothing && this.targetFocusDistance !== this.currentFocusDistance) {
       this.currentFocusDistance = this.targetFocusDistance
       this.setDOFFocusDistance(this.currentFocusDistance)
-    }
-
-    // Enhanced reticle autofocus with first-person reticle support
-    if (this.reticleAutofocus && !this.dynamicDOF) {
-      const player = this.world.entities?.player
-      const isFirstPerson = player?.firstPerson === true
-
-      let raycastDist = null
-
-      if (isFirstPerson) {
-        // In first-person, prioritize reticle-based focusing
-        raycastDist = this.raycastFromFirstPersonReticle()
-        if (raycastDist !== null) {
-          // Use immediately without delay for more responsive first-person focusing
-          this.targetFocusDistance = raycastDist
-          console.log(`[ClientCameraControls-FirstPerson] Immediate reticle focus: ${raycastDist.toFixed(2)}m`)
-        } else {
-          // Fallback to camera center raycast for first-person
-          raycastDist = this.raycastFocusDistance()
-          if (raycastDist !== null) {
-            this.targetFocusDistance = raycastDist
-            console.log(`[ClientCameraControls-FirstPerson] Fallback camera focus: ${raycastDist.toFixed(2)}m`)
-          }
-        }
-      } else {
-        // In third-person, keep existing reticle behavior with head raycast priority
-        raycastDist = this.raycastFromPlayerHead() || this.raycastFocusDistance()
-
-        if (raycastDist !== null) {
-          // Check if we're looking at a new target
-          if (Math.abs(raycastDist - (this.lastReticleTarget || 0)) > 0.5) {
-            // New target, reset timer
-            this.reticleFocusTimer = 0
-            this.lastReticleTarget = raycastDist
-          } else {
-            // Same target, increment timer
-            this.reticleFocusTimer += delta
-
-            // After delay, start focusing
-            if (this.reticleFocusTimer >= this.reticleFocusDelay) {
-              this.targetFocusDistance = raycastDist
-            }
-          }
-        }
-      }
-    }
-
-    // Player autofocus (overrides reticle if both are enabled)
-    if (this.playerAutofocus && !this.dynamicDOF) {
-      const distance = this.getFocusDistanceToPlayer()
-      if (distance !== null) {
-        this.targetFocusDistance = distance
-      }
     }
   }
 
@@ -526,7 +370,6 @@ export class ClientCameraControls extends System {
       this.world.camera.updateProjectionMatrix()
 
       if (this.debugDOF) {
-        console.log(`Focal length: ${focalLength}mm, FOV: ${fov.toFixed(1)}°, Far: ${dynamicFar}`)
       }
     }
   }
@@ -564,21 +407,11 @@ export class ClientCameraControls extends System {
   }
 
   // Auto-focus on target position
-  autoFocus(targetPosition) {
-    if (!targetPosition) {
-      console.warn('Target position required for auto-focus')
-      return
-    }
-
-    const distance = this.world.camera.position.distanceTo(targetPosition)
-    this.setDOFFocusDistance(distance)
-  }
 
   // Raycast from camera center to get focus distance
   raycastFocusDistance() {
     if (!this.world.camera || !this.world.stage) {
       if (this.debugDOF) {
-        // console.log('DOF Debug: Camera or stage not ready')
       }
       return null
     }
@@ -586,7 +419,6 @@ export class ClientCameraControls extends System {
     // Check if viewport is ready (required for raycast)
     if (!this.world.stage.viewport) {
       if (this.debugDOF) {
-        // console.log('DOF Debug: Stage viewport not ready')
       }
       return null
     }
@@ -607,14 +439,11 @@ export class ClientCameraControls extends System {
           }
           return distance
         } else if (this.debugDOF) {
-          console.log('DOF Debug: All hits were too close (< 0.5)')
         }
       } else if (this.debugDOF) {
-        console.log('DOF Debug: No octree hits')
       }
     } catch (err) {
       if (this.debugDOF) {
-        console.log('DOF Debug: Stage raycast error:', err.message)
       }
     }
 
@@ -623,14 +452,6 @@ export class ClientCameraControls extends System {
   }
 
   // Auto-focus using raycast
-  autoFocusRaycast() {
-    const distance = this.raycastFocusDistance()
-    if (distance !== null) {
-      this.setDOFFocusDistance(distance)
-      return distance
-    }
-    return null
-  }
 
   // Get focus distance to player
   getFocusDistanceToPlayer() {
@@ -658,114 +479,18 @@ export class ClientCameraControls extends System {
     return cameraWorldPos.distanceTo(playerPos)
   }
 
-  // Enhanced first-person reticle-based focus
-  raycastFromFirstPersonReticle() {
-    if (!this.world.entities?.player || !this.world.camera) {
-      return null
-    }
 
-    const player = this.world.entities.player
-    if (!player?.firstPerson) return null // Only works in first-person mode
-
-    // Use direct reticle raycast for more responsive first-person focusing
-    const reticleHits = this.world.stage.raycastReticle()
-    if (reticleHits && reticleHits.length > 0) {
-      const targetDistance = reticleHits[0].distance
-      console.log(`[ClientCameraControls-FirstPerson] Reticle focus: ${targetDistance.toFixed(2)}m`)
-      return targetDistance
-    }
-
-    return null
-  }
-
-  // Raycast from player head position towards camera look direction (third-person only)
-  raycastFromPlayerHead() {
-    if (!this.world.entities?.player || !this.world.camera) {
-      return null
-    }
-
-    const player = this.world.entities.player
-    const isFirstPerson = player?.firstPerson === true
-
-    if (isFirstPerson) {
-      return null // Don't use head bone in first-person, use reticle method instead
-    }
-
-    const avatar = this.world.avatar
-
-    // Try to use actual head bone if available (only in third-person)
-    let headPos = null
-    let headDir = null
-
-    if (avatar && avatar.getBoneTransform) {
-      const headMatrix = avatar.getBoneTransform('head')
-      if (headMatrix) {
-        headPos = new THREE.Vector3().setFromMatrixPosition(headMatrix)
-        const headQuat = new THREE.Quaternion().setFromRotationMatrix(headMatrix)
-        headDir = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat)
-        console.log(`[ClientCameraControls-HeadBone] Using head bone raycast in third-person`)
-      }
-    }
-
-    // Fallback to simplified head position + camera direction
-    if (!headPos) {
-      if (!player.entity?.position) return null
-
-      headPos = player.entity.position.clone()
-      headPos.y += 1.6 // Standard eye height
-
-      // Get camera direction (for simplified head raycast in third-person)
-      headDir = new THREE.Vector3()
-      this.world.camera.getWorldDirection(headDir)
-      console.log(`[ClientCameraControls-HeadBone] Using simplified position for third-person`)
-    }
-
-    // Set up raycaster from player head in head direction
-    this.raycaster.set(headPos, headDir)
-
-    // Get intersectable objects from stage scene
-    const scene = this.world.stage?.scene
-    const viewport = this.world.viewport
-    const intersectables = scene || viewport
-
-    if (!intersectables) return null
-
-    // Perform raycast
-    const intersects = this.raycaster.intersectObjects(intersectables.children || [], true)
-
-    if (intersects.length > 0) {
-      const targetDistance = intersects[0].distance
-      console.log(`[ClientCameraControls-HeadBone] Head focus: ${targetDistance.toFixed(2)}m`)
-      return targetDistance
-    }
-
-    console.log('[ClientCameraControls-HeadBone] No intersections found in third-person')
-    return null
-  }
 
   // Auto-focus on player
-  autoFocusPlayer() {
-    const distance = this.getFocusDistanceToPlayer()
-    if (distance !== null) {
-      this.setDOFFocusDistance(distance)
-      return distance
-    }
-    return null
-  }
 
   // Master enable/disable
   enable() {
     this.enabled = true
-    console.log('Camera controls system: ENABLED')
   }
 
   disable() {
     this.enabled = false
     // Reset autofocus when disabling
-    this.reticleAutofocus = false
-    this.playerAutofocus = false
-    this.enableScrollZoom = false
-    console.log('Camera controls system: DISABLED')
   }
 
   setEnabled(enabled) {
@@ -778,16 +503,12 @@ export class ClientCameraControls extends System {
 
   // Enable/disable autofocus modes
   setReticleAutofocus(enabled) {
-    this.reticleAutofocus = enabled
     this.world.prefs.setReticleAutofocus(enabled)
     if (!enabled) {
-      this.reticleFocusTimer = 0
-      this.lastReticleTarget = null
     }
   }
 
   setPlayerAutofocus(enabled) {
-    this.playerAutofocus = enabled
     this.world.prefs.setPlayerAutofocus(enabled)
   }
 
@@ -802,8 +523,6 @@ export class ClientCameraControls extends System {
   }
 
   setReticleFocusDelay(delay) {
-    this.reticleFocusDelay = Math.max(0, delay)
-    this.world.prefs.setReticleFocusDelay(this.reticleFocusDelay)
   }
 
   // Zoom control
@@ -813,59 +532,24 @@ export class ClientCameraControls extends System {
   }
 
   setScrollZoomEnabled(enabled) {
-    this.enableScrollZoom = enabled
     this.world.prefs.setScrollZoomEnabled(enabled)
   }
 
   // Handle scroll wheel zoom (focal length only, not camera distance)
-  handleScrollZoom(delta) {
-    if (!this.enableScrollZoom) return
-
-    // Only adjust focal length, let Hyperfy handle camera distance
-    const currentFocalLength = this.world.prefs.focalLength || 50
-    const change = -delta * this.zoomSpeed
-    const newFocalLength = Math.max(10, Math.min(200, currentFocalLength + change))
-
-    this.setFocalLength(newFocalLength)
-
-    if (this.debugDOF) {
-      console.log(`Focal length zoom: ${newFocalLength.toFixed(0)}mm`)
-    }
-  }
 
   // Pinch-to-zoom methods (mobile camera control)
-  setupPinchZoom() {
     // Track if listeners are attached
-    this.pinchEventListenersAttached = false
 
     // Bind event handlers
-    this.handleTouchStart = this.handleTouchStart.bind(this)
-    this.handleTouchMove = this.handleTouchMove.bind(this)
-    this.handleTouchEnd = this.handleTouchEnd.bind(this)
 
     // Attach event listeners
-    window.addEventListener('touchstart', this.handleTouchStart, { passive: false })
-    window.addEventListener('touchmove', this.handleTouchMove, { passive: false })
-    window.addEventListener('touchend', this.handleTouchEnd, { passive: false })
-    window.addEventListener('touchcancel', this.handleTouchEnd, { passive: false })
 
-    this.pinchEventListenersAttached = true
-    console.log('[ClientCameraControls] Pinch-to-zoom enabled (center of screen only)')
   }
 
-  removePinchZoomListeners() {
-    if (this.pinchEventListenersAttached) {
-      window.removeEventListener('touchstart', this.handleTouchStart)
-      window.removeEventListener('touchmove', this.handleTouchMove)
-      window.removeEventListener('touchend', this.handleTouchEnd)
-      window.removeEventListener('touchcancel', this.handleTouchEnd)
-      this.pinchEventListenersAttached = false
-      console.log('[ClientCameraControls] Pinch-to-zoom disabled')
     }
   }
 
   // Calculate distance between two touch points
-  getTouchDistance(touches) {
     if (touches.length < 2) return 0
     const dx = touches[0].clientX - touches[1].clientX
     const dy = touches[0].clientY - touches[1].clientY
@@ -873,16 +557,14 @@ export class ClientCameraControls extends System {
   }
 
   // Calculate center point of two touches
-  getTouchCenter(touches) {
     if (touches.length < 2) return { x: 0, y: 0 }
     return {
       x: (touches[0].clientX + touches[1].clientX) / 2,
-      y: (touches[0].clientY + touches[1].clientY) / 2
+      y: (touches[0].clientY + touches[1].clientY) / 2,
     }
   }
 
   // Check if pinch is in center zone (middle 30% of screen)
-  isInCenterZone(touch) {
     const centerX = window.innerWidth / 2
     const centerY = window.innerHeight / 2
     const zoneRadius = Math.min(window.innerWidth, window.innerHeight) * 0.3
@@ -894,39 +576,23 @@ export class ClientCameraControls extends System {
     return distance < zoneRadius
   }
 
-  handleTouchStart(event) {
-    if (!this.enablePinchZoom || event.touches.length !== 2) return
 
     event.preventDefault()
 
     // Check if pinch starts in center zone
-    const center = this.getTouchCenter(event.touches)
-    if (!this.isInCenterZone(center)) {
-      // console.log('[ClientCameraControls] Pinch outside center zone, ignoring')
       return
     }
 
     // Start pinch
-    this.isPinching = true
-    this.pinchStartDistance = this.getTouchDistance(event.touches)
-    this.pinchCurrentDistance = this.pinchStartDistance
-    this.pinchZoomLevel = this.world.prefs.focalLength || 24
 
-    // console.log('[ClientCameraControls] Pinch started, distance:', this.pinchStartDistance.toFixed(1))
   }
 
-  handleTouchMove(event) {
-    if (!this.enablePinchZoom || !this.isPinching || event.touches.length !== 2) return
 
     event.preventDefault()
 
-    const currentDistance = this.getTouchDistance(event.touches)
-    const distanceDelta = currentDistance - this.pinchCurrentDistance
 
     // Only zoom if distance changed significantly
-    if (Math.abs(distanceDelta) > this.pinchMinDistance) {
       // Convert pinch delta to scroll delta
-      const scrollDelta = -distanceDelta * this.pinchSensitivity
 
       // Apply zoom using focal length adjustment (works independently of scroll zoom setting)
       const currentFocalLength = this.world.prefs.focalLength || 50
@@ -936,21 +602,15 @@ export class ClientCameraControls extends System {
       this.setFocalLength(newFocalLength)
 
       if (this.debugDOF) {
-        console.log(`Pinch zoom: ${newFocalLength.toFixed(0)}mm`)
       }
 
       // Update current distance
-      this.pinchCurrentDistance = currentDistance
     }
   }
 
-  handleTouchEnd(event) {
-    if (!this.isPinching) return
 
     // Check if pinch actually ended (less than 2 touches)
     if (event.touches.length < 2) {
-      this.isPinching = false
-      // console.log('[ClientCameraControls] Pinch ended')
     }
   }
 
@@ -1043,7 +703,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.enableDOF()
-          console.log('DOF enabled')
           return true
         },
 
@@ -1053,7 +712,6 @@ export class ClientCameraControls extends System {
             return false
           }
           this.disableDOF()
-          console.log('DOF disabled')
           return true
         },
 
@@ -1064,7 +722,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setDOFFocusDistance(distance)
-          console.log(`DOF focus distance set to ${distance}`)
           return true
         },
 
@@ -1075,7 +732,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setDOFFocusRange(range)
-          console.log(`DOF focus range set to ${range}`)
           return true
         },
 
@@ -1086,7 +742,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setDOFBokehScale(scale)
-          console.log(`DOF bokeh scale set to ${scale}`)
           return true
         },
       },
@@ -1099,7 +754,6 @@ export class ClientCameraControls extends System {
         }
         this.enabled = true
         this.setFocalLength(length)
-        console.log(`Focal length set to ${length}mm`)
         return true
       },
 
@@ -1112,7 +766,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setReticleAutofocus(enable)
-          console.log(`Reticle autofocus ${enable ? 'enabled' : 'disabled'}`)
           return true
         },
 
@@ -1123,7 +776,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setPlayerAutofocus(enable)
-          console.log(`Player autofocus ${enable ? 'enabled' : 'disabled'}`)
           return true
         },
 
@@ -1134,11 +786,8 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.dynamicDOF = enable
-          console.log(`Dynamic DOF ${enable ? 'enabled' : 'disabled'} - DOF auto-adjusts with camera zoom`)
           if (enable) {
             // Disable other autofocus modes when dynamic is enabled
-            this.reticleAutofocus = false
-            this.playerAutofocus = false
           }
           return true
         },
@@ -1150,7 +799,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setFocusSmoothing(enable)
-          console.log(`Focus smoothing ${enable ? 'enabled' : 'disabled'}`)
           return true
         },
 
@@ -1161,7 +809,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setFocusSpeed(speed)
-          console.log(`Focus speed set to ${speed}`)
           return true
         },
       },
@@ -1175,7 +822,6 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setScrollZoomEnabled(true)
-          console.log('Scroll zoom enabled')
           return true
         },
 
@@ -1185,7 +831,6 @@ export class ClientCameraControls extends System {
             return false
           }
           this.setScrollZoomEnabled(false)
-          console.log('Scroll zoom disabled')
           return true
         },
 
@@ -1208,8 +853,6 @@ export class ClientCameraControls extends System {
             return false
           }
           this.enabled = true
-          this.adsZoomEnabled = true
-          console.log('ADS zoom enabled - hold right mouse to zoom')
           return true
         },
 
@@ -1218,8 +861,6 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.adsZoomEnabled = false
-          console.log('ADS zoom disabled')
           return true
         },
 
@@ -1228,8 +869,6 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.adsZoomFocalLength = focalLength
-          console.log(`ADS zoom focal length set to ${focalLength}mm`)
           return true
         },
 
@@ -1238,7 +877,6 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.adsBokehMultiplier = multiplier
           console.log(`ADS bokeh multiplier set to ${multiplier}x`)
           return true
         },
@@ -1248,7 +886,6 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.zoomTransitionSpeed = speed
           console.log(`ADS transition speed set to ${speed}`)
           return true
         },
@@ -1267,7 +904,6 @@ export class ClientCameraControls extends System {
             return false
           }
           this.zoomDistanceMultiplier = value
-          console.log(`Dynamic DOF zoom factor set to ${value}`)
           return true
         },
         setStops: stops => {
@@ -1287,7 +923,6 @@ export class ClientCameraControls extends System {
           }))
           clamped.sort((a, b) => a.t - b.t)
           this.zoomStops = clamped
-          console.log('Dynamic DOF stops set:', clamped)
           return true
         },
         resetStops: () => {
@@ -1301,7 +936,6 @@ export class ClientCameraControls extends System {
             { t: 0.66, focus: 28, range: 9.0, bokeh: 0.6 },
             { t: 1.0, focus: 60, range: 18.0, bokeh: 0.45 },
           ]
-          console.log('Dynamic DOF stops reset to default')
           return true
         },
         resetObserved: () => {
@@ -1311,7 +945,6 @@ export class ClientCameraControls extends System {
           }
           this.zoomObservedMin = null
           this.zoomObservedMax = null
-          console.log('Dynamic DOF observed zoom span reset')
           return true
         },
         setPlayerBlend: (max, pow = 1.0) => {
@@ -1331,7 +964,6 @@ export class ClientCameraControls extends System {
           }
           this.playerFocusBlendMax = m
           this.playerFocusBlendPow = p
-          console.log(`Dynamic DOF player blend set: max=${m}, pow=${p}`)
           return true
         },
         anchorPlayer: enable => {
@@ -1340,7 +972,6 @@ export class ClientCameraControls extends System {
             return false
           }
           this.anchorFocusToPlayer = !!enable
-          console.log(`Dynamic DOF anchor to player ${this.anchorFocusToPlayer ? 'ENABLED' : 'DISABLED'}`)
           return true
         },
       },
@@ -1353,7 +984,6 @@ export class ClientCameraControls extends System {
         }
         this.enabled = true
         this.applyPreset(name)
-        console.log(`Applied preset: ${name}`)
         return true
       },
 
@@ -1369,14 +999,11 @@ export class ClientCameraControls extends System {
         this.resetCamera()
 
         // Re-enable ADS after reset
-        this.adsZoomEnabled = true
 
         // Apply the reset
         this.applyFocalLength(this.baseFocalLength)
 
         // Reset autofocus settings
-        this.reticleAutofocus = false
-        this.playerAutofocus = false
         this.dynamicDOF = false
         this.focusSmoothing = true
         this.focusSpeed = 0.1
@@ -1384,11 +1011,8 @@ export class ClientCameraControls extends System {
         // Save reset state
         this.world.prefs.persist()
 
-        console.log('Camera reset to wide landscape preset:')
         console.log('- FOV: 73° (24mm focal length)')
         console.log('- DOF: Disabled')
-        console.log('- Scroll zoom: Disabled')
-        console.log('- ADS zoom: Disabled')
         console.log('- All autofocus: Disabled')
         return true
       },
@@ -1400,8 +1024,6 @@ export class ClientCameraControls extends System {
           return null
         }
         const settings = this.getCameraSettings()
-        console.log('Camera Settings:', settings)
-        console.log('Dynamic DOF:', this.dynamicDOF)
         console.log('Current Focus Distance:', this.currentFocusDistance)
         console.log('Target Focus Distance:', this.targetFocusDistance)
         return settings
@@ -1414,7 +1036,6 @@ export class ClientCameraControls extends System {
           return false
         }
         this.debugDOF = enable !== undefined ? enable : !this.debugDOF
-        console.log(`DOF Debug: ${this.debugDOF ? 'ON' : 'OFF'}`)
         return this.debugDOF
       },
 
@@ -1481,6 +1102,5 @@ cam.help() - Show this help message
       },
     }
 
-    // console.log('Camera controls ready for admins. Type cam.help() for commands.')
   }
 }
