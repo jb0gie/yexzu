@@ -601,6 +601,14 @@ export class ServerNetwork extends System {
     this.send('platformerAction', data, socket.id)
   }
 
+  onEvmConnect = (socket, address) => {
+    this.world.evm.onEvmConnect(socket, address)
+  }
+
+  onEvmDisconnect = socket => {
+    this.world.evm.onEvmDisconnect(socket)
+  }
+
   onDisconnect = (socket, code) => {
     this.world.livekit.clearModifiers(socket.id)
     socket.player.destroy(true)
