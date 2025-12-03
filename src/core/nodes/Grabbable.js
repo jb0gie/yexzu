@@ -24,6 +24,8 @@ const defaults = {
   unsnapSignal: null,
   rigidbodyTypeOnSnap: null,
   rigidbodyTypeOnRelease: null,
+  outlineColor: '#ffffff',
+  outlineEnabled: true,
 }
 
 export class Grabbable extends Node {
@@ -46,6 +48,8 @@ export class Grabbable extends Node {
     this.unsnapSignal = data.unsnapSignal
     this.rigidbodyTypeOnSnap = data.rigidbodyTypeOnSnap
     this.rigidbodyTypeOnRelease = data.rigidbodyTypeOnRelease
+    this.outlineColor = data.outlineColor
+    this.outlineEnabled = data.outlineEnabled
 
     this.isGrabbed = false
     this.isSnapped = false
@@ -63,6 +67,10 @@ export class Grabbable extends Node {
 
     this._raycaster = new THREE.Raycaster()
     this._grabOffset = new THREE.Vector3()
+    
+    this.control = null
+    this.outlineEffect = null
+    this.outlineEffect = null
   }
 
   mount() {
@@ -77,6 +85,39 @@ export class Grabbable extends Node {
 
     if (this.ctx.world.isClient) {
       this.setupInputHandlers()
+      this.setupOutline()
+    }
+  }
+
+  setupOutline() {
+    if (!this.outlineEnabled) return
+    
+    const graphics = this.ctx.world.graphics
+    if (!graphics || !graphics.composer) return
+
+    try {
+      const { OutlineEffect, BlendFunction } = await import('postprocessing')
+      
+      this.outlineEffect = new OutlineEffect(this.ctx.world.scene, this.ctx.world.camera, {
+        blendFunction: BlendFunction.SCREEN,
+        patternTexture: null,
+        edgeStrength: 2.5,
+        pulseSpeed: 0.0,
+        visibleEdgeColor: new THREE.Color(this.outlineColor),
+        hiddenEdgeColor: new THREE.Color(0x22090a),
+        blur: false,
+        xRay: true,
+        multisampling: 0
+      })
+      
+      graphics.composer.addPass(new EffectPass(this.ctx.world.camera, this.outlineEffect))
+      
+      const selection = new Selection()
+      selection.add(this)
+      this.outlineEffect.selection = selection
+      
+    } catch (error) {
+      console.warn('[Grabbable] Failed to setup outline effect:', error)
     }
   }
 
@@ -95,6 +136,8 @@ export class Grabbable extends Node {
     viewport.addEventListener('pointerup', this.onPointerUp)
     viewport.addEventListener('touchstart', this.onTouchStart)
     viewport.addEventListener('touchend', this.onTouchEnd)
+
+    this.control = this.ctx.world.controls.bind({ priority: 50 })
   }
 
   handlePointerDown(event) {
@@ -206,9 +249,55 @@ export class Grabbable extends Node {
     this.ctx.world.on('update', this.updateGrabbedPosition)
   }
 
-  updateGrabbedPosition = () => {
+  update() {
+    if (!this.enabled || !this.ctx.world.isClient) return
+    
+    if (!this.isGrabbed) {
+      this.checkForGrabAttempt()
+    } else {
+      this.updateGrabbedPosition()
+      this.checkForRelease()
+    }
+  }
+
+  checkForGrabAttempt() {
+    if (!this.control) return
+    
+    const leftGrip = this.control.entries.xrLeftGrip
+    const rightGrip = this.control.entries.xrRightGrip
+    
+    if (leftGrip?.pressed && this.isInGrabRange('left')) {
+      this.grabWithXR('left')
+    } else if (rightGrip?.pressed && this.isInGrabRange('right')) {
+      this.grabWithXR('right')
+    }
+  }
+
+  checkForRelease() {
+    if (!this.control) return
+    
+    const leftGrip = this.control.entries.xrLeftGrip
+    const rightGrip = this.control.entries.xrRightGrip
+    
+    if ((this.grabbedBy === 'xr-left' && leftGrip?.released) ||
+        (this.grabbedBy === 'xr-right' && rightGrip?.released)) {
+      this.release()
+    }
+  }
+
+  updateGrabbedPosition() {
     if (!this.isGrabbed || !this.grabbedBy) return
 
+    if (this.grabbedBy === 'xr-left') {
+      this.updateFromXRController('left')
+    } else if (this.grabbedBy === 'xr-right') {
+      this.updateFromXRController('right')
+    } else {
+      this.updateFromCamera()
+    }
+  }
+
+  updateFromCamera() {
     const camera = this.ctx.world.camera
     if (!camera) return
 
@@ -219,6 +308,148 @@ export class Grabbable extends Node {
 
     this.position.copy(_v1)
     this.quaternion.copy(camera.quaternion)
+  }
+
+  updateFromXRController(hand) {
+    if (!this.control) return
+
+    const poseKey = hand === 'left' ? 'xrLeftGripPose' : 'xrRightGripPose'
+    const pose = this.control.entries[poseKey]
+    
+    if (!pose) return
+
+    _m1.compose(pose.position, pose.quaternion, _v2.set(1, 1, 1))
+    _v1.set(0, 0, -0.1).applyMatrix4(_m1)
+    
+    this.position.copy(_v1)
+    this.quaternion.copy(pose.quaternion)
+  }
+
+  isInGrabRange(hand) {
+    if (!this.control) return false
+
+    const poseKey = hand === 'left' ? 'xrLeftGripPose' : 'xrRightGripPose'
+    const pose = this.control.entries[poseKey]
+    
+    if (!pose) return false
+
+    const distance = this.position.distanceTo(pose.position)
+    return distance <= this.grabDistance
+  }
+
+  grabWithXR(hand) {
+    if (this.isGrabbed) return
+
+    this.isGrabbed = true
+    this.grabbedBy = `xr-${hand}`
+
+    if (this.originalParent) {
+      this.originalParent.remove(this)
+    }
+    this.ctx.world.scene.add(this)
+
+    const rigidbody = this.findNode(node => node.name === 'rigidbody')
+    if (rigidbody && rigidbody.type === 'dynamic') {
+      rigidbody.type = 'kinematic'
+    }
+
+    if (this.onGrab) {
+      this.onGrab(this, null)
+    }
+  }
+  }
+
+  updateFromCamera() {
+    const camera = this.ctx.world.camera
+    if (!camera) return
+
+    _v1.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    _v1.multiplyScalar(this.grabDistance * 0.8)
+    _v1.add(camera.position)
+    _v1.sub(this._grabOffset)
+
+    this.position.copy(_v1)
+    this.quaternion.copy(camera.quaternion)
+  }
+
+  updateFromXRController(hand) {
+    const controls = this.ctx.world.controls
+    if (!controls) return
+
+    const poseKey = hand === 'left' ? 'xrLeftGripPose' : 'xrRightGripPose'
+    const control = controls.controls.find(c => c.entries[poseKey])
+
+    if (!control || !control.entries[poseKey]) return
+
+    const pose = control.entries[poseKey]
+
+    _m1.compose(pose.position, pose.quaternion, _v2.set(1, 1, 1))
+    _v1.set(0, 0, -0.1).applyMatrix4(_m1)
+
+    this.position.copy(_v1)
+    this.quaternion.copy(pose.quaternion)
+  }
+
+  handleXRLeftGrip = down => {
+    if (!this.enabled || this.isPinned()) return
+
+    if (down && !this.isGrabbed) {
+      if (this.isInGrabRange('left')) {
+        this.grabWithXR('left')
+      }
+    } else if (!down && this.isGrabbed && this.grabbedBy === 'xr-left') {
+      this.release()
+    }
+  }
+
+  handleXRRightGrip = down => {
+    if (!this.enabled || this.isPinned()) return
+
+    if (down && !this.isGrabbed) {
+      if (this.isInGrabRange('right')) {
+        this.grabWithXR('right')
+      }
+    } else if (!down && this.isGrabbed && this.grabbedBy === 'xr-right') {
+      this.release()
+    }
+  }
+
+  isInGrabRange(hand) {
+    const controls = this.ctx.world.controls
+    if (!controls) return false
+
+    const poseKey = hand === 'left' ? 'xrLeftGripPose' : 'xrRightGripPose'
+    const control = controls.controls.find(c => c.entries[poseKey])
+
+    if (!control || !control.entries[poseKey]) return false
+
+    const pose = control.entries[poseKey]
+    const distance = this.position.distanceTo(pose.position)
+
+    return distance <= this.grabDistance
+  }
+
+  grabWithXR(hand) {
+    if (this.isGrabbed) return
+
+    this.isGrabbed = true
+    this.grabbedBy = `xr-${hand}`
+
+    if (this.originalParent) {
+      this.originalParent.remove(this)
+    }
+    this.ctx.world.scene.add(this)
+
+    const rigidbody = this.findNode(node => node.name === 'rigidbody')
+    if (rigidbody && rigidbody.type === 'dynamic') {
+      rigidbody.type = 'kinematic'
+    }
+
+    if (this.onGrab) {
+      this.onGrab(this, null)
+    }
+
+    this.ctx.world.on('update', this.updateGrabbedPosition)
   }
 
   release() {
@@ -334,6 +565,11 @@ export class Grabbable extends Node {
       viewport.removeEventListener('pointerup', this.onPointerUp)
       viewport.removeEventListener('touchstart', this.onTouchStart)
       viewport.removeEventListener('touchend', this.onTouchEnd)
+    }
+
+    if (this.control) {
+      this.control.api.release()
+      this.control = null
     }
 
     this.ctx.world.off('update', this.updateGrabbedPosition)

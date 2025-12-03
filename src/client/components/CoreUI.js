@@ -16,23 +16,8 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 // import { MenuMain } from './MenuMain'
 // import { MenuApp } from './MenuApp'
 import { ChevronDoubleUpIcon, HandIcon } from './Icons'
-
-// Simple camera icon for the camera toggle button
-function CameraIcon({ size = 24 }) {
-  return (
-    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
-      <path
-        d='M12 15.5C13.933 15.5 15.5 13.933 15.5 12C15.5 10.067 13.933 8.5 12 8.5C10.067 8.5 8.5 10.067 8.5 12C8.5 13.933 10.067 15.5 12 15.5Z'
-        fill='currentColor'
-      />
-      <path
-        d='M9 2L7.17 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4H16.83L15 2H9ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17Z'
-        fill='currentColor'
-      />
-    </svg>
-  )
-}
 import { Sidebar } from './Sidebar'
+import { EVM } from './EVM'
 
 export function CoreUI({ world }) {
   const ref = useRef()
@@ -123,6 +108,7 @@ export function CoreUI({ world }) {
       {ready && isTouch && <TouchStick world={world} />}
       {confirm && <Confirm options={confirm} />}
       <div id='core-ui-portal' />
+      {ready && <EVM world={world} />}
     </div>
   )
 }
@@ -1099,7 +1085,8 @@ function TouchBtns({ world }) {
   }, [])
 
   // Track platformer mode changes - DISABLED
-  {/*
+  {
+    /*
   useEffect(() => {
     const player = world.entities.player
     if (player) {
@@ -1123,10 +1110,12 @@ function TouchBtns({ world }) {
       }
     }
   }, [world])
-  */}
+  */
+  }
 
   // Handle ADS toggle state - REMOVED
-  {/*
+  {
+    /*
   useEffect(() => {
     if (adsToggled) {
       world.controls.simulateButton('mouseRight', true)
@@ -1134,10 +1123,12 @@ function TouchBtns({ world }) {
       world.controls.simulateButton('mouseRight', false)
     }
   }, [adsToggled, world])
-  */}
+  */
+  }
 
   // Handle camera mode changes - Desktop scroll emulation - REMOVED
-  {/*
+  {
+    /*
   useEffect(() => {
     const player = world.entities.player
     if (player) {
@@ -1159,7 +1150,8 @@ function TouchBtns({ world }) {
   const cycleCameraMode = () => {
     setCameraMode(prev => (prev + 1) % 4) // Cycle through 4 modes: 0, 1, 2, 3
   }
-  */}
+  */
+  }
 
   // lookpad removed
   return (

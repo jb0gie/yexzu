@@ -28,6 +28,8 @@ const names = [
   'pong',
   'platformerState',
   'platformerAction',
+  'evmConnect',
+  'evmDisconnect',
 ]
 
 const byName = {}

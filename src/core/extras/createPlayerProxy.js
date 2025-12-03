@@ -73,7 +73,14 @@ export function createPlayerProxy(entity, player) {
       return player.avatar?.getBoneTransform?.(boneName)
     },
     addBoneRotation(boneName, euler) {
-      console.log('[player-proxy] addBoneRotation called for bone:', boneName, 'avatar exists:', !!player.avatar, 'instance exists:', !!player.avatar?.instance)
+      console.log(
+        '[player-proxy] addBoneRotation called for bone:',
+        boneName,
+        'avatar exists:',
+        !!player.avatar,
+        'instance exists:',
+        !!player.avatar?.instance
+      )
       const result = player.avatar?.addBoneRotation?.(boneName, euler)
       console.log('[player-proxy] addBoneRotation result:', result)
       return result
@@ -204,7 +211,10 @@ export function createPlayerProxy(entity, player) {
       console.log(`[player-proxy] applyAdditiveAnimation called with url: ${url}, options:`, options)
       console.log(`[player-proxy] player.avatar exists:`, !!player.avatar)
       console.log(`[player-proxy] player.avatar.instance exists:`, !!player.avatar?.instance)
-      console.log(`[player-proxy] player.avatar.instance.setAdditiveAnimation exists:`, !!player.avatar?.instance?.setAdditiveAnimation)
+      console.log(
+        `[player-proxy] player.avatar.instance.setAdditiveAnimation exists:`,
+        !!player.avatar?.instance?.setAdditiveAnimation
+      )
 
       if (!player.avatar?.instance?.setAdditiveAnimation) {
         console.warn('[player-proxy] Additive animations not supported by avatar')
@@ -217,6 +227,15 @@ export function createPlayerProxy(entity, player) {
     stopAdditiveAnimation(url, options = {}) {
       if (!player.avatar?.instance?.stopAdditiveAnimation) return
       player.avatar.instance.stopAdditiveAnimation(url, options?.fadeDuration)
+    },
+    get evm() {
+      return player.data.evm
+    },
+    connect() {
+      return world.evm.connect(player)
+    },
+    disconnect() {
+      return world.evm.disconnect(player)
     },
     // Clear all additive animations
     clearAdditiveAnimations(options = {}) {
