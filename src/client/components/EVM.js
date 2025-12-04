@@ -51,6 +51,10 @@ function Logic({ world }) {
 
   useEffect(() => {
     if (initialized) return
+    if (!world.systems?.evm) {
+      console.warn('[EVM] EVM system not available')
+      return
+    }
     setInitialized(true)
 
     let actions = {}
@@ -58,27 +62,36 @@ function Logic({ world }) {
       actions[action] = (...args) => fn(config, ...args)
     }
 
-    world.systems.evm.bind({
-      actions,
-      utils,
-      abis: { erc20: erc20Abi, erc721: null },
-      config,
-      address,
-      isConnected,
-      isConnecting: isConnecting || isReconnecting,
-      isDisconnected,
-      connect,
-      disconnect,
-      connectors,
-    })
+    try {
+      world.systems.evm.bind({
+        actions,
+        utils,
+        abis: { erc20: erc20Abi, erc721: null },
+        config,
+        address,
+        isConnected,
+        isConnecting: isConnecting || isReconnecting,
+        isDisconnected,
+        connect: connect || (() => {}),
+        disconnect: disconnect || (() => {}),
+        connectors: connectors || [],
+      })
+    } catch (error) {
+      console.error('[EVM] Failed to bind EVM system:', error)
+    }
   }, [config, initialized])
 
   useEffect(() => {
     if (!world.systems?.evm) return
-    world.systems.evm.address = address
-    world.systems.evm.isConnected = isConnected
-    world.systems.evm.isConnecting = isConnecting || isReconnecting
-    world.systems.evm.isDisconnected = isDisconnected
+
+    try {
+      world.systems.evm.address = address
+      world.systems.evm.isConnected = isConnected
+      world.systems.evm.isConnecting = isConnecting || isReconnecting
+      world.systems.evm.isDisconnected = isDisconnected
+    } catch (error) {
+      console.error('[EVM] Failed to update EVM state:', error)
+    }
   }, [address, isConnected, isConnecting, isReconnecting, isDisconnected, world.systems])
 
   return null
