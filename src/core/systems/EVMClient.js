@@ -1,95 +1,84 @@
-commit f39c16f987ddea731d8f38d578def7992d2df028
-Author: peezy <itspeezy@protonmail.com>
-Date:   Sun Nov 2 13:45:12 2025 -0300
+import { System } from './System'
+import { storage } from '../storage'
 
-    evm v1.0.7
+const key = 'evm:auths'
 
-diff --git a/src/core/systems/EVMClient.js b/src/core/systems/EVMClient.js
-new file mode 100644
-index 0000000..5c98cd3
---- /dev/null
-+++ b/src/core/systems/EVMClient.js
-@@ -0,0 +1,83 @@
-+import { System } from './System'
-+import { storage } from '../storage'
-+
-+const key = 'hyp:solana:auths'
-+const template = 'Connect to world:\n{address}'
-+
-+export class EVM extends System {
-+  constructor(world) {
-+    super(world)
-+    this.auths = storage.get(key, []) // [...{ address, signature }]
-+    this.connected = false
-+  }
-+
-+  async bind({ connectors, connect, config, actions, abis, address, isConnected, isConnecting, disconnect }) {
-+    // console.log('bind', { isConnected, isConnecting })
-+    // {connectors, connect, config, actions, abis, address}
-+    this.actions = actions
-+    this.abis = abis
-+    this.connection = { connect, disconnect, connectors }
-+    // this.connectors = connectors
-+    // this.connect = connect
-+    this.config = config
-+    this.address = address
-+    // this.disconnect = disconnect
-+    if (isConnected && !this.connected) {
-+      this.connected = true
-+      this.world.network.send('evmConnect', address)
-+    }
-+    if (!isConnected && this.connected) {
-+      this.connected = false
-+      this.world.network.send('evmDisconnect')
-+    }
-+  }
-+
-+  connect(player) {
-+    // console.log('connect', player.data.id !== this.world.network.id, this.connected)
-+    if (player && player.data.id !== this.world.network.id) {
-+      throw new Error('[solana] cannot connect a remote player from client')
-+    }
-+    if (this.connected) return
-+    this.connection.connect({ connector: this.connection.connectors[0] })
-+    this.connected = true
-+    // if (!this.wallet) return
-+    // if (this.wallet.connected) return
-+    // this.modal.setVisible(true)
-+  }
-+
-+  disconnect(player) {
-+    if (player && player.data.id !== this.world.network.id) {
-+      throw new Error('[solana] cannot disconnect a remote player from client')
-+    }
-+    if (!this.connected) return
-+    this.connection.disconnect()
-+    this.connected = false
-+    // this.world.network.send('evmDisconnect')
-+  }
-+
-+  deposit(playerId, amount) {
-+    throw new Error('[solana] deposit can only be called on the server')
-+  }
-+
-+  withdraw(playerId, amount) {
-+    throw new Error('[solana] withdraw can only be called on the server')
-+  }
-+
-+  async onDepositRequest({ depositId, serializedTx }) {
-+    // console.log('onDepositRequest', { depositId, serializedTx })
-+    // const tx = Transaction.from(Buffer.from(serializedTx, 'base64'))
-+    // const signedTx = await this.wallet.signTransaction(tx)
-+    // const serializedSignedTx = Buffer.from(signedTx.serialize()).toString('base64')
-+    this.world.network.send('depositResponse', { depositId, serializedSignedTx })
-+    // console.log('depositResponse', { depositId, serializedSignedTx })
-+  }
-+
-+  async onWithdrawRequest({ withdrawId, serializedTx }) {
-+    // console.log('onWithdrawRequest', { withdrawId, serializedTx })
-+    // const tx = Transaction.from(Buffer.from(serializedTx, 'base64'))
-+    // const signedTx = await this.wallet.signTransaction(tx)
-+    // const serializedSignedTx = Buffer.from(signedTx.serialize({ requireAllSignatures: false })).toString('base64')
-+    this.world.network.send('withdrawResponse', { withdrawId, serializedSignedTx })
-+    // console.log('withdrawResponse', { withdrawId, serializedSignedTx })
-+  }
-+}
+export class EVM extends System {
+  constructor(world) {
+    super(world)
+    this.auths = storage.get(key, [])
+    this.connected = false
+    this.address = null
+    this.isConnected = false
+    this.isConnecting = false
+    this.isDisconnected = true
+    this.connection = null
+  }
+
+  init() {
+    // Server-side init if needed
+  }
+
+  bind({ actions, utils, abis, config, address, isConnected, isConnecting, isDisconnected, connect, disconnect, connectors }) {
+    this.actions = actions
+    this.utils = utils
+    this.abis = abis
+    this.config = config
+    this.address = address
+    this.isConnected = isConnected
+    this.isConnecting = isConnecting
+    this.isDisconnected = isDisconnected
+    this.connection = { connect, disconnect, connectors }
+
+    if (isConnected && !this.connected) {
+      this.connected = true
+      this.world.network.send('evmConnect', address)
+    }
+    if (!isConnected && this.connected) {
+      this.connected = false
+      this.world.network.send('evmDisconnect')
+    }
+  }
+
+  connect(player) {
+    if (player && !this.world.isServer) {
+      throw new Error('[evm] cannot connect a remote player from client')
+    }
+    if (this.connected) return
+    if (this.connection?.connect) {
+      this.connection.connect({ connector: this.connection.connectors?.[0] })
+    }
+  }
+
+  disconnect(player) {
+    if (player && !this.world.isServer) {
+      throw new Error('[evm] cannot disconnect a remote player from client')
+    }
+    if (!this.connected) return
+    if (this.connection?.disconnect) {
+      this.connection.disconnect()
+    }
+  }
+
+  deposit(playerId, amount) {
+    if (!this.world.isServer) {
+      throw new Error('[evm] deposit can only be called on the server')
+    }
+    // Server-side deposit logic
+  }
+
+  withdraw(playerId, amount) {
+    if (!this.world.isServer) {
+      throw new Error('[evm] withdraw can only be called on the server')
+    }
+    // Server-side withdraw logic
+  }
+
+  onDepositRequest({ depositId, serializedTx }) {
+    this.world.network.send('depositResponse', { depositId, serializedSignedTx: null })
+  }
+
+  onWithdrawRequest({ withdrawId, serializedTx }) {
+    this.world.network.send('withdrawResponse', { withdrawId, serializedSignedTx: null })
+  }
+}

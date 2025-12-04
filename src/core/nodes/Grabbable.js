@@ -85,11 +85,13 @@ export class Grabbable extends Node {
 
     if (this.ctx.world.isClient) {
       this.setupInputHandlers()
-      this.setupOutline()
+      this.setupOutline().catch(err => {
+        console.error('[Grabbable] Failed to setup outline:', err)
+      })
     }
   }
 
-  setupOutline() {
+  async setupOutline() {
     if (!this.outlineEnabled) return
     
     const graphics = this.ctx.world.graphics
@@ -356,7 +358,6 @@ export class Grabbable extends Node {
     if (this.onGrab) {
       this.onGrab(this, null)
     }
-  }
   }
 
   updateFromCamera() {
