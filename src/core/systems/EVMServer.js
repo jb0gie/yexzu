@@ -14,7 +14,7 @@ export class EVM extends System {
 
     if (!chain) throw new Error('invalid chain string')
 
-    if (world.network.isServer) {
+    if (world.network.isServer && process.env.EVM_SEED_PHRASE) {
       const account = mnemonicToAccount(process.env.EVM_SEED_PHRASE)
 
       const wallet = createWalletClient({
@@ -31,6 +31,16 @@ export class EVM extends System {
       this.utils = utils
       this.actions = client
       this.wallet = wallet
+      this.getContract = getContract
+      this.abis = {
+        erc20: erc20Abi,
+        erc721: null,
+      }
+    } else if (world.network.isServer) {
+      console.warn('[EVM] EVM_SEED_PHRASE not set - EVM features disabled')
+      this.utils = utils
+      this.actions = null
+      this.wallet = null
       this.getContract = getContract
       this.abis = {
         erc20: erc20Abi,
