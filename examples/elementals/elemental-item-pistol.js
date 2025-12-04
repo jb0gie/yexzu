@@ -394,6 +394,25 @@ createItem(({ player, hooks }) => {
     }
   }
 
+  // Helper function to transition to up pose (aiming)
+  function transitionToUpPose() {
+    console.log('[pistol] Transitioning to UP pose (aiming)')
+    playAimAnimation()
+  }
+
+  // Helper function to transition to down pose (not aiming)
+  function transitionToDownPose() {
+    console.log('[pistol] Transitioning to DOWN pose (not aiming)')
+    playPistolGripAnimation()
+  }
+
+  // Helper function to update pose weights for smooth crossfading
+  function updatePoseWeights(delta) {
+    // This function handles smooth transitions between pose weights
+    // Currently a placeholder for future implementation
+    // The actual pose management is handled by the additive animation system
+  }
+
   // Helper function to detect player movement state
   function getPlayerMovementState() {
     if (!control) return 'idle'
@@ -1333,13 +1352,13 @@ createItem(({ player, hooks }) => {
 
             // Handle aim animations with proper state management
             if (isAiming) {
-              // Play aim animation
+              // Transition to UP pose (arms raised)
               setPistolState('aiming')
-              playAimAnimation()
+              transitionToUpPose()
             } else {
-              // Return to pistol grip animation
+              // Transition to DOWN pose (arms lowered)
               setPistolState('equipped')
-              playPistolGripAnimation()
+              transitionToDownPose()
             }
           }
         }
