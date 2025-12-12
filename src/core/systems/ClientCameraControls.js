@@ -1,6 +1,6 @@
 import { isNumber } from 'lodash-es'
 import { System } from './System'
-import { Raycaster, Vector2 } from 'three'
+import { Raycaster, Vector2, Vector3, Quaternion } from 'three'
 
 /**
  * Client Camera Controls System
@@ -75,7 +75,7 @@ export class ClientCameraControls extends System {
 
     // Head bone raycast configuration
     this.useHeadBoneRaycast = true // Enable head bone raycast by default
-    this.focusHysteresis = 0.05 // Anti-jump threshold (5cm)
+    this.focusHysteresis = 0.5 // Anti-jump threshold (50cm) - prevents jitter
     this.lastRaycastPerformance = 0 // Performance monitoring
   }
 
@@ -183,7 +183,7 @@ export class ClientCameraControls extends System {
     }
   }
 
-  update(delta) {
+  update(_delta) {
     // Throttle raycasts for performance (only run every 8ms = ~120fps)
     const now = Date.now()
     const shouldRaycast = now - this.lastRaycastTime >= this.raycastThrottleMs
@@ -279,16 +279,9 @@ export class ClientCameraControls extends System {
         }
       }
 
-      // Apply shaped focus range and bokeh
-      let rangeUsed = baseRange
-      // Ensure the player's plane remains within focus range if we blended away
-      const playerDist = this.getFocusDistanceToPlayer()
-      if (playerDist !== null && isFinite(playerDist)) {
-        const extra = Math.abs(this.targetFocusDistance - playerDist) * 2.0 // Increased from 1.25
-        rangeUsed = Math.max(baseRange, extra) // Use max() to ensure player stays in focus
-        this.world.prefs.setDOFFocusRange(rangeUsed)
-        this.world.prefs.setDOFBokehScale(baseBokeh)
-      }
+      // Apply zoom-based focus range and bokeh (simple, no dynamic expansion)
+      this.world.prefs.setDOFFocusRange(baseRange)
+      this.world.prefs.setDOFBokehScale(baseBokeh)
 
       // When the user changes zoom, snap focus to prevent temporary blur
       if (zoomDelta > 0.05) {
@@ -300,15 +293,9 @@ export class ClientCameraControls extends System {
     // Smooth focus transition with hysteresis
     if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.01) {
       // Apply hysteresis to prevent head jitter from causing focus jumps
-      const previousFocus = this.currentFocusDistance
-      const newFocus = this.targetFocusDistance
-
-      const smoothedFocus = this.applyFocusHysteresis(newFocus, previousFocus)
-
-      if (smoothedFocus !== previousFocus) {
-        this.currentFocusDistance += (smoothedFocus - this.currentFocusDistance) * this.focusSpeed
-        this.setDOFFocusDistance(this.currentFocusDistance)
-      }
+      // Simple smoothing without duplicate hysteresis
+      this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * this.focusSpeed
+      this.setDOFFocusDistance(this.currentFocusDistance)
     } else if (!this.focusSmoothing && this.targetFocusDistance !== this.currentFocusDistance) {
       this.currentFocusDistance = this.targetFocusDistance
       this.setDOFFocusDistance(this.currentFocusDistance)
@@ -474,9 +461,9 @@ export class ClientCameraControls extends System {
       const headMatrix = player.avatar.getBoneTransform('head')
       if (!headMatrix) return null
 
-      const headPos = new THREE.Vector3().setFromMatrixPosition(headMatrix)
-      const headQuat = new THREE.Quaternion().setFromRotationMatrix(headMatrix)
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat)
+      const headPos = new Vector3().setFromMatrixPosition(headMatrix)
+      const headQuat = new Quaternion().setFromRotationMatrix(headMatrix)
+      const forward = new Vector3(0, 0, -1).applyQuaternion(headQuat)
 
       this.raycaster.set(headPos, forward)
       const intersectables = this.world.stage?.scene || this.world.viewport
