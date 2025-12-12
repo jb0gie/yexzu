@@ -258,17 +258,17 @@ export class ClientCameraControls extends System {
       const baseRange = Math.min(camFar * 0.45, lerp(s0.range, s1.range, t))
       const baseBokeh = Math.max(0.2, Math.min(2.0, lerp(s0.bokeh, s1.bokeh, t)))
 
-      // Choose focus center
-      const playerDist = this.getFocusDistanceToPlayer()
-      if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
-        // Blend between player distance and stop-based focus according to zoom
-        const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
-        this.targetFocusDistance = playerDist * (1 - blend) + baseFocus * blend
+      // Choose focus center - RAYCAST FIRST for true dynamic focus
+      const raycastDistance = this.raycastFocusDistance()
+      if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
+        // Primary: Use raycast from reticle for dynamic focus on looked-at objects
+        this.targetFocusDistance = raycastDistance
       } else {
-        // Blend with reticle raycast if available (low influence to avoid jumpiness)
-        const raycastDistance = this.raycastFocusDistance()
-        if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
-          this.targetFocusDistance = raycastDistance * 0.25 + baseFocus * 0.75
+        // Fallback: Blend player distance with stop-based focus
+        const playerDist = this.getFocusDistanceToPlayer()
+        if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
+          const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
+          this.targetFocusDistance = playerDist * (1 - blend) + baseFocus * blend
         } else {
           this.targetFocusDistance = baseFocus
         }
@@ -277,6 +277,7 @@ export class ClientCameraControls extends System {
       // Apply shaped focus range and bokeh
       let rangeUsed = baseRange
       // Ensure the player's plane remains within focus range if we blended away
+      const playerDist = this.getFocusDistanceToPlayer()
       if (playerDist !== null && isFinite(playerDist)) {
         const extra = Math.abs(this.targetFocusDistance - playerDist) * 2.0 // Increased from 1.25
         rangeUsed = Math.max(baseRange, extra) // Use max() to ensure player stays in focus
