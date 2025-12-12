@@ -55,13 +55,13 @@ app.configure([
     key: 'debugMode',
     type: 'toggle',
     label: 'Debug Mode',
-    initial: true,  // Enable debug by default to see what's happening
+    initial: false,
     hint: 'Enable console debugging'
   },
 ])
 
 const FORWARD = new Vector3(0, 0, -1)
-const chargeEmote = props.chargeEmote?.url ? props.chargeEmote.url + '?l=0' : ''
+const chargeEmote = props.chargeEmote?.url + '?l=0'
 const v1 = new Vector3()
 const q1 = new Quaternion()
 const e1 = new Euler(0, 0, 0, 'YXZ')
@@ -80,46 +80,35 @@ if (world.isClient) {
   const control = app.control()
   let canDash = true
   let currentStamina = 100
-  let lastPressed = false
   const dashKey = config.dashKey || 'keyF'
 
   debugLog('Dash key:', dashKey)
-  debugLog('Control object:', control)
-  debugLog('Control key available:', control?.[dashKey])
 
   if (control?.[dashKey]) {
     control[dashKey].capture = true
     debugLog('Captured', dashKey, 'for dash')
-  } else {
-    debugLog('WARNING: Could not capture', dashKey, '- key not available in control')
   }
 
   // Get stamina from combined system or event system
   function getStamina() {
-    debugLog('getStamina() called')
     if (app.stamina) {
       // Combined system
       currentStamina = app.stamina.get()
-      debugLog('Initial stamina from combined system:', currentStamina)
+      debugLog('Initial stamina:', currentStamina)
     } else {
-      // Event-based system - query initial value
+      // Event-based system
       const playerId = player.id
       const initRequestId = Math.random().toString(36).substr(2, 9)
-      debugLog('Querying stamina with requestId:', initRequestId)
       const initHandler = ({ stamina }) => {
         world.off(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
         currentStamina = stamina
-        debugLog('Initial stamina from event system:', currentStamina)
+        debugLog('Initial stamina:', currentStamina)
       }
       world.emit(`stamina:query:${playerId}`, { requestId: initRequestId })
       world.on(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
 
-      // ============================================================
-      // KEY FIX: Declare handler AND cleanup in SAME SCOPE!
-      // This matches the working pattern from oldromDash.js
-      // ============================================================
+      // Listen for updates
       const staminaChangedHandler = ({ playerId: changedPlayerId, stamina }) => {
-        debugLog('stamina:changed event received:', { changedPlayerId, stamina, myPlayerId: player.id })
         if (changedPlayerId === player.id) {
           currentStamina = stamina
           debugLog('Stamina updated:', currentStamina)
@@ -127,7 +116,6 @@ if (world.isClient) {
       }
       world.on('stamina:changed', staminaChangedHandler)
       app.on('destroy', () => {
-        debugLog('Cleanup: removing stamina:changed listener')
         world.off('stamina:changed', staminaChangedHandler)
       })
     }
@@ -145,80 +133,50 @@ if (world.isClient) {
   }
 
   function charge() {
-    debugLog('charge() called')
-    if (player.hasEffect()) {
-      debugLog('Cannot dash - player has effect')
-      return
-    }
-    if (!canDash) {
-      debugLog('Cannot dash - already dashing')
-      return
-    }
+    if (player.hasEffect()) return
+    if (!canDash) return
 
     const staminaCost = config.staminaCost || 30
-    debugLog('Checking stamina - cost:', staminaCost, 'current:', currentStamina)
 
-    // Sync check for immediate feedback - check local cache first
     if (currentStamina < staminaCost) {
-      debugLog('Not enough stamina (sync check) - cost:', staminaCost, 'current:', currentStamina)
+      debugLog('Not enough stamina - current:', currentStamina, 'cost:', staminaCost)
       return
     }
 
+    debugLog('Dash activated! Stamina cost:', staminaCost)
     canDash = false
-    debugLog('Attempting dash - emitting stamina:try-consume event')
 
     const playerId = player.id
     const requestId = Math.random().toString(36).substr(2, 9)
-    debugLog('RequestId:', requestId)
 
     const replyHandler = ({ success, remaining }) => {
-      debugLog('Received reply - success:', success, 'remaining:', remaining)
       world.off(`stamina:try-consume-reply:${playerId}:${requestId}`, replyHandler)
-
-      if (!success) {
-        debugLog('Not enough stamina - cost:', staminaCost, 'remaining:', remaining)
-        canDash = true
-        return
-      }
-
-      debugLog('Dash activated! Stamina cost:', staminaCost)
-      const dir = getDirection()
-      const force = dir.multiplyScalar(30)
-      debugLog('Applying force:', force)
-      player.push(force)
-      player.applyEffect({
-        emote: chargeEmote,
-        turn: true,
-        duration: 0.4,
-        onEnd: () => {
-          debugLog('Dash effect ended')
-          canDash = true
-        },
-      })
     }
 
-    debugLog('Emitting stamina:try-consume event')
     world.emit(`stamina:try-consume:${playerId}`, {
       amount: staminaCost,
       requestId,
-      source: 'romDash',
     })
 
     world.on(`stamina:try-consume-reply:${playerId}:${requestId}`, replyHandler)
-    debugLog('Waiting for reply...')
+
+    const dir = getDirection()
+    const force = dir.multiplyScalar(30)
+    player.push(force)
+    player.applyEffect({
+      emote: chargeEmote,
+      turn: true,
+      duration: 0.4,
+      onEnd: () => {
+        canDash = true
+      },
+    })
   }
 
   app.on('update', delta => {
-    const isPressed = control?.[dashKey]?.pressed || false
-    debugLog('Update - isPressed:', isPressed, 'lastPressed:', lastPressed, 'dashKey:', dashKey)
-
-    // Only trigger dash on key press (not hold)
-    if (isPressed && !lastPressed) {
-      debugLog('Key pressed, calling charge()')
+    if (control?.[dashKey]?.pressed) {
       charge()
     }
-
-    lastPressed = isPressed
   })
 
   if (config.showMobileButton) {

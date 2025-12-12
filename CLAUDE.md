@@ -244,3 +244,5 @@ Apps execute in controlled sandbox with restricted APIs. Always assume limited g
   - ✅ DO use direct JavaScript code at the top level
   - ✅ DO use app.configure() and app.create() directly
   - ✅ DO reference world and app globally, not as parameters
+- this doens't work in hyperfy
+  app.import('/examples/essentials/stamina-system.js')

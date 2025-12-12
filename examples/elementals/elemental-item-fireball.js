@@ -97,6 +97,16 @@ const orb = app.create('prim', {
   opacity: 1
 });
 
+console.log('[fireball] Created orb:', {
+  position: orb.position.toArray(),
+  color: orb.color,
+  emissive: orb.emissive,
+  emissiveIntensity: orb.emissiveIntensity,
+  opacity: orb.opacity,
+  visible: orb.visible,
+  size: CONFIG.ORB.SIZE
+});
+
 const fire = app.create('particles', {
   shape: ['cone', 0.2, 1, 0],
   direction: 0.2,
@@ -140,25 +150,44 @@ world.attach(dotsGroup);
 const originalPos = orb.position.clone().add(new Vector3(0, CONFIG.ORB.RADIUS, 0));
 
 // Step 3: Add pickup action for non-admin players
+console.log('[fireball] Creating pickup action...');
 const pickupAction = app.create('action', {
   label: 'Pick Up Fireball',
+  distance: 3,
+  position: [0, 1, 0], // Position 1m above the orb (more visible)
   onTrigger: () => {
-    console.log('[fireball] Pickup triggered');
-    app.send('pickup', world.getPlayer().id);
+    console.log('[fireball] Pickup action triggered!');
+    const p = world.getPlayer();
+    if (p) {
+      // Clear previous holder if any
+      if (app.state.heldBy && app.state.heldBy !== p.id) {
+        console.log(`[fireball] Clearing previous holder ${app.state.heldBy}`);
+        app.send('drop', { playerId: app.state.heldBy });
+      }
+      // Send 'give' event which elemental-core system handles
+      console.log(`[fireball] Sending 'give' event for player ${p.id}`);
+      app.send('give', p.id);
+    } else {
+      console.error('[fireball] No local player found');
+    }
   }
 });
 orb.add(pickupAction);
 pickupAction.active = true;
+console.log(`[fireball] Pickup action created: active=${pickupAction.active}, distance=${pickupAction.distance}`);
 
 console.log('[fireball] Visual fireball created');
 
 // Step 4: Wrap with elemental item system
 createItem(({ player, hooks }) => {
+  // Initialize orb state based on whether it's held
+  const initiallyHeld = app.state.heldBy === player.id;
+
   const state = {
     heldBy: app.state.heldBy || null,
     control: null,
     lastShootTime: 0,
-    orbVisible: true,
+    orbVisible: !initiallyHeld, // Hide orb if already held (it will be shown in init)
     lastPollTime: 0,
     animationNode: null,
     shootPending: false,
@@ -167,19 +196,47 @@ createItem(({ player, hooks }) => {
     client: world.isClient ? { projectiles: new Map(), lastSend: 0, sendRate: 1 / 30, explosions: new Map(), nextExplosionId: 0 } : null
   };
 
-  function loadGLBAnimation() {
-    if (!world.isClient || !app.props.shootAnimation?.url) return;
-
-    try {
-      const glbNode = app.create('glb', { url: app.props.shootAnimation.url });
-      app.add(glbNode);
-      state.animationNode = glbNode;
-    } catch (error) {
-      console.error('Error loading GLB:', error);
-    }
+  // Set initial visibility
+  if (initiallyHeld) {
+    orb.opacity = 0;
+    orb.emissiveIntensity = 0;
+    dots.active = false;
+    fire.active = false;
   }
 
-  function applyPlayerAnimation(playerId) {
+  return {
+    loadGLBAnimation() {
+      // Only even attempt to load GLB if URL is provided
+    if (!world.isClient || !app.props.shootAnimation || !app.props.shootAnimation.url) {
+      console.log('[fireball] No shoot animation URL configured, skipping GLB load');
+      return;
+    }
+
+    console.log(`[fireball] Loading GLB animation from ${app.props.shootAnimation.url}`);
+
+    try {
+      // Verify 'glb' node type is available
+      if (typeof app.create !== 'function') {
+        console.warn('[fireball] app.create not available');
+        return;
+      }
+
+      // Try to create GLB node with error handling
+      const glbNode = app.create('glb', { url: app.props.shootAnimation.url });
+      if (glbNode) {
+        app.add(glbNode);
+        state.animationNode = glbNode;
+        console.log('[fireball] Loaded shoot animation GLB successfully');
+      } else {
+        console.warn('[fireball] Failed to create GLB node');
+      }
+    } catch (error) {
+      console.error('[fireball] Error loading GLB animation:', error.message);
+      // Non-fatal error, continue without animation
+    }
+  },
+
+  applyPlayerAnimation(playerId) {
     if (!app.props.shootAnimation?.url) return;
     try {
       const player = world.getPlayer(playerId);
@@ -194,9 +251,9 @@ createItem(({ player, hooks }) => {
     } catch (error) {
       console.error('Error playing animation:', error);
     }
-  }
+  },
 
-  function updateOrbVisibility(time) {
+  updateOrbVisibility(time) {
     if (!state.orbVisible) {
       const timeSinceShot = time - state.lastShootTime;
       const totalDuration = CONFIG.TIMING.ORB_HIDE + CONFIG.TIMING.ORB_FADE;
@@ -214,9 +271,9 @@ createItem(({ player, hooks }) => {
       }
       if (state.animationNode) state.animationNode.active = state.orbVisible;
     }
-  }
+  },
 
-  function updateNodeTransforms(delta, targetPlayer, isLocal) {
+  updateNodeTransforms(delta, targetPlayer, isLocal) {
     const time = world.getTime();
     const angle = time * CONFIG.ANIMATION.ORBIT_SPEED;
     const bob = CONFIG.ANIMATION.BOB_AMP * Math.sin(time * CONFIG.ANIMATION.BOB_SPEED);
@@ -230,6 +287,7 @@ createItem(({ player, hooks }) => {
     const newQuat = new Quaternion().setFromEuler(new Euler(0, angle, 0));
 
     if (isLocal) {
+      // For local player, set position directly
       orb.position.copy(newPos);
       orb.quaternion.copy(newQuat);
       dotsGroup.position.copy(newPos);
@@ -238,11 +296,13 @@ createItem(({ player, hooks }) => {
         state.animationNode.position.copy(newPos);
         state.animationNode.quaternion.copy(newQuat);
       }
+      // Send position update to server periodically
       if (time - state.lastPollTime >= CONFIG.TIMING.POLL_INTERVAL) {
         app.send('updatePos', { playerId: state.heldBy, pos: orb.position.toArray() });
         state.lastPollTime = time;
       }
     } else {
+      // For remote players, lerp for smooth movement
       orb.position.lerp(newPos, CONFIG.ANIMATION.LERP_FACTOR);
       orb.quaternion.slerp(newQuat, CONFIG.ANIMATION.LERP_FACTOR);
       dotsGroup.position.lerp(newPos, CONFIG.ANIMATION.LERP_FACTOR);
@@ -252,49 +312,90 @@ createItem(({ player, hooks }) => {
         state.animationNode.quaternion.slerp(newQuat, CONFIG.ANIMATION.LERP_FACTOR);
       }
     }
+
+    // Update particle visibility
     dots.active = state.orbVisible;
     fire.active = state.orbVisible;
-  }
+  },
 
-  return {
     client: {
       init() {
-        loadGLBAnimation();
+        console.log(`[fireball] Client init for player ${player.id}, heldBy=${state.heldBy}, initiallyHeld=${state.heldBy === player.id}`);
+
+        this.loadGLBAnimation();
 
         if (state.heldBy === player.id) {
+          console.log('[fireball] Player already holding fireball at init, making orb visible');
           state.control = app.control();
-        }
-
-        app.on('held', id => {
-          state.heldBy = id;
-          pickupAction.active = false;
           state.orbVisible = true;
           orb.opacity = 1;
           orb.emissiveIntensity = CONFIG.ORB.EMISSIVE_INTENSITY;
           dots.active = true;
           fire.active = true;
+          if (state.animationNode) state.animationNode.active = true;
+          console.log(`[fireball] Orb made visible: opacity=${orb.opacity}, emissive=${orb.emissiveIntensity}`);
+        } else {
+          console.log('[fireball] Player not holding fireball at init, orb should be hidden');
+        }
+
+        app.on('held', id => {
+          console.log(`[fireball] Item held by ${id}, local=${player.local}`);
+          state.heldBy = id;
+          pickupAction.active = false;
+          state.orbVisible = true;
+
+          // CRITICAL: Ensure orb is visible
+          orb.opacity = 1;
+          orb.emissiveIntensity = CONFIG.ORB.EMISSIVE_INTENSITY;
+          console.log(`[fireball] Setting orb opacity=${orb.opacity}, emissive=${orb.emissiveIntensity}`);
+
+          dots.active = true;
+          fire.active = true;
+
           if (id === player.id) {
+            console.log('[fireball] Local player picked up fireball');
             state.control = app.control();
           }
           if (state.animationNode) state.animationNode.active = true;
         });
 
         app.on('dropped', ({ position }) => {
+          console.log(`[fireball] Client received dropped event`);
+          console.log(`[fireball] Dropped position:`, position);
           state.heldBy = null;
-          pickupAction.active = true;
           state.orbVisible = true;
-          orb.opacity = 1;
-          orb.emissiveIntensity = CONFIG.ORB.EMISSIVE_INTENSITY;
+
+          // Return orb to original position
           orb.position.fromArray(position);
+          orb.quaternion.set(0, 0, 0, 1);
+          console.log(`[fireball] Orb returned to position:`, orb.position.toArray());
+
+          // Reset particle positions
           dotsGroup.position.copy(originalPos);
           dotsGroup.quaternion.set(0, 0, 0, 1);
-          dots.active = false;
+
+          // Show particles again
+          dots.active = false; // dots off when in world
           fire.active = true;
+          console.log(`[fireball] Particles active - dots: ${dots.active}, fire: ${fire.active}`);
+
+          // Release controls
           if (state.control) {
             state.control.release();
             state.control = null;
           }
-          if (state.animationNode) state.animationNode.active = false;
+
+          // Hide any animation node
+          if (state.animationNode) {
+            state.animationNode.position.copy(originalPos);
+            state.animationNode.quaternion.set(0, 0, 0, 1);
+            state.animationNode.active = false;
+          }
+
+          // CRITICAL: Re-enable pickup action
+          console.log(`[fireball] Reactivating pickup action`);
+          pickupAction.active = true;
+          console.log(`[fireball] Pickup action active state: ${pickupAction.active}`);
         });
 
         app.on('orb:position', posArray => {
@@ -302,17 +403,30 @@ createItem(({ player, hooks }) => {
         });
 
         app.on('projectile:spawn', ({ id, pos, scale, vel }) => {
+          console.log(`[fireball] CLIENT received projectile:spawn event for id ${id}`);
+          console.log(`[fireball] Projectile data: pos=`, pos, 'scale=', scale, 'vel=', vel);
+
           const initialPos = new Vector3().fromArray(pos);
           const initialVel = new Vector3().fromArray(vel);
+
+          // Make sure we're creating a visible projectile
+          console.log(`[fireball] Creating projectile sphere with size [${scale}]`);
+          // Make projectile more visible for testing (bigger and brighter)
+          const projectileScale = Math.max(scale, 0.1); // Minimum 0.1 size
           const proj = app.create('prim', {
             type: 'sphere',
-            size: [scale],
+            size: [projectileScale],
             position: initialPos,
             color: CONFIG.ORB.COLOR,
             emissive: CONFIG.ORB.COLOR,
-            emissiveIntensity: CONFIG.ORB.EMISSIVE_INTENSITY
+            emissiveIntensity: 20, // Much brighter
+            opacity: 1
           });
 
+          console.log(`[fireball] Created projectile sphere size [${projectileScale}] at`, initialPos.toArray());
+          console.log(`[fireball] Projectile properties: color=${CONFIG.ORB.COLOR}, emissive=${CONFIG.ORB.COLOR}, emissiveIntensity=20, opacity=1`);
+
+          // Create trail particles - ensure they're actively emitting
           const trail = app.create('particles', {
             shape: CONFIG.TRAIL.SHAPE,
             rate: CONFIG.TRAIL.RATE,
@@ -327,21 +441,39 @@ createItem(({ player, hooks }) => {
             velocityLinear: new Vector3(0, 0, 0)
           });
           proj.add(trail);
+          console.log(`[fireball] Added trail to projectile - emitting=${trail.emitting}`);
+
+          // Ensure trail is actively emitting from the start
+          trail.emit();
+
           world.add(proj);
+          console.log(`[fireball] Added projectile to world`);
+
           state.client.projectiles.set(id, { object: proj, initialPos, vel: initialVel, startTime: world.getTime() });
         });
 
         app.on('projectile:cleanup', id => {
+          console.log(`[fireball] Cleaning up projectile ${id}`);
           const proj = state.client.projectiles.get(id);
           if (proj) {
+            console.log(`[fireball] Removing projectile from world`);
             world.remove(proj.object);
             state.client.projectiles.delete(id);
+          } else {
+            console.log(`[fireball] Projectile ${id} not found for cleanup`);
           }
         });
 
         app.on('explosion:spawn', ({ position }) => {
+          console.log(`[fireball] CLIENT received explosion:spawn event`);
+          console.log(`[fireball] Explosion position:`, position);
+
           const expPos = new Vector3().fromArray(position);
           const id = state.client.nextExplosionId++;
+
+          console.log(`[fireball] Creating explosion at`, position);
+
+          // Create main explosion sphere
           const sphere = app.create('prim', {
             type: 'sphere',
             size: [CONFIG.EXPLOSION.RADIUS],
@@ -353,7 +485,9 @@ createItem(({ player, hooks }) => {
           });
           sphere.scale.set(0, 0, 0);
           world.add(sphere);
+          console.log(`[fireball] Created explosion sphere`);
 
+          // Create shockwave ring
           const shockwave = app.create('prim', {
             type: 'sphere',
             size: [CONFIG.SHOCKWAVE.INITIAL_RADIUS],
@@ -367,6 +501,7 @@ createItem(({ player, hooks }) => {
           shockwave.scale.set(0, CONFIG.SHOCKWAVE.HEIGHT / (2 * CONFIG.SHOCKWAVE.INITIAL_RADIUS), 0);
           world.add(shockwave);
 
+          // Create explosion particles
           const particles = app.create('particles', {
             shape: CONFIG.EXPLOSION_PARTICLES.SHAPE,
             direction: CONFIG.EXPLOSION_PARTICLES.DIRECTION,
@@ -388,14 +523,20 @@ createItem(({ player, hooks }) => {
           });
           particles.position.copy(expPos);
           world.add(particles);
+
+          // Clean up particles after duration
           setTimeout(() => {
             world.remove(particles);
           }, 2500);
 
           state.client.explosions.set(id, { sphere, shockwave, startTime: world.getTime() });
+
+          // Apply damage to nearby entities
+          console.log(`[fireball] Checking for entities in explosion radius at`, expPos.toArray());
+          this.applyExplosionDamage(expPos, CONFIG.EXPLOSION.RADIUS);
         });
 
-        app.on('playAnimation', ({ playerId }) => applyPlayerAnimation(playerId));
+        app.on('playAnimation', ({ playerId }) => this.applyPlayerAnimation(playerId));
 
         app.on('shootTime', ({ time, playerId }) => {
           if (state.heldBy === playerId) {
@@ -405,30 +546,65 @@ createItem(({ player, hooks }) => {
         });
       },
 
+      applyExplosionDamage(position, radius) {
+          console.log(`[fireball] Applying damage - position:`, position.toArray(), `radius:`, radius);
+
+          // Check all players
+          const players = world.getPlayers();
+          for (const player of players) {
+            const distance = player.position.distanceTo(position);
+            if (distance <= radius) {
+              const damage = Math.floor((1 - distance / radius) * 50); // 50 max damage at center
+              console.log(`[fireball] Player ${player.id} hit for ${damage} damage`);
+              // Emit damage event for elemental-combat.js
+              app.emit('elemental-item:dmg', [player.id, damage, false]);
+            }
+          }
+
+          // Check all mobs (elemental-mob instances)
+          for (const mobApp of world.apps) {
+            if (mobApp.isMob) { // Mob app should set this flag
+              const distance = mobApp.position.distanceTo(position);
+              if (distance <= radius) {
+                const damage = Math.floor((1 - distance / radius) * 50);
+                console.log(`[fireball] Mob ${mobApp.instanceId} hit for ${damage} damage`);
+                // Emit damage event for mob
+                app.emit('elemental-mob:dmg', [mobApp.instanceId, damage, false]);
+              }
+            }
+          }
+        },
+
       update(delta) {
         const time = world.getTime();
 
         if (state.heldBy === player.id) {
+          // Shooting mechanics
           if (state.control.mouseLeft.pressed && time - state.lastShootTime >= CONFIG.TIMING.SHOOT_COOLDOWN && !state.shootPending) {
+            console.log('[fireball] Mouse left pressed - starting shoot sequence');
             state.shootPending = true;
             state.shootTimer = time;
-            applyPlayerAnimation(player.id);
+            this.applyPlayerAnimation(player.id);
           }
           if (state.shootPending && time - state.shootTimer >= CONFIG.TIMING.SHOOT_DELAY) {
+            console.log('[fireball] Shoot delay complete - firing projectile');
             const fwd = new Vector3(0, 0, -1).applyQuaternion(state.control.camera.quaternion);
             const start = orb.position.clone().add(fwd.clone().normalize().multiplyScalar(CONFIG.ORB.START_OFFSET));
+            console.log('[fireball] Calling server shoot with position:', start.toArray(), 'forward:', fwd.toArray());
             hooks.call('shoot', { playerId: state.heldBy, position: start.toArray(), forward: fwd.toArray() });
             state.lastShootTime = time;
             state.orbVisible = false;
             state.shootPending = false;
           }
 
-          if (state.control.keyX.pressed) {
+          // Drop with Q key
+          if (state.control.keyQ && state.control.keyQ.pressed) {
+            console.log(`[fireball] Q pressed, dropping fireball`);
             hooks.call('drop', { playerId: state.heldBy });
             state.shootPending = false;
           }
 
-          updateOrbVisibility(time);
+          this.updateOrbVisibility(time);
         }
 
         for (const [id, exp] of state.client.explosions.entries()) {
@@ -454,10 +630,16 @@ createItem(({ player, hooks }) => {
       },
 
       lateUpdate(delta) {
+        console.log(`[fireball] lateUpdate: heldBy=${state.heldBy}, player.id=${player.id}, orbVisible=${state.orbVisible}`);
+
         if (state.heldBy) {
+          console.log(`[fireball] Item is held, updating position`);
           const targetPlayer = world.getPlayer(state.heldBy);
           if (targetPlayer) {
-            updateNodeTransforms(delta, targetPlayer, state.heldBy === player.id);
+            console.log(`[fireball] Found target player, updating transforms`);
+            this.updateNodeTransforms(delta, targetPlayer, state.heldBy === player.id);
+          } else {
+            console.warn(`[fireball] Could not find player ${state.heldBy}`);
           }
         } else {
           orb.position.copy(originalPos);
@@ -473,11 +655,18 @@ createItem(({ player, hooks }) => {
           }
         }
 
+        // Update projectile positions
         for (const proj of state.client.projectiles.values()) {
           const timeAlive = world.getTime() - proj.startTime;
           const gravityVec = new Vector3(0, -CONFIG.PROJECTILE.GRAVITY, 0);
           const displacement = proj.vel.clone().multiplyScalar(timeAlive).add(gravityVec.multiplyScalar(0.5 * timeAlive * timeAlive));
-          proj.object.position.copy(proj.initialPos).add(displacement);
+          const newPos = proj.initialPos.clone().add(displacement);
+          proj.object.position.copy(newPos);
+
+          // Log projectile position occasionally for debugging
+          if (Math.floor(timeAlive * 10) % 50 === 0) { // Log every ~5 seconds of simulation
+            console.log(`[fireball] Projectile ${proj} at`, newPos.toArray());
+          }
         }
       },
 
@@ -491,10 +680,15 @@ createItem(({ player, hooks }) => {
 
     server: {
       init() {
+        console.log('[fireball] Server init');
       },
 
       shoot({ playerId, position, forward }) {
-        if (state.heldBy !== playerId) return;
+        console.log(`[fireball] Server received shoot from player ${playerId}`);
+        if (state.heldBy !== playerId) {
+          console.log(`[fireball] Shoot rejected - not held by this player`);
+          return;
+        }
 
         const id = state.server.nextId++;
         const pos = new Vector3().fromArray(position);
@@ -507,6 +701,8 @@ createItem(({ player, hooks }) => {
         const vel = forwardVec.clone().multiplyScalar(v0 * Math.cos(theta));
         vel.y += v0 * Math.sin(theta);
 
+        console.log(`[fireball] Server spawning projectile ${id} from player ${playerId}`);
+
         app.send('projectile:spawn', { id, pos: pos.toArray(), scale: CONFIG.PROJECTILE.SCALE, vel: vel.toArray() });
         app.send('playAnimation', { playerId });
         app.send('shootTime', { time: world.getTime(), playerId });
@@ -515,49 +711,69 @@ createItem(({ player, hooks }) => {
         const y = pos.y;
         const lifetime = CONFIG.PROJECTILE.LIFETIME;
 
-        if (y <= 0) {
-          app.send('explosion:spawn', { position: pos.toArray() });
-          app.send('projectile:cleanup', id);
-          return;
-        }
-
-        const discriminant = vy * vy + 2 * g * y;
-        if (discriminant < 0) {
-          const timeout = setTimeout(() => {
-            app.send('projectile:cleanup', id);
-            state.server.projectiles.delete(id);
-          }, lifetime * 1000);
-          state.server.projectiles.set(id, { owner: playerId, timeout });
-        } else {
-          const sqrtDisc = Math.sqrt(discriminant);
-          const hitT = (vy + sqrtDisc) / g;
-
-          if (hitT < lifetime) {
-            const gravityVec = new Vector3(0, -g, 0);
-            const displacement = vel.clone().multiplyScalar(hitT).add(gravityVec.clone().multiplyScalar(0.5 * hitT * hitT));
-            const hitPos = pos.clone().add(displacement);
-            const timeout = setTimeout(() => {
-              app.send('explosion:spawn', { position: hitPos.toArray() });
-              app.send('projectile:cleanup', id);
-              state.server.projectiles.delete(id);
-            }, hitT * 1000);
-            state.server.projectiles.set(id, { owner: playerId, timeout });
-          } else {
-            const timeout = setTimeout(() => {
-              app.send('projectile:cleanup', id);
-              state.server.projectiles.delete(id);
-            }, lifetime * 1000);
-            state.server.projectiles.set(id, { owner: playerId, timeout });
+        // Calculate when projectile hits ground
+        let hitT = lifetime;
+        if (y > 0) {
+          const discriminant = vy * vy + 2 * g * y;
+          if (discriminant >= 0) {
+            const sqrtDisc = Math.sqrt(discriminant);
+            hitT = Math.min((vy + sqrtDisc) / g, lifetime);
           }
         }
+
+        // Calculate hit position
+        const gravityVec = new Vector3(0, -g, 0);
+        const displacement = vel.clone().multiplyScalar(hitT).add(gravityVec.clone().multiplyScalar(0.5 * hitT * hitT));
+        const hitPos = pos.clone().add(displacement);
+
+        console.log(`[fireball] Projectile will hit at`, hitPos.toArray(), `in ${hitT}s`);
+
+        // Schedule explosion
+        const timeout = setTimeout(() => {
+          app.send('explosion:spawn', { position: hitPos.toArray() });
+
+          // Apply server-side damage
+          applyServerDamage(hitPos, CONFIG.EXPLOSION.RADIUS, playerId);
+
+          app.send('projectile:cleanup', id);
+          state.server.projectiles.delete(id);
+        }, hitT * 1000);
+
+        state.server.projectiles.set(id, { owner: playerId, timeout });
+      },
+
+      applyServerDamage(position, radius, attackerId) {
+        console.log(`[fireball] Server applying damage at`, position.toArray(), `radius:`, radius);
+
+        // Apply damage with falloff
+        const maxDamage = 50;
+
+        // Check all players
+        const players = world.getPlayers();
+        for (const player of players) {
+          if (player.id === attackerId) continue; // Don't damage self
+
+          const distance = player.position.distanceTo(position);
+          if (distance <= radius) {
+            const damage = Math.floor((1 - distance / radius) * maxDamage);
+            console.log(`[fireball] Damaging player ${player.id} for ${damage}`);
+            player.damage(damage);
+          }
+        }
+
+        // Notify mobs in radius
+        app.emit('elemental:explosion', { position: position.toArray(), radius, damage: maxDamage, attackerId });
       },
 
       drop({ playerId }) {
         if (state.heldBy === playerId) {
+          console.log(`[fireball] Dropping fireball from player ${playerId}`);
           state.heldBy = null;
           app.state.heldBy = null;
-          orb.position.copy(originalPos);
+
+          // Send drop event to all clients
           app.send('dropped', { position: originalPos.toArray() });
+          console.log(`[fireball] Sent dropped event with position`, originalPos.toArray());
         }
       },
 
@@ -676,6 +892,7 @@ function createItem(createInstance) {
       instances.set(playerId, instance);
       instance.server?.init?.();
       app.send('activate', playerId);
+      app.send('held', playerId); // Tell client it's held
     });
 
     world.on(`elemental-core:deactivate:${id}`, (playerId) => {
@@ -729,6 +946,7 @@ function createItem(createInstance) {
     const localPlayer = world.getPlayer();
 
     let state = app.state;
+
     if (state.ready) {
       init(state);
     } else {
@@ -739,7 +957,7 @@ function createItem(createInstance) {
       state = _state;
       const instances = new Map();
 
-      function activate(playerId) {
+      const activate = (playerId) => {
         const player = world.getPlayer(playerId);
         const instance = createInstance({
           player,
@@ -757,7 +975,7 @@ function createItem(createInstance) {
         });
         instances.set(playerId, instance);
         instance.client?.init?.();
-      }
+      };
 
       for (const playerId of state.active) {
         activate(playerId);

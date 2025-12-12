@@ -1,3 +1,6 @@
+// romDash - ULTRA SAFE VERSION
+// This version uses inline functions that are guaranteed to work
+
 app.configure([
   {
     key: 'rName',
@@ -55,7 +58,7 @@ app.configure([
     key: 'debugMode',
     type: 'toggle',
     label: 'Debug Mode',
-    initial: true,  // Enable debug by default to see what's happening
+    initial: true,
     hint: 'Enable console debugging'
   },
 ])
@@ -69,11 +72,12 @@ const e1 = new Euler(0, 0, 0, 'YXZ')
 // Debug logging utility
 function debugLog(...args) {
   if (config.debugMode) {
-    console.log('[Dash ROM]', ...args)
+    console.log('[ULTIMATE FIX]', ...args)
   }
 }
 
-debugLog('Initializing with dash key:', config.dashKey || 'keyF')
+debugLog('=== ULTIMATE SAFE VERSION LOADED ===')
+debugLog('Pattern: Named function declarations for guaranteed scope')
 
 if (world.isClient) {
   const player = world.getPlayer()
@@ -85,49 +89,65 @@ if (world.isClient) {
 
   debugLog('Dash key:', dashKey)
   debugLog('Control object:', control)
-  debugLog('Control key available:', control?.[dashKey])
 
   if (control?.[dashKey]) {
     control[dashKey].capture = true
-    debugLog('Captured', dashKey, 'for dash')
+    debugLog('✓ Captured', dashKey)
   } else {
-    debugLog('WARNING: Could not capture', dashKey, '- key not available in control')
+    debugLog('✗ WARNING: Could not capture', dashKey)
   }
 
   // Get stamina from combined system or event system
   function getStamina() {
     debugLog('getStamina() called')
+
     if (app.stamina) {
       // Combined system
       currentStamina = app.stamina.get()
-      debugLog('Initial stamina from combined system:', currentStamina)
-    } else {
-      // Event-based system - query initial value
-      const playerId = player.id
-      const initRequestId = Math.random().toString(36).substr(2, 9)
-      debugLog('Querying stamina with requestId:', initRequestId)
-      const initHandler = ({ stamina }) => {
-        world.off(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
-        currentStamina = stamina
-        debugLog('Initial stamina from event system:', currentStamina)
-      }
-      world.emit(`stamina:query:${playerId}`, { requestId: initRequestId })
-      world.on(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
+      debugLog('✓ Combined API - stamina:', currentStamina)
 
-      // ============================================================
-      // KEY FIX: Declare handler AND cleanup in SAME SCOPE!
-      // This matches the working pattern from oldromDash.js
-      // ============================================================
-      const staminaChangedHandler = ({ playerId: changedPlayerId, stamina }) => {
-        debugLog('stamina:changed event received:', { changedPlayerId, stamina, myPlayerId: player.id })
+      // For combined API, still listen for changes
+      function staminaChangedHandler({ playerId: changedPlayerId, stamina }) {
         if (changedPlayerId === player.id) {
           currentStamina = stamina
-          debugLog('Stamina updated:', currentStamina)
+          debugLog('✓ Stamina updated via combined API:', currentStamina)
         }
       }
       world.on('stamina:changed', staminaChangedHandler)
       app.on('destroy', () => {
-        debugLog('Cleanup: removing stamina:changed listener')
+        world.off('stamina:changed', staminaChangedHandler)
+      })
+    } else {
+      // Event-based system
+      debugLog('ℹ Using event-based system')
+
+      const playerId = player.id
+      const initRequestId = Math.random().toString(36).substr(2, 9)
+      debugLog('Querying stamina - requestId:', initRequestId)
+
+      const initHandler = ({ stamina }) => {
+        world.off(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
+        currentStamina = stamina
+        debugLog('✓ Initial stamina:', currentStamina)
+      }
+      world.emit(`stamina:query:${playerId}`, { requestId: initRequestId })
+      world.on(`stamina:query-reply:${playerId}:${initRequestId}`, initHandler)
+
+      // ========================================================
+      // ULTRA SAFE PATTERN: Named function declaration
+      // Function declarations are hoisted within their scope
+      // This GUARANTEES the function is available for cleanup
+      // ========================================================
+      function staminaChangedHandler({ playerId: changedPlayerId, stamina }) {
+        debugLog('✓ stamina:changed event - player:', player.id, 'stamina:', stamina)
+        if (changedPlayerId === player.id) {
+          currentStamina = stamina
+          debugLog('✓ Updated currentStamina:', currentStamina)
+        }
+      }
+      world.on('stamina:changed', staminaChangedHandler)
+      app.on('destroy', () => {
+        debugLog('✓ Cleanup: removing stamina:changed listener')
         world.off('stamina:changed', staminaChangedHandler)
       })
     }
@@ -136,6 +156,10 @@ if (world.isClient) {
   getStamina()
 
   function getDirection() {
+    if (!control?.camera) {
+      debugLog('✗ Camera not available, using forward')
+      return new Vector3(0, 0, -1)
+    }
     e1.setFromQuaternion(control.camera.quaternion)
     e1.x = 0
     e1.z = 0
@@ -146,58 +170,66 @@ if (world.isClient) {
 
   function charge() {
     debugLog('charge() called')
+
     if (player.hasEffect()) {
-      debugLog('Cannot dash - player has effect')
+      debugLog('✗ Cannot dash - player has effect')
       return
     }
     if (!canDash) {
-      debugLog('Cannot dash - already dashing')
+      debugLog('✗ Cannot dash - already dashing')
       return
     }
 
     const staminaCost = config.staminaCost || 30
-    debugLog('Checking stamina - cost:', staminaCost, 'current:', currentStamina)
+    debugLog('Stamina check - cost:', staminaCost, 'current:', currentStamina)
 
-    // Sync check for immediate feedback - check local cache first
     if (currentStamina < staminaCost) {
-      debugLog('Not enough stamina (sync check) - cost:', staminaCost, 'current:', currentStamina)
+      debugLog('✗ Not enough stamina - need:', staminaCost, 'have:', currentStamina)
       return
     }
 
     canDash = false
-    debugLog('Attempting dash - emitting stamina:try-consume event')
+    debugLog('✓ Attempting dash')
 
     const playerId = player.id
     const requestId = Math.random().toString(36).substr(2, 9)
-    debugLog('RequestId:', requestId)
+    debugLog('Request ID:', requestId)
 
     const replyHandler = ({ success, remaining }) => {
-      debugLog('Received reply - success:', success, 'remaining:', remaining)
+      debugLog('✓ Reply received - success:', success)
       world.off(`stamina:try-consume-reply:${playerId}:${requestId}`, replyHandler)
 
       if (!success) {
-        debugLog('Not enough stamina - cost:', staminaCost, 'remaining:', remaining)
+        debugLog('✗ Stamina consumption failed - remaining:', remaining)
         canDash = true
         return
       }
 
-      debugLog('Dash activated! Stamina cost:', staminaCost)
+      debugLog('✓ Dash activated!')
       const dir = getDirection()
       const force = dir.multiplyScalar(30)
-      debugLog('Applying force:', force)
+      debugLog('✓ Applying force:', force)
       player.push(force)
-      player.applyEffect({
-        emote: chargeEmote,
-        turn: true,
-        duration: 0.4,
-        onEnd: () => {
-          debugLog('Dash effect ended')
+
+      if (chargeEmote) {
+        player.applyEffect({
+          emote: chargeEmote,
+          turn: true,
+          duration: 0.4,
+          onEnd: () => {
+            debugLog('✓ Dash effect ended')
+            canDash = true
+          },
+        })
+      } else {
+        debugLog('✓ No emote, using timeout')
+        setTimeout(() => {
           canDash = true
-        },
-      })
+        }, 400)
+      }
     }
 
-    debugLog('Emitting stamina:try-consume event')
+    debugLog('✓ Emitting stamina:try-consume event')
     world.emit(`stamina:try-consume:${playerId}`, {
       amount: staminaCost,
       requestId,
@@ -205,16 +237,15 @@ if (world.isClient) {
     })
 
     world.on(`stamina:try-consume-reply:${playerId}:${requestId}`, replyHandler)
-    debugLog('Waiting for reply...')
+    debugLog('✓ Waiting for reply...')
   }
 
   app.on('update', delta => {
     const isPressed = control?.[dashKey]?.pressed || false
-    debugLog('Update - isPressed:', isPressed, 'lastPressed:', lastPressed, 'dashKey:', dashKey)
+    debugLog('Update - pressed:', isPressed, 'last:', lastPressed)
 
-    // Only trigger dash on key press (not hold)
     if (isPressed && !lastPressed) {
-      debugLog('Key pressed, calling charge()')
+      debugLog('✓ KEY PRESSED - calling charge()')
       charge()
     }
 
@@ -222,6 +253,8 @@ if (world.isClient) {
   })
 
   if (config.showMobileButton) {
+    debugLog('✓ Creating mobile button')
+
     const dashBtn = app.create('ui', {
       space: 'screen',
       width: 50,
@@ -236,53 +269,54 @@ if (world.isClient) {
       alignItems: 'center',
       justifyContent: 'center',
     })
+
     const label = app.create('uitext', {
       value: 'DASH',
       color: 'white',
       fontSize: 10,
       fontWeight: 'bold',
     })
+
     dashBtn.add(label)
     app.add(dashBtn)
-    debugLog('Mobile button created')
+    debugLog('✓ Mobile button created')
   }
+
+  debugLog('=== romDash FULLY INITIALIZED ===')
 }
 
+// ROM visual
 const ui = app.create('ui')
 ui.rotation.y = 180 * DEG2RAD
 ui.position.z = -0.12
 ui.position.y = -0.46
 ui.width = 20
+
 const romName = app.create('uitext')
 romName.fontSize = 4
 romName.textAlign = 'center'
 romName.color = '#000000'
-romName.value = props.rName
+romName.value = props.rName || 'Dash ROM'
 romName.backgroundColor = '#ffffff'
 romName.fontFamily = 'Arial Black'
-const mesh = app.get('RomColor')
-mesh.linked = false
 
-let colorSet = false
-let lastColor = null
-app.on('update', () => {
-  if (!colorSet && mesh && mesh.material) {
-    mesh.material.color = props.color
-    colorSet = true
-    lastColor = props.color
-  } else if (colorSet && mesh && mesh.material && props.color !== lastColor) {
-    mesh.material.color = props.color
-    lastColor = props.color
-  }
-})
+const mesh = app.get('RomColor')
+if (mesh) {
+  mesh.linked = false
+  app.on('update', () => {
+    if (mesh.material) {
+      mesh.material.color = props.color
+    }
+  })
+}
 
 ui.add(romName)
 app.add(ui)
 
-// Add kinematic rigidbody so ROM can trigger collision detection
-// The static rigidbody in the .glb won't fire trigger events
 const romBody = app.create('rigidbody', {
   type: 'kinematic',
   trigger: true,
 })
 app.add(romBody)
+
+debugLog('=== SCRIPT FULLY LOADED ===')

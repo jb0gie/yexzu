@@ -1,5 +1,7 @@
 # DojoEngine + Hyperfy Integration Guide
 
+> **🚀 QUICK START:** New to blockchain gaming? Start here: **[QUICKSTART.md](QUICKSTART.md)** - Get running in 3 commands!
+
 ## Overview
 
 This integration combines **Hyperfy's real-time 3D, physics, and multiplayer capabilities** with **DojoEngine's onchain verifiable game logic and persistence**. The result is a powerful hybrid platform for blockchain gaming with true digital ownership.
