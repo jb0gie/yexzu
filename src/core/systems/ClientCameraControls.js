@@ -72,6 +72,11 @@ export class ClientCameraControls extends System {
     // Raycast throttling for performance (8ms = ~120fps)
     this.lastRaycastTime = 0
     this.raycastThrottleMs = 8
+
+    // Head bone raycast configuration
+    this.useHeadBoneRaycast = true // Enable head bone raycast by default
+    this.focusHysteresis = 0.05 // Anti-jump threshold (5cm)
+    this.lastRaycastPerformance = 0 // Performance monitoring
   }
 
   init() {
@@ -292,10 +297,18 @@ export class ClientCameraControls extends System {
       }
     }
 
-    // Smooth focus transition
+    // Smooth focus transition with hysteresis
     if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.01) {
-      this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * this.focusSpeed
-      this.setDOFFocusDistance(this.currentFocusDistance)
+      // Apply hysteresis to prevent head jitter from causing focus jumps
+      const previousFocus = this.currentFocusDistance
+      const newFocus = this.targetFocusDistance
+
+      const smoothedFocus = this.applyFocusHysteresis(newFocus, previousFocus)
+
+      if (smoothedFocus !== previousFocus) {
+        this.currentFocusDistance += (smoothedFocus - this.currentFocusDistance) * this.focusSpeed
+        this.setDOFFocusDistance(this.currentFocusDistance)
+      }
     } else if (!this.focusSmoothing && this.targetFocusDistance !== this.currentFocusDistance) {
       this.currentFocusDistance = this.targetFocusDistance
       this.setDOFFocusDistance(this.currentFocusDistance)
@@ -413,6 +426,15 @@ export class ClientCameraControls extends System {
 
   // Raycast from camera center to get focus distance
   raycastFocusDistance() {
+    // Priority 1: Head bone raycast (most accurate - from player avatar)
+    if (this.useHeadBoneRaycast) {
+      const headFocus = this.raycastFromPlayerHead()
+      if (headFocus !== null && isFinite(headFocus) && headFocus > 0.5) {
+        return headFocus
+      }
+    }
+
+    // Priority 2: Reticle raycast (fallback - from screen center)
     if (!this.world.camera || !this.world.stage) {
       return null
     }
@@ -441,6 +463,43 @@ export class ClientCameraControls extends System {
 
   // Auto-focus using raycast
 
+  // Raycast from player head bone for accurate focus
+  raycastFromPlayerHead() {
+    const player = this.world.entities.player
+    if (!player?.avatar) return null
+
+    const startTime = performance.now()
+
+    try {
+      const headMatrix = player.avatar.getBoneTransform('head')
+      if (!headMatrix) return null
+
+      const headPos = new THREE.Vector3().setFromMatrixPosition(headMatrix)
+      const headQuat = new THREE.Quaternion().setFromRotationMatrix(headMatrix)
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat)
+
+      this.raycaster.set(headPos, forward)
+      const intersectables = this.world.stage?.scene || this.world.viewport
+      const intersects = this.raycaster.intersectObjects(intersectables?.children || [], true)
+
+      const distance = intersects.length > 0 ? intersects[0].distance : null
+
+      // Performance monitoring
+      const endTime = performance.now()
+      this.lastRaycastPerformance = endTime - startTime
+
+      // Warn if raycast is slow (>1ms)
+      if (this.lastRaycastPerformance > 1 && this.debugDOF) {
+        console.warn(`[ClientCameraControls] Head bone raycast took ${this.lastRaycastPerformance.toFixed(2)}ms`)
+      }
+
+      return distance
+    } catch (error) {
+      console.warn('[ClientCameraControls] Head bone raycast failed:', error)
+      return null
+    }
+  }
+
   // Get focus distance to player
   getFocusDistanceToPlayer() {
     if (!this.world.entities?.player || !this.world.camera) {
@@ -468,6 +527,21 @@ export class ClientCameraControls extends System {
   }
 
   // Auto-focus on player
+
+  // Apply hysteresis to prevent focus jumping from head jitter
+  applyFocusHysteresis(newFocus, previousFocus) {
+    if (previousFocus === null) return newFocus
+
+    const distance = Math.abs(newFocus - previousFocus)
+
+    if (distance < this.focusHysteresis) {
+      // Maintain current focus - prevents tiny jumps from head jitter
+      return previousFocus
+    }
+
+    // Large change - allow new focus
+    return newFocus
+  }
 
   // Master enable/disable
   enable() {
@@ -883,6 +957,55 @@ export class ClientCameraControls extends System {
         },
       },
 
+      // Head bone raycast control
+      headBone: {
+        enable: () => {
+          if (!this.isPlayerAdmin()) {
+            console.warn('Camera controls are admin-only')
+            return false
+          }
+          this.useHeadBoneRaycast = true
+          console.log('Head bone raycast enabled')
+          return true
+        },
+
+        disable: () => {
+          if (!this.isPlayerAdmin()) {
+            console.warn('Camera controls are admin-only')
+            return false
+          }
+          this.useHeadBoneRaycast = false
+          console.log('Head bone raycast disabled')
+          return true
+        },
+
+        debug: () => {
+          if (!this.isPlayerAdmin()) {
+            console.warn('Camera controls are admin-only')
+            return false
+          }
+          const headFocus = this.raycastFromPlayerHead()
+          const reticleFocus = (() => {
+            if (!this.world.camera || !this.world.stage?.viewport) return null
+            try {
+              const hits = this.world.stage.raycastReticle()
+              if (hits && hits.length > 0) {
+                const validHits = hits.filter(hit => hit.distance > 0.5)
+                if (validHits.length > 0) return validHits[0].distance
+              }
+            } catch (err) {}
+            return null
+          })()
+
+          console.log(`Head bone focus: ${headFocus}m`)
+          console.log(`Reticle focus: ${reticleFocus}m`)
+          console.log(`Using head bone: ${this.useHeadBoneRaycast}`)
+          console.log(`Player avatar available: ${!!this.world.entities.player?.avatar}`)
+          console.log(`Last raycast performance: ${this.lastRaycastPerformance}ms`)
+          return true
+        },
+      },
+
       // Presets
       preset: name => {
         if (!this.isPlayerAdmin()) {
@@ -1000,6 +1123,11 @@ cam.preset('portrait') - Apply portrait preset
 cam.preset('landscape') - Apply landscape preset
 cam.preset('macro') - Apply macro preset
 cam.preset('standard') - Apply standard preset
+
+Head Bone Raycast:
+cam.headBone.enable() - Enable head bone raycast (default: ON)
+cam.headBone.disable() - Disable head bone raycast (fallback to reticle)
+cam.headBone.debug() - Show current focus sources and performance
 
 Info:
 cam.settings() - Show current camera settings
