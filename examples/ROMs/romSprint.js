@@ -1,5 +1,23 @@
 app.configure([
   {
+    key: 'rName',
+    type: 'text',
+    label: 'Rom Name',
+  },
+  {
+    key: 'color',
+    type: 'dropdown',
+    label: 'Color',
+    options: [
+      { label: 'Red', value: 'red' },
+      { label: 'Orange', value: 'orange' },
+      { label: 'Yellow', value: 'yellow' },
+      { label: 'Green', value: 'green' },
+      { label: 'Blue', value: 'blue' },
+    ],
+    initial: 'red',
+  },
+  {
     key: 'superRunEmote',
     type: 'file',
     kind: 'emote',
@@ -34,12 +52,7 @@ if (world.isClient) {
 
   function isGrounded() {
     if (!player?.position) return true
-    const hit = world.raycast(
-      player.position.clone(),
-      new Vector3(0, -1, 0),
-      PLAYER_HALF_HEIGHT + 0.1,
-      layerMask
-    )
+    const hit = world.raycast(player.position.clone(), new Vector3(0, -1, 0), PLAYER_HALF_HEIGHT + 0.1, layerMask)
     return hit !== null && hit.distance <= PLAYER_HALF_HEIGHT + 0.05
   }
 
@@ -86,3 +99,32 @@ if (world.isClient) {
     }
   })
 }
+const ui = app.create('ui')
+ui.rotation.y = 180 * DEG2RAD
+ui.position.z = -0.12
+ui.position.y = -0.46
+ui.width = 20
+const romName = app.create('uitext')
+romName.fontSize = 4
+romName.textAlign = 'center'
+romName.color = '#000000'
+romName.value = props.rName
+romName.backgroundColor = '#ffffff'
+romName.fontFamily = 'Arial Black'
+const mesh = app.get('RomColor')
+mesh.linked = false
+
+let colorSet = false
+let lastColor = null
+app.on('update', () => {
+  if (!colorSet && mesh && mesh.material) {
+    mesh.material.color = props.color
+    colorSet = true
+    lastColor = props.color
+  } else if (colorSet && mesh && mesh.material && props.color !== lastColor) {
+    mesh.material.color = props.color
+    lastColor = props.color
+  }
+})
+ui.add(romName)
+app.add(ui)

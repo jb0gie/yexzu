@@ -46,10 +46,10 @@ export class ClientPrefs extends System {
     // Camera settings
     this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : false
     this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 10
-    this.dofAperture = isNumber(data.dofAperture) ? data.dofAperture : 5.6 // F-stop value (1.4 = shallow DOF, 22 = deep DOF)
+    this.dofAperture = isNumber(data.dofAperture) ? data.dofAperture : 5.6  // F-stop value (1.4 = shallow DOF, 22 = deep DOF)
     this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
     this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 1
-    this.focalLength = isNumber(data.focalLength) ? data.focalLength : 24 // Wide landscape preset default (73° FOV)
+    this.focalLength = isNumber(data.focalLength) ? data.focalLength : 50
     this.showHelpers = isBoolean(data.showHelpers) ? data.showHelpers : false
     // Autofocus settings
     this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : false
@@ -59,19 +59,9 @@ export class ClientPrefs extends System {
     this.reticleFocusDelay = isNumber(data.reticleFocusDelay) ? data.reticleFocusDelay : 0.5
     this.scrollZoomEnabled = isBoolean(data.scrollZoomEnabled) ? data.scrollZoomEnabled : false
     this.zoomSpeed = isNumber(data.zoomSpeed) ? data.zoomSpeed : 5
-    // Mobile/touch controls
-    this.touchLookSensitivity = isNumber(data.touchLookSensitivity) ? data.touchLookSensitivity : isTouch ? 1.2 : 1
-    this.touchInvertY = isBoolean(data.touchInvertY) ? data.touchInvertY : false
-    this.autoSprintThreshold = isNumber(data.autoSprintThreshold) ? data.autoSprintThreshold : 0.9
     this.v = data.v
 
     this.changes = null
-  }
-
-  init() {
-    this.world.chat.bindCommand('stats', () => {
-      this.setStats(!this.stats)
-    })
   }
 
   preFixedUpdate() {
@@ -118,9 +108,6 @@ export class ClientPrefs extends System {
       reticleFocusDelay: this.reticleFocusDelay,
       scrollZoomEnabled: this.scrollZoomEnabled,
       zoomSpeed: this.zoomSpeed,
-      touchLookSensitivity: this.touchLookSensitivity,
-      touchInvertY: this.touchInvertY,
-      autoSprintThreshold: this.autoSprintThreshold,
       v: this.v,
     })
   }
@@ -192,47 +179,34 @@ export class ClientPrefs extends System {
   setShowHelpers(value) {
     this.modify('showHelpers', value)
   }
-
+  
   // Autofocus setters
   setReticleAutofocus(value) {
     this.modify('reticleAutofocus', value)
   }
-
+  
   setPlayerAutofocus(value) {
     this.modify('playerAutofocus', value)
   }
-
+  
   setFocusSmoothing(value) {
     this.modify('focusSmoothing', value)
   }
-
+  
   setFocusSpeed(value) {
     this.modify('focusSpeed', value)
   }
-
+  
   setReticleFocusDelay(value) {
     this.modify('reticleFocusDelay', value)
   }
-
+  
   setScrollZoomEnabled(value) {
     this.modify('scrollZoomEnabled', value)
   }
-
+  
   setZoomSpeed(value) {
     this.modify('zoomSpeed', value)
-  }
-
-  // Touch/mobile controls
-  setTouchLookSensitivity(value) {
-    this.modify('touchLookSensitivity', value)
-  }
-
-  setTouchInvertY(value) {
-    this.modify('touchInvertY', value)
-  }
-
-  setAutoSprintThreshold(value) {
-    this.modify('autoSprintThreshold', value)
   }
 
   destroy() {

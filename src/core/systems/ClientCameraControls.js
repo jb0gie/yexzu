@@ -23,7 +23,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus state
     this.focusSmoothing = true
-    this.focusSpeed = 0.1
+    this.focusSpeed = 0.6
     this.targetFocusDistance = 10
     this.currentFocusDistance = 10
 
@@ -33,7 +33,7 @@ export class ClientCameraControls extends System {
     // Pinch-to-zoom state
 
     // Dynamic DOF compensation
-    this.dynamicDOF = false // Auto-adjust DOF based on zoom
+    this.dynamicDOF = true // Auto-adjust DOF based on zoom
     this.lastCameraZoom = null
     this.debugDOF = false // Debug logging
 
@@ -46,7 +46,7 @@ export class ClientCameraControls extends System {
     this.zoomDistanceMultiplier = 3
     this.anchorFocusToPlayer = true
     // Blend player distance with stop-based focus as we zoom out (0..1)
-    this.playerFocusBlendMax = 0.15
+    this.playerFocusBlendMax = 0.5 // 50% blend for better player focus in third-person
     this.playerFocusBlendPow = 1.2
 
     // Track observed zoom range so we can normalize stops to user's device
@@ -68,6 +68,10 @@ export class ClientCameraControls extends System {
     this.focusRangeFarFactor = 3.0
 
     // One-click autofocus using right mouse (outside build mode)
+
+    // Raycast throttling for performance (8ms = ~120fps)
+    this.lastRaycastTime = 0
+    this.raycastThrottleMs = 8
   }
 
   init() {
@@ -82,7 +86,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus defaults
     this.focusSmoothing = true
-    this.focusSpeed = 0.1
+    this.focusSpeed = 0.6
 
     // Other defaults
     this.zoomSpeed = 5
@@ -175,6 +179,14 @@ export class ClientCameraControls extends System {
   }
 
   update(delta) {
+    // Throttle raycasts for performance (only run every 8ms = ~120fps)
+    const now = Date.now()
+    const shouldRaycast = now - this.lastRaycastTime >= this.raycastThrottleMs
+
+    if (shouldRaycast) {
+      this.lastRaycastTime = now
+    }
+
     // ADS zoom removed - weapons handle their own zoom
 
     // Smooth focal length transition
@@ -266,8 +278,8 @@ export class ClientCameraControls extends System {
       let rangeUsed = baseRange
       // Ensure the player's plane remains within focus range if we blended away
       if (playerDist !== null && isFinite(playerDist)) {
-        const extra = Math.abs(this.targetFocusDistance - playerDist) * 1.25
-        if (extra > rangeUsed) rangeUsed = Math.min(camFar * 0.45, extra)
+        const extra = Math.abs(this.targetFocusDistance - playerDist) * 2.0 // Increased from 1.25
+        rangeUsed = Math.max(baseRange, extra) // Use max() to ensure player stays in focus
         this.world.prefs.setDOFFocusRange(rangeUsed)
         this.world.prefs.setDOFBokehScale(baseBokeh)
       }

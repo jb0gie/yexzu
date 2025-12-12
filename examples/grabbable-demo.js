@@ -33,7 +33,7 @@ const puzzlePiece1 = app.create('grabbable', {
   position: [-2, 1.5, -3],
   grabDistance: 3,
   snapDistance: 1.5,
-  snapToPoints: true,
+  snapToPoints: true,	
   returnOnRelease: false,
   snapSignal: 'puzzle:piece1-snapped',
   unsnapSignal: 'puzzle:piece1-unsnapped',

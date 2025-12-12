@@ -119,9 +119,27 @@ app.configure([
 		step: 0.5,
 		initial: 2,
 	},
+	{
+		type: 'section',
+		label: 'Debug',
+	},
+	{
+		key: 'debugLogs',
+		type: 'toggle',
+		label: 'Enable Debug Logs',
+		initial: false,
+		hint: 'Show detailed console logs for debugging',
+	},
 ])
 
 if (world.isClient) {
+	// ===== DEBUG HELPER =====
+	function debugLog(...args) {
+		if (props.debugLogs) {
+			console.log('[foot-trails]', ...args)
+		}
+	}
+
 	// Use default particle template (like speed-trails.js)
 	let particleTemplate = app.get('SpeedParticle')
 	if (!particleTemplate) {
@@ -139,9 +157,9 @@ if (world.isClient) {
 	let customModelLoaded = false
 
 	if (props.customModel?.url) {
-		console.log('✅ Loading custom model:', props.customModel.url)
+		debugLog('Loading custom model:', props.customModel.url)
 		world.load('model', props.customModel.url).then(loadedModel => {
-			console.log('✅ Custom model loaded successfully')
+			debugLog('Custom model loaded successfully')
 			// Use the first child from the model
 			if (loadedModel.children && loadedModel.children.length > 0) {
 				customModelTemplate = loadedModel.children[0]
@@ -156,13 +174,13 @@ if (world.isClient) {
 				world.add(customModelTemplate)
 			}
 			customModelLoaded = true
-			console.log('✅ Custom model template ready with mesh type:', customModelTemplate.type)
+			debugLog('Custom model template ready with mesh type:', customModelTemplate.type)
 		}).catch(err => {
-			console.error('❌ Failed to load custom model:', err)
+			console.error('Failed to load custom model:', err)
 			customModelLoaded = false
 		})
 	} else {
-		console.log('🔧 Using default particles (no custom model uploaded)')
+		debugLog('Using default particles (no custom model uploaded)')
 	}
 
 	// CONFIG exactly matching speed-trails.js working values
@@ -356,7 +374,7 @@ if (world.isClient) {
 		if (CONFIG.ENABLE_DOUBLE_JUMP && jumpCooldown <= 0) {
 			// Only detect double jumps with higher threshold to reduce frequency
 			if (isInAir && airTime > 0.1 && currentVelocityY > 4) {
-				console.log('🚀 Jump detected!')
+				debugLog('Jump detected!')
 				// Create 1 particle exactly like speed-trails landing burst
 				const trail = particleTemplate.clone(true)
 				trail.visible = true
@@ -384,7 +402,7 @@ if (world.isClient) {
 			// Also consider small hops as landing events for more feedback
 			const shouldTriggerLanding = fallVelocity > CONFIG.MIN_LANDING_VELOCITY || airTime > 0.15
 			if (shouldTriggerLanding) {
-				console.log('💥 Landing impact detected! Velocity:', fallVelocity.toFixed(2), 'Air time:', airTime.toFixed(2))
+				debugLog('Landing impact detected! Velocity:', fallVelocity.toFixed(2), 'Air time:', airTime.toFixed(2))
 
 				// Create landing burst
 				const moveDir = footPos.clone().sub(lastFootPos).normalize()
@@ -397,7 +415,7 @@ if (world.isClient) {
 					if (customModelLoaded && customModelTemplate) {
 						// Clone the loaded custom model
 						trail = customModelTemplate.clone(true)
-						console.log('🌟 Using custom model particle')
+						debugLog('Using custom model particle')
 					} else {
 						// Clone the default template
 						trail = particleTemplate.clone(true)
@@ -460,7 +478,7 @@ if (world.isClient) {
 					if (customModelLoaded && customModelTemplate) {
 						// Clone the loaded custom model
 						trail = customModelTemplate.clone(true)
-						console.log('🌟 Using custom model particle')
+						debugLog('Using custom model particle')
 					} else {
 						// Clone the default template
 						trail = particleTemplate.clone(true)

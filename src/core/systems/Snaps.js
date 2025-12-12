@@ -1,5 +1,6 @@
 import { System } from './System'
 import { SnapOctree } from '../extras/SnapOctree'
+import * as THREE from '../extras/three'
 
 /**
  * Snaps System

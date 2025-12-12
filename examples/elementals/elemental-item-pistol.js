@@ -1,4 +1,4 @@
-// Projectile-based Pistol Item for @elementals/
+// Projectile-based Pistol Item for @elementals/ - v1764864708
 const MIN_DMG = 20
 const MAX_DMG = 40
 const CRIT_CHANCE = 0.2
@@ -11,6 +11,8 @@ const FIRE_RATE = 0.1 // Cooldown in seconds between shots (reduced for testing)
 const v1 = new Vector3()
 const v2 = new Vector3()
 const v3 = new Vector3()
+const q1 = new Quaternion()
+const e1 = new Euler(0, 0, 0, 'YXZ')
 
 // ===== GLOBAL VARIABLES =====
 let pickupAction = null // Pickup action for the pistol
@@ -173,8 +175,14 @@ createItem(({ player, hooks }) => {
     const isPoseAnimation = options.isPose || animUrl.includes('grip') || animUrl.includes('aim') || animUrl.includes('idle') || animUrl.includes('Idle') || animUrl.includes('PistolIdle') || animUrl.includes('AimIdle') || animUrl.includes('fire') || animUrl.includes('reload') || animUrl.includes('Fire') || animUrl.includes('Reload')
     const isActionAnimation = options.isAction || animUrl.includes('equip') || animUrl.includes('Equip')
 
+    // CRITICAL: For non-looping animations, use a unique URL to force replay
+    // The VRM system caches animations by URL, so we need to make each call unique
+    // Define uniqueUrl here so it's available in all scopes
+    const uniqueUrl = options.loop !== false ? animUrl : animUrl + (animUrl.includes('?') ? '&' : '?') + '_t=' + Date.now()
+
     console.log(`[pistol] Animation analysis:`, {
       animUrl,
+      uniqueUrl,
       isPoseAnimation,
       isActionAnimation,
       applyAdditiveAnimation: !!player.applyAdditiveAnimation,
@@ -194,7 +202,9 @@ createItem(({ player, hooks }) => {
           'Boolean(props.debugArmRotations)': Boolean(props.debugArmRotations)
         })
 
-        player.applyAdditiveAnimation(animUrl, {
+        console.log(`[pistol] Using ${options.loop !== false ? 'standard' : 'unique'} URL: ${uniqueUrl}`)
+
+        player.applyAdditiveAnimation(uniqueUrl, {
           weight: (options.weight || 1.0) * (props.pistolAnimationWeight || 1.0),
           fadeDuration: options.fadeDuration || 0.15,
           loop: options.loop !== false, // Default to true unless explicitly set to false
@@ -298,7 +308,8 @@ createItem(({ player, hooks }) => {
     }
 
     // Track current animation and set cooldown only for non-looping animations
-    currentAnimation = animUrl
+    // Use uniqueUrl for non-looping animations to match what was actually played
+    currentAnimation = options.loop !== false ? animUrl : uniqueUrl
     if (!options.loop) {
       animationCooldown = now
     }
@@ -987,6 +998,20 @@ createItem(({ player, hooks }) => {
                   dir = v1.set(0, 0, -1).applyQuaternion(q1)
                 }
 
+                // Rotate player to face camera direction (like dash.js)
+                if (control.camera && control.camera.quaternion) {
+                  e1.setFromQuaternion(control.camera.quaternion)
+                  e1.x = 0 // Keep player upright
+                  e1.z = 0 // Keep player upright
+                  q1.setFromEuler(e1)
+
+                  // Use applyEffect with turn:true to rotate player (like dash.js)
+                  player.applyEffect({
+                    turn: true, // This rotates the player to face the direction
+                    duration: 0.1, // Quick rotation
+                  })
+                }
+
                 const origin = player.position.clone()
                 origin.y += 1.5
 
@@ -1046,7 +1071,7 @@ createItem(({ player, hooks }) => {
               borderRadius: 25,
               pivot: 'top-right',
               position: [1, 1],
-              offset: [-145, -160],
+              offset: [-155, -155],
               cursor: 'pointer',
               onPointerDown: () => {
                 isAiming = !isAiming
@@ -1135,10 +1160,43 @@ createItem(({ player, hooks }) => {
         console.log('  - aim idle:', props.aimIdleEmote?.url || 'not configured')
         console.log('[pistol] Natural locomotion preserved - no overrides needed!')
 
-        // Handle projectile visual effects from server
-        app.on('projectile', (data) => {
+        // Handle fire effects from server (projectile trail, muzzle flash, sound for other players)
+        app.on('fireEffects', (data) => {
+          // Don't show effects for local player firing (they play client-side)
+          if (player.local) return
+
           const startPos = new Vector3().fromArray(data.start)
           const dir = new Vector3().fromArray(data.direction)
+          const muzzlePos = data.muzzlePos ? new Vector3().fromArray(data.muzzlePos) : startPos
+
+          // Play shot sound at muzzle position
+          playSound('fireSound')
+
+          // Create muzzle flash at the shooter's muzzle position
+          if (props.enableParticles) {
+            const muzzleFlash = app.create('particles', {
+              shape: ['sphere', 0.1, 1],
+              direction: 1,
+              rate: 0,
+              max: 30,
+              bursts: [
+                { time: 0, count: 30 }
+              ],
+              color: props.muzzleFlashColor || '#ffaa00',
+              size: '0.05~0.15',
+              alphaOverLife: '1,1|1,0',
+              emissive: '10',
+              speed: '2~5',
+              life: '0.1~0.3'
+            })
+            muzzleFlash.position.copy(muzzlePos)
+            world.add(muzzleFlash)
+
+            // Remove after particles fade
+            setTimeout(() => {
+              world.remove(muzzleFlash)
+            }, 500)
+          }
 
           // Create bullet trail
           const trail = createBulletTrail(startPos, dir)
@@ -1171,6 +1229,37 @@ createItem(({ player, hooks }) => {
           }
 
           app.on('update', updateHandler)
+        })
+
+        // Handle reload effects from server (animation and sound for other players)
+        app.on('reloadEffects', (data) => {
+          // Don't show effects for local player (they play reload client-side)
+          if (player.local) return
+
+          const reloadUrl = getAnimationUrl('reload')
+          if (reloadUrl) {
+            setPistolState('reloading')
+            playAnimation(reloadUrl, {
+              duration: props.reloadDuration || 0.917,
+              loop: false,
+              fadeDuration: 0.2,
+              isPose: true,
+            })
+
+            // Restore pose after reload
+            const reloadDuration = props.reloadDuration || 0.917
+            setTimeout(() => {
+              // CRITICAL: Reset currentAnimation so maintenance system knows to reapply poses
+              currentAnimation = null
+              returnToIdleState()
+            }, reloadDuration * 1000 + 500)
+          }
+
+          // Play reload sound
+          playSound('reloadSound')
+
+          // Play pistol model reload animation
+          playPistolAnimation('EmoteReload')
         })
       },
 
@@ -1221,14 +1310,33 @@ createItem(({ player, hooks }) => {
               dir = v1.set(0, 0, -1).applyQuaternion(q1)
             }
 
+            // Rotate player to face camera direction (like dash.js)
+            if (control.camera && control.camera.quaternion) {
+              e1.setFromQuaternion(control.camera.quaternion)
+              e1.x = 0 // Keep player upright
+              e1.z = 0 // Keep player upright
+              q1.setFromEuler(e1)
+
+              // Use applyEffect with turn:true to rotate player (like dash.js)
+              player.applyEffect({
+                turn: true, // This rotates the player to face the direction
+                duration: 0.1, // Quick rotation
+              })
+            }
+
             // Get muzzle position from bone (like tackle.js - project forward to avoid self-hits)
             const origin = player.position.clone()
             origin.y += 1.5 // Fallback height
 
             if (muzzleBone && muzzleBone.matrixWorld) {
               origin.setFromMatrixPosition(muzzleBone.matrixWorld)
-              // Project origin slightly forward to avoid self-hits in third person
-              const forwardOffset = dir.clone().multiplyScalar(0.3)
+              // Project origin significantly forward to avoid self-hits during movement
+              // 2.0 units ensures we're well clear of the player's bounding box even during animations
+              const forwardOffset = dir.clone().multiplyScalar(2.0)
+              origin.add(forwardOffset)
+            } else {
+              // Fallback: Use camera direction from player's position if muzzle bone unavailable
+              const forwardOffset = dir.clone().multiplyScalar(2.0)
               origin.add(forwardOffset)
             }
 
@@ -1238,6 +1346,9 @@ createItem(({ player, hooks }) => {
               origin: origin.toArray(),
               dir: dir.toArray(),
               ammo,
+              // Client sends muzzle position for networking
+              muzzlePos: muzzleBone && muzzleBone.matrixWorld ? new Vector3().setFromMatrixPosition(muzzleBone.matrixWorld).toArray() : null,
+              worldPos: player.position.toArray() // For fallbacks
             })
             lastFireTime = now
             // console.log(`[pistol] CLIENT: Fire event sent`)
@@ -1704,7 +1815,8 @@ createItem(({ player, hooks }) => {
               }
 
               // Prevent hits that are too close (likely self-hits in third person)
-              if (hit.distance < 0.5) {
+              // With 2.0 unit forward offset, allow hits beyond 1.0 unit (gives space for close combat)
+              if (hit.distance < 1.0) {
                 console.log(`[pistol] Preventing close-range hit - distance: ${hit.distance}`)
                 return
               }
@@ -1780,42 +1892,20 @@ createItem(({ player, hooks }) => {
           console.log(`[pistol] Velocity:`, projectile.velocity.toArray())
           console.log(`[pistol] Hit result:`, hit ? `hit ${hit.object?.id} at ${hit.point.toArray()}` : 'no hit')
 
-          // Send projectile data to clients for visual trail
-          app.send('projectile', {
+          // Send comprehensive fire event to all clients for visual/audio effects
+          app.send('fireEffects', {
             id: `${player.id}-${Date.now()}`,
             start: origin.toArray(),
             direction: dir.toArray(),
             distance: hit ? hit.distance : RANGE,
+            muzzlePos: data.muzzlePos || data.worldPos, // Use client-provided muzzle position if available
+            worldPos: data.worldPos || player.position.toArray(),
             hit: hit ? {
               position: hit.point.toArray(),
               playerId: hit.playerId,
               entityId: hit.entityId
             } : null
           })
-
-          // ===== TASK 5: Muzzle flash at correct bone position =====
-          // Note: On server we don't have visual bones, so this would be
-          // better handled client-side or as a particle effect
-          // For now, create a temporary marker for debugging
-          const flash = app.create('prim', {
-            type: 'sphere',
-            size: [0.1],
-            color: '#ffaa00',
-            emissive: '#ffaa00',
-            emissiveIntensity: 5,
-          })
-          flash.position.copy(origin)
-          world.add(flash)
-
-          let flashTime = 0
-          function flashUpdate(dt) {
-            flashTime += dt
-            if (flashTime > 0.05) {
-              world.remove(flash)
-              app.off('update', flashUpdate)
-            }
-          }
-          app.on('update', flashUpdate)
 
           // Don't use projectile damage system - we already did instant raycast damage above
           // The projectile is just for visual effect, not for hit detection
@@ -1846,6 +1936,12 @@ createItem(({ player, hooks }) => {
             maxAmmo: maxAmmo
           })
         }
+
+        // Broadcast reload animation and sound to all clients
+        app.send('reloadEffects', {
+          playerId: player.id,
+          muzzlePos: data.muzzlePos || null // Send muzzle position if available
+        })
 
         // Send updated ammo to client
         hooks.call('reload', { ammo })

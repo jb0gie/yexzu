@@ -149,33 +149,6 @@ app.configure([
     step: 0.01,
     hint: 'Forward/back position offset for Seat1 (driver seat) in meters.',
   },
-  {
-    key: 'seat2XOffset',
-    type: 'number',
-    label: 'Seat2 X Offset',
-    initial: 0,
-    dp: 2,
-    step: 0.01,
-    hint: 'Horizontal position offset for Seat2 (passenger seat) in meters.',
-  },
-  {
-    key: 'seat2YOffset',
-    type: 'number',
-    label: 'Seat2 Y Offset',
-    initial: 0,
-    dp: 2,
-    step: 0.01,
-    hint: 'Vertical position offset for Seat2 (passenger seat) in meters.',
-  },
-  {
-    key: 'seat2ZOffset',
-    type: 'number',
-    label: 'Seat2 Z Offset',
-    initial: 0,
-    dp: 2,
-    step: 0.01,
-    hint: 'Forward/back position offset for Seat2 (passenger seat) in meters.',
-  },
   // Enhanced Audio System
   {
     key: 'engineIdle',
@@ -292,9 +265,9 @@ const CAMERA_MODES = {
 const WHEEL_MASS = 0.05
 
 // Hop/Drift system configuration
-const HOP_FORCE = 50 // Upward impulse force
+const HOP_FORCE = 50 // Upward impulse force - increased for noticeable hop
 const DRIFT_GRIP_MULTIPLIER = 0.3 // Reduced grip during drift
-const DRIFT_DURATION = 1.5 // Seconds of reduced grip after hop
+const DRIFT_DURATION = 1.5 // Seconds of reduced grip after hop (longer for better drift control)
 
 // Validation and error handling
 function validateConfiguration() {
@@ -388,7 +361,7 @@ const defaultTurnCurve = [
 ]
 const defaultGripCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
-  { time: 1, value: 0.2, inTangent: 0, outTangent: 0 },
+  { time: 1, value: 0.75, inTangent: 0, outTangent: 0 }, // Increased to 0.75 for maximum high-speed stability
 ]
 const defaultLongGripCurve = [
   { time: 0, value: 1, inTangent: 0, outTangent: 0 },
@@ -664,6 +637,7 @@ let hopInput = false
 let isHopping = false
 let isDrifting = false
 let driftTime = 0
+let currentGripMultiplier = 1.0 // Smooth grip transition multiplier
 let isGasPressed = false
 let isHopButtonPressed = false
 
@@ -1721,7 +1695,13 @@ function simulateMode() {
       const turnFactor = turnCurve.evaluate(speedRatioAbs)
       const steerSpeedFactor = 1.0 - speedRatioAbs * 0.7
       const adjustedSteerSpeed = steerSpeed * steerSpeedFactor
-      const targetSteerAngle = steerInput * (steerAngleMax * DEG2RAD) * turnFactor
+      const speedSteeringLimit = 1.0 - speedRatioAbs * 0.5 // Additional steering limit at high speed
+      let targetSteerAngle = steerInput * (steerAngleMax * DEG2RAD) * turnFactor * speedSteeringLimit
+
+      // High-speed steering cap - limit to 15% of max steering at 90%+ speed
+      const highSpeedSteeringCap = speedRatioAbs > 0.9 ? 0.15 : 1.0
+      targetSteerAngle = targetSteerAngle * highSpeedSteeringCap
+
       const angleDifference = targetSteerAngle - steerAngle
       const maxAngleChange = adjustedSteerSpeed * delta
 
@@ -1803,7 +1783,10 @@ function simulateMode() {
         } else if (isDrifting) {
           gripFactor = wheel.gripCurve.evaluate(lateralVelRatio) * wheel.currentGrip * DRIFT_GRIP_MULTIPLIER
         } else {
-          gripFactor = wheel.gripCurve.evaluate(lateralVelRatio) * wheel.currentGrip
+          // High-speed minimum grip threshold to prevent spinouts
+          const baseGrip = wheel.gripCurve.evaluate(lateralVelRatio) * wheel.currentGrip
+          const minGrip = speedRatioAbs > 0.85 ? 0.4 : 0.0 // Enforce 40% minimum grip at 85%+ speed
+          gripFactor = Math.max(baseGrip, minGrip)
         }
 
         const desiredVelChange = -steeringVel * gripFactor
@@ -1811,6 +1794,12 @@ function simulateMode() {
         const counterForce = v4.copy(steeringDir).multiplyScalar(tireMass * desiredAccel)
 
         car.addForceAtLocalPos(counterForce, wheel.spring.position)
+
+        // High-speed lateral velocity damping to prevent spinouts
+        if (speedRatioAbs > 0.85 && Math.abs(steeringVel) > 2) {
+          const dampingForce = v4.copy(steeringDir).multiplyScalar(-steeringVel * 0.5 * tireMass)
+          car.addForceAtLocalPos(dampingForce, wheel.spring.position)
+        }
 
         if (wheel.skid) {
           const sliding = gripFactor < 0.3 && Math.abs(speed) > 5
@@ -1833,22 +1822,67 @@ function simulateMode() {
         wheel.tire.rotation.x += rotationAmount
       }
 
-      // Hop/Drift mechanic
+      // Track landing from hop to start drift
+      if (isHopping && !grounded) {
+        // Still in the air from hop
+      } else if (isHopping && grounded) {
+        // Just landed from hop - start drifting
+        isHopping = false
+        isDrifting = true
+        driftTime = 0
+      }
+
+      // Update drift state - simplified for reliability
+      if (isDrifting) {
+        driftTime += delta
+
+        if (driftTime >= DRIFT_DURATION) {
+          // IMMEDIATE drift end - no transition to ensure clean reset
+          isDrifting = false
+          driftTime = 0
+          currentGripMultiplier = 1.0
+
+          // Force immediate grip and particle reset
+          for (const wheel of wheels) {
+            wheel.currentGrip = wheel.baseGrip
+            if (wheel.skid) wheel.skid.emitting = false
+            if (wheel.smoke) wheel.smoke.emitting = false
+          }
+        } else {
+          // During drift: 30% grip
+          currentGripMultiplier = DRIFT_GRIP_MULTIPLIER
+          for (const wheel of wheels) {
+            wheel.currentGrip = wheel.baseGrip * currentGripMultiplier
+          }
+        }
+      } else {
+        // Not drifting: ensure 100% grip
+        currentGripMultiplier = 1.0
+        for (const wheel of wheels) {
+          wheel.currentGrip = wheel.baseGrip
+        }
+      }
+
+      // Manual drift cancel - immediate reset
+      if (hopInput && isDrifting && !isHopping) {
+        isDrifting = false
+        driftTime = 0
+        currentGripMultiplier = 1.0
+
+        // Force immediate reset
+        for (const wheel of wheels) {
+          wheel.currentGrip = wheel.baseGrip
+          if (wheel.skid) wheel.skid.emitting = false
+          if (wheel.smoke) wheel.smoke.emitting = false
+        }
+      }
+
+      // Hop mechanic - only hop when grounded and not already hopping
       if (hopInput && !isHopping && grounded) {
         // Apply upward impulse
         car.addForce(new Vector3(0, HOP_FORCE, 0))
         isHopping = true
-        isDrifting = true
-        driftTime = 0
-        isHopping = false // Reset immediately for next hop
-      }
-
-      // Update drift state
-      if (isDrifting) {
-        driftTime += delta
-        if (driftTime >= DRIFT_DURATION) {
-          isDrifting = false
-        }
+        // Don't start drift yet - wait for landing
       }
 
       updateTireTemperature(delta)

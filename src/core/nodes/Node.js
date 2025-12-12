@@ -282,6 +282,16 @@ export class Node {
     }
   }
 
+  findNode(predicate) {
+    if (predicate(this)) return this
+    const children = this.children
+    for (let i = 0, l = children.length; i < l; i++) {
+      const found = children[i].findNode(predicate)
+      if (found) return found
+    }
+    return null
+  }
+
   clone(recursive) {
     return new this.constructor().copy(this, recursive)
   }
