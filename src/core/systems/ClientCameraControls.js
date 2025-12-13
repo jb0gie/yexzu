@@ -75,7 +75,7 @@ export class ClientCameraControls extends System {
 
     // Head bone raycast configuration
     this.useHeadBoneRaycast = true // Enable head bone raycast by default
-    this.focusHysteresis = 0.5 // Anti-jump threshold (50cm) - prevents jitter
+    this.focusHysteresis = 1.5 // Anti-jump threshold (1.5m) - more stable
     this.lastRaycastPerformance = 0 // Performance monitoring
   }
 
@@ -91,7 +91,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus defaults
     this.focusSmoothing = true
-    this.focusSpeed = 0.6
+    this.focusSpeed = 0.25 // Slower, more natural focus changes
 
     // Other defaults
     this.zoomSpeed = 5
@@ -291,7 +291,7 @@ export class ClientCameraControls extends System {
     }
 
     // Smooth focus transition with hysteresis
-    if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.01) {
+    if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.15) {
       // Apply hysteresis to prevent head jitter from causing focus jumps
       // Simple smoothing without duplicate hysteresis
       this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * this.focusSpeed
