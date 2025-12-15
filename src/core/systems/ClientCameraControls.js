@@ -91,7 +91,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus defaults
     this.focusSmoothing = true
-    this.focusSpeed = 0.25 // Slower, more natural focus changes
+    this.focusSpeed = 6 // Exponential smoothing speed (higher = faster convergence)
 
     // Other defaults
     this.zoomSpeed = 5
@@ -290,11 +290,12 @@ export class ClientCameraControls extends System {
       }
     }
 
-    // Smooth focus transition with hysteresis
+    // Smooth focus transition with exponential smoothing (more natural than linear)
     if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.15) {
-      // Apply hysteresis to prevent head jitter from causing focus jumps
-      // Simple smoothing without duplicate hysteresis
-      this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * this.focusSpeed
+      // Exponential smoothing: starts fast, slows down as it approaches target
+      // Frame-rate independent and feels more cinematic
+      const lerpFactor = 1 - Math.exp(-this.focusSpeed * _delta)
+      this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * lerpFactor
       this.setDOFFocusDistance(this.currentFocusDistance)
     } else if (!this.focusSmoothing && this.targetFocusDistance !== this.currentFocusDistance) {
       this.currentFocusDistance = this.targetFocusDistance
