@@ -14,4 +14,4 @@ build/
 /.hive-mind*
 code_search_index*
 /.sequential-thoughts*
-/.call_overflow*
+/.call_overflow*.vexify.db

@@ -52,6 +52,17 @@ const Modes = {
   FALL: 4,
   FLY: 5,
   TALK: 6,
+  FLIP: 7,
+  BACKFLIP: 8,
+  SIDEFLIP_LEFT: 9,
+  SIDEFLIP_RIGHT: 10,
+  STRAFE_JUMP_LEFT: 11,
+  STRAFE_JUMP_RIGHT: 12,
+  GRINDING: 13,
+  CLIMBING: 14,
+  LEDGE_HANGING: 15,
+  AIR_DIVING: 16,
+  WALL_SLIDING: 17,
 }
 
 export class PlayerLocal extends Entity {
@@ -99,6 +110,9 @@ export class PlayerLocal extends Entity {
     this.flyForce = 100
     this.flyDrag = 300
     this.flyDir = new THREE.Vector3()
+
+    this.doubleJumpEnabled = true
+    this.flipsEnabled = true
 
     this.platform = {
       actor: null,
@@ -639,7 +653,7 @@ export class PlayerLocal extends Entity {
       const shouldJump =
         this.grounded && !this.jumping && this.jumpDown && !this.data.effect?.snare && !this.data.effect?.freeze
       const shouldAirJump =
-        false && !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled // temp: disabled
+        this.doubleJumpEnabled && !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -918,7 +932,8 @@ export class PlayerLocal extends Entity {
     } else if (this.flying) {
       mode = Modes.FLY
     } else if (this.airJumping) {
-      mode = Modes.FLIP
+      const flipMode = this.detectSmartFlipMode()
+      mode = flipMode
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
@@ -1112,6 +1127,19 @@ export class PlayerLocal extends Entity {
   setName(name) {
     this.modify({ name })
     this.world.network.send('entityModified', { id: this.data.id, name })
+  }
+
+  setDoubleJumpEnabled(enabled) {
+    this.doubleJumpEnabled = enabled
+  }
+
+  detectSmartFlipMode() {
+    if (!this.flipsEnabled) return Modes.FLIP
+    const angle = (Math.atan2(this.axis.x, -this.axis.z) * 180) / Math.PI
+    if (angle > -135 && angle < -45) return Modes.SIDEFLIP_LEFT
+    if (angle > 45 && angle < 135) return Modes.SIDEFLIP_RIGHT
+    if (angle >= 135 || angle <= -135) return Modes.BACKFLIP
+    return Modes.FLIP
   }
 
   setSessionAvatar(avatar) {
