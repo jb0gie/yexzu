@@ -144,8 +144,7 @@ export class ClientGraphics extends System {
     this.world.camera.updateProjectionMatrix()
     this.renderer.setSize(this.width, this.height)
     this.composer.setSize(this.width, this.height)
-    this.css3dRenderer.setSize(this.width, this.height)
-
+    // Note: css3dRenderer is managed by WebView nodes, not ClientGraphics
 
     this.emit('resize')
     this.render()
