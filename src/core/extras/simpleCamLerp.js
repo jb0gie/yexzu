@@ -15,35 +15,32 @@ export function simpleCamLerp(world, camera, target, delta) {
   const alpha = 1.0 - Math.exp(-smoothing * delta)
   camera.quaternion.slerp(target.quaternion, alpha)
 
-  // Store base position (shoulder position from target)
-  const basePosition = v1.copy(target.position)
+  // interpolate camera position
+  // camera.position.lerp(target.position, alpha)
+  // const distToTarget = camera.position.distanceTo(target.position)
+  // if (distToTarget > MAX_CAM_DISTANCE) {
+  //   // Pull the camera closer so it's exactly MAX_CAM_DISTANCE away
+  //   const direction = v1.copy(camera.position).sub(target.position).normalize()
+  //   camera.position.copy(target.position).addScaledVector(direction, MAX_CAM_DISTANCE)
+  // }
 
-  // Calculate backward direction from camera rotation
-  const backward = v1.copy(BACKWARD).applyQuaternion(camera.quaternion)
+  // EXPERIMENTAL: snap camera position instead
+  camera.position.copy(target.position)
 
-  // Get target zoom distance and smooth it
-  const targetDistance = target.zoom
-  if (!camera.zoom || camera.zoom <= 0) {
-    camera.zoom = targetDistance
-  } else {
-    const zoomAlpha = 6 * delta
-    camera.zoom += (targetDistance - camera.zoom) * zoomAlpha
-  }
-
-  // Calculate desired offset position (move camera backward by zoom distance)
-  const desiredPosition = basePosition.clone().add(backward.multiplyScalar(-camera.zoom))
-
-  // raycast from base position backward to check for obstacles
+  // raycast backward to check for zoom collision
   if (!sweepGeometry) sweepGeometry = new PHYSX.PxSphereGeometry(0.2)
-  const layerMask = Layers.camera.mask
-  const hit = world.physics.sweep(sweepGeometry, basePosition, backward, camera.zoom, layerMask)
+  const origin = camera.position
+  const direction = v1.copy(BACKWARD).applyQuaternion(camera.quaternion)
+  const layerMask = Layers.camera.mask // hit everything the camera should hit
+  const hit = world.physics.sweep(sweepGeometry, origin, direction, 200, layerMask)
 
-  // Set camera position based on raycast result
-  if (hit && hit.distance < camera.zoom) {
-    // Hit something - place camera at hit point
-    camera.position.copy(basePosition).add(backward.multiplyScalar(-hit.distance))
+  // lerp to target zoom distance
+  let distance = target.zoom
+  // but if we hit something snap it in so we don't end up in the wall
+  if (hit && hit.distance < distance) {
+    camera.zoom = hit.distance
   } else {
-    // No obstacle - use desired position
-    camera.position.copy(desiredPosition)
+    const alpha = 6 * delta
+    camera.zoom += (distance - camera.zoom) * alpha // regular lerp
   }
 }
