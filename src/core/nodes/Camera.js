@@ -371,6 +371,34 @@ export class Camera extends Node {
             this.cameraHelper.visible = localShow && globalShow !== false
           }
         }
+
+        // Handle DOF preference changes
+        if (changes.dofEnabled !== undefined || changes.dofFocusDistance !== undefined ||
+            changes.dofFocusRange !== undefined || changes.dofBokehScale !== undefined ||
+            changes.focalLength !== undefined) {
+          console.log('[Camera] DOF pref change detected:', Object.keys(changes).filter(k => k.startsWith('dof') || k === 'focalLength'))
+          if (this.effects.dof && this.effects.dof.circleOfConfusionMaterial) {
+            const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
+            if (uniforms) {
+              if (changes.dofFocusDistance !== undefined && uniforms.focusDistance) {
+                uniforms.focusDistance.value = this.ctx.world.prefs.dofFocusDistance / this.far
+                console.log('[Camera] Updated focusDistance:', uniforms.focusDistance.value)
+              }
+              if (changes.focalLength !== undefined && uniforms.focalLength) {
+                uniforms.focalLength.value = this.ctx.world.prefs.focalLength * 0.001
+                console.log('[Camera] Updated focalLength:', uniforms.focalLength.value)
+              }
+              if (changes.dofFocusRange !== undefined && uniforms.focusRange) {
+                uniforms.focusRange.value = this.ctx.world.prefs.dofFocusRange
+                console.log('[Camera] Updated focusRange:', uniforms.focusRange.value)
+              }
+              if (changes.dofBokehScale !== undefined && this.effects.dof.bokehScale !== undefined) {
+                this.effects.dof.bokehScale = this.ctx.world.prefs.dofBokehScale
+                console.log('[Camera] Updated bokehScale:', this.effects.dof.bokehScale)
+              }
+            }
+          }
+        }
       }
       this.ctx.world.prefs.on('change', this.onPrefsChange)
     }
