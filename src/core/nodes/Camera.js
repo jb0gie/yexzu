@@ -114,10 +114,10 @@ export class Camera extends Node {
     // Realistic cinematic DOF settings (based on actual camera lenses)
     this.dof = {
       enabled: data.dof?.enabled ?? true,
-      focusDistance: data.dof?.focusDistance ?? 10,
-      focalLength: data.dof?.focalLength ?? 50,
+      focusDistance: data.dof?.focusDistance ?? 5, // Close focus for shallow DOF
+      focalLength: data.dof?.focalLength ?? 85, // Portrait lens for shallow DOF
       fStop: data.dof?.fStop ?? 1.8, // Realistic: f/1.4-f/2.8 typical for sharp + bokeh
-      maxBlur: data.dof?.maxBlur ?? 0.06, // Reduced for more realistic blur
+      maxBlur: data.dof?.maxBlur ?? 0.2, // Increased for more visible DOF effect
       luminanceThreshold: data.dof?.luminanceThreshold ?? 0.6, // Higher threshold for natural bokeh
       luminanceGain: data.dof?.luminanceGain ?? 2.5, // Reduced gain for realism
       bias: data.dof?.bias ?? 0.08, // Smoother focus transition
