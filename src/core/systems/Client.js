@@ -68,11 +68,6 @@ export class Client extends System {
     initYoga()
   }
 
-  async init({ loadYoga }) {
-    await loadYoga
-    initYoga()
-  }
-
   start() {
     this.world.graphics.renderer.setAnimationLoop(this.world.tick)
     document.addEventListener('visibilitychange', this.onVisibilityChange)

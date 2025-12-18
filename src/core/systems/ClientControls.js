@@ -549,58 +549,6 @@ export class ClientControls extends System {
     }
   }
 
-  buildActions() {
-    this.actions = []
-    for (const control of this.controls) {
-      const actions = control.actions
-      if (actions) {
-        for (const action of actions) {
-          // ignore if already existing
-          if (!action.type === 'custom') {
-            const idx = this.actions.findIndex(a => a.type === action.type)
-            if (idx !== -1) continue
-          }
-          this.actions.push(action)
-        }
-      }
-    }
-    this.world.emit('actions', this.actions)
-  }
-
-  simulateButton(prop, pressed) {
-    if (pressed) {
-      if (this.buttonsDown.has(prop)) return
-      this.buttonsDown.add(prop)
-      for (const control of this.controls) {
-        const button = control.entries[prop]
-        if (button?.$button) {
-          button.pressed = true
-          button.down = true
-          const capture = button.onPress?.()
-          if (capture || button.capture) break
-        }
-        const capture = control.onButtonPress?.(prop)
-        if (capture) break
-      }
-    } else {
-      if (!this.buttonsDown.has(prop)) return
-      this.buttonsDown.delete(prop)
-      for (const control of this.controls) {
-        const button = control.entries[prop]
-        if (button?.$button && button.down) {
-          button.down = false
-          button.released = true
-          button.onRelease?.()
-        }
-      }
-    }
-  }
-
-  setTouchBtn(prop, pressed) {
-    // Set touch button state for mobile controls
-    this.simulateButton(prop, pressed)
-  }
-
   onKeyDown = e => {
     if (e.defaultPrevented) return
     if (e.repeat) return
