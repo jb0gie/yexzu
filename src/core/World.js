@@ -49,7 +49,7 @@ export class World extends EventEmitter {
     this.register('entities', Entities)
     this.register('physics', Physics)
     this.register('stage', Stage)
-    this.register('platformerMechanics', PlatformerMechanics)
+    // this.register('platformerMechanics', PlatformerMechanics)
   }
 
   register(key, System) {
