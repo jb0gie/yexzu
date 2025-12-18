@@ -103,7 +103,7 @@ export class World extends EventEmitter {
         attachToRig: true,
         isPlayerCamera: true, // This is the main player camera
         // Start with effects disabled for faster initial load
-        dof: { enabled: false },
+        dof: { enabled: true, focusDistance: 10, focalLength: 24, bokehScale: 1 },
         bloom: { enabled: false },
         vignette: { enabled: false },
         chromaticAberration: { enabled: false },
