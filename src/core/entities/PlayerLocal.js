@@ -97,6 +97,8 @@ export class PlayerLocal extends Entity {
     this.jumped = false
     this.jumping = false
     this.justLeftGround = false
+    this.canDoubleJump = true  // Track if we can perform a double jump
+    this.doubleJumpUsed = false  // Prevent multiple triggers per air session
 
     this.fallTimer = 0
     this.falling = false
@@ -610,6 +612,11 @@ export class PlayerLocal extends Entity {
         this.jumping = false
       }
 
+      // Reset double jump when landing
+      if (this.grounded) {
+        this.canDoubleJump = true
+        this.doubleJumpUsed = false  // Reset for next jump
+      }
       // if airJumping and we're now on the ground, clear it
       if (this.airJumped && this.grounded) {
         this.airJumped = false
@@ -718,7 +725,7 @@ export class PlayerLocal extends Entity {
       const shouldJump =
         this.grounded && !this.jumping && this.jumpDown && !this.data.effect?.snare && !this.data.effect?.freeze
       const shouldAirJump =
-        false && !this.grounded && !this.airJumped && this.jumpPressed && !this.world.builder?.enabled // temp: disabled
+        !this.grounded && this.canDoubleJump && !this.doubleJumpUsed && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
         // calc velocity needed to reach jump height
         let jumpVelocity = Math.sqrt(2 * this.effectiveGravity * this.jumpHeight)
@@ -736,6 +743,8 @@ export class PlayerLocal extends Entity {
           this.falling = false
           this.fallTimer = 0
           this.jumping = true
+          this.canDoubleJump = false  // Prevent multiple double jumps
+          this.doubleJumpUsed = true  // Mark as used for this air session
           this.airJumped = true
           this.airJumping = true
         }
@@ -879,6 +888,10 @@ export class PlayerLocal extends Entity {
 
     // watch jump presses to either fly or air-jump
     this.jumpDown = xr ? this.control.xrRightBtn1.down : this.control.space.down || this.control.touchA.down
+    // Reset double jump used flag when button is released (allows next press)
+    if (!this.jumpDown && this.doubleJumpUsed && !this.grounded) {
+      this.doubleJumpUsed = false
+    }
     if (xr ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed) {
       this.jumpPressed = true
     }
