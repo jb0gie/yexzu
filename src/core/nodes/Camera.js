@@ -585,14 +585,16 @@ export class Camera extends Node {
     // Set up postprocessing if not already done
     if (!this.composer && this.ctx?.world?.graphics) {
       try {
+        console.log('[Camera] Calling setupPostprocessing...')
         this.setupPostprocessing()
         console.log('[Camera] Postprocessing setup complete, composer created:', !!this.composer)
       } catch (error) {
         console.error('[Camera] Failed to setup postprocessing:', error.message)
+        console.error('[Camera] Error stack:', error.stack)
         // Continue without postprocessing rather than breaking
       }
     }
-    console.log('[Camera] Activate complete. Active:', this._active, 'Composer:', !!this.composer)
+    console.log('[Camera] Activate complete. Active:', this._active, 'Composer:', !!this.composer, 'Effects:', Object.keys(this.effects))
   }
 
   /**
@@ -841,32 +843,40 @@ export class Camera extends Node {
 
     // Depth of Field with cinematic settings
     if (this.dof.enabled) {
-      console.log('[Camera] Setting up DOF with params:', {
-        focusDistance: this.dof.focusDistance,
-        focalLength: this.dof.focalLength,
-        bokehScale: this.dof.maxBlur * 100,
-        far: this.far
-      })
-      this.effects.dof = new DepthOfFieldEffect(this.camera, {
-        blendFunction: BlendFunction.NORMAL,
-        focusDistance: this.dof.focusDistance / this.far, // Normalize to 0-1
-        focalLength: this.dof.focalLength * 0.001, // Convert mm to Three.js units
-        bokehScale: this.dof.maxBlur * 100, // Scale for visibility
-        height: 480, // Resolution for DOF
-      })
+      console.log('[Camera] Setting up DOF effect...')
+      try {
+        console.log('[Camera] DOF params:', {
+          focusDistance: this.dof.focusDistance,
+          focalLength: this.dof.focalLength,
+          maxBlur: this.dof.maxBlur,
+          bokehScale: this.dof.maxBlur * 100,
+          far: this.far
+        })
+        this.effects.dof = new DepthOfFieldEffect(this.camera, {
+          blendFunction: BlendFunction.NORMAL,
+          focusDistance: this.dof.focusDistance / this.far, // Normalize to 0-1
+          focalLength: this.dof.focalLength * 0.001, // Convert mm to Three.js units
+          bokehScale: this.dof.maxBlur * 100, // Scale for visibility
+          height: 480, // Resolution for DOF
+        })
+        console.log('[Camera] DOF effect created successfully:', !!this.effects.dof)
 
-      // Configure DOF effect with realistic parameters
-      const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
-      if (uniforms.fStop) uniforms.fStop.value = this.dof.fStop
-      if (uniforms.maxBlur) uniforms.maxBlur.value = this.dof.maxBlur
-      if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = this.dof.luminanceThreshold
-      if (uniforms.luminanceGain) uniforms.luminanceGain.value = this.dof.luminanceGain
-      if (uniforms.bias) uniforms.bias.value = this.dof.bias
-      if (uniforms.fringe) uniforms.fringe.value = this.dof.fringe
-      if (uniforms.pentagon) uniforms.pentagon.value = this.dof.pentagon
-      if (uniforms.shapeBlur) uniforms.shapeBlur.value = this.dof.shapeBlur
+        // Configure DOF effect with realistic parameters
+        const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
+        if (uniforms.fStop) uniforms.fStop.value = this.dof.fStop
+        if (uniforms.maxBlur) uniforms.maxBlur.value = this.dof.maxBlur
+        if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = this.dof.luminanceThreshold
+        if (uniforms.luminanceGain) uniforms.luminanceGain.value = this.dof.luminanceGain
+        if (uniforms.bias) uniforms.bias.value = this.dof.bias
+        if (uniforms.fringe) uniforms.fringe.value = this.dof.fringe
+        if (uniforms.pentagon) uniforms.pentagon.value = this.dof.pentagon
+        if (uniforms.shapeBlur) uniforms.shapeBlur.value = this.dof.shapeBlur
 
-      enabledEffects.push(this.effects.dof)
+        enabledEffects.push(this.effects.dof)
+        console.log('[Camera] DOF added to enabledEffects, total effects:', enabledEffects.length)
+      } catch (error) {
+        console.error('[Camera] Failed to create DOF effect:', error)
+      }
     }
 
     // Bloom
