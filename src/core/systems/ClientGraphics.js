@@ -155,6 +155,12 @@ export class ClientGraphics extends System {
     const activeCameraNode = this.world.cameraManager?.activeCamera
     const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
 
+    // Debug logging to see which camera path is taken
+    if (!this._renderLogged) {
+      console.log('[Graphics] Render - ActiveCameraNode:', !!activeCameraNode, 'HasComposer:', !!activeCameraNode?.composer, 'UsingCameraNode:', !!activeCameraNode?.composer)
+      this._renderLogged = true
+    }
+
     // Render WebGL scene
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
       this.renderer.render(this.world.stage.scene, cam)
