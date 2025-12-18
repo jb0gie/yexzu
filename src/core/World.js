@@ -14,6 +14,7 @@ import { Entities } from './systems/Entities'
 import { Physics } from './systems/Physics'
 import { Stage } from './systems/Stage'
 import { Scripts } from './systems/Scripts'
+import { Camera } from './nodes/Camera'
 
 export class World extends EventEmitter {
   constructor() {

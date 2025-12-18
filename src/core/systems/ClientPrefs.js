@@ -158,6 +158,31 @@ export class ClientPrefs extends System {
     this.modify('focusSmoothing', value)
   }
 
+  // Additional camera/DOF preference methods
+  setFocusSpeed(value) {
+    this.modify('focusSpeed', value)
+  }
+
+  setPlayerAutofocus(value) {
+    this.modify('playerAutofocus', value)
+  }
+
+  setReticleAutofocus(value) {
+    this.modify('reticleAutofocus', value)
+  }
+
+  setScrollZoomEnabled(value) {
+    this.modify('scrollZoomEnabled', value)
+  }
+
+  setShowHelpers(value) {
+    this.modify('showHelpers', value)
+  }
+
+  setZoomSpeed(value) {
+    this.modify('zoomSpeed', value)
+  }
+
   destroy() {
     // ...
   }
