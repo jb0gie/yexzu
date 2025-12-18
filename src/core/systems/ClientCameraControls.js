@@ -91,7 +91,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus defaults
     this.focusSmoothing = true
-    this.focusSpeed = 3 // Slower exponential smoothing for more constant feel
+    this.focusSpeed = 0.5 // Much slower for natural, imperceptible focus transitions
 
     // Other defaults
     this.zoomSpeed = 5
