@@ -415,27 +415,11 @@ export class Camera extends Node {
     // - Player camera should auto-activate
     // - Non-player cameras only auto-activate if explicitly requested via data.autoActivate
     if (this._active && (this.isPlayerCamera || this.data?.autoActivate === true)) {
-      console.log('[Camera] Camera marked as active, activating...')
       // Ensure registration before activation
       if (this.ctx?.world?.cameraManager && !this.ctx.world.cameraManager.cameras.has(this.id)) {
         this.ctx.world.cameraManager.registerCamera(this)
-        console.log('[Camera] Registered with CameraManager')
       }
       this.ctx?.world?.cameraManager?.setActiveCamera?.(this)
-      console.log('[Camera] Set as active camera')
-
-      // One-time summary log (after a delay to ensure everything is set up)
-      setTimeout(() => {
-        console.log('=== Camera Summary ===')
-        console.log('- Active:', this._active)
-        console.log('- Player Camera:', this.isPlayerCamera)
-        console.log('- DOF Enabled:', this.dof.enabled)
-        console.log('- DOF Effect Created:', !!this.effects.dof)
-        console.log('- Has Composer:', !!this.composer)
-        console.log('- CameraManager Active:', !!this.ctx?.world?.cameraManager?.activeCamera)
-        console.log('- ActiveCamera === this:', this.ctx?.world?.cameraManager?.activeCamera === this)
-        console.log('======================')
-      }, 1000)
     }
   }
 
@@ -1233,6 +1217,15 @@ export class Camera extends Node {
   update(delta) {
     // Early exit if camera is disposed
     if (this._disposed) return
+
+    // Setup postprocessing if not done yet (graphics may not have been available during activate)
+    if (!this.composer && this.ctx?.world?.graphics && this._active) {
+      try {
+        this.setupPostprocessing()
+      } catch (error) {
+        console.error('[Camera] Deferred setupPostprocessing failed:', error.message)
+      }
+    }
 
     // Make sure camera is initialized
     if (!this.camera) return
