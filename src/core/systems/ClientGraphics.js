@@ -155,10 +155,15 @@ export class ClientGraphics extends System {
     const activeCameraNode = this.world.cameraManager?.activeCamera
     const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
 
-    // Debug logging to see which camera path is taken
-    if (!this._renderLogged) {
-      console.log('[Graphics] Render - ActiveCameraNode:', !!activeCameraNode, 'HasComposer:', !!activeCameraNode?.composer, 'UsingCameraNode:', !!activeCameraNode?.composer)
-      this._renderLogged = true
+    // Debug logging to see which camera path is taken (log once, then every 300 frames)
+    this._renderLogTimer = (this._renderLogTimer || 0) + 1
+    if (this._renderLogTimer === 1 || this._renderLogTimer % 300 === 0) {
+      console.log('[Graphics] Render frame', this._renderLogTimer, '- ActiveCameraNode:', !!activeCameraNode, 'HasComposer:', !!activeCameraNode?.composer)
+      if (activeCameraNode?.composer) {
+        console.log('[Graphics] Using camera node composer with DOF effects')
+      } else {
+        console.log('[Graphics] Using default composer (no Camera node DOF)')
+      }
     }
 
     // Render WebGL scene

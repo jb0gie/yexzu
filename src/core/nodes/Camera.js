@@ -376,27 +376,35 @@ export class Camera extends Node {
         if (changes.dofEnabled !== undefined || changes.dofFocusDistance !== undefined ||
             changes.dofFocusRange !== undefined || changes.dofBokehScale !== undefined ||
             changes.focalLength !== undefined) {
-          console.log('[Camera] DOF pref change detected:', Object.keys(changes).filter(k => k.startsWith('dof') || k === 'focalLength'))
+          // Throttle logging - only log every 60 frames
+          this._dofLogTimer = (this._dofLogTimer || 0) + 1
+          if (this._dofLogTimer % 60 === 0 || typeof this._dofLogTimer === 'undefined') {
+            console.log('[Camera] DOF pref change detected:', Object.keys(changes).filter(k => k.startsWith('dof') || k === 'focalLength'))
+          }
           if (this.effects.dof && this.effects.dof.circleOfConfusionMaterial) {
             const uniforms = this.effects.dof.circleOfConfusionMaterial.uniforms
             if (uniforms) {
               if (changes.dofFocusDistance !== undefined && uniforms.focusDistance) {
                 uniforms.focusDistance.value = this.ctx.world.prefs.dofFocusDistance / this.far
-                console.log('[Camera] Updated focusDistance:', uniforms.focusDistance.value)
+                if (this._dofLogTimer % 60 === 0) console.log('[Camera] Updated focusDistance:', uniforms.focusDistance.value.toFixed(3))
               }
               if (changes.focalLength !== undefined && uniforms.focalLength) {
                 uniforms.focalLength.value = this.ctx.world.prefs.focalLength * 0.001
-                console.log('[Camera] Updated focalLength:', uniforms.focalLength.value)
+                if (this._dofLogTimer % 60 === 0) console.log('[Camera] Updated focalLength:', uniforms.focalLength.value.toFixed(3))
               }
               if (changes.dofFocusRange !== undefined && uniforms.focusRange) {
                 uniforms.focusRange.value = this.ctx.world.prefs.dofFocusRange
-                console.log('[Camera] Updated focusRange:', uniforms.focusRange.value)
+                if (this._dofLogTimer % 60 === 0) console.log('[Camera] Updated focusRange:', uniforms.focusRange.value.toFixed(3))
               }
               if (changes.dofBokehScale !== undefined && this.effects.dof.bokehScale !== undefined) {
                 this.effects.dof.bokehScale = this.ctx.world.prefs.dofBokehScale
-                console.log('[Camera] Updated bokehScale:', this.effects.dof.bokehScale)
+                if (this._dofLogTimer % 60 === 0) console.log('[Camera] Updated bokehScale:', this.effects.dof.bokehScale.toFixed(3))
               }
+            } else if (this._dofLogTimer % 60 === 0) {
+              console.log('[Camera] DOF effect exists but no uniforms')
             }
+          } else if (this._dofLogTimer % 60 === 0) {
+            console.log('[Camera] DOF pref changes but no DOF effect (enabled:', this.dof.enabled, ')')
           }
         }
       }
@@ -415,6 +423,19 @@ export class Camera extends Node {
       }
       this.ctx?.world?.cameraManager?.setActiveCamera?.(this)
       console.log('[Camera] Set as active camera')
+
+      // One-time summary log (after a delay to ensure everything is set up)
+      setTimeout(() => {
+        console.log('=== Camera Summary ===')
+        console.log('- Active:', this._active)
+        console.log('- Player Camera:', this.isPlayerCamera)
+        console.log('- DOF Enabled:', this.dof.enabled)
+        console.log('- DOF Effect Created:', !!this.effects.dof)
+        console.log('- Has Composer:', !!this.composer)
+        console.log('- CameraManager Active:', !!this.ctx?.world?.cameraManager?.activeCamera)
+        console.log('- ActiveCamera === this:', this.ctx?.world?.cameraManager?.activeCamera === this)
+        console.log('======================')
+      }, 1000)
     }
   }
 
