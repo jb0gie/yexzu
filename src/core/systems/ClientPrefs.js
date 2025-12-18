@@ -43,25 +43,15 @@ export class ClientPrefs extends System {
     this.music = isNumber(data.music) ? data.music : 1
     this.sfx = isNumber(data.sfx) ? data.sfx : 1
     this.voice = isNumber(data.voice) ? data.voice : 1
-    // Camera settings
-    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : false
-    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 10
-    this.dofAperture = isNumber(data.dofAperture) ? data.dofAperture : 5.6  // F-stop value (1.4 = shallow DOF, 22 = deep DOF)
-    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
-    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 1
-    this.focalLength = isNumber(data.focalLength) ? data.focalLength : 50
-    this.showHelpers = isBoolean(data.showHelpers) ? data.showHelpers : false
-    // Autofocus settings
-    this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : false
-    this.playerAutofocus = isBoolean(data.playerAutofocus) ? data.playerAutofocus : false
-    this.focusSmoothing = isBoolean(data.focusSmoothing) ? data.focusSmoothing : true
-    this.focusSpeed = isNumber(data.focusSpeed) ? data.focusSpeed : 0.1
-    this.reticleFocusDelay = isNumber(data.reticleFocusDelay) ? data.reticleFocusDelay : 0.5
-    this.scrollZoomEnabled = isBoolean(data.scrollZoomEnabled) ? data.scrollZoomEnabled : false
-    this.zoomSpeed = isNumber(data.zoomSpeed) ? data.zoomSpeed : 5
     this.v = data.v
 
     this.changes = null
+  }
+
+  init() {
+    this.world.chat.bindCommand('stats', () => {
+      this.setStats(!this.stats)
+    })
   }
 
   preFixedUpdate() {
@@ -95,19 +85,6 @@ export class ClientPrefs extends System {
       music: this.music,
       sfx: this.sfx,
       voice: this.voice,
-      dofEnabled: this.dofEnabled,
-      dofFocusDistance: this.dofFocusDistance,
-      dofFocusRange: this.dofFocusRange,
-      dofBokehScale: this.dofBokehScale,
-      focalLength: this.focalLength,
-      showHelpers: this.showHelpers,
-      reticleAutofocus: this.reticleAutofocus,
-      playerAutofocus: this.playerAutofocus,
-      focusSmoothing: this.focusSmoothing,
-      focusSpeed: this.focusSpeed,
-      reticleFocusDelay: this.reticleFocusDelay,
-      scrollZoomEnabled: this.scrollZoomEnabled,
-      zoomSpeed: this.zoomSpeed,
       v: this.v,
     })
   }
@@ -154,59 +131,6 @@ export class ClientPrefs extends System {
 
   setVoice(value) {
     this.modify('voice', value)
-  }
-
-  setDOFEnabled(value) {
-    this.modify('dofEnabled', value)
-  }
-
-  setDOFFocusDistance(value) {
-    this.modify('dofFocusDistance', value)
-  }
-
-  setDOFFocusRange(value) {
-    this.modify('dofFocusRange', value)
-  }
-
-  setDOFBokehScale(value) {
-    this.modify('dofBokehScale', value)
-  }
-
-  setFocalLength(value) {
-    this.modify('focalLength', value)
-  }
-
-  setShowHelpers(value) {
-    this.modify('showHelpers', value)
-  }
-  
-  // Autofocus setters
-  setReticleAutofocus(value) {
-    this.modify('reticleAutofocus', value)
-  }
-  
-  setPlayerAutofocus(value) {
-    this.modify('playerAutofocus', value)
-  }
-  
-  setFocusSmoothing(value) {
-    this.modify('focusSmoothing', value)
-  }
-  
-  setFocusSpeed(value) {
-    this.modify('focusSpeed', value)
-  }
-  
-  setReticleFocusDelay(value) {
-    this.modify('reticleFocusDelay', value)
-  }
-  
-  setScrollZoomEnabled(value) {
-    this.modify('scrollZoomEnabled', value)
-  }
-  
-  setZoomSpeed(value) {
-    this.modify('zoomSpeed', value)
   }
 
   destroy() {

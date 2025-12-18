@@ -185,14 +185,10 @@ export class App extends Entity {
       player.$cleanup()
     })
     // deactivate local node
-    if (this.root && typeof this.root.deactivate === 'function') {
-      this.root.deactivate()
-    }
+    this.root?.deactivate()
     // deactivate world nodes
     for (const node of this.worldNodes) {
-      if (typeof node.deactivate === 'function') {
-        node.deactivate()
-      }
+      node.deactivate()
     }
     this.worldNodes.clear()
     // clear script event listeners

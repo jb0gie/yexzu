@@ -1,7 +1,6 @@
 import * as THREE from './extras/three'
 import EventEmitter from 'eventemitter3'
 
-import { Camera } from './nodes/Camera'
 import { Settings } from './systems/Settings'
 import { Collections } from './systems/Collections'
 import { Apps } from './systems/Apps'
@@ -15,7 +14,6 @@ import { Entities } from './systems/Entities'
 import { Physics } from './systems/Physics'
 import { Stage } from './systems/Stage'
 import { Scripts } from './systems/Scripts'
-import { PlatformerMechanics } from './systems/PlatformerMechanics'
 
 export class World extends EventEmitter {
   constructor() {
@@ -35,39 +33,8 @@ export class World extends EventEmitter {
     this.rig = new THREE.Object3D()
     // NOTE: camera near is slightly smaller than spherecast. far is slightly more than skybox.
     // this gives us minimal z-fighting without needing logarithmic depth buffers
-
-    // We'll create the default camera node after systems are initialized
-    this.defaultCameraNode = null
-
-    // Backwards compatibility: world.camera returns active camera node's camera
-    Object.defineProperty(this, 'camera', {
-      get() {
-        // Return the active camera node's THREE.js camera
-        if (this.cameraManager?.activeCamera?.camera) {
-          return this.cameraManager.activeCamera.camera
-        }
-        // Fall back to default camera node if available
-        if (this.defaultCameraNode?.camera) {
-          return this.defaultCameraNode.camera
-        }
-        // Last resort: create a temporary camera (shouldn't happen)
-        // console.warn('No camera available - this should not happen')
-        return new THREE.PerspectiveCamera(73, 1, 0.2, 1200)
-      },
-    })
-
-    // Expose network properties for client/server detection
-    Object.defineProperty(this, 'isClient', {
-      get() {
-        return this.network?.isClient || false
-      },
-    })
-
-    Object.defineProperty(this, 'isServer', {
-      get() {
-        return this.network?.isServer || false
-      },
-    })
+    this.camera = new THREE.PerspectiveCamera(70, 0, 0.2, 1200)
+    this.rig.add(this.camera)
 
     this.register('settings', Settings)
     this.register('collections', Collections)
@@ -97,8 +64,6 @@ export class World extends EventEmitter {
     this.storage = options.storage
     this.assetsDir = options.assetsDir
     this.assetsUrl = options.assetsUrl
-
-    // Initialize all systems first
     for (const system of this.systems) {
       await system.init(options)
     }

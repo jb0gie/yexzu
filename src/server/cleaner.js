@@ -8,9 +8,9 @@ class Cleaner {
 
   async init({ db }) {
     const clean = process.env.CLEAN === 'true' || process.env.CLEAN === 'dryrun'
-    if (!clean) return // console.log('[clean] skipped')
+    if (!clean) return console.log('[clean] skipped')
     const dryrun = process.env.CLEAN === 'dryrun'
-    // console.log(dryrun ? '[clean] dry run' : '[clean] running')
+    console.log(dryrun ? '[clean] dry run' : '[clean] running')
     // get all assets
     const allAssets = await assets.list() // hash-only assets
     // get all blueprints
@@ -49,9 +49,9 @@ class Cleaner {
       }
     }
     if (blueprintsToDelete.length) {
-      // console.log(`[clean] ${blueprintsToDelete.length} blueprints can be deleted`)
+      console.log(`[clean] ${blueprintsToDelete.length} blueprints can be deleted`)
       if (!dryrun) {
-        // console.log(`[clean] ${blueprintsToDelete.length} blueprints deleted`)
+        console.log(`[clean] ${blueprintsToDelete.length} blueprints deleted`)
         while (blueprintsToDelete.length) {
           const blueprint = blueprintsToDelete.pop()
           await db('blueprints').where('id', blueprint.id).delete()
@@ -91,13 +91,13 @@ class Cleaner {
       }
     }
     if (assetsToDelete.size) {
-      // console.log(`[clean] ${assetsToDelete.size} assets can be deleted`)
+      console.log(`[clean] ${assetsToDelete.size} assets can be deleted`)
       if (!dryrun) {
-        // console.log(`[clean] ${assetsToDelete.size} assets deleted`)
+        console.log(`[clean] ${assetsToDelete.size} assets deleted`)
         await assets.delete(assetsToDelete)
       }
     }
-    // console.log('[clean] complete')
+    console.log('[clean] complete')
   }
 }
 

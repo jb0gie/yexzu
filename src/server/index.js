@@ -68,11 +68,11 @@ await fs.ensureDir(worldDir)
 // init assets
 await assets.init({ rootDir, worldDir })
 
-// init db BEFORE collections so it can save blueprints
-const db = await getDB({ worldDir })
-
 // init collections
-await collections.init({ rootDir, worldDir, db })
+await collections.init({ rootDir, worldDir })
+
+// init db
+const db = await getDB({ worldDir })
 
 // init cleaner
 await cleaner.init({ db })
@@ -91,12 +91,7 @@ await world.init({
   collections: collections.list,
 })
 
-fastify.register(cors, {
-  origin: '*',
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
-})
+fastify.register(cors)
 fastify.register(compress)
 fastify.get('/', async (req, reply) => {
   const title = world.settings.title || 'World'

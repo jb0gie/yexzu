@@ -2,7 +2,7 @@ import * as THREE from '../extras/three'
 import { Node } from './Node'
 
 export class Snap extends Node {
-  constructor(data) {
+  constructor(data = {}) {
     super(data)
     this.name = 'snap'
     this.worldPosition = new THREE.Vector3()
@@ -32,19 +32,10 @@ export class Snap extends Node {
 
   getProxy() {
     if (!this.proxy) {
-      const self = this
       let proxy = {
-        get active() {
-          return self.active
-        },
-        set active(value) {
-          self.active = value
-        },
+        // ...
       }
-      const superProxy = super.getProxy()
-      if (superProxy) {
-        proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(superProxy))
-      }
+      proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
       this.proxy = proxy
     }
     return this.proxy

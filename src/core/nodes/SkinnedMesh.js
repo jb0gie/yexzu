@@ -31,7 +31,6 @@ export class SkinnedMesh extends Node {
     this.bones = null
     this.animNames = []
     this.boneHandles = {}
-    this._timeScale = 1.0
   }
 
   mount() {
@@ -104,29 +103,6 @@ export class SkinnedMesh extends Node {
     return this.animNames.slice()
   }
 
-  get timeScale() {
-    return this._timeScale
-  }
-
-  set timeScale(value) {
-    this._timeScale = value
-    // Update mixer's global timeScale
-    if (this.mixer) {
-      this.mixer.timeScale = value
-    }
-    // Also update current action's timeScale if needed
-    if (this.action) {
-      this.action.timeScale = value
-    }
-  }
-
-  setActionTimeScale(value) {
-    // Set timeScale for current action only (not global mixer)
-    if (this.action) {
-      this.action.timeScale = value
-    }
-  }
-
   get castShadow() {
     return this._castShadow
   }
@@ -159,17 +135,17 @@ export class SkinnedMesh extends Node {
     }
   }
 
-  play({ name, fade = 0.15, speed, loop = true, crossFade = false, warp = true }) {
+  play({ name, fade = 0.15, speed, loop = true }) {
     if (!this.mixer) {
       this.mixer = new THREE.AnimationMixer(this.obj)
-      this.mixer.timeScale = this._timeScale // Apply global timeScale
       this.ctx.world.setHot(this, true)
     }
     if (this.action?._clip.name === name) {
       return
     }
-
-    const prevAction = this.action
+    if (this.action) {
+      this.action.fadeOut(fade)
+    }
     this.action = this.actions[name]
     if (!this.action) {
       const clip = this.clips[name]
@@ -177,29 +153,10 @@ export class SkinnedMesh extends Node {
       this.action = this.mixer.clipAction(clip)
       this.actions[name] = this.action
     }
-
-    // Use provided speed or fall back to global timeScale
-    if (speed !== undefined) {
-      this.action.timeScale = speed
-    } else {
-      this.action.timeScale = this._timeScale
-    }
+    if (speed !== undefined) this.action.timeScale = speed
     this.action.clampWhenFinished = !loop
     this.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce)
-
-    // Use crossFadeTo if requested and there's a previous action
-    if (crossFade && prevAction && prevAction.isRunning()) {
-      console.log(`[SkinnedMesh] Using crossFadeTo from ${prevAction._clip.name} to ${name} (duration: ${fade}s)`)
-      this.action.reset()
-      this.action.play()
-      prevAction.crossFadeTo(this.action, fade, warp)
-    } else {
-      // Fall back to original fade behavior
-      if (prevAction) {
-        prevAction.fadeOut(fade)
-      }
-      this.action.reset().fadeIn(fade).play()
-    }
+    this.action.reset().fadeIn(fade).play()
   }
 
   stop(opts = defaultStopOpts) {
@@ -224,46 +181,6 @@ export class SkinnedMesh extends Node {
       return null
     }
     return bone
-  }
-
-  // Add bone rotation offset (for procedural aiming, IK, etc.)
-  addBoneRotation(boneName, euler) {
-    const bone = this.readBone(boneName)
-    if (!bone) {
-      console.warn(`[skinnedmesh] addBoneRotation failed: bone '${boneName}' not found`)
-      return false
-    }
-
-    // Store original rotation if not already stored
-    if (!bone.userData.originalRotation) {
-      bone.userData.originalRotation = bone.rotation.clone()
-      console.log(`[skinnedmesh] Stored original rotation for bone '${boneName}':`, bone.userData.originalRotation)
-    }
-
-    // Apply additive rotation
-    bone.rotation.x = bone.userData.originalRotation.x + euler.x
-    bone.rotation.y = bone.userData.originalRotation.y + euler.y
-    bone.rotation.z = bone.userData.originalRotation.z + euler.z
-
-    console.log(`[skinnedmesh] Applied rotation to bone '${boneName}':`, bone.rotation.x, bone.rotation.y, bone.rotation.z)
-    return true
-  }
-
-  // Reset bone rotation to original
-  resetBoneRotation(boneName) {
-    const bone = this.readBone(boneName)
-    if (!bone || !bone.userData.originalRotation) return false
-
-    bone.rotation.copy(bone.userData.originalRotation)
-    return true
-  }
-
-  // Reset all bone rotations
-  resetAllBoneRotations() {
-    if (!this.bones) return
-    for (const boneName in this.bones) {
-      this.resetBoneRotation(boneName)
-    }
   }
 
   getBone(name) {
@@ -320,15 +237,6 @@ export class SkinnedMesh extends Node {
         get anims() {
           return self.anims
         },
-        get timeScale() {
-          return self.timeScale
-        },
-        set timeScale(value) {
-          self.timeScale = value
-        },
-        setActionTimeScale(value) {
-          self.setActionTimeScale(value)
-        },
         get castShadow() {
           return self.castShadow
         },
@@ -343,9 +251,6 @@ export class SkinnedMesh extends Node {
         },
         play(opts) {
           self.play(opts)
-        },
-        crossFadeTo(name, duration = 0.15, warp = true) {
-          self.play({ name, fade: duration, crossFade: true, warp })
         },
         stop(opts) {
           self.stop(opts)

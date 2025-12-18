@@ -26,10 +26,6 @@ const names = [
   'ai',
   'ping',
   'pong',
-  'platformerState',
-  'platformerAction',
-  'evmConnect',
-  'evmDisconnect',
 ]
 
 const byName = {}

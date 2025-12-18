@@ -35,10 +35,6 @@ export class Entities extends System {
     return this.players.get(entityId)
   }
 
-  getLocalPlayer() {
-    return this.player
-  }
-
   add(data, local) {
     let Entity
     if (data.type === 'player') {

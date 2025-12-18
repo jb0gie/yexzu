@@ -133,21 +133,6 @@ export class Avatar extends Node {
     return this.instance?.getBoneTransform(boneName)
   }
 
-  addBoneRotation(boneName, euler) {
-    // console.log('[avatar] addBoneRotation called for bone:', boneName, 'instance exists:', !!this.instance)
-    const result = this.instance?.addBoneRotation?.(boneName, euler)
-    // console.log('[avatar] addBoneRotation result:', result)
-    return result
-  }
-
-  resetBoneRotation(boneName) {
-    return this.instance?.resetBoneRotation?.(boneName)
-  }
-
-  resetAllBoneRotations() {
-    return this.instance?.resetAllBoneRotations?.()
-  }
-
   disableRateCheck() {
     if (this.instance) {
       this.instance.disableRateCheck()

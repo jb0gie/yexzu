@@ -50,64 +50,11 @@ export class Apps extends System {
       isClient(entity) {
         return world.network.isClient
       },
-      // Expose world.prefs to apps for focal length control
-      prefs(entity) {
-        return world.prefs
-      },
-      // Expose world.web3 to apps for cartridge integration
-      web3(entity) {
-        return world.web3
-      },
-      // Expose world.dojo to apps for DojoEngine integration
-      dojo(entity) {
-        return world.dojo
-      },
     }
     this.worldSetters = {
       // ...
     }
     this.worldMethods = {
-      // Camera manager helpers for apps
-      activateDefaultCamera(entity) {
-        const fallback = world.defaultCameraNode || world.cameraManager?.defaultCamera
-        if (fallback) {
-          world.cameraManager.setActiveCamera(fallback)
-          return true
-        }
-        return false
-      },
-      setActiveCameraById(entity, id) {
-        if (!id) return false
-        const cam = world.cameraManager?.getCamera(id)
-        if (cam) {
-          world.cameraManager.setActiveCamera(cam)
-          return true
-        }
-        return false
-      },
-      // DOF helpers for apps
-      dofSetEnabled(entity, value) {
-        world.prefs?.setDOFEnabled(!!value)
-      },
-      dofSetFocusDistance(entity, value) {
-        if (typeof value === 'number') world.prefs?.setDOFFocusDistance(value)
-      },
-      dofSetFocusRange(entity, value) {
-        if (typeof value === 'number') world.prefs?.setDOFFocusRange(value)
-      },
-      dofSetBokehScale(entity, value) {
-        if (typeof value === 'number') world.prefs?.setDOFBokehScale(value)
-      },
-      // Global helpers visibility for apps
-      setShowHelpers(entity, value) {
-        world.prefs?.setShowHelpers(!!value)
-      },
-      getShowHelpers(entity) {
-        return !!world.prefs?.showHelpers
-      },
-      dofAutoFocusRaycast(entity) {
-        return world.cameraControls?.autoFocusRaycast?.() ?? null
-      },
       add(entity, pNode) {
         const node = getRef(pNode)
         if (!node) return
@@ -371,10 +318,6 @@ export class Apps extends System {
         entity.control?.release()
         // TODO: only allow on user interaction
         // TODO: show UI with a button to release()
-        if (!world.controls) {
-          console.warn('Controls system not available - app running on server or controls not initialized')
-          return null
-        }
         entity.control = world.controls.bind({
           ...options,
           priority: ControlPriorities.APP,

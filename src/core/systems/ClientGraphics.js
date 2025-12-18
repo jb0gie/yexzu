@@ -1,5 +1,4 @@
 import * as THREE from '../extras/three'
-import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { N8AOPostPass } from 'n8ao'
 import {
   EffectComposer,
@@ -17,7 +16,6 @@ import {
   DepthPass,
   Pass,
   DepthEffect,
-  DepthOfFieldEffect,
 } from 'postprocessing'
 
 import { System } from './System'
@@ -70,24 +68,10 @@ export class ClientGraphics extends System {
     this.maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy()
     THREE.Texture.DEFAULT_ANISOTROPY = this.maxAnisotropy
     this.usePostprocessing = this.world.prefs.postprocessing
-
-    // Initialize CSS3D renderer for WebViews
-    this.css3dScene = new THREE.Scene()
-    this.css3dRenderer = new CSS3DRenderer()
-    this.css3dRenderer.setSize(this.width, this.height)
-    this.css3dRenderer.domElement.style.position = 'absolute'
-    this.css3dRenderer.domElement.style.top = '0'
-    this.css3dRenderer.domElement.style.left = '0'
-    this.css3dRenderer.domElement.style.pointerEvents = 'none'
-    this.css3dRenderer.domElement.style.zIndex = '1'
-    this.viewport.appendChild(this.css3dRenderer.domElement)
-
     const context = this.renderer.getContext()
     const maxMultisampling = context.getParameter(context.MAX_SAMPLES)
     this.composer = new EffectComposer(this.renderer, {
       frameBufferType: THREE.HalfFloatType,
-      depthBuffer: true,
-      stencilBuffer: false,
       // multisampling: Math.min(8, maxMultisampling),
     })
     this.renderPass = new RenderPass(this.world.stage.scene, this.world.camera)
@@ -126,16 +110,6 @@ export class ClientGraphics extends System {
       radius: 0.8,
     })
     this.bloomEnabled = this.world.prefs.bloom
-    // Depth of Field effect (normalize focus inputs by camera.far)
-    this.dof = new DepthOfFieldEffect(this.world.camera, {
-      blendFunction: BlendFunction.NORMAL,
-      focusDistance: (this.world.prefs.dofFocusDistance || 10) / this.world.camera.far,
-      focusRange: (this.world.prefs.dofFocusRange || 5) / this.world.camera.far,
-      bokehScale: this.world.prefs.dofBokehScale,
-      resolutionScale: 1.0, // Full resolution to prevent flickering
-      height: 480, // Limit resolution for performance
-    })
-    this.dofEnabled = this.world.prefs.dofEnabled
     this.smaa = new SMAAEffect({
       preset: SMAAPreset.ULTRA,
     })
@@ -160,15 +134,6 @@ export class ClientGraphics extends System {
   start() {
     this.world.on('xrSession', this.onXRSession)
     this.world.settings.on('change', this.onSettingsChange)
-
-    // Listen for camera changes from CameraManager
-    this.world.on('camera-changed', camera => {
-      // Update the render pass with the new camera
-      if (this.renderPass && camera?.camera) {
-        this.renderPass.camera = camera.camera
-        // console.log('ClientGraphics: Updated render pass camera')
-      }
-    })
   }
 
   resize(width, height) {
@@ -201,13 +166,6 @@ export class ClientGraphics extends System {
       // Fall back to the default composer
       this.composer.render()
     }
-
-    // Render CSS3D after main scene
-    if (this.css3dRenderer && this.css3dScene) {
-      const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
-      this.css3dRenderer.render(this.css3dScene, cam)
-    }
-
     if (this.xrDimensionsNeeded) {
       this.checkXRDimensions()
     }
@@ -216,7 +174,6 @@ export class ClientGraphics extends System {
   commit() {
     this.render()
   }
-
 
   preTick() {
     // calc world to screen factor
@@ -244,41 +201,6 @@ export class ClientGraphics extends System {
     // ao
     if (changes.ao) {
       this.aoPass.enabled = changes.ao.value && this.world.settings.ao
-    }
-    // depth of field
-    if (changes.dofEnabled) {
-      this.dofEnabled = changes.dofEnabled.value
-      this.updatePostProcessingEffects()
-    }
-    if (changes.dofFocusDistance) {
-      if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusDistance.value =
-          changes.dofFocusDistance.value / this.world.camera.far
-      }
-    }
-    if (changes.dofFocusRange) {
-      if (this.dof.circleOfConfusionMaterial) {
-        this.dof.circleOfConfusionMaterial.uniforms.focusRange.value =
-          changes.dofFocusRange.value / this.world.camera.far
-      }
-    }
-    if (changes.dofBokehScale) {
-      // Bokeh scale might be on the bokehMaterial
-      if (this.dof.bokehMaterial) {
-        this.dof.bokehMaterial.uniforms.scale.value = changes.dofBokehScale.value
-      }
-    }
-    // focal length
-    if (changes.focalLength) {
-      // Convert focal length to FOV
-      const sensorHeight = 24 // 35mm sensor height in mm
-      const fov = 2 * Math.atan(sensorHeight / (2 * changes.focalLength.value)) * (180 / Math.PI)
-      this.world.camera.fov = fov
-      this.world.camera.updateProjectionMatrix()
-    }
-    // helpers
-    if (changes.showHelpers) {
-      this.updateHelpers(changes.showHelpers.value)
     }
   }
 
@@ -328,15 +250,12 @@ export class ClientGraphics extends System {
   onSettingsChange = changes => {
     if (changes.ao) {
       this.aoPass.enabled = changes.ao.value && this.world.prefs.ao
-      // console.log(this.aoPass.enabled)
+      console.log(this.aoPass.enabled)
     }
   }
 
   updatePostProcessingEffects() {
     const effects = []
-    if (this.dofEnabled) {
-      effects.push(this.dof)
-    }
     if (this.bloomEnabled) {
       effects.push(this.bloom)
     }
@@ -346,46 +265,8 @@ export class ClientGraphics extends System {
     this.effectPass.recompile()
   }
 
-  updateHelpers(show) {
-    if (show) {
-      // Add helpers
-      if (!this.cameraHelper) {
-        this.cameraHelper = new THREE.CameraHelper(this.world.camera)
-        this.world.stage.scene.add(this.cameraHelper)
-        this.helpers.add(this.cameraHelper)
-      }
-      if (!this.gridHelper) {
-        this.gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222)
-        this.world.stage.scene.add(this.gridHelper)
-        this.helpers.add(this.gridHelper)
-      }
-      if (!this.axesHelper) {
-        this.axesHelper = new THREE.AxesHelper(5)
-        this.world.stage.scene.add(this.axesHelper)
-        this.helpers.add(this.axesHelper)
-      }
-    } else {
-      // Remove helpers
-      this.helpers.forEach(helper => {
-        this.world.stage.scene.remove(helper)
-        if (helper.dispose) helper.dispose()
-      })
-      this.helpers.clear()
-      this.cameraHelper = null
-      this.gridHelper = null
-      this.axesHelper = null
-    }
-  }
-
   destroy() {
     this.resizer.disconnect()
-
-    if (this.css3dRenderer) {
-      this.css3dRenderer.domElement.remove()
-      this.css3dRenderer = null
-      this.css3dScene = null
-    }
-
     this.viewport.removeChild(this.renderer.domElement)
   }
 }

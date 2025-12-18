@@ -89,7 +89,6 @@ export class ClientControls extends System {
 
   start() {
     this.world.on('xrSession', this.onXRSession)
-    this.world.on('stick', this.onStick)
   }
 
   applyXRRig(xrRig) {
@@ -121,7 +120,6 @@ export class ClientControls extends System {
         if (control.entries.scrollDelta.capture) break
       }
     }
-
     // xr
     if (this.xrSession) {
       const referenceSpace = this.world.graphics.renderer.xr.getReferenceSpace()
@@ -357,12 +355,6 @@ export class ClientControls extends System {
         this.world.camera.position.z = camera.zoom
         written = true
       } else if (camera) {
-        // SKIP updating camera if active camera is in free-flying mode
-        const activeCamera = this.world.systems.CameraManager?.activeCamera
-        if (activeCamera?.freeFlying) {
-          // Free-flying camera controls its own position/rotation
-          continue
-        }
         camera.position.copy(this.world.rig.position)
         camera.quaternion.copy(this.world.rig.quaternion)
         camera.zoom = this.world.camera.position.z
@@ -480,6 +472,78 @@ export class ClientControls extends System {
           value.released = true
           value.down = false
           value.onRelease?.()
+        }
+      }
+    }
+  }
+
+  buildActions() {
+    this.actions = []
+    for (const control of this.controls) {
+      const actions = control.actions
+      if (actions) {
+        for (const action of actions) {
+          // ignore if already existing
+          if (!action.type === 'custom') {
+            const idx = this.actions.findIndex(a => a.type === action.type)
+            if (idx !== -1) continue
+          }
+          this.actions.push(action)
+        }
+      }
+    }
+    this.world.emit('actions', this.actions)
+  }
+
+  setTouchBtn(prop, down) {
+    if (down) {
+      this.buttonsDown.add(prop)
+      for (const control of this.controls) {
+        const button = control.entries[prop]
+        if (button?.$button) {
+          button.pressed = true
+          button.down = true
+          const capture = button.onPress?.()
+          if (capture || button.capture) break
+        }
+      }
+    } else {
+      this.buttonsDown.delete(prop)
+      for (const control of this.controls) {
+        const button = control.entries[prop]
+        if (button?.$button && button.down) {
+          button.down = false
+          button.released = true
+          button.onRelease?.()
+        }
+      }
+    }
+  }
+
+  simulateButton(prop, pressed) {
+    if (pressed) {
+      if (this.buttonsDown.has(prop)) return
+      this.buttonsDown.add(prop)
+      for (const control of this.controls) {
+        const button = control.entries[prop]
+        if (button?.$button) {
+          button.pressed = true
+          button.down = true
+          const capture = button.onPress?.()
+          if (capture || button.capture) break
+        }
+        const capture = control.onButtonPress?.(prop, text)
+        if (capture) break
+      }
+    } else {
+      if (!this.buttonsDown.has(prop)) return
+      this.buttonsDown.delete(prop)
+      for (const control of this.controls) {
+        const button = control.entries[prop]
+        if (button?.$button && button.down) {
+          button.down = false
+          button.released = true
+          button.onRelease?.()
         }
       }
     }
@@ -782,47 +846,8 @@ export class ClientControls extends System {
     return document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA'
   }
 
-  onStick = stick => {
-    if (stick && stick.active) {
-      const touchX = stick.touch.position.x
-      const touchY = stick.touch.position.y
-      const centerX = stick.center.x
-      const centerY = stick.center.y
-      const moveRadius = 25 // STICK_OUTER_RADIUS (50) - STICK_INNER_RADIUS (25)
-
-      // Calculate normalized stick values
-      const stickX = (touchX - centerX) / moveRadius
-      const stickY = (touchY - centerY) / moveRadius
-
-      // Clamp to unit circle
-      const magnitude = Math.sqrt(stickX * stickX + stickY * stickY)
-      const clampedX = magnitude > 1 ? stickX / magnitude : stickX
-      const clampedY = magnitude > 1 ? stickY / magnitude : stickY
-
-      // Populate touchStick for all controls that have it
-      for (const control of this.controls) {
-        if (control.entries.touchStick) {
-          control.entries.touchStick.value.x = clampedX
-          control.entries.touchStick.value.z = clampedY
-          control.entries.touchStick.value.y = 0
-        }
-      }
-    } else {
-      // Reset touchStick when joystick is not active
-      for (const control of this.controls) {
-        if (control.entries.touchStick) {
-          control.entries.touchStick.value.x = 0
-          control.entries.touchStick.value.z = 0
-          control.entries.touchStick.value.y = 0
-        }
-      }
-    }
-  }
-
   destroy() {
     if (!isBrowser) return
-    this.world.off('xrSession', this.onXRSession)
-    this.world.off('stick', this.onStick)
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     document.removeEventListener('pointerlockchange', this.onPointerLockChange)

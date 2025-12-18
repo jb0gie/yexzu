@@ -187,104 +187,72 @@ export class ServerAI extends System {
 
 class OpenAIClient {
   constructor(apiKey, model, effort) {
-    const config = { apiKey }
-
-    // Check for custom base URL override
-    const baseURL = process.env.OPENAI_BASE_URL
-    if (baseURL) {
-      config.baseURL = baseURL
-    }
-
-    this.client = new OpenAI(config)
+    this.client = new OpenAI({ apiKey })
     this.model = model
     this.effort = effort
   }
 
   async create(prompt) {
-    const resp = await this.client.chat.completions.create({
+    const resp = await this.client.responses.create({
       model: this.model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'system',
-          content: `
-            ${docs}
-            ===============
-            You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.`,
-        },
-        {
-          role: 'user',
-          content: `Respond with the javascript needed to generate the following:\n\n"${prompt}"`,
-        },
-      ],
+      reasoning: { effort: this.effort },
+      // text: { verbosity: 'low' },
+      // max_output_tokens: 8192,
+      instructions: `
+        ${docs}
+        ===============
+        You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.`,
+      input: `Respond with the javascript needed to generate the following:\n\n"${prompt}"`,
     })
-    return resp.choices[0].message.content
+    return resp.output_text
   }
 
   async edit(code, prompt) {
-    const resp = await this.client.chat.completions.create({
+    const resp = await this.client.responses.create({
       model: this.model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'system',
-          content: `
-            ${docs}
-            ===============
-            You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.
-            Here is the existing script that you will be working with:
-            ===============
-            ${code}`,
-        },
-        {
-          role: 'user',
-          content: `Please edit the code above to satisfy the following request:\n\n"${prompt}"`,
-        },
-      ],
+      reasoning: { effort: this.effort },
+      // text: { verbosity: 'low' },
+      // max_output_tokens: 8192,
+      instructions: `
+        ${docs}
+        ===============
+        You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.
+        Here is the existing script that you will be working with:
+        ===============
+        ${code}`,
+      input: `Please edit the code above to satisfy the following request:\n\n"${prompt}"`,
     })
-    return resp.choices[0].message.content
+    return resp.output_text
   }
 
   async fix(code, error) {
-    const resp = await this.client.chat.completions.create({
+    const resp = await this.client.responses.create({
       model: this.model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'system',
-          content: `
-            ${docs}
-            ===============
-            You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.
-            Here is the existing script that you will be working with:
-            ===============
-            ${code}`,
-        },
-        {
-          role: 'user',
-          content: `This code has an error please fix it:\n\n"${JSON.stringify(error, null, 2)}"`,
-        },
-      ],
+      reasoning: { effort: this.effort },
+      // text: { verbosity: 'low' },
+      // max_output_tokens: 8192,
+      instructions: `
+        ${docs}
+        ===============
+        You are an artist and code generator. Always respond with raw code only, never use markdown code blocks or any other formatting.
+        Here is the existing script that you will be working with:
+        ===============
+        ${code}`,
+      input: `This code has an error please fix it:\n\n"${JSON.stringify(error, null, 2)}"`,
     })
-    return resp.choices[0].message.content
+    return resp.output_text
   }
 
   async classify(prompt) {
-    const resp = await this.client.chat.completions.create({
+    const resp = await this.client.responses.create({
       model: this.model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'system',
-          content: `You are a classifier. We will give you a prompt that a user has entered to generate a 3D object and your job is respond with a short name for the object. For example if someone prompts "a cool gamer desk with neon lights" you would respond with something like "Gamer Desk" because it is a short descriptive name that captures the essence of the object.`,
-        },
-        {
-          role: 'user',
-          content: `Please classify the following prompt:\n\n"${prompt}"`,
-        },
-      ],
+      reasoning: { effort: this.effort },
+      // text: { verbosity: 'low' },
+      // max_output_tokens: 8192,
+      instructions: `You are a classifier. We will give you a prompt that a user has entered to generate a 3D object and your job is respond with a short name for the object. For example if someone prompts "a cool gamer desk with neon lights" you would respond with something like "Gamer Desk" because it is a short descriptive name that captures the essence of the object.`,
+      input: `Please classify the following prompt:\n\n"${prompt}"`,
     })
-    return resp.choices[0].message.content
+    return resp.output_text
   }
 }
 
@@ -748,8 +716,7 @@ function writeChangelog(code, changelog) {
   const cleanCode = code.replace(changelogRegex, '')
   // construct new changelog header
   const entries = changelog.map(entry => ` * - ${entry}`).join('\n')
-  const header = `/**
- * changelog:\n${entries}\n */\n\n`
+  const header = `/**\n * changelog:\n${entries}\n */\n\n`
   // insert new header at beginning
   return header + cleanCode.trimStart()
 }

@@ -72,25 +72,6 @@ export function createPlayerProxy(entity, player) {
     getBoneTransform(boneName) {
       return player.avatar?.getBoneTransform?.(boneName)
     },
-    addBoneRotation(boneName, euler) {
-      console.log(
-        '[player-proxy] addBoneRotation called for bone:',
-        boneName,
-        'avatar exists:',
-        !!player.avatar,
-        'instance exists:',
-        !!player.avatar?.instance
-      )
-      const result = player.avatar?.addBoneRotation?.(boneName, euler)
-      console.log('[player-proxy] addBoneRotation result:', result)
-      return result
-    },
-    resetBoneRotation(boneName) {
-      return player.avatar?.resetBoneRotation?.(boneName)
-    },
-    resetAllBoneRotations() {
-      return player.avatar?.resetAllBoneRotations?.()
-    },
     setSessionAvatar(url) {
       const avatar = url
       if (player.data.owner === world.network.id) {
@@ -205,42 +186,6 @@ export function createPlayerProxy(entity, player) {
         voiceMod = world.livekit.updateModifier(voiceMod, level)
         return
       }
-    },
-    // Apply additive animation that layers over locomotion
-    applyAdditiveAnimation(url, options = {}) {
-      console.log(`[player-proxy] applyAdditiveAnimation called with url: ${url}, options:`, options)
-      console.log(`[player-proxy] player.avatar exists:`, !!player.avatar)
-      console.log(`[player-proxy] player.avatar.instance exists:`, !!player.avatar?.instance)
-      console.log(
-        `[player-proxy] player.avatar.instance.setAdditiveAnimation exists:`,
-        !!player.avatar?.instance?.setAdditiveAnimation
-      )
-
-      if (!player.avatar?.instance?.setAdditiveAnimation) {
-        console.warn('[player-proxy] Additive animations not supported by avatar')
-        return
-      }
-
-      return player.avatar.instance.setAdditiveAnimation(url, options)
-    },
-    // Stop additive animation
-    stopAdditiveAnimation(url, options = {}) {
-      if (!player.avatar?.instance?.stopAdditiveAnimation) return
-      player.avatar.instance.stopAdditiveAnimation(url, options?.fadeDuration)
-    },
-    get evm() {
-      return player.data.evm
-    },
-    connect() {
-      return world.evm.connect(player)
-    },
-    disconnect() {
-      return world.evm.disconnect(player)
-    },
-    // Clear all additive animations
-    clearAdditiveAnimations(options = {}) {
-      if (!player.avatar?.instance?.setAdditiveAnimation) return
-      player.avatar.instance.setAdditiveAnimation(null, options)
     },
     $cleanup() {
       activeEffectConfig?.onEnd()

@@ -44,28 +44,12 @@ export class ServerNetwork extends System {
     // get spawn
     const spawnRow = await this.db('config').where('key', 'spawn').first()
     this.spawn = JSON.parse(spawnRow?.value || defaultSpawn)
-
-    // Add blueprints from collections FIRST
-    // console.log(`[ServerNetwork] Loading ${this.collections?.length || 0} collections`)
-    if (this.collections) {
-      for (const collection of this.collections) {
-        // console.log(`[ServerNetwork] Loading collection: ${collection.name} with ${collection.blueprints.length} blueprints`)
-        for (const blueprint of collection.blueprints) {
-          // console.log(`[ServerNetwork] Adding blueprint: ${blueprint.name}`)
-          this.world.blueprints.add(blueprint, true)
-        }
-      }
-    }
-
-    // hydrate blueprints from database
+    // hydrate blueprints
     const blueprints = await this.db('blueprints')
-    // console.log(`[ServerNetwork] Hydrating ${blueprints.length} blueprints from database`)
     for (const blueprint of blueprints) {
       const data = JSON.parse(blueprint.data)
       this.world.blueprints.add(data, true)
     }
-    // console.log(`[ServerNetwork] Total blueprints loaded: ${this.world.blueprints.items.size}`)
-
     // hydrate entities
     const entities = await this.db('entities')
     for (const entity of entities) {
@@ -311,7 +295,7 @@ export class ServerNetwork extends System {
         settings: this.world.settings.serialize(),
         chat: this.world.chat.serialize(),
         ai: this.world.ai.serialize(),
-        blueprints: blueprints,
+        blueprints: this.world.blueprints.serialize(),
         entities: this.world.entities.serialize(),
         livekit,
         authToken,
@@ -586,27 +570,6 @@ export class ServerNetwork extends System {
 
   onPing = (socket, time) => {
     socket.send('pong', time)
-  }
-
-  onPlatformerState = (socket, data) => {
-    // Broadcast platformer state to all other clients
-    this.send('platformerState', data, socket.id)
-  }
-
-  onPlatformerAction = (socket, data) => {
-    // Handle platformer action and broadcast to all clients
-    if (this.world.platformerMechanics) {
-      this.world.platformerMechanics.onPlatformerAction(data)
-    }
-    this.send('platformerAction', data, socket.id)
-  }
-
-  onEvmConnect = (socket, address) => {
-    this.world.evm.onEvmConnect(socket, address)
-  }
-
-  onEvmDisconnect = socket => {
-    this.world.evm.onEvmDisconnect(socket)
   }
 
   onDisconnect = (socket, code) => {

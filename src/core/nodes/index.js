@@ -15,13 +15,11 @@ export { Nametag as nametag } from './Nametag.js'
 export { Particles as particles } from './Particles.js'
 
 export { Sky as sky } from './Sky.js'
-export { Camera as camera } from './Camera.js'
 
 export { UI as ui } from './UI.js'
 export { UIView as uiview } from './UIView.js'
 export { UIText as uitext } from './UIText.js'
 export { UIImage as uiimage } from './UIImage.js'
-export { WebView as webview } from './WebView.js'
 
 export { Controller as controller } from './Controller.js'
 export { RigidBody as rigidbody } from './RigidBody.js'
