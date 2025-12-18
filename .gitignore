@@ -6,4 +6,5 @@ localstorage.json
 .notes/
 node_modules/
 build/
-/world*.vexify.db
+/world
+*.vexify.db
