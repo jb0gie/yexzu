@@ -100,6 +100,10 @@ export class PlayerLocal extends Entity {
     this.canDoubleJump = true  // Track if we can perform a double jump
     this.doubleJumpUsed = false  // Prevent multiple triggers per air session
 
+    this.flipStartAt = 0
+    this.flipUntil = 0
+    this.flipDuration = 0.65
+
     this.fallTimer = 0
     this.falling = false
 
@@ -616,6 +620,11 @@ export class PlayerLocal extends Entity {
       if (this.grounded) {
         this.canDoubleJump = true
         this.doubleJumpUsed = false  // Reset for next jump
+        // Clear flip animation when landing
+        if (this.flipUntil > 0) {
+          this.flipStartAt = 0
+          this.flipUntil = 0
+        }
       }
       // if airJumping and we're now on the ground, clear it
       if (this.airJumped && this.grounded) {
@@ -747,6 +756,9 @@ export class PlayerLocal extends Entity {
           this.doubleJumpUsed = true  // Mark as used for this air session
           this.airJumped = true
           this.airJumping = true
+          // lock flip pose for a short, deterministic duration
+          this.flipStartAt = this.world.time
+          this.flipUntil = this.flipStartAt + this.flipDuration
         }
       }
     } else {
@@ -1030,6 +1042,12 @@ export class PlayerLocal extends Entity {
     }
     this.avatar?.setEmote(this.emote)
 
+    // Clear expired flip animation
+    if (this.flipUntil > 0 && this.world.time >= this.flipUntil) {
+      this.flipStartAt = 0
+      this.flipUntil = 0
+    }
+
     // get locomotion mode
     let mode
     if (this.data.effect?.emote) {
@@ -1037,7 +1055,18 @@ export class PlayerLocal extends Entity {
     } else if (this.flying) {
       mode = Modes.FLY
     } else if (this.airJumping) {
-      mode = Modes.FLIP
+      // Smart flip mode detection - based on movement direction
+      const flipMode = this.detectSmartFlipMode()
+
+      if (flipMode === 'left') {
+        mode = Modes.SIDEFLIP_LEFT      // Left strafe flip
+      } else if (flipMode === 'right') {
+        mode = Modes.SIDEFLIP_RIGHT     // Right strafe flip
+      } else if (flipMode === 'back') {
+        mode = Modes.BACKFLIP           // Back flip for pure backward
+      } else {
+        mode = Modes.FLIP               // Default front flip for forward/any direction
+      }
     } else if (this.jumping) {
       mode = Modes.JUMP
     } else if (this.falling) {
@@ -1132,6 +1161,40 @@ export class PlayerLocal extends Entity {
         this.setEffect(null)
       }
     }
+  }
+
+  detectSmartFlipMode() {
+    // Detect flip direction based on movement patterns - intuitive like existing front/back flip system
+    const axis = this.axis
+    if (!axis || axis.length() === 0) return 'front'  // Default front flip when still
+
+    let moveRad = Math.atan2(axis.x, -axis.z)
+    let moveDeg = moveRad * (180 / Math.PI)
+    if (moveDeg < 0) moveDeg += 360
+
+    // Check for pure strafe movements (±22.5° from 90°/270°)
+    if (moveDeg >= 67.5 && moveDeg <= 112.5) {
+      return 'right'  // Pure right strafe
+    }
+    if (moveDeg >= 247.5 && moveDeg <= 292.5) {
+      return 'left'   // Pure left strafe
+    }
+
+    // Test coordinate system: In case D key gives different axis values
+    if (axis.x > 0.5) {
+      return 'right'
+    }
+    if (axis.x < -0.5) {
+      return 'left'
+    }
+
+    // Check for pure backward movement (±22.5° from 180°)
+    if (moveDeg >= 157.5 && moveDeg <= 202.5) {
+      return 'back'   // Pure backward
+    }
+
+    // All other movements default to front flip (including diagonals)
+    return 'front'    // Default front flip for all other directions
   }
 
   lateUpdate(delta) {
