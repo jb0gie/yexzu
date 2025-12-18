@@ -133,6 +133,31 @@ export class ClientPrefs extends System {
     this.modify('voice', value)
   }
 
+  // Camera/DOF preference methods
+  setFocalLength(value) {
+    this.modify('focalLength', value)
+  }
+
+  setDOFBokehScale(value) {
+    this.modify('dofBokehScale', value)
+  }
+
+  setDOFFocusDistance(value) {
+    this.modify('dofFocusDistance', value)
+  }
+
+  setDOFFocusRange(value) {
+    this.modify('dofFocusRange', value)
+  }
+
+  setDOFEnabled(value) {
+    this.modify('dofEnabled', value)
+  }
+
+  setFocusSmoothing(value) {
+    this.modify('focusSmoothing', value)
+  }
+
   destroy() {
     // ...
   }
