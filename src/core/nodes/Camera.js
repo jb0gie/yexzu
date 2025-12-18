@@ -788,6 +788,12 @@ export class Camera extends Node {
 
     // Depth of Field with cinematic settings
     if (this.dof.enabled) {
+      console.log('[Camera] Setting up DOF with params:', {
+        focusDistance: this.dof.focusDistance,
+        focalLength: this.dof.focalLength,
+        bokehScale: this.dof.maxBlur * 100,
+        far: this.far
+      })
       this.effects.dof = new DepthOfFieldEffect(this.camera, {
         blendFunction: BlendFunction.NORMAL,
         focusDistance: this.dof.focusDistance / this.far, // Normalize to 0-1
