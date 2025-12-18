@@ -103,14 +103,7 @@ export class World extends EventEmitter {
         attachToRig: true,
         isPlayerCamera: true, // This is the main player camera
         // Enable DOF by default for enhanced camera experience
-        dof: {
-          enabled: true,
-          focusDistance: 5,
-          focalLength: 85,
-          maxBlur: 0.2,
-          bokehScale: 2,
-          autofocus: false
-        },
+        dof: { enabled: true, focusDistance: 10, focalLength: 24, bokehScale: 1 },
         bloom: { enabled: false },
         vignette: { enabled: false },
         chromaticAberration: { enabled: false },
