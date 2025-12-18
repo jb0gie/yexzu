@@ -53,6 +53,17 @@ const Modes = {
   FALL: 4,
   FLY: 5,
   TALK: 6,
+  FLIP: 7,
+  BACKFLIP: 8,
+  SIDEFLIP_LEFT: 9,
+  SIDEFLIP_RIGHT: 10,
+  STRAFE_JUMP_LEFT: 11,
+  STRAFE_JUMP_RIGHT: 12,
+  GRINDING: 13,
+  CLIMBING: 14,
+  LEDGE_HANGING: 15,
+  AIR_DIVING: 16,
+  WALL_SLIDING: 17,
 }
 
 export class PlayerLocal extends Entity {
