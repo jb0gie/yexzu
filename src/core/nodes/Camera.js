@@ -1299,17 +1299,9 @@ export class Camera extends Node {
     }
 
     // If attached to rig, the rig handles position/rotation automatically
-    // We only need to handle zoom for player camera
-    if (this.attachToRig && this.isPlayerCamera) {
-      // Update zoom like legacy camera
-      const localPlayer = this.ctx?.world?.entities?.getLocalPlayer?.()
-      if (localPlayer?.cam?.zoom !== undefined) {
-        this.camera.position.z = localPlayer.cam.zoom
-      }
-    }
-
-    // Apply organic camera motion (only if not free-flying, as it has its own movement)
-    if (this.motion.enabled && this._active && !this.freeFlying) {
+    // DO NOT manually set camera position or apply motion when attached to rig
+    // Only apply motion and position updates for non-rig cameras (static or free-flying)
+    if (!this.attachToRig && this.motion.enabled && this._active && !this.freeFlying) {
       this.updateCameraMotion(delta)
     }
 
