@@ -16,6 +16,7 @@ import {
   DepthPass,
   Pass,
   DepthEffect,
+  DepthOfFieldEffect,
 } from 'postprocessing'
 
 import { System } from './System'
@@ -119,6 +120,13 @@ export class ClientGraphics extends System {
     this.effectPass = new EffectPass(this.world.camera)
     this.updatePostProcessingEffects()
     this.composer.addPass(this.effectPass)
+
+    // Setup DOF if enabled
+    if (this.world.prefs.dofEnabled) {
+      this.setupDOF()
+      this.updatePostProcessingEffects() // Re-run to include DOF
+    }
+
     this.world.prefs.on('change', this.onPrefsChange)
     this.resizer = new ResizeObserver(() => {
       this.resize(this.viewport.offsetWidth, this.viewport.offsetHeight)
@@ -151,29 +159,11 @@ export class ClientGraphics extends System {
   }
 
   render() {
-    // Check if we have an active camera node with its own composer
-    const activeCameraNode = this.world.cameraManager?.activeCamera
-    const cam = this.world.cameraManager?.getRenderCamera() || this.world.camera
-
-    // Debug logging to see which camera path is taken (log once, then every 300 frames)
-    this._renderLogTimer = (this._renderLogTimer || 0) + 1
-    if (this._renderLogTimer === 1 || this._renderLogTimer % 300 === 0) {
-      console.log('[Graphics] Render frame', this._renderLogTimer, '- ActiveCameraNode:', !!activeCameraNode, 'HasComposer:', !!activeCameraNode?.composer)
-      if (activeCameraNode?.composer) {
-        console.log('[Graphics] Using camera node composer with DOF effects')
-      } else {
-        console.log('[Graphics] Using default composer (no Camera node DOF)')
-      }
-    }
-
-    // Render WebGL scene
+    // Render WebGL scene using world.camera
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
-      this.renderer.render(this.world.stage.scene, cam)
-    } else if (activeCameraNode?.composer) {
-      // Use the camera node's composer if it has one
-      activeCameraNode.composer.render()
+      this.renderer.render(this.world.stage.scene, this.world.camera)
     } else {
-      // Fall back to the default composer
+      // Use the default composer (includes DOF effect)
       this.composer.render()
     }
     if (this.xrDimensionsNeeded) {
@@ -269,10 +259,44 @@ export class ClientGraphics extends System {
     if (this.bloomEnabled) {
       effects.push(this.bloom)
     }
+    // Add DOF effect if enabled and created
+    if (this.world.prefs.dofEnabled && this.dofEffect) {
+      effects.push(this.dofEffect)
+    }
     effects.push(this.smaa)
     effects.push(this.tonemapping)
     this.effectPass.setEffects(effects)
     this.effectPass.recompile()
+  }
+
+  setupDOF() {
+    if (!this.world.prefs.dofEnabled) return
+
+    try {
+      this.dofEffect = new DepthOfFieldEffect(this.world.camera, {
+        blendFunction: BlendFunction.NORMAL,
+        focusDistance: (this.world.prefs.dofFocusDistance || 10) / (this.world.camera.far || 1200),
+        focalLength: (this.world.prefs.dofFocalLength || 24) * 0.001,
+        bokehScale: (this.world.prefs.dofMaxBlur || 0.15) * 100,
+        height: 480,
+      })
+
+      // Configure DOF uniforms
+      const uniforms = this.dofEffect.circleOfConfusionMaterial.uniforms
+      uniforms.fStop.value = this.world.prefs.dofFStop || 1.8
+      uniforms.maxBlur.value = this.world.prefs.dofMaxBlur || 0.15
+      uniforms.luminanceThreshold.value = this.world.prefs.dofLuminanceThreshold || 0.6
+      uniforms.luminanceGain.value = this.world.prefs.dofLuminanceGain || 2.5
+      uniforms.bias.value = this.world.prefs.dofBias || 0.08
+      uniforms.fringe.value = this.world.prefs.dofFringe || 0.8
+
+      // Store uniform references for updates
+      this.dofUniforms = uniforms
+    } catch (error) {
+      console.error('[ClientGraphics] Failed to setup DOF effect:', error)
+      this.dofEffect = null
+      this.dofUniforms = null
+    }
   }
 
   destroy() {

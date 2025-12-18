@@ -142,9 +142,8 @@ export class ClientCameraControls extends System {
       }
     })
 
-    // Initialize dynamic DOF state based on current camera
-    const currentCam = this.world.cameraManager?.activeCamera || this.world.defaultCameraNode
-    this.dynamicDOF = !!currentCam?.isPlayerCamera
+    // Initialize dynamic DOF - always enabled for player camera
+    this.dynamicDOF = true
   }
 
   resetCamera() {
@@ -318,6 +317,10 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusDistance(distance)
+    // Update DOF uniform if effect exists
+    if (this.world.graphics?.dofUniforms?.focusDistance) {
+      this.world.graphics.dofUniforms.focusDistance.value = distance / (this.world.camera.far || 1200)
+    }
   }
 
   setDOFFocusRange(range) {
@@ -326,6 +329,10 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusRange(range)
+    // Update DOF uniform if effect exists
+    if (this.world.graphics?.dofUniforms?.focusRange) {
+      this.world.graphics.dofUniforms.focusRange.value = range
+    }
   }
 
   setDOFBokehScale(scale) {
@@ -334,6 +341,10 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFBokehScale(scale)
+    // Update DOF effect if exists
+    if (this.world.graphics?.dofEffect) {
+      this.world.graphics.dofEffect.bokehScale = scale
+    }
   }
 
   // Focal Length Control

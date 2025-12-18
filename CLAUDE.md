@@ -246,3 +246,4 @@ Apps execute in controlled sandbox with restricted APIs. Always assume limited g
   - ✅ DO reference world and app globally, not as parameters
 - this doens't work in hyperfy
   app.import('/examples/essentials/stamina-system.js')
+- anything in /examples is to be considered untested until i say so

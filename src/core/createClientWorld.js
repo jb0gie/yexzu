@@ -6,7 +6,6 @@ import { ClientPointer } from './systems/ClientPointer'
 import { ClientPrefs } from './systems/ClientPrefs'
 import { ClientControls } from './systems/ClientControls'
 import { ClientCameraControls } from './systems/ClientCameraControls'
-import { CameraManager } from './systems/CameraManager'
 import { ClientNetwork } from './systems/ClientNetwork'
 import { ClientLoader } from './systems/ClientLoader'
 import { ClientGraphics } from './systems/ClientGraphics'
@@ -36,7 +35,6 @@ export function createClientWorld() {
   world.register('prefs', ClientPrefs)
   world.register('controls', ClientControls)
   world.register('cameraControls', ClientCameraControls)
-  world.register('cameraManager', CameraManager)
   world.register('network', ClientNetwork)
   world.register('loader', ClientLoader)
   world.register('graphics', ClientGraphics)
