@@ -53,7 +53,7 @@ export class ClientPrefs extends System {
     this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.08
     this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
     this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 1.8
-    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.5
+    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.15
     this.dofLuminanceThreshold = isNumber(data.dofLuminanceThreshold) ? data.dofLuminanceThreshold : 0.6
     this.dofLuminanceGain = isNumber(data.dofLuminanceGain) ? data.dofLuminanceGain : 2.5
     this.dofBias = isNumber(data.dofBias) ? data.dofBias : 0.08
