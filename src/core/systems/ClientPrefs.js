@@ -45,12 +45,57 @@ export class ClientPrefs extends System {
     this.voice = isNumber(data.voice) ? data.voice : 1
     this.v = data.v
 
+    // DOF preferences
+    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : true
+    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 10
+    this.dofFocalLength = isNumber(data.dofFocalLength) ? data.dofFocalLength : 24
+    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.08
+    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
+    this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 1.8
+    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.5
+    this.dofLuminanceThreshold = isNumber(data.dofLuminanceThreshold) ? data.dofLuminanceThreshold : 0.6
+    this.dofLuminanceGain = isNumber(data.dofLuminanceGain) ? data.dofLuminanceGain : 2.5
+    this.dofBias = isNumber(data.dofBias) ? data.dofBias : 0.08
+    this.dofFringe = isNumber(data.dofFringe) ? data.dofFringe : 0.8
+
+    // Additional DOF preferences
+    this.focusSmoothing = isNumber(data.focusSmoothing) ? data.focusSmoothing : 0.08
+    this.focusSpeed = isNumber(data.focusSpeed) ? data.focusSpeed : 8
+    this.playerAutofocus = isBoolean(data.playerAutofocus) ? data.playerAutofocus : false
+    this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : false
+    this.scrollZoomEnabled = isBoolean(data.scrollZoomEnabled) ? data.scrollZoomEnabled : true
+    this.showHelpers = isBoolean(data.showHelpers) ? data.showHelpers : false
+    this.zoomSpeed = isNumber(data.zoomSpeed) ? data.zoomSpeed : 1
+
+    // Bloom preferences
+    this.bloomIntensity = isNumber(data.bloomIntensity) ? data.bloomIntensity : 0.5
+    this.bloomRadius = isNumber(data.bloomRadius) ? data.bloomRadius : 0.8
+    this.bloomLuminanceThreshold = isNumber(data.bloomLuminanceThreshold) ? data.bloomLuminanceThreshold : 1
+    this.bloomLuminanceSmoothing = isNumber(data.bloomLuminanceSmoothing) ? data.bloomLuminanceSmoothing : 0.3
+
+    // AO preferences
+    this.aoRadius = isNumber(data.aoRadius) ? data.aoRadius : 64
+    this.aoDistanceFalloff = isNumber(data.aoDistanceFalloff) ? data.aoDistanceFalloff : 0.3
+    this.aoIntensity = isNumber(data.aoIntensity) ? data.aoIntensity : 1
+    this.aoHalfRes = isBoolean(data.aoHalfRes) ? data.aoHalfRes : true
+    this.aoScreenSpaceRadius = isBoolean(data.aoScreenSpaceRadius) ? data.aoScreenSpaceRadius : true
+
+    // Tone mapping preferences
+    this.toneMapAdaptationRate = isNumber(data.toneMapAdaptationRate) ? data.toneMapAdaptationRate : 0.5
+    this.toneMapWhitePoint = isNumber(data.toneMapWhitePoint) ? data.toneMapWhitePoint : 1
+    this.toneMapMiddleGrey = isNumber(data.toneMapMiddleGrey) ? data.toneMapMiddleGrey : 0.6
+    this.toneMapMinLuminance = isNumber(data.toneMapMinLuminance) ? data.toneMapMinLuminance : 0.01
+
     this.changes = null
   }
 
   init() {
     this.world.chat.bindCommand('stats', () => {
       this.setStats(!this.stats)
+    })
+    this.world.chat.bindCommand('dof', () => {
+      this.setDOFEnabled(!this.dofEnabled)
+      console.log(`DOF ${this.dofEnabled ? 'ENABLED ✓' : 'DISABLED ✗'}`)
     })
   }
 
@@ -86,6 +131,42 @@ export class ClientPrefs extends System {
       sfx: this.sfx,
       voice: this.voice,
       v: this.v,
+      // DOF preferences
+      dofEnabled: this.dofEnabled,
+      dofFocusDistance: this.dofFocusDistance,
+      dofFocalLength: this.dofFocalLength,
+      dofBokehScale: this.dofBokehScale,
+      dofFocusRange: this.dofFocusRange,
+      dofFStop: this.dofFStop,
+      dofMaxBlur: this.dofMaxBlur,
+      dofLuminanceThreshold: this.dofLuminanceThreshold,
+      dofLuminanceGain: this.dofLuminanceGain,
+      dofBias: this.dofBias,
+      dofFringe: this.dofFringe,
+      // Additional DOF preferences
+      focusSmoothing: this.focusSmoothing,
+      focusSpeed: this.focusSpeed,
+      playerAutofocus: this.playerAutofocus,
+      reticleAutofocus: this.reticleAutofocus,
+      scrollZoomEnabled: this.scrollZoomEnabled,
+      showHelpers: this.showHelpers,
+      zoomSpeed: this.zoomSpeed,
+      // Bloom preferences
+      bloomIntensity: this.bloomIntensity,
+      bloomRadius: this.bloomRadius,
+      bloomLuminanceThreshold: this.bloomLuminanceThreshold,
+      bloomLuminanceSmoothing: this.bloomLuminanceSmoothing,
+      // AO preferences
+      aoRadius: this.aoRadius,
+      aoDistanceFalloff: this.aoDistanceFalloff,
+      aoIntensity: this.aoIntensity,
+      aoHalfRes: this.aoHalfRes,
+      aoScreenSpaceRadius: this.aoScreenSpaceRadius,
+      // Tone mapping preferences
+      toneMapAdaptationRate: this.toneMapAdaptationRate,
+      toneMapWhitePoint: this.toneMapWhitePoint,
+      toneMapMiddleGrey: this.toneMapMiddleGrey,
+      toneMapMinLuminance: this.toneMapMinLuminance,
     })
   }
 
@@ -181,6 +262,86 @@ export class ClientPrefs extends System {
 
   setZoomSpeed(value) {
     this.modify('zoomSpeed', value)
+  }
+
+  // DOF parameter setters
+  setDOFFStop(value) {
+    this.modify('dofFStop', value)
+  }
+
+  setDOFMaxBlur(value) {
+    this.modify('dofMaxBlur', value)
+  }
+
+  setDOFLuminanceThreshold(value) {
+    this.modify('dofLuminanceThreshold', value)
+  }
+
+  setDOFLuminanceGain(value) {
+    this.modify('dofLuminanceGain', value)
+  }
+
+  setDOFBias(value) {
+    this.modify('dofBias', value)
+  }
+
+  setDOFFringe(value) {
+    this.modify('dofFringe', value)
+  }
+
+  // Bloom parameter setters
+  setBloomIntensity(value) {
+    this.modify('bloomIntensity', value)
+  }
+
+  setBloomRadius(value) {
+    this.modify('bloomRadius', value)
+  }
+
+  setBloomLuminanceThreshold(value) {
+    this.modify('bloomLuminanceThreshold', value)
+  }
+
+  setBloomLuminanceSmoothing(value) {
+    this.modify('bloomLuminanceSmoothing', value)
+  }
+
+  // AO parameter setters
+  setAORadius(value) {
+    this.modify('aoRadius', value)
+  }
+
+  setAODistanceFalloff(value) {
+    this.modify('aoDistanceFalloff', value)
+  }
+
+  setAOIntensity(value) {
+    this.modify('aoIntensity', value)
+  }
+
+  setAOHalfRes(value) {
+    this.modify('aoHalfRes', value)
+  }
+
+  setAOScreenSpaceRadius(value) {
+    this.modify('aoScreenSpaceRadius', value)
+  }
+
+  // Tone mapping parameter setters
+  setToneMapAdaptationRate(value) {
+    this.modify('toneMapAdaptationRate', value)
+  }
+
+  setToneMapWhitePoint(value) {
+    this.modify('toneMapWhitePoint', value)
+  }
+
+  setToneMapMiddleGrey(value) {
+    this.modify('toneMapMiddleGrey', value)
+  }
+
+  setToneMapMinLuminance(value) {
+    this.modify('toneMapMinLuminance', value)
   }
 
   destroy() {
