@@ -1,6 +1,7 @@
 import { isBoolean, isNumber } from 'lodash-es'
 
 import { System } from './System'
+import { EffectRegistry } from './EffectRegistry'
 import { storage } from '../storage'
 import { isTouch } from '../../client/utils'
 
@@ -87,6 +88,56 @@ export class ClientPrefs extends System {
     this.toneMapMinLuminance = isNumber(data.toneMapMinLuminance) ? data.toneMapMinLuminance : 0.01
 
     this.changes = null
+
+    // Initialize EffectRegistry for dynamic setter generation
+    this.effectRegistry = new EffectRegistry(world)
+
+    // Auto-generate setters for all effect parameters
+    this.generateEffectSetters()
+  }
+
+  /**
+   * Auto-generate setter methods from EffectRegistry configurations
+   */
+  generateEffectSetters() {
+    const effects = this.effectRegistry.getAllEffects()
+    const allPrefKeys = new Set()
+
+    // Collect all preference keys from effect uniforms
+    Object.keys(effects).forEach(name => {
+      const config = this.effectRegistry.getEffectConfig(name)
+      if (config.uniforms) {
+        Object.values(config.uniforms).forEach(prefKey => {
+          allPrefKeys.add(prefKey)
+        })
+      }
+    })
+
+    // Also add basic preference keys not in effects
+    const basicPrefs = [
+      'ui', 'actions', 'stats', 'dpr', 'shadows',
+      'postprocessing', 'bloom', 'ao', 'music', 'sfx', 'voice',
+      'dofEnabled', 'focusSmoothing', 'focusSpeed', 'playerAutofocus',
+      'reticleAutofocus', 'scrollZoomEnabled', 'showHelpers', 'zoomSpeed',
+      'focalLength', 'fStop', 'maxBlur', 'luminanceThreshold',
+      'luminanceGain', 'bias', 'fringe', 'focusRange'
+    ]
+    basicPrefs.forEach(pref => allPrefKeys.add(pref))
+
+    // Generate setters for all preference keys
+    allPrefKeys.forEach(prefKey => {
+      const setterName = `set${prefKey.charAt(0).toUpperCase() + prefKey.slice(1)}`
+
+      // Skip if it's one of the special DOF methods that have custom logic
+      if (['setDOFFocusDistance', 'setDOFFocusRange', 'setDOFBokehScale'].includes(setterName)) {
+        return
+      }
+
+      this[setterName] = value => {
+        this.modify(prefKey, value)
+        console.log(`[ClientPrefs] ${prefKey} set to:`, value)
+      }
+    })
   }
 
   init() {
@@ -170,51 +221,9 @@ export class ClientPrefs extends System {
     })
   }
 
-  setUI(value) {
-    this.modify('ui', value)
-  }
+  // Basic setters are now auto-generated in generateEffectSetters()
 
-  setActions(value) {
-    this.modify('actions', value)
-  }
-
-  setStats(value) {
-    this.modify('stats', value)
-  }
-
-  setDPR(value) {
-    this.modify('dpr', value)
-  }
-
-  setShadows(value) {
-    this.modify('shadows', value)
-  }
-
-  setPostprocessing(value) {
-    this.modify('postprocessing', value)
-  }
-
-  setBloom(value) {
-    this.modify('bloom', value)
-  }
-
-  setAO(value) {
-    this.modify('ao', value)
-  }
-
-  setMusic(value) {
-    this.modify('music', value)
-  }
-
-  setSFX(value) {
-    this.modify('sfx', value)
-  }
-
-  setVoice(value) {
-    this.modify('voice', value)
-  }
-
-  // Camera/DOF preference methods
+  // Special DOF methods that have custom logic
   setFocalLength(value) {
     this.modify('focalLength', value)
   }
@@ -231,118 +240,7 @@ export class ClientPrefs extends System {
     this.modify('dofFocusRange', value)
   }
 
-  setDOFEnabled(value) {
-    this.modify('dofEnabled', value)
-  }
-
-  setFocusSmoothing(value) {
-    this.modify('focusSmoothing', value)
-  }
-
-  // Additional camera/DOF preference methods
-  setFocusSpeed(value) {
-    this.modify('focusSpeed', value)
-  }
-
-  setPlayerAutofocus(value) {
-    this.modify('playerAutofocus', value)
-  }
-
-  setReticleAutofocus(value) {
-    this.modify('reticleAutofocus', value)
-  }
-
-  setScrollZoomEnabled(value) {
-    this.modify('scrollZoomEnabled', value)
-  }
-
-  setShowHelpers(value) {
-    this.modify('showHelpers', value)
-  }
-
-  setZoomSpeed(value) {
-    this.modify('zoomSpeed', value)
-  }
-
-  // DOF parameter setters
-  setDOFFStop(value) {
-    this.modify('dofFStop', value)
-  }
-
-  setDOFMaxBlur(value) {
-    this.modify('dofMaxBlur', value)
-  }
-
-  setDOFLuminanceThreshold(value) {
-    this.modify('dofLuminanceThreshold', value)
-  }
-
-  setDOFLuminanceGain(value) {
-    this.modify('dofLuminanceGain', value)
-  }
-
-  setDOFBias(value) {
-    this.modify('dofBias', value)
-  }
-
-  setDOFFringe(value) {
-    this.modify('dofFringe', value)
-  }
-
-  // Bloom parameter setters
-  setBloomIntensity(value) {
-    this.modify('bloomIntensity', value)
-  }
-
-  setBloomRadius(value) {
-    this.modify('bloomRadius', value)
-  }
-
-  setBloomLuminanceThreshold(value) {
-    this.modify('bloomLuminanceThreshold', value)
-  }
-
-  setBloomLuminanceSmoothing(value) {
-    this.modify('bloomLuminanceSmoothing', value)
-  }
-
-  // AO parameter setters
-  setAORadius(value) {
-    this.modify('aoRadius', value)
-  }
-
-  setAODistanceFalloff(value) {
-    this.modify('aoDistanceFalloff', value)
-  }
-
-  setAOIntensity(value) {
-    this.modify('aoIntensity', value)
-  }
-
-  setAOHalfRes(value) {
-    this.modify('aoHalfRes', value)
-  }
-
-  setAOScreenSpaceRadius(value) {
-    this.modify('aoScreenSpaceRadius', value)
-  }
-
-  // Tone mapping parameter setters
-  setToneMapAdaptationRate(value) {
-    this.modify('toneMapAdaptationRate', value)
-  }
-
-  setToneMapWhitePoint(value) {
-    this.modify('toneMapWhitePoint', value)
-  }
-
-  setToneMapMiddleGrey(value) {
-    this.modify('toneMapMiddleGrey', value)
-  }
-
-  setToneMapMinLuminance(value) {
-    this.modify('toneMapMinLuminance', value)
-  }
+  // All other setters are auto-generated in generateEffectSetters()
 
   destroy() {
     // ...
