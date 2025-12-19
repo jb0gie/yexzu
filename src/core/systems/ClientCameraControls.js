@@ -1,6 +1,7 @@
 import { isNumber } from 'lodash-es'
 import { System } from './System'
 import { Raycaster, Vector2, Vector3, Quaternion } from 'three'
+import { DOFController } from './DOFController'
 
 /**
  * Client Camera Controls System
@@ -21,11 +22,8 @@ export class ClientCameraControls extends System {
     // Master control
     this.enabled = true // Camera controls ON by default for ADS to work
 
-    // Autofocus state
-    this.focusSmoothing = true
-    this.focusSpeed = 0.08
-    this.targetFocusDistance = 10
-    this.currentFocusDistance = 10
+    // Create DOF controller
+    this.dofController = new DOFController(world)
 
     // Zoom control
     this.zoomSpeed = 5
@@ -35,7 +33,6 @@ export class ClientCameraControls extends System {
     // Dynamic DOF compensation
     this.dynamicDOF = true // Auto-adjust DOF based on zoom
     this.lastCameraZoom = null
-    this.debugDOF = false // Debug logging
 
     // ADS-style zoom
     this.baseFocalLength = 24 // Will be set properly in init()
@@ -72,11 +69,6 @@ export class ClientCameraControls extends System {
     // Raycast throttling for performance (8ms = ~120fps)
     this.lastRaycastTime = 0
     this.raycastThrottleMs = 8
-
-    // Head bone raycast configuration
-    this.useHeadBoneRaycast = true // Enable head bone raycast by default
-    this.focusHysteresis = 2.5 // Anti-jump threshold (2.5m) - more constant, less dynamic
-    this.lastRaycastPerformance = 0 // Performance monitoring
   }
 
   init() {
@@ -90,13 +82,12 @@ export class ClientCameraControls extends System {
     this.enabled = true // Enable camera controls
 
     // Autofocus defaults
-    this.focusSmoothing = true
-    this.focusSpeed = 0.08 // Much slower for natural, imperceptible focus transitions
+    this.world.prefs.setFocusSmoothing(true)
+    this.dofController.focusSpeed = 0.08 // Much slower for natural, imperceptible focus transitions
+    this.dofController.setFocusDistance(10)
 
     // Other defaults
     this.zoomSpeed = 5
-    this.currentFocusDistance = 10
-    this.targetFocusDistance = 10
 
     // Apply settings to prefs
     if (this.world.prefs) {
@@ -137,8 +128,7 @@ export class ClientCameraControls extends System {
         // Seed focus immediately based on current zoom level
         const z = Math.abs(this.world.camera?.position?.z || 0)
         const baseFocus = 5 + z * 1.5
-        this.targetFocusDistance = baseFocus
-        this.currentFocusDistance = baseFocus
+        this.dofController.setFocusDistance(baseFocus)
         this.setDOFFocusDistance(baseFocus)
       }
     })
@@ -170,11 +160,12 @@ export class ClientCameraControls extends System {
     this.world.prefs.off('change', this.onPrefsChange)
     this.control?.release()
     this.control = null
+    this.dofController?.destroy()
+    this.dofController = null
   }
 
   onPrefsChange = changes => {
-    if (changes.focusSmoothing) this.focusSmoothing = changes.focusSmoothing.value
-    if (changes.focusSpeed) this.focusSpeed = changes.focusSpeed.value
+    if (changes.focusSpeed) this.dofController.focusSpeed = changes.focusSpeed.value
     if (changes.zoomSpeed) this.zoomSpeed = changes.zoomSpeed.value
 
     // Apply focal length changes from apps
@@ -196,7 +187,7 @@ export class ClientCameraControls extends System {
 
     // Smooth focal length transition
     if (Math.abs(this.targetFocalLength - this.currentFocalLength) > 0.1) {
-      this.currentFocalLength += (this.targetFocalLength - this.currentFocalLength) * this.focusSpeed
+      this.currentFocalLength += (this.targetFocalLength - this.currentFocalLength) * this.dofController.focusSpeed
       this.setFocalLength(this.currentFocalLength)
     } else if (this.currentFocalLength !== this.targetFocalLength) {
       // Snap to target if very close
@@ -207,11 +198,8 @@ export class ClientCameraControls extends System {
     // Removed scroll zoom to avoid conflicting with native camera controls
     // Use ADS zoom (right-click) instead for focal length adjustment
 
-    // Only run DOF updates if master control is enabled AND DOF is enabled
-    if (!this.enabled || !this.world.prefs.dofEnabled) return
-
     // Dynamic DOF compensation based on camera zoom (mouse scroll distance)
-    if (this.dynamicDOF && this.world.camera) {
+    if (this.enabled && this.dynamicDOF && this.world.camera) {
       // Calculate focus based on camera distance from player (zoom level)
       // In first person (z=0), focus close. In third person, focus further
       const cameraZoom = Math.abs(this.world.camera.position.z)
@@ -268,23 +256,23 @@ export class ClientCameraControls extends System {
       if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
         // Apply hysteresis: only update target if change is significant
         const focusChangeThreshold = 1.0 // meters
-        const distanceDelta = Math.abs(raycastDistance - this.targetFocusDistance)
+        const distanceDelta = Math.abs(raycastDistance - this.dofController.targetFocusDistance)
 
         if (distanceDelta > focusChangeThreshold) {
           // Filter out sky/background (camera far plane hits)
           if (raycastDistance > camFar * 0.8) {
-            if (this.debugDOF) console.log(`[DOF] Skipped far plane hit: ${raycastDistance.toFixed(1)}m`)
+            if (this.dofController.debugDOF) console.log(`[DOF] Skipped far plane hit: ${raycastDistance.toFixed(1)}m`)
           } else {
             // Valid focus change - update target
-            if (this.debugDOF) {
-              console.log(`[DOF] Focus: ${this.targetFocusDistance.toFixed(1)}m → ${raycastDistance.toFixed(1)}m (${this.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
+            if (this.dofController.debugDOF) {
+              console.log(`[DOF] Focus: ${this.dofController.targetFocusDistance.toFixed(1)}m → ${raycastDistance.toFixed(1)}m (${this.dofController.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
             }
-            this.targetFocusDistance = raycastDistance
+            this.dofController.targetFocusDistance = raycastDistance
           }
         } else {
           // Small change - ignore to prevent stuttering
-          if (this.debugDOF && distanceDelta > 0.1) {
-            console.log(`[DOF] Ignored small change: ${distanceDelta.toFixed(2)}m (current: ${this.targetFocusDistance.toFixed(1)}m)`)
+          if (this.dofController.debugDOF && distanceDelta > 0.1) {
+            console.log(`[DOF] Ignored small change: ${distanceDelta.toFixed(2)}m (current: ${this.dofController.targetFocusDistance.toFixed(1)}m)`)
           }
         }
       } else {
@@ -292,9 +280,10 @@ export class ClientCameraControls extends System {
         const playerDist = this.getFocusDistanceToPlayer()
         if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
           const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
-          this.targetFocusDistance = playerDist * (1 - blend) + baseFocus * blend
+          const blendedFocus = playerDist * (1 - blend) + baseFocus * blend
+          this.dofController.setFocusDistance(blendedFocus)
         } else {
-          this.targetFocusDistance = baseFocus
+          this.dofController.setFocusDistance(baseFocus)
         }
       }
 
@@ -304,22 +293,13 @@ export class ClientCameraControls extends System {
 
       // When the user changes zoom, snap focus to prevent temporary blur
       if (zoomDelta > 0.05) {
-        this.currentFocusDistance = this.targetFocusDistance
-        this.setDOFFocusDistance(this.currentFocusDistance)
+        const focus = this.dofController.getFocusDistance()
+        this.setDOFFocusDistance(focus)
       }
     }
 
-    // Smooth focus transition with exponential smoothing (more natural than linear)
-    if (this.focusSmoothing && Math.abs(this.targetFocusDistance - this.currentFocusDistance) > 0.15) {
-      // Exponential smoothing: starts fast, slows down as it approaches target
-      // Frame-rate independent and feels more cinematic
-      const lerpFactor = 1 - Math.exp(-this.focusSpeed * _delta)
-      this.currentFocusDistance += (this.targetFocusDistance - this.currentFocusDistance) * lerpFactor
-      this.setDOFFocusDistance(this.currentFocusDistance)
-    } else if (!this.focusSmoothing && this.targetFocusDistance !== this.currentFocusDistance) {
-      this.currentFocusDistance = this.targetFocusDistance
-      this.setDOFFocusDistance(this.currentFocusDistance)
-    }
+    // Update DOF using controller
+    this.dofController.update(_delta)
   }
 
   // Depth of Field Controls
@@ -337,21 +317,7 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusDistance(distance)
-    // Update DOF uniform using EffectRegistry
-    if (this.world.graphics?.effectRegistry) {
-      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
-      if (dofEffect) {
-        const adjustedValue = distance / (this.world.camera.far || 1200)
-        const success = this.world.graphics.effectRegistry.updateUniform(
-          dofEffect,
-          'circleOfConfusionMaterial.uniforms.focusDistance',
-          adjustedValue
-        )
-        if (success) {
-          console.log(`[ClientCameraControls] Updated DOF focus distance: ${distance}`)
-        }
-      }
-    }
+    this.dofController.setFocusDistance(distance)
   }
 
   setDOFFocusRange(range) {
@@ -360,23 +326,7 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusRange(range)
-    // Update DOF uniform using EffectRegistry
-    if (this.world.graphics?.effectRegistry) {
-      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
-      if (dofEffect) {
-        // Convert focus range to fStop for the DOF effect
-        // Higher focus range -> smaller fStop = shallower DOF
-        const fStop = Math.max(0.1, 22 / (range + 1))
-        const success = this.world.graphics.effectRegistry.updateUniform(
-          dofEffect,
-          'circleOfConfusionMaterial.uniforms.fStop',
-          fStop
-        )
-        if (success) {
-          console.log(`[ClientCameraControls] Updated DOF focus range: ${range} (fStop: ${fStop.toFixed(2)})`)
-        }
-      }
-    }
+    // Note: DOF controller will handle uniform updates
   }
 
   setDOFBokehScale(scale) {
@@ -385,22 +335,7 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFBokehScale(scale)
-    // Update DOF uniform using EffectRegistry
-    if (this.world.graphics?.effectRegistry) {
-      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
-      if (dofEffect) {
-        // Convert bokeh scale to maxBlur for the DOF effect
-        const maxBlur = scale * 0.15
-        const success = this.world.graphics.effectRegistry.updateUniform(
-          dofEffect,
-          'circleOfConfusionMaterial.uniforms.maxBlur',
-          maxBlur
-        )
-        if (success) {
-          console.log(`[ClientCameraControls] Updated DOF bokeh scale: ${scale} (maxBlur: ${maxBlur.toFixed(3)})`)
-        }
-      }
-    }
+    // Note: DOF controller will handle uniform updates
   }
 
   // Focal Length Control
@@ -477,82 +412,9 @@ export class ClientCameraControls extends System {
     }
   }
 
-  // Auto-focus on target position
-
-  // Raycast from camera center to get focus distance
+  // Raycast from camera center to get focus distance (delegates to DOF controller)
   raycastFocusDistance() {
-    // Priority 1: Head bone raycast (most accurate - from player avatar)
-    if (this.useHeadBoneRaycast) {
-      const headFocus = this.raycastFromPlayerHead()
-      if (headFocus !== null && isFinite(headFocus) && headFocus > 0.5) {
-        return headFocus
-      }
-    }
-
-    // Priority 2: Reticle raycast (fallback - from screen center)
-    if (!this.world.camera || !this.world.stage) {
-      return null
-    }
-
-    // Check if viewport is ready (required for raycast)
-    if (!this.world.stage.viewport) {
-      return null
-    }
-
-    // Use Stage raycast which properly uses the octree
-    try {
-      const hits = this.world.stage.raycastReticle()
-      if (hits && hits.length > 0) {
-        // Filter out very close hits (likely the player)
-        const validHits = hits.filter(hit => hit.distance > 0.5)
-        if (validHits.length > 0) {
-          const distance = validHits[0].distance
-          return distance
-        }
-      }
-    } catch (err) {}
-
-    // No fallback to manual scene traversal since objects are in the octree
-    return null
-  }
-
-  // Auto-focus using raycast
-
-  // Raycast from player head bone for accurate focus
-  raycastFromPlayerHead() {
-    const player = this.world.entities.player
-    if (!player?.avatar) return null
-
-    const startTime = performance.now()
-
-    try {
-      const headMatrix = player.avatar.getBoneTransform('head')
-      if (!headMatrix) return null
-
-      const headPos = new Vector3().setFromMatrixPosition(headMatrix)
-      const headQuat = new Quaternion().setFromRotationMatrix(headMatrix)
-      const forward = new Vector3(0, 0, -1).applyQuaternion(headQuat)
-
-      this.raycaster.set(headPos, forward)
-      const intersectables = this.world.stage?.scene || this.world.viewport
-      const intersects = this.raycaster.intersectObjects(intersectables?.children || [], true)
-
-      const distance = intersects.length > 0 ? intersects[0].distance : null
-
-      // Performance monitoring
-      const endTime = performance.now()
-      this.lastRaycastPerformance = endTime - startTime
-
-      // Warn if raycast is slow (>1ms)
-      if (this.lastRaycastPerformance > 1 && this.debugDOF) {
-        console.warn(`[ClientCameraControls] Head bone raycast took ${this.lastRaycastPerformance.toFixed(2)}ms`)
-      }
-
-      return distance
-    } catch (error) {
-      console.warn('[ClientCameraControls] Head bone raycast failed:', error)
-      return null
-    }
+    return this.dofController._getRaycastFocusDistance()
   }
 
   // Get focus distance to player
@@ -583,21 +445,7 @@ export class ClientCameraControls extends System {
 
   // Auto-focus on player
 
-  // Apply hysteresis to prevent focus jumping from head jitter
-  applyFocusHysteresis(newFocus, previousFocus) {
-    if (previousFocus === null) return newFocus
-
-    const distance = Math.abs(newFocus - previousFocus)
-
-    if (distance < this.focusHysteresis) {
-      // Maintain current focus - prevents tiny jumps from head jitter
-      return previousFocus
-    }
-
-    // Large change - allow new focus
-    return newFocus
-  }
-
+  
   // Master enable/disable
   enable() {
     this.enabled = true
@@ -628,13 +476,12 @@ export class ClientCameraControls extends System {
   }
 
   setFocusSmoothing(enabled) {
-    this.focusSmoothing = enabled
     this.world.prefs.setFocusSmoothing(enabled)
   }
 
   setFocusSpeed(speed) {
-    this.focusSpeed = Math.max(0.01, Math.min(1, speed))
-    this.world.prefs.setFocusSpeed(this.focusSpeed)
+    this.dofController.setFocusSpeed(speed)
+    this.world.prefs.setFocusSpeed(speed)
   }
 
   setReticleFocusDelay(delay) {}
@@ -1019,7 +866,7 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.useHeadBoneRaycast = true
+          this.dofController.useHeadBoneRaycast = true
           console.log('Head bone raycast enabled')
           return true
         },
@@ -1029,7 +876,7 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          this.useHeadBoneRaycast = false
+          this.dofController.useHeadBoneRaycast = false
           console.log('Head bone raycast disabled')
           return true
         },
@@ -1039,7 +886,7 @@ export class ClientCameraControls extends System {
             console.warn('Camera controls are admin-only')
             return false
           }
-          const headFocus = this.raycastFromPlayerHead()
+          const headFocus = this.dofController._raycastFromPlayerHead()
           const reticleFocus = (() => {
             if (!this.world.camera || !this.world.stage?.viewport) return null
             try {
@@ -1054,9 +901,9 @@ export class ClientCameraControls extends System {
 
           console.log(`Head bone focus: ${headFocus}m`)
           console.log(`Reticle focus: ${reticleFocus}m`)
-          console.log(`Using head bone: ${this.useHeadBoneRaycast}`)
+          console.log(`Using head bone: ${this.dofController.useHeadBoneRaycast}`)
           console.log(`Player avatar available: ${!!this.world.entities.player?.avatar}`)
-          console.log(`Last raycast performance: ${this.lastRaycastPerformance}ms`)
+          console.log(`Last raycast performance: ${this.dofController.lastRaycastPerformance}ms`)
           return true
         },
       },
@@ -1090,8 +937,8 @@ export class ClientCameraControls extends System {
 
         // Reset autofocus settings
         this.dynamicDOF = false
-        this.focusSmoothing = true
-        this.focusSpeed = 0.1
+        this.world.prefs.setFocusSmoothing(true)
+        this.dofController.setFocusSpeed(0.1)
 
         // Save reset state
         this.world.prefs.persist()
@@ -1109,8 +956,8 @@ export class ClientCameraControls extends System {
           return null
         }
         const settings = this.getCameraSettings()
-        console.log('Current Focus Distance:', this.currentFocusDistance)
-        console.log('Target Focus Distance:', this.targetFocusDistance)
+        console.log('Current Focus Distance:', this.dofController.getFocusDistance())
+        console.log('Target Focus Distance:', this.dofController.targetFocusDistance)
         return settings
       },
 
@@ -1120,8 +967,8 @@ export class ClientCameraControls extends System {
           console.warn('Camera controls are admin-only')
           return false
         }
-        this.debugDOF = enable !== undefined ? enable : !this.debugDOF
-        return this.debugDOF
+        this.dofController.setDebug(enable !== undefined ? enable : !this.dofController.debugDOF)
+        return this.dofController.debugDOF
       },
 
       // Help
