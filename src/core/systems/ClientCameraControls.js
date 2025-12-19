@@ -317,9 +317,20 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusDistance(distance)
-    // Update DOF uniform if effect exists
-    if (this.world.graphics?.dofUniforms?.focusDistance) {
-      this.world.graphics.dofUniforms.focusDistance.value = distance / (this.world.camera.far || 1200)
+    // Update DOF uniform using EffectRegistry
+    if (this.world.graphics?.effectRegistry) {
+      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
+      if (dofEffect) {
+        const adjustedValue = distance / (this.world.camera.far || 1200)
+        const success = this.world.graphics.effectRegistry.updateUniform(
+          dofEffect,
+          'circleOfConfusionMaterial.uniforms.focusDistance',
+          adjustedValue
+        )
+        if (success) {
+          console.log(`[ClientCameraControls] Updated DOF focus distance: ${distance}`)
+        }
+      }
     }
   }
 
@@ -329,9 +340,22 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFFocusRange(range)
-    // Update DOF uniform if effect exists
-    if (this.world.graphics?.dofUniforms?.focusRange) {
-      this.world.graphics.dofUniforms.focusRange.value = range
+    // Update DOF uniform using EffectRegistry
+    if (this.world.graphics?.effectRegistry) {
+      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
+      if (dofEffect) {
+        // Convert focus range to fStop for the DOF effect
+        // Higher focus range -> smaller fStop = shallower DOF
+        const fStop = Math.max(0.1, 22 / (range + 1))
+        const success = this.world.graphics.effectRegistry.updateUniform(
+          dofEffect,
+          'circleOfConfusionMaterial.uniforms.fStop',
+          fStop
+        )
+        if (success) {
+          console.log(`[ClientCameraControls] Updated DOF focus range: ${range} (fStop: ${fStop.toFixed(2)})`)
+        }
+      }
     }
   }
 
@@ -341,9 +365,21 @@ export class ClientCameraControls extends System {
       return
     }
     this.world.prefs.setDOFBokehScale(scale)
-    // Update DOF effect if exists
-    if (this.world.graphics?.dofEffect) {
-      this.world.graphics.dofEffect.bokehScale = scale
+    // Update DOF uniform using EffectRegistry
+    if (this.world.graphics?.effectRegistry) {
+      const dofEffect = this.world.graphics.effectRegistry.getEffect('dof')
+      if (dofEffect) {
+        // Convert bokeh scale to maxBlur for the DOF effect
+        const maxBlur = scale * 0.15
+        const success = this.world.graphics.effectRegistry.updateUniform(
+          dofEffect,
+          'circleOfConfusionMaterial.uniforms.maxBlur',
+          maxBlur
+        )
+        if (success) {
+          console.log(`[ClientCameraControls] Updated DOF bokeh scale: ${scale} (maxBlur: ${maxBlur.toFixed(3)})`)
+        }
+      }
     }
   }
 
