@@ -194,20 +194,17 @@ export class DOFController {
   _updateDofUniforms() {
     if (!this.world.graphics?.effectRegistry) return
 
-    const registry = this.world.graphics.effectRegistry
-    const focus = this.currentFocusDistance
-    const range = this.world.prefs.dofFocusRange || 20
-    const bokeh = this.world.prefs.dofBokehScale || 1
+    const dof = this.world.graphics.effectRegistry.instances.get('dof')
+    if (!dof) return
 
-    // Update focus distance
-    registry.updateUniform('dof', 'circleOfConfusionMaterial.uniforms.focusDistance', focus)
+    // Update world focus distance directly on the effect
+    // This is the proper way to set focus distance in world units
+    dof.worldFocusDistance = this.currentFocusDistance
 
-    // Update focus range (converted to f-stop)
-    const fStop = Math.max(0.5, Math.min(32, range / Math.max(1e-6, focus)))
-    registry.updateUniform('dof', 'circleOfConfusionMaterial.uniforms.fStop', fStop)
-
-    // Update bokeh scale
-    registry.updateUniform('dof', 'circleOfConfusionMaterial.uniforms.maxBlur', bokeh)
+    // Recompile effect to apply changes
+    if (dof.recompile && typeof dof.recompile === 'function') {
+      dof.recompile()
+    }
   }
 
   /**

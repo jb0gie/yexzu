@@ -121,23 +121,17 @@ export class EffectRegistry {
         factory: (config, camera, world) => {
           const dof = new DepthOfFieldEffect(camera, {
             ...config.params,
-            focusDistance: (world.prefs.dofFocusDistance || 50) / (camera.far || 1200),
+            // Use worldFocusDistance for world unit distances (not normalized)
+            // The DOF controller will update this dynamically
+            worldFocusDistance: 50,
             focalLength: (world.prefs.dofFocalLength || 24) * 0.001,
-            bokehScale: (world.prefs.dofMaxBlur || 0.03) * 100,
+            focusRange: (world.prefs.dofFocusRange || 30) / 1000, // Convert to normalized
+            bokehScale: (world.prefs.dofMaxBlur || 0.01) * 100,
             height: 480,
           })
 
-          // Configure DOF uniforms (check if they exist first)
-          const uniforms = dof.circleOfConfusionMaterial.uniforms
-          if (uniforms.fStop) uniforms.fStop.value = world.prefs.dofFStop || 5.6
-          if (uniforms.maxBlur) uniforms.maxBlur.value = world.prefs.dofMaxBlur || 0.03
-          if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = world.prefs.dofLuminanceThreshold || 0.6
-          if (uniforms.luminanceGain) uniforms.luminanceGain.value = world.prefs.dofLuminanceGain || 2.5
-          if (uniforms.bias) uniforms.bias.value = world.prefs.dofBias || 0.08
-          if (uniforms.fringe) uniforms.fringe.value = world.prefs.dofFringe || 0.8
-
-          // Store uniform references for updates
-          dof.__uniforms = uniforms
+          // Store reference for dynamic updates
+          dof.__world = world
           return dof
         },
       },
