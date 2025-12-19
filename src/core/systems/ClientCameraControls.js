@@ -272,6 +272,7 @@ export class ClientCameraControls extends System {
     }
 
     // Update DOF using controller (handles raycasting and smoothing)
+    console.log('[ClientCameraControls] Updating DOFController with delta:', _delta)
     this.dofController.update(_delta)
   }
 

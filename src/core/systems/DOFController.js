@@ -43,8 +43,17 @@ export class DOFController {
    * Update DOF focus (called each frame)
    */
   update(delta) {
-    if (!this.world.prefs?.dofEnabled) return
-    if (!this.world.camera) return
+    if (!this.world.prefs?.dofEnabled) {
+      console.warn('[DOF] SKIPPED - dofEnabled is false')
+      return
+    }
+    if (!this.world.camera) {
+      console.warn('[DOF] SKIPPED - no camera')
+      return
+    }
+
+    console.log('[DOF] ==========================================')
+    console.log('[DOF] UPDATE START - delta:', delta)
 
     // Calculate target focus distance
     this._updateTargetFocusDistance()
@@ -56,39 +65,54 @@ export class DOFController {
       this.currentFocusDistance = this.targetFocusDistance
     }
 
+    console.log('[DOF] Current focus:', this.currentFocusDistance.toFixed(2), 'm')
+    console.log('[DOF] Target focus:', this.targetFocusDistance.toFixed(2), 'm')
+
     // Update DOF uniforms
     this._updateDofUniforms()
+
+    console.log('[DOF] UPDATE END')
+    console.log('[DOF] ==========================================')
   }
 
   /**
    * Update target focus distance based on raycast or fallback
    */
   _updateTargetFocusDistance() {
+    console.log('[DOF] _updateTargetFocusDistance() called')
+    console.log('[DOF] Current target focus:', this.targetFocusDistance.toFixed(2))
+
     const raycastDistance = this._getRaycastFocusDistance()
+    console.log('[DOF] Raycast result:', raycastDistance)
 
     if (raycastDistance !== null) {
       // Raycast succeeded - update focus with hysteresis
       const distanceDelta = Math.abs(raycastDistance - this.targetFocusDistance)
+      console.log('[DOF] Raycast distance:', raycastDistance.toFixed(2), 'm')
+      console.log('[DOF] Distance delta:', distanceDelta.toFixed(2), 'm (hysteresis:', this.focusHysteresis, ')')
 
       if (distanceDelta > this.focusHysteresis) {
+        console.log('[DOF] APPLYING raycast focus - delta > hysteresis')
         this.targetFocusDistance = raycastDistance
-
-        if (this.debugDOF) {
-          console.log(`[DOF] Raycast focus: ${this.targetFocusDistance.toFixed(1)}m`)
-        }
+      } else {
+        console.log('[DOF] SKIPPING raycast focus - delta <= hysteresis')
       }
     } else {
+      console.log('[DOF] Raycast returned NULL - using FALLBACK')
       // Raycast failed - use fallback from zoom-based calculation
       const distanceDelta = Math.abs(this.fallbackFocusDistance - this.targetFocusDistance)
+      console.log('[DOF] Fallback distance:', this.fallbackFocusDistance.toFixed(2), 'm')
+      console.log('[DOF] Fallback delta:', distanceDelta.toFixed(2), 'm')
 
       if (distanceDelta > this.focusHysteresis) {
+        console.log('[DOF] APPLYING fallback focus')
         this.targetFocusDistance = this.fallbackFocusDistance
-
-        if (this.debugDOF) {
-          console.log(`[DOF] Fallback focus: ${this.targetFocusDistance.toFixed(1)}m`)
-        }
+      } else {
+        console.log('[DOF] SKIPPING fallback focus')
       }
     }
+
+    console.log('[DOF] Final target focus:', this.targetFocusDistance.toFixed(2), 'm')
   }
 
   /**
@@ -105,34 +129,68 @@ export class DOFController {
    * Priority 2: Reticle/camera center
    */
   _getRaycastFocusDistance() {
+    console.log('[DOF] _getRaycastFocusDistance() called - useHeadBoneRaycast:', this.useHeadBoneRaycast)
+
     // Try head bone raycast first
     if (this.useHeadBoneRaycast) {
       const headFocus = this._raycastFromPlayerHead()
-      if (headFocus !== null) return headFocus
+      console.log('[DOF] Head bone raycast result:', headFocus)
+      if (headFocus !== null) {
+        console.log('[DOF] Using HEAD BONE raycast:', headFocus.toFixed(2), 'm')
+        return headFocus
+      }
+      console.log('[DOF] Head bone raycast FAILED - trying reticle')
     }
 
     // Fallback to reticle raycast
-    return this._raycastFromReticle()
+    const reticleFocus = this._raycastFromReticle()
+    console.log('[DOF] Reticle raycast result:', reticleFocus)
+    if (reticleFocus !== null) {
+      console.log('[DOF] Using RETICLE raycast:', reticleFocus.toFixed(2), 'm')
+    } else {
+      console.log('[DOF] BOTH raycasts FAILED')
+    }
+    return reticleFocus
   }
 
   /**
    * Raycast from player head bone
    */
   _raycastFromPlayerHead() {
+    console.log('[DOF] _raycastFromPlayerHead() called')
+
     const player = this.world.entities.player
-    if (!player?.avatar) return null
+    if (!player?.avatar) {
+      console.log('[DOF] NO PLAYER or AVATAR')
+      return null
+    }
+
+    console.log('[DOF] Player found:', !!player)
+    console.log('[DOF] Avatar found:', !!player.avatar)
 
     try {
       const headMatrix = player.avatar.getBoneTransform('head')
-      if (!headMatrix) return null
+      console.log('[DOF] Head bone matrix:', headMatrix)
+
+      if (!headMatrix) {
+        console.log('[DOF] Head bone matrix is NULL')
+        return null
+      }
 
       const headPos = this.v1.setFromMatrixPosition(headMatrix)
       const headQuat = this.v2.setFromRotationMatrix(headMatrix)
       const forward = this.v3.set(0, 0, -1).applyQuaternion(headQuat)
 
-      return this._performRaycast(headPos, forward)
+      console.log('[DOF] Head position:', headPos)
+      console.log('[DOF] Head quaternion:', headQuat)
+      console.log('[DOF] Forward direction:', forward)
+
+      const result = this._performRaycast(headPos, forward)
+      console.log('[DOF] Raycast result from head:', result)
+
+      return result
     } catch (err) {
-      if (this.debugDOF) console.warn('[DOF] Head raycast error:', err)
+      console.error('[DOF] HEAD RAYCAST ERROR:', err)
       return null
     }
   }
@@ -141,13 +199,23 @@ export class DOFController {
    * Raycast from camera/reticle
    */
   _raycastFromReticle() {
-    if (!this.world.stage?.viewport) return null
+    console.log('[DOF] _raycastFromReticle() called')
+
+    if (!this.world.stage?.viewport) {
+      console.log('[DOF] NO STAGE or VIEWPORT')
+      return null
+    }
 
     try {
       const hits = this.world.stage.raycastReticle()
-      return this._processRaycastHits(hits)
+      console.log('[DOF] Reticle raycast hits:', hits?.length || 0)
+
+      const result = this._processRaycastHits(hits)
+      console.log('[DOF] Processed reticle result:', result)
+
+      return result
     } catch (err) {
-      if (this.debugDOF) console.warn('[DOF] Reticle raycast error:', err)
+      console.error('[DOF] RETICLE RAYCAST ERROR:', err)
       return null
     }
   }
@@ -156,35 +224,77 @@ export class DOFController {
    * Perform raycast and get distance
    */
   _performRaycast(origin, direction) {
+    console.log('[DOF] _performRaycast() called')
+    console.log('[DOF] Origin:', origin)
+    console.log('[DOF] Direction:', direction)
+
     this.raycaster.set(origin, direction)
+    console.log('[DOF] Raycaster set')
 
     const intersectables = this.world.stage?.scene
-    if (!intersectables) return null
+    console.log('[DOF] Scene available:', !!intersectables)
+
+    if (!intersectables) {
+      console.log('[DOF] NO SCENE to raycast against')
+      return null
+    }
+
+    console.log('[DOF] Scene children count:', intersectables.children?.length || 0)
 
     const intersects = this.raycaster.intersectObjects(
       intersectables.children || [],
       true
     )
 
-    return this._processRaycastHits(intersects)
+    console.log('[DOF] Raw intersects count:', intersects.length)
+    console.log('[DOF] Raw intersects:', intersects)
+
+    const result = this._processRaycastHits(intersects)
+    console.log('[DOF] Processed result:', result)
+
+    return result
   }
 
   /**
    * Process raycast hits and extract distance
    */
   _processRaycastHits(hits) {
-    if (!hits || hits.length === 0) return null
+    console.log('[DOF] _processRaycastHits() called with', hits?.length || 0, 'hits')
+
+    if (!hits || hits.length === 0) {
+      console.log('[DOF] NO HITS')
+      return null
+    }
+
+    console.log('[DOF] All hits:')
+    hits.forEach((hit, i) => {
+      console.log(`[DOF]   Hit ${i}: distance=${hit.distance}, object=${hit.object?.name || hit.object?.type}`)
+    })
 
     // Filter out very close hits (likely the player)
     const validHits = hits.filter(hit => hit.distance > 0.5)
-    if (validHits.length === 0) return null
+    console.log('[DOF] After filtering <0.5m: count =', validHits.length)
+
+    if (validHits.length === 0) {
+      console.log('[DOF] NO VALID HITS after filtering')
+      return null
+    }
 
     const distance = validHits[0].distance
+    console.log('[DOF] Best hit distance:', distance)
 
     // Filter out sky/background (camera far plane)
     const camFar = this.world.camera.far || 1200
-    if (distance > camFar * 0.8) return null
+    const maxDistance = camFar * 0.8
+    console.log('[DOF] Max distance allowed:', maxDistance.toFixed(2))
+    console.log('[DOF] Hit distance vs max:', distance > maxDistance ? 'TOO FAR' : 'OK')
 
+    if (distance > maxDistance) {
+      console.log('[DOF] SKIPPED - Hit is too far (likely skybox)')
+      return null
+    }
+
+    console.log('[DOF] ACCEPTED distance:', distance.toFixed(2), 'm')
     return distance
   }
 
@@ -192,18 +302,30 @@ export class DOFController {
    * Update DOF uniforms through EffectRegistry
    */
   _updateDofUniforms() {
-    if (!this.world.graphics?.effectRegistry) return
+    console.log('[DOF] _updateDofUniforms() called')
+
+    if (!this.world.graphics?.effectRegistry) {
+      console.log('[DOF] NO EFFECT REGISTRY')
+      return
+    }
 
     const dof = this.world.graphics.effectRegistry.instances.get('dof')
-    if (!dof) return
+    if (!dof) {
+      console.log('[DOF] NO DOF EFFECT INSTANCE')
+      return
+    }
+
+    console.log('[DOF] Setting worldFocusDistance to:', this.currentFocusDistance.toFixed(2))
 
     // Update world focus distance directly on the effect
-    // This is the proper way to set focus distance in world units
     dof.worldFocusDistance = this.currentFocusDistance
 
     // Recompile effect to apply changes
     if (dof.recompile && typeof dof.recompile === 'function') {
+      console.log('[DOF] Recompiling effect')
       dof.recompile()
+    } else {
+      console.log('[DOF] NO recompile method on effect')
     }
   }
 
