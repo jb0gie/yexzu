@@ -62,8 +62,8 @@ export class ClientPrefs extends System {
     // Additional DOF preferences
     this.focusSmoothing = isNumber(data.focusSmoothing) ? data.focusSmoothing : 0.08
     this.focusSpeed = isNumber(data.focusSpeed) ? data.focusSpeed : 8
-    this.playerAutofocus = isBoolean(data.playerAutofocus) ? data.playerAutofocus : false
-    this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : false
+    this.playerAutofocus = isBoolean(data.playerAutofocus) ? data.playerAutofocus : true
+    this.reticleAutofocus = isBoolean(data.reticleAutofocus) ? data.reticleAutofocus : true
     this.scrollZoomEnabled = isBoolean(data.scrollZoomEnabled) ? data.scrollZoomEnabled : true
     this.showHelpers = isBoolean(data.showHelpers) ? data.showHelpers : false
     this.zoomSpeed = isNumber(data.zoomSpeed) ? data.zoomSpeed : 1

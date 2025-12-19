@@ -27,6 +27,9 @@ export class DOFController {
     this.lastRaycastPerformance = 0
     this.debugDOF = false
 
+    // Fallback focus distance (from zoom-based calculation)
+    this.fallbackFocusDistance = 10
+
     // Raycaster for focus detection
     this.raycaster = new Raycaster()
 
@@ -58,21 +61,32 @@ export class DOFController {
   }
 
   /**
-   * Update target focus distance based on raycast
+   * Update target focus distance based on raycast or fallback
    */
   _updateTargetFocusDistance() {
     const raycastDistance = this._getRaycastFocusDistance()
 
-    if (raycastDistance === null) return
+    if (raycastDistance !== null) {
+      // Raycast succeeded - update focus with hysteresis
+      const distanceDelta = Math.abs(raycastDistance - this.targetFocusDistance)
 
-    // Apply hysteresis: only update if change is significant
-    const distanceDelta = Math.abs(raycastDistance - this.targetFocusDistance)
+      if (distanceDelta > this.focusHysteresis) {
+        this.targetFocusDistance = raycastDistance
 
-    if (distanceDelta > this.focusHysteresis) {
-      this.targetFocusDistance = raycastDistance
+        if (this.debugDOF) {
+          console.log(`[DOF] Raycast focus: ${this.targetFocusDistance.toFixed(1)}m`)
+        }
+      }
+    } else {
+      // Raycast failed - use fallback from zoom-based calculation
+      const distanceDelta = Math.abs(this.fallbackFocusDistance - this.targetFocusDistance)
 
-      if (this.debugDOF) {
-        console.log(`[DOF] Target focus: ${this.targetFocusDistance.toFixed(1)}m`)
+      if (distanceDelta > this.focusHysteresis) {
+        this.targetFocusDistance = this.fallbackFocusDistance
+
+        if (this.debugDOF) {
+          console.log(`[DOF] Fallback focus: ${this.targetFocusDistance.toFixed(1)}m`)
+        }
       }
     }
   }
@@ -201,6 +215,13 @@ export class DOFController {
    */
   getFocusDistance() {
     return this.currentFocusDistance
+  }
+
+  /**
+   * Set fallback focus distance (from zoom-based calculation)
+   */
+  setFallbackFocusDistance(distance) {
+    this.fallbackFocusDistance = Math.max(0.1, distance)
   }
 
   /**

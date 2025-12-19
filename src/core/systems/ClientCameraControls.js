@@ -251,54 +251,25 @@ export class ClientCameraControls extends System {
       const baseRange = Math.min(camFar * 0.45, lerp(s0.range, s1.range, t))
       const baseBokeh = Math.max(0.2, Math.min(2.0, lerp(s0.bokeh, s1.bokeh, t)))
 
-      // Choose focus center - RAYCAST FIRST for true dynamic focus
-      const raycastDistance = this.raycastFocusDistance()
-      if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
-        // Apply hysteresis: only update target if change is significant
-        const focusChangeThreshold = 1.0 // meters
-        const distanceDelta = Math.abs(raycastDistance - this.dofController.targetFocusDistance)
+      // Pass zoom-based values to DOFController as fallbacks
+      // DOFController will handle raycasting and blend with these values
+      this.dofController.setFallbackFocusDistance(baseFocus)
 
-        if (distanceDelta > focusChangeThreshold) {
-          // Filter out sky/background (camera far plane hits)
-          if (raycastDistance > camFar * 0.8) {
-            if (this.dofController.debugDOF) console.log(`[DOF] Skipped far plane hit: ${raycastDistance.toFixed(1)}m`)
-          } else {
-            // Valid focus change - update target
-            if (this.dofController.debugDOF) {
-              console.log(`[DOF] Focus: ${this.dofController.targetFocusDistance.toFixed(1)}m → ${raycastDistance.toFixed(1)}m (${this.dofController.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
-            }
-            this.dofController.targetFocusDistance = raycastDistance
-          }
-        } else {
-          // Small change - ignore to prevent stuttering
-          if (this.dofController.debugDOF && distanceDelta > 0.1) {
-            console.log(`[DOF] Ignored small change: ${distanceDelta.toFixed(2)}m (current: ${this.dofController.targetFocusDistance.toFixed(1)}m)`)
-          }
-        }
-      } else {
-        // Fallback: Blend player distance with stop-based focus
-        const playerDist = this.getFocusDistanceToPlayer()
-        if (this.anchorFocusToPlayer && playerDist !== null && isFinite(playerDist)) {
-          const blend = Math.max(0, Math.min(1, Math.pow(tZoom, this.playerFocusBlendPow) * this.playerFocusBlendMax))
-          const blendedFocus = playerDist * (1 - blend) + baseFocus * blend
-          this.dofController.setFocusDistance(blendedFocus)
-        } else {
-          this.dofController.setFocusDistance(baseFocus)
-        }
-      }
-
-      // Apply zoom-based focus range and bokeh (simple, no dynamic expansion)
+      // Apply zoom-based focus range and bokeh
       this.world.prefs.setDOFFocusRange(baseRange)
       this.world.prefs.setDOFBokehScale(baseBokeh)
 
       // When the user changes zoom, snap focus to prevent temporary blur
       if (zoomDelta > 0.05) {
         const focus = this.dofController.getFocusDistance()
-        this.setDOFFocusDistance(focus)
+        // Snap to current focus as new fallback
+        this.dofController.setFallbackFocusDistance(focus)
+        // Also set as target to prevent smoothing lag
+        this.dofController.setFocusDistance(focus)
       }
     }
 
-    // Update DOF using controller
+    // Update DOF using controller (handles raycasting and smoothing)
     this.dofController.update(_delta)
   }
 
