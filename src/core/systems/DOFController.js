@@ -1,5 +1,5 @@
 import * as THREE from '../extras/three'
-import { Raycaster, Vector3 } from '../extras/three'
+import { Raycaster, Vector3, Quaternion, Matrix4 } from '../extras/three'
 
 /**
  * Dedicated DOF (Depth of Field) Controller
@@ -37,6 +37,7 @@ export class DOFController {
     this.v1 = new Vector3()
     this.v2 = new Vector3()
     this.v3 = new Vector3()
+    this.q1 = new Quaternion()
   }
 
   /**
@@ -178,11 +179,9 @@ export class DOFController {
       }
 
       const headPos = this.v1.setFromMatrixPosition(headMatrix)
-      const headQuat = this.v2.setFromRotationMatrix(headMatrix)
-      const forward = this.v3.set(0, 0, -1).applyQuaternion(headQuat)
+      const forward = this.v3.set(0, 0, -1).transformDirection(headMatrix)
 
       console.log('[DOF] Head position:', headPos)
-      console.log('[DOF] Head quaternion:', headQuat)
       console.log('[DOF] Forward direction:', forward)
 
       const result = this._performRaycast(headPos, forward)
