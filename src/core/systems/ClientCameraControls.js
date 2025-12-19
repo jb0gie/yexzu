@@ -91,13 +91,16 @@ export class ClientCameraControls extends System {
 
     // Apply settings to prefs
     if (this.world.prefs) {
-      // Use values from prefs or defaults
-      this.world.prefs.setFocalLength(this.world.prefs.focalLength || 24)
-      this.world.prefs.setDOFBokehScale(this.world.prefs.dofBokehScale || 1)
-      this.world.prefs.setDOFFocusDistance(this.world.prefs.dofFocusDistance || 50)
-      this.world.prefs.setDOFFocusRange(this.world.prefs.dofFocusRange || 20)
-      this.world.prefs.setDOFEnabled(this.world.prefs.dofEnabled || false) // Respect user preference
-      this.world.prefs.setFocusSmoothing(true) // Enable focus smoothing
+      // Respect existing preference values without overriding
+      if (!this.world.prefs.focalLength) {
+        this.world.prefs.setFocalLength(24)
+      }
+      if (!this.world.prefs.dofEnabled) {
+        this.world.prefs.setDOFEnabled(false)
+      }
+      if (typeof this.world.prefs.focusSmoothing === 'undefined') {
+        this.world.prefs.setFocusSmoothing(true)
+      }
 
       // Apply the focal length
       this.applyFocalLength(this.world.prefs.focalLength || 24)
@@ -255,9 +258,8 @@ export class ClientCameraControls extends System {
       // DOFController will handle raycasting and blend with these values
       this.dofController.setFallbackFocusDistance(baseFocus)
 
-      // Apply zoom-based focus range and bokeh
-      this.world.prefs.setDOFFocusRange(baseRange)
-      this.world.prefs.setDOFBokehScale(baseBokeh)
+      // Don't override user DOF preferences - let them control blur intensity
+      // The zoom-based calculations are only for focus distance, not blur amount
 
       // When the user changes zoom, snap focus to prevent temporary blur
       if (zoomDelta > 0.05) {

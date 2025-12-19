@@ -48,12 +48,12 @@ export class ClientPrefs extends System {
 
     // DOF preferences - DISABLED BY DEFAULT due to excessive blur issues
     this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : false
-    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 50 // Further focus distance
+    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 50
     this.dofFocalLength = isNumber(data.dofFocalLength) ? data.dofFocalLength : 24
-    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.03 // Much less blur
-    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 20 // Wider in-focus area
-    this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 5.6 // Narrower aperture = less blur
-    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.03 // Match bokeh scale
+    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.01 // Minimal blur
+    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 30 // Wider in-focus area
+    this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 8.0 // Very narrow aperture = very little blur
+    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.01 // Match minimal bokeh
     this.dofLuminanceThreshold = isNumber(data.dofLuminanceThreshold) ? data.dofLuminanceThreshold : 0.6
     this.dofLuminanceGain = isNumber(data.dofLuminanceGain) ? data.dofLuminanceGain : 2.5
     this.dofBias = isNumber(data.dofBias) ? data.dofBias : 0.08
