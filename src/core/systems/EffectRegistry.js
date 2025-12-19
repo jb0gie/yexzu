@@ -25,8 +25,17 @@ import {
  * Provides a centralized, modular system for managing postprocessing effects
  * with preference-driven configuration and uniform updates.
  *
+ * Features:
+ * - Effect categories (postprocessing, rendering, lighting)
+ * - Dependency resolution with topological sort
+ * - Runtime effect registration
+ * - Effect presets (high, medium, low quality)
+ * - Effect configuration validation
+ *
  * @example
  * const registry = new EffectRegistry(world)
+ * registry.registerEffect('customBloom', customConfig)
+ * registry.applyPreset('high')
  * const bloom = registry.createEffect('bloom', camera, world)
  * registry.updateUniform(bloom, 'intensity', 1.5)
  */
@@ -35,19 +44,39 @@ export class EffectRegistry {
     this.world = world
     this.effects = new Map()
     this.instances = new Map()
+    this.resolvedOrder = []
+
+    // Initialize effect definitions
+    this.initializeEffects()
+    // Resolve effect dependencies
+    this.resolveDependencies()
+  }
+
+    /**
+   * Initialize effect definitions
+   * @private
+   */
+  initializeEffects() {
+    const definitions = this.getBuiltInEffectDefinitions()
+
+    // Store effect definitions in Map for easier access
+    for (const [name, config] of Object.entries(definitions)) {
+      this.effects.set(name, config)
+    }
   }
 
   /**
-   * Effect configurations
+   * Built-in effect configurations
    * @private
    */
-  getEffectDefinitions() {
+  getBuiltInEffectDefinitions() {
     return {
       bloom: {
         name: 'bloom',
         class: BloomEffect,
         enabled: 'bloom',
         category: 'postprocessing',
+        dependencies: null,
         params: {
           blendFunction: BlendFunction.ADD,
           mipmapBlur: true,
@@ -178,7 +207,249 @@ export class EffectRegistry {
           aoPass.configuration.intensity = world.prefs.aoIntensity ?? 1
           return aoPass
         },
+       },
+
+      // Add more lighting and rendering categories for extensibility
+      directionalLight: {
+        name: 'directionalLight',
+        class: null,
+        enabled: null,
+        category: 'lighting',
+        dependencies: null,
+        params: {
+          color: '#ffffff',
+          intensity: 1,
+          position: [5, 10, 5],
+          castShadow: true,
+        },
+        uniforms: {},
       },
+
+      shadowMapping: {
+        name: 'shadowMapping',
+        class: null,
+        enabled: 'shadowsEnabled',
+        category: 'rendering',
+        dependencies: ['directionalLight'],
+        params: {
+          enabled: true,
+          type: THREE.PCFSoftShadowMap,
+        },
+        uniforms: {},
+      },
+    }
+  }
+
+  /**
+   * Effect preset configurations
+   * @private
+   */
+  getEffectPresets() {
+    return {
+      // High quality preset - maximum visual fidelity
+      high: {
+        bloom: {
+          enabled: true,
+          intensity: 1.0,
+          radius: 1.0,
+          luminanceThreshold: 0.8,
+        },
+        dof: {
+          enabled: true,
+          focusDistance: 50,
+          focalLength: 0.024,
+          maxBlur: 0.05,
+        },
+        ao: {
+          enabled: true,
+          intensity: 1.5,
+          aoRadius: 64,
+          halfRes: false,
+          screenSpaceRadius: true,
+        },
+        smaa: {
+          enabled: true,
+        },
+        tonemapping: {
+          enabled: true,
+          adaptationRate: 0.3,
+        },
+        shadowsEnabled: true,
+      },
+
+      // Medium quality preset - balanced performance and quality
+      medium: {
+        bloom: {
+          enabled: true,
+          intensity: 0.5,
+          radius: 0.8,
+          luminanceThreshold: 1.0,
+        },
+        dof: {
+          enabled: false,
+        },
+        ao: {
+          enabled: true,
+          intensity: 1.0,
+          aoRadius: 32,
+          halfRes: true,
+          screenSpaceRadius: true,
+        },
+        smaa: {
+          enabled: true,
+        },
+        tonemapping: {
+          enabled: true,
+          adaptationRate: 0.5,
+        },
+        shadowsEnabled: true,
+      },
+
+      // Low quality preset - maximum performance
+      low: {
+        bloom: {
+          enabled: false,
+        },
+        dof: {
+          enabled: false,
+        },
+        ao: {
+          enabled: false,
+        },
+        smaa: {
+          enabled: true,
+        },
+        tonemapping: {
+          enabled: true,
+          adaptationRate: 1.0,
+        },
+        shadowsEnabled: false,
+      },
+
+      // Custom presets can be added by plugins
+      cinematic: {
+        bloom: {
+          enabled: true,
+          intensity: 1.5,
+          radius: 1.2,
+          luminanceThreshold: 0.6,
+        },
+        dof: {
+          enabled: true,
+          focusDistance: 30,
+          focalLength: 0.035,
+          maxBlur: 0.08,
+        },
+        ao: {
+          enabled: true,
+          intensity: 2.0,
+          aoRadius: 80,
+          halfRes: false,
+          screenSpaceRadius: true,
+        },
+        smaa: {
+          enabled: true,
+        },
+        tonemapping: {
+          enabled: true,
+          adaptationRate: 0.1,
+        },
+        shadowsEnabled: true,
+      },
+    }
+  }
+
+  /**
+   * Resolve effect dependencies using topological sort
+   * @private
+   */
+  resolveDependencies() {
+    const visited = new Set()
+    const visiting = new Set()
+    const sorted = []
+
+    const visit = (name) => {
+      if (visiting.has(name)) {
+        throw new Error(`Circular dependency detected in effects: ${name}`)
+      }
+      if (visited.has(name)) return
+
+      visiting.add(name)
+      const config = this.effects.get(name)
+
+      if (config && config.dependencies) {
+        for (const dep of config.dependencies) {
+          if (this.effects.has(dep) || dep === 'camera' || dep === 'aoPass') {
+            visit(dep)
+          }
+        }
+      }
+
+      visiting.delete(name)
+      visited.add(name)
+      sorted.push(name)
+    }
+
+    for (const name of this.effects.keys()) {
+      visit(name)
+    }
+
+    this.resolvedOrder = sorted
+    console.log('[EffectRegistry] Effect dependency order resolved:', this.resolvedOrder)
+  }
+
+  /**
+   * Validate effect configuration
+   * @param {Object} config - Effect configuration
+   * @param {string} name - Effect name
+   * @returns {Object} Validation result { valid: boolean, errors: string[] }
+   */
+  validateEffectConfig(config, name) {
+    const errors = []
+
+    if (!config || typeof config !== 'object') {
+      errors.push('Configuration must be an object')
+      return { valid: false, errors }
+    }
+
+    // Check required fields
+    if (!config.name || typeof config.name !== 'string') {
+      errors.push('Effect must have a valid name string')
+    }
+
+    if (!config.category || typeof config.category !== 'string') {
+      errors.push('Effect must have a valid category string')
+    }
+
+    // Validate category
+    const validCategories = ['postprocessing', 'rendering', 'lighting']
+    if (!validCategories.includes(config.category)) {
+      errors.push(`Invalid category: ${config.category}. Must be one of: ${validCategories.join(', ')}`)
+    }
+
+    // Check dependencies
+    if (config.dependencies && !Array.isArray(config.dependencies)) {
+      errors.push('Dependencies must be an array')
+    }
+
+    // Validate class or factory
+    if (!config.class && !config.factory) {
+      errors.push('Effect must have either a class or factory function')
+    }
+
+    // Validate params
+    if (config.params && typeof config.params !== 'object') {
+      errors.push('Params must be an object')
+    }
+
+    // Validate uniforms mapping
+    if (config.uniforms && typeof config.uniforms !== 'object') {
+      errors.push('Uniforms must be an object')
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
     }
   }
 
@@ -188,8 +459,7 @@ export class EffectRegistry {
    * @returns {Object|null} Effect configuration
    */
   getEffectConfig(name) {
-    const definitions = this.getEffectDefinitions()
-    return definitions[name] || null
+    return this.effects.get(name) || null
   }
 
   /**
@@ -198,13 +468,16 @@ export class EffectRegistry {
    * @returns {Object} All effect configurations
    */
   getAllEffects(category = null) {
-    const definitions = this.getEffectDefinitions()
     if (category) {
-      return Object.fromEntries(
-        Object.entries(definitions).filter(([_, config]) => config.category === category)
-      )
+      const result = {}
+      for (const [name, config] of this.effects) {
+        if (config.category === category) {
+          result[name] = config
+        }
+      }
+      return result
     }
-    return definitions
+    return Object.fromEntries(this.effects)
   }
 
   /**
@@ -212,9 +485,139 @@ export class EffectRegistry {
    * @param {string} category - Category name
    * @returns {Array} Array of effect configurations
    */
-  getAllEffectsByCategory(category) {
-    const definitions = this.getEffectDefinitions()
-    return Object.values(definitions).filter(config => config.category === category)
+  getEffectsByCategory(category) {
+    return Array.from(this.effects.values()).filter(config => config.category === category)
+  }
+
+  /**
+   * Register a new effect at runtime
+   * @param {string} name - Effect name
+   * @param {Object} config - Effect configuration
+   * @returns {boolean} Success status
+   */
+  registerEffect(name, config) {
+    // Validate configuration
+    const validation = this.validateEffectConfig(config, name)
+    if (!validation.valid) {
+      console.error(`[EffectRegistry] Invalid configuration for effect ${name}:`, validation.errors)
+      return false
+    }
+
+    // Check if effect already exists
+    if (this.effects.has(name)) {
+      console.warn(`[EffectRegistry] Effect ${name} already exists. Overwriting...`)
+    }
+
+    // Store effect
+    this.effects.set(name, config)
+
+    // Re-resolve dependencies
+    this.resolveDependencies()
+
+    console.log(`[EffectRegistry] Registered effect: ${name} (${config.category})`)
+    return true
+  }
+
+  /**
+   * Unregister an effect
+   * @param {string} name - Effect name
+   * @returns {boolean} Success status
+   */
+  unregisterEffect(name) {
+    if (!this.effects.has(name)) {
+      console.warn(`[EffectRegistry] Effect ${name} not found`)
+      return false
+    }
+
+    // Remove instance if active
+    if (this.instances.has(name)) {
+      this.removeEffect(name)
+    }
+
+    // Remove effect definition
+    this.effects.delete(name)
+
+    // Re-resolve dependencies
+    this.resolveDependencies()
+
+    console.log(`[EffectRegistry] Unregistered effect: ${name}`)
+    return true
+  }
+
+  /**
+   * Apply a preset configuration
+   * @param {string} presetName - Preset name
+   * @returns {boolean} Success status
+   */
+  applyPreset(presetName) {
+    const presets = this.getEffectPresets()
+    const preset = presets[presetName]
+
+    if (!preset) {
+      console.error(`[EffectRegistry] Unknown preset: ${presetName}`)
+      return false
+    }
+
+    console.log(`[EffectRegistry] Applying preset: ${presetName}`)
+
+    // Apply preset settings to world preferences
+    for (const [effectName, settings] of Object.entries(preset)) {
+      if (typeof settings === 'boolean') {
+        // Simple boolean toggle
+        this.world.prefs[`${effectName}`] = settings
+      } else if (typeof settings === 'object') {
+        // Object with multiple settings
+        for (const [key, value] of Object.entries(settings)) {
+          // Map to preference keys
+          this.world.prefs[`${effectName}${key.charAt(0).toUpperCase() + key.slice(1)}`] = value
+        }
+      }
+    }
+
+    // Update existing effects if world preferences system is available
+    if (this.world.prefs && typeof this.world.prefs.set === 'function') {
+      this.world.prefs.set()
+    }
+
+    console.log(`[EffectRegistry] Preset ${presetName} applied successfully`)
+    return true
+  }
+
+  /**
+   * Register a new preset
+   * @param {string} name - Preset name
+   * @param {Object} config - Preset configuration
+   * @returns {boolean} Success status
+   */
+  registerPreset(name, config) {
+    if (!config || typeof config !== 'object') {
+      console.error(`[EffectRegistry] Invalid preset configuration for ${name}`)
+      return false
+    }
+
+    // Store preset (extend presets object)
+    const presets = this.getEffectPresets()
+    presets[name] = config
+    this.presets = presets // Store reference for lookup
+
+    console.log(`[EffectRegistry] Registered preset: ${name}`)
+    return true
+  }
+
+  /**
+   * Get all available presets
+   * @returns {Object} All preset configurations
+   */
+  getAvailablePresets() {
+    return this.presets || this.getEffectPresets()
+  }
+
+  /**
+   * Get effect creation order based on dependencies
+   * @returns {Array} Array of effect names in dependency order
+   */
+  getEffectCreationOrder() {
+    return [...this.resolvedOrder]
   }
 
   /**
@@ -231,7 +634,7 @@ export class EffectRegistry {
       return null
     }
 
-    // Check dependencies
+    // Check dependencies with proper resolution
     if (config.dependencies) {
       for (const dep of config.dependencies) {
         if (dep === 'camera' && !camera) {
@@ -240,6 +643,11 @@ export class EffectRegistry {
         }
         if (dep === 'aoPass' && config.name !== 'ao') {
           console.warn(`[EffectRegistry] AO is special case, handled separately`)
+        }
+        // Check if dependency effect exists and is active
+        if (this.effects.has(dep) && !this.isEffectActive(dep) && dep !== 'camera' && dep !== 'aoPass') {
+          console.warn(`[EffectRegistry] Effect ${name} requires ${dep}, but ${dep} is not active`)
+          return null
         }
       }
     }
