@@ -265,7 +265,10 @@ export class ClientCameraControls extends System {
       // Choose focus center - RAYCAST FIRST for true dynamic focus
       const raycastDistance = this.raycastFocusDistance()
       if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
-        // Primary: Use raycast from reticle for dynamic focus on looked-at objects
+        // Primary: Use raycast for dynamic focus on looked-at objects
+        if (this.debugDOF) {
+          console.log(`[DOF] Focus set to ${raycastDistance.toFixed(2)}m (${this.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
+        }
         this.targetFocusDistance = raycastDistance
       } else {
         // Fallback: Blend player distance with stop-based focus
