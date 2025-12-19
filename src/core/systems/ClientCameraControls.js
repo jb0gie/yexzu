@@ -91,15 +91,15 @@ export class ClientCameraControls extends System {
 
     // Apply settings to prefs
     if (this.world.prefs) {
-      // Respect existing preference values without overriding
-      if (!this.world.prefs.focalLength) {
-        this.world.prefs.setFocalLength(24)
+      // Apply conservative defaults for DOF blur
+      if (!this.world.prefs.dofMaxBlur) {
+        this.world.prefs.setDOFMaxBlur(0.001)  // Ultra minimal blur
       }
-      if (!this.world.prefs.dofEnabled) {
-        this.world.prefs.setDOFEnabled(false)
+      if (!this.world.prefs.dofFStop) {
+        this.world.prefs.setDOFFStop(16.0)  // Ultra narrow aperture
       }
-      if (typeof this.world.prefs.focusSmoothing === 'undefined') {
-        this.world.prefs.setFocusSmoothing(true)
+      if (!this.world.prefs.dofFocusRange) {
+        this.world.prefs.setDOFFocusRange(5)  // Narrow range
       }
 
       // Apply the focal length
