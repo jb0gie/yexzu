@@ -126,10 +126,17 @@ export class ClientPrefs extends System {
 
     // Generate setters for all preference keys
     allPrefKeys.forEach(prefKey => {
-      const setterName = `set${prefKey.charAt(0).toUpperCase() + prefKey.slice(1)}`
+      // Handle DOF acronym properly (dofEnabled -> setDOFEnabled, not setDofEnabled)
+      let processedKey = prefKey
+      if (prefKey.startsWith('dof')) {
+        processedKey = 'DOF' + prefKey.slice(3)
+      } else if (prefKey.startsWith('focus')) {
+        // Do nothing, will become setFocusSmoothing etc.
+      }
+      const setterName = `set${processedKey.charAt(0).toUpperCase() + processedKey.slice(1)}`
 
       // Skip if it's one of the special DOF methods that have custom logic
-      if (['setDOFFocusDistance', 'setDOFFocusRange', 'setDOFBokehScale'].includes(setterName)) {
+      if (['setFocalLength', 'setDOFFocusDistance', 'setDOFFocusRange'].includes(setterName)) {
         return
       }
 
