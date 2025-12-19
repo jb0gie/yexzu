@@ -274,6 +274,9 @@ export class ClientCameraControls extends System {
     // Update DOF using controller (handles raycasting and smoothing)
     console.log('[ClientCameraControls] Updating DOFController with delta:', _delta)
     this.dofController.update(_delta)
+
+    // Log focus info for debugging
+    console.log(`[DOF] Focus: ${this.dofController.currentFocusDistance.toFixed(2)}m (target: ${this.dofController.targetFocusDistance.toFixed(2)}m)`)
   }
 
   // Depth of Field Controls
