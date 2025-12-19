@@ -17,9 +17,9 @@ export class DOFController {
     this.world = world
 
     // Focus state
-    this.currentFocusDistance = 10
-    this.targetFocusDistance = 10
-    this.focusSpeed = 0.08
+    this.currentFocusDistance = 5  // Start closer for typical first-person view
+    this.targetFocusDistance = 5
+    this.focusSpeed = 3.0  // Much faster for responsive focus changes
     this.focusHysteresis = 0.1  // Lower threshold for visible focus changes
 
     // Raycast state
