@@ -23,7 +23,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus state
     this.focusSmoothing = true
-    this.focusSpeed = 0.6
+    this.focusSpeed = 0.08
     this.targetFocusDistance = 10
     this.currentFocusDistance = 10
 
@@ -91,7 +91,7 @@ export class ClientCameraControls extends System {
 
     // Autofocus defaults
     this.focusSmoothing = true
-    this.focusSpeed = 0.5 // Much slower for natural, imperceptible focus transitions
+    this.focusSpeed = 0.08 // Much slower for natural, imperceptible focus transitions
 
     // Other defaults
     this.zoomSpeed = 5
@@ -265,11 +265,27 @@ export class ClientCameraControls extends System {
       // Choose focus center - RAYCAST FIRST for true dynamic focus
       const raycastDistance = this.raycastFocusDistance()
       if (raycastDistance !== null && isFinite(raycastDistance) && raycastDistance > 0.5) {
-        // Primary: Use raycast for dynamic focus on looked-at objects
-        if (this.debugDOF) {
-          console.log(`[DOF] Focus set to ${raycastDistance.toFixed(2)}m (${this.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
+        // Apply hysteresis: only update target if change is significant
+        const focusChangeThreshold = 1.0 // meters
+        const distanceDelta = Math.abs(raycastDistance - this.targetFocusDistance)
+
+        if (distanceDelta > focusChangeThreshold) {
+          // Filter out sky/background (camera far plane hits)
+          if (raycastDistance > camFar * 0.8) {
+            if (this.debugDOF) console.log(`[DOF] Skipped far plane hit: ${raycastDistance.toFixed(1)}m`)
+          } else {
+            // Valid focus change - update target
+            if (this.debugDOF) {
+              console.log(`[DOF] Focus: ${this.targetFocusDistance.toFixed(1)}m → ${raycastDistance.toFixed(1)}m (${this.useHeadBoneRaycast ? 'head' : 'reticle'} raycast)`)
+            }
+            this.targetFocusDistance = raycastDistance
+          }
+        } else {
+          // Small change - ignore to prevent stuttering
+          if (this.debugDOF && distanceDelta > 0.1) {
+            console.log(`[DOF] Ignored small change: ${distanceDelta.toFixed(2)}m (current: ${this.targetFocusDistance.toFixed(1)}m)`)
+          }
         }
-        this.targetFocusDistance = raycastDistance
       } else {
         // Fallback: Blend player distance with stop-based focus
         const playerDist = this.getFocusDistanceToPlayer()
