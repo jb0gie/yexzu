@@ -20,7 +20,7 @@ export class DOFController {
     this.currentFocusDistance = 10
     this.targetFocusDistance = 10
     this.focusSpeed = 0.08
-    this.focusHysteresis = 1.5
+    this.focusHysteresis = 0.1  // Lower threshold for visible focus changes
 
     // Raycast state
     this.useHeadBoneRaycast = true
