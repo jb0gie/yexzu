@@ -98,14 +98,14 @@ export class EffectRegistry {
             height: 480,
           })
 
-          // Configure DOF uniforms
+          // Configure DOF uniforms (check if they exist first)
           const uniforms = dof.circleOfConfusionMaterial.uniforms
-          uniforms.fStop.value = world.prefs.dofFStop || 1.8
-          uniforms.maxBlur.value = world.prefs.dofMaxBlur || 0.15
-          uniforms.luminanceThreshold.value = world.prefs.dofLuminanceThreshold || 0.6
-          uniforms.luminanceGain.value = world.prefs.dofLuminanceGain || 2.5
-          uniforms.bias.value = world.prefs.dofBias || 0.08
-          uniforms.fringe.value = world.prefs.dofFringe || 0.8
+          if (uniforms.fStop) uniforms.fStop.value = world.prefs.dofFStop || 1.8
+          if (uniforms.maxBlur) uniforms.maxBlur.value = world.prefs.dofMaxBlur || 0.15
+          if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = world.prefs.dofLuminanceThreshold || 0.6
+          if (uniforms.luminanceGain) uniforms.luminanceGain.value = world.prefs.dofLuminanceGain || 2.5
+          if (uniforms.bias) uniforms.bias.value = world.prefs.dofBias || 0.08
+          if (uniforms.fringe) uniforms.fringe.value = world.prefs.dofFringe || 0.8
 
           // Store uniform references for updates
           dof.__uniforms = uniforms
