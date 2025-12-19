@@ -46,8 +46,8 @@ export class ClientPrefs extends System {
     this.voice = isNumber(data.voice) ? data.voice : 1
     this.v = data.v
 
-    // DOF preferences - TUNED FOR LESS AGGRESSIVE BLUR
-    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : true
+    // DOF preferences - DISABLED BY DEFAULT due to excessive blur issues
+    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : false
     this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 50 // Further focus distance
     this.dofFocalLength = isNumber(data.dofFocalLength) ? data.dofFocalLength : 24
     this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.03 // Much less blur

@@ -100,15 +100,16 @@ export class ClientCameraControls extends System {
 
     // Apply settings to prefs
     if (this.world.prefs) {
-      this.world.prefs.setFocalLength(24)
-      this.world.prefs.setDOFBokehScale(1)
-      this.world.prefs.setDOFFocusDistance(10)
-      this.world.prefs.setDOFFocusRange(5)
-      this.world.prefs.setDOFEnabled(true)
-      this.world.prefs.setFocusSmoothing(false)
+      // Use values from prefs or defaults
+      this.world.prefs.setFocalLength(this.world.prefs.focalLength || 24)
+      this.world.prefs.setDOFBokehScale(this.world.prefs.dofBokehScale || 1)
+      this.world.prefs.setDOFFocusDistance(this.world.prefs.dofFocusDistance || 50)
+      this.world.prefs.setDOFFocusRange(this.world.prefs.dofFocusRange || 20)
+      this.world.prefs.setDOFEnabled(this.world.prefs.dofEnabled || false) // Respect user preference
+      this.world.prefs.setFocusSmoothing(true) // Enable focus smoothing
 
       // Apply the focal length
-      this.applyFocalLength(24)
+      this.applyFocalLength(this.world.prefs.focalLength || 24)
     }
 
     // Bind controls for mouse input
