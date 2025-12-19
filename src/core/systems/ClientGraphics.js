@@ -205,7 +205,8 @@ export class ClientGraphics extends System {
         this.effectRegistry.removeEffect('dof')
         this.effects.dof = null
       }
-      this.updatePostProcessingEffects()
+      // Recreate EffectPass to ensure clean WebGL state
+      this.recreateEffectPass()
     }
   }
 
@@ -287,6 +288,22 @@ export class ClientGraphics extends System {
     this.effectPass.setEffects(effects)
     this.effectPass.recompile()
     console.log(`[ClientGraphics] Updated postprocessing effects: ${effects.length} effects active`)
+  }
+
+  recreateEffectPass() {
+    // Dispose old EffectPass and create new one for clean WebGL state
+    if (this.effectPass) {
+      this.composer.removePass(this.effectPass)
+      if (this.effectPass.dispose && typeof this.effectPass.dispose === 'function') {
+        this.effectPass.dispose()
+      }
+    }
+
+    this.effectPass = new EffectPass(this.world.camera)
+    this.updatePostProcessingEffects()
+    this.composer.addPass(this.effectPass)
+
+    console.log('[ClientGraphics] EffectPass recreated for clean WebGL state')
   }
 
   destroy() {
