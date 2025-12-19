@@ -46,14 +46,14 @@ export class ClientPrefs extends System {
     this.voice = isNumber(data.voice) ? data.voice : 1
     this.v = data.v
 
-    // DOF preferences
+    // DOF preferences - TUNED FOR LESS AGGRESSIVE BLUR
     this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : true
-    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 10
+    this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 50 // Further focus distance
     this.dofFocalLength = isNumber(data.dofFocalLength) ? data.dofFocalLength : 24
-    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.08
-    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 5
-    this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 1.8
-    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.08
+    this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.03 // Much less blur
+    this.dofFocusRange = isNumber(data.dofFocusRange) ? data.dofFocusRange : 20 // Wider in-focus area
+    this.dofFStop = isNumber(data.dofFStop) ? data.dofFStop : 5.6 // Narrower aperture = less blur
+    this.dofMaxBlur = isNumber(data.dofMaxBlur) ? data.dofMaxBlur : 0.03 // Match bokeh scale
     this.dofLuminanceThreshold = isNumber(data.dofLuminanceThreshold) ? data.dofLuminanceThreshold : 0.6
     this.dofLuminanceGain = isNumber(data.dofLuminanceGain) ? data.dofLuminanceGain : 2.5
     this.dofBias = isNumber(data.dofBias) ? data.dofBias : 0.08

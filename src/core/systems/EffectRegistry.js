@@ -73,9 +73,9 @@ export class EffectRegistry {
         dependencies: ['camera'],
         params: {
           blendFunction: BlendFunction.NORMAL,
-          focusDistance: 10,
+          focusDistance: 50,
           focalLength: 0.024,
-          bokehScale: 15,
+          bokehScale: 3, // 0.03 * 100 = 3 (much less blur)
           height: 480,
         },
         uniforms: {
@@ -92,16 +92,16 @@ export class EffectRegistry {
         factory: (config, camera, world) => {
           const dof = new DepthOfFieldEffect(camera, {
             ...config.params,
-            focusDistance: (world.prefs.dofFocusDistance || 10) / (camera.far || 1200),
+            focusDistance: (world.prefs.dofFocusDistance || 50) / (camera.far || 1200),
             focalLength: (world.prefs.dofFocalLength || 24) * 0.001,
-            bokehScale: (world.prefs.dofMaxBlur || 0.15) * 100,
+            bokehScale: (world.prefs.dofMaxBlur || 0.03) * 100,
             height: 480,
           })
 
           // Configure DOF uniforms (check if they exist first)
           const uniforms = dof.circleOfConfusionMaterial.uniforms
-          if (uniforms.fStop) uniforms.fStop.value = world.prefs.dofFStop || 1.8
-          if (uniforms.maxBlur) uniforms.maxBlur.value = world.prefs.dofMaxBlur || 0.15
+          if (uniforms.fStop) uniforms.fStop.value = world.prefs.dofFStop || 5.6
+          if (uniforms.maxBlur) uniforms.maxBlur.value = world.prefs.dofMaxBlur || 0.03
           if (uniforms.luminanceThreshold) uniforms.luminanceThreshold.value = world.prefs.dofLuminanceThreshold || 0.6
           if (uniforms.luminanceGain) uniforms.luminanceGain.value = world.prefs.dofLuminanceGain || 2.5
           if (uniforms.bias) uniforms.bias.value = world.prefs.dofBias || 0.08
