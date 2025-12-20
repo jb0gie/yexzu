@@ -272,11 +272,7 @@ export class ClientCameraControls extends System {
     }
 
     // Update DOF using controller (handles raycasting and smoothing)
-    console.log('[ClientCameraControls] Updating DOFController with delta:', _delta)
     this.dofController.update(_delta)
-
-    // Log focus info for debugging
-    console.log(`[DOF] Focus: ${this.dofController.currentFocusDistance.toFixed(2)}m (target: ${this.dofController.targetFocusDistance.toFixed(2)}m)`)
   }
 
   // Depth of Field Controls
@@ -313,6 +309,14 @@ export class ClientCameraControls extends System {
     }
     this.world.prefs.setDOFBokehScale(scale)
     // Note: DOF controller will handle uniform updates
+  }
+
+  setDOFFStop(fstop) {
+    if (!isNumber(fstop) || fstop < 0.1 || fstop > 64) {
+      console.warn('f-stop must be a number between 0.1 and 64')
+      return
+    }
+    this.world.prefs.setDOFFStop(fstop)
   }
 
   // Focal Length Control
@@ -602,6 +606,17 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setDOFBokehScale(scale)
+          return true
+        },
+
+        setFStop: fstop => {
+          if (!this.isPlayerAdmin()) {
+            console.warn('Camera controls are admin-only')
+            return false
+          }
+          this.enabled = true
+          this.setDOFFStop(fstop)
+          console.log(`[DOF] f-stop set to ${fstop}`)
           return true
         },
       },
@@ -962,10 +977,11 @@ cam.disable() - Disable camera controls
 
 DOF Controls:
 cam.dof.enable() - Enable depth of field
-cam.dof.disable() - Disable depth of field  
+cam.dof.disable() - Disable depth of field
 cam.dof.setFocus(distance) - Set focus distance (e.g., 10)
 cam.dof.setRange(range) - Set focus range (e.g., 5)
 cam.dof.setBokeh(scale) - Set bokeh scale (e.g., 2)
+cam.dof.setFStop(fstop) - Set f-stop aperture (e.g., 2.8 for strong blur, 8 for subtle)
 
 Focal Length:
 cam.setFocalLength(mm) - Set focal length (e.g., 50)
