@@ -27,6 +27,12 @@ export class DOFController {
     this.lastRaycastPerformance = 0
     this.debugDOF = false
 
+    // Performance optimization
+    this.lastRaycastTime = 0
+    this.raycastInterval = 16  // Raycast every ~16ms (60fps), increase for better performance
+    this.frameSkipCounter = 0
+    this.frameSkipInterval = 1  // Raycast every N frames (1=no skip, 2=every other frame, etc.)
+
     // Fallback focus distance (from zoom-based calculation)
     this.fallbackFocusDistance = 10
 
@@ -47,18 +53,24 @@ export class DOFController {
     if (!this.world.prefs?.dofEnabled) return
     if (!this.world.camera) return
 
-    // Update camera position/rotation for accurate raycasting
-    if (this.world.camera.parent) {
-      this.world.camera.updateMatrixWorld()
+    // Performance: Skip frames to reduce raycast frequency
+    this.frameSkipCounter++
+    if (this.frameSkipCounter >= this.frameSkipInterval) {
+      this.frameSkipCounter = 0
+
+      // Update camera position/rotation for accurate raycasting
+      if (this.world.camera.parent) {
+        this.world.camera.updateMatrixWorld()
+      }
+
+      // Calculate target focus distance
+      this._updateTargetFocusDistance()
+
+      // Instant focus - no smoothing for responsive autofocus
+      this.currentFocusDistance = this.targetFocusDistance
     }
 
-    // Calculate target focus distance
-    this._updateTargetFocusDistance()
-
-    // Instant focus - no smoothing for responsive autofocus
-    this.currentFocusDistance = this.targetFocusDistance
-
-    // Update DOF uniforms
+    // Update DOF uniforms every frame (inexpensive)
     this._updateDofUniforms()
   }
 

@@ -619,6 +619,29 @@ export class ClientCameraControls extends System {
           // console.log(`[DOF] f-stop set to ${fstop}`)
           return true
         },
+
+        performance: {
+          get: () => {
+            if (!this.isPlayerAdmin()) {
+              console.warn('Camera controls are admin-only')
+              return false
+            }
+            return {
+              lastRaycastTime: this.dofController.lastRaycastTime,
+              raycastInterval: this.dofController.raycastInterval,
+              frameSkipInterval: this.dofController.frameSkipInterval,
+            }
+          },
+
+          setFrameSkip: interval => {
+            if (!this.isPlayerAdmin()) {
+              console.warn('Camera controls are admin-only')
+              return false
+            }
+            this.dofController.frameSkipInterval = Math.max(1, Math.floor(interval))
+            return true
+          },
+        },
       },
 
       // Focal length control
@@ -982,6 +1005,11 @@ cam.dof.setFocus(distance) - Set focus distance (e.g., 10)
 cam.dof.setRange(range) - Set focus range (e.g., 5)
 cam.dof.setBokeh(scale) - Set bokeh scale (e.g., 2)
 cam.dof.setFStop(fstop) - Set f-stop aperture (e.g., 2.8 for strong blur, 8 for subtle)
+
+Performance:
+cam.dof.performance.get() - Get performance metrics
+
+cam.dof.performance.setFrameSkip(interval) - Set raycast frequency (1=every frame, 2=every 2nd, etc.)
 
 Focal Length:
 cam.setFocalLength(mm) - Set focal length (e.g., 50)
