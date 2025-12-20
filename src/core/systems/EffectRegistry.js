@@ -126,7 +126,7 @@ export class EffectRegistry {
             worldFocusDistance: 50,
             focalLength: (world.prefs.dofFocalLength || 24) * 0.001,
             focusRange: (world.prefs.dofFocusRange || 30) / 1000, // Convert to normalized
-            bokehScale: (world.prefs.dofMaxBlur || 0.01) * 10, // REDUCED: 0.01 * 10 = 0.1 (much less blur)
+            bokehScale: (world.prefs.dofMaxBlur || 0.01) * 2, // ULTRA SUBTLE: 0.001 * 2 = 0.002 (barely visible)
             height: 480,
           })
 
