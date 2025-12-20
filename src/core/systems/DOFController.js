@@ -192,10 +192,10 @@ export class DOFController {
       dof.circleOfConfusionMaterial.uniforms.focusDistance.value = normalizedFocus
 
       // Log when focus changes significantly (debugging only, remove later)
-      if (Math.abs(this.currentFocusDistance - (this.lastLoggedFocus || 0)) > 1.0) {
-        console.log(`[DOF] Shader focus updated: ${this.currentFocusDistance.toFixed(1)}m (normalized: ${normalizedFocus.toFixed(3)})`)
-        this.lastLoggedFocus = this.currentFocusDistance
-      }
+      // if (Math.abs(this.currentFocusDistance - (this.lastLoggedFocus || 0)) > 1.0) {
+      //   console.log(`[DOF] Shader focus updated: ${this.currentFocusDistance.toFixed(1)}m (normalized: ${normalizedFocus.toFixed(3)})`)
+      //   this.lastLoggedFocus = this.currentFocusDistance
+      // }
     }
   }
 

@@ -616,7 +616,7 @@ export class ClientCameraControls extends System {
           }
           this.enabled = true
           this.setDOFFStop(fstop)
-          console.log(`[DOF] f-stop set to ${fstop}`)
+          // console.log(`[DOF] f-stop set to ${fstop}`)
           return true
         },
       },
