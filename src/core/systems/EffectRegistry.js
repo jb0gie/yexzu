@@ -389,7 +389,7 @@ export class EffectRegistry {
     }
 
     this.resolvedOrder = sorted
-    console.log('[EffectRegistry] Effect dependency order resolved:', this.resolvedOrder)
+    // console.log('[EffectRegistry] Effect dependency order resolved:', this.resolvedOrder)
   }
 
   /**
@@ -508,7 +508,7 @@ export class EffectRegistry {
     // Re-resolve dependencies
     this.resolveDependencies()
 
-    console.log(`[EffectRegistry] Registered effect: ${name} (${config.category})`)
+    // console.log(`[EffectRegistry] Registered effect: ${name} (${config.category})`)
     return true
   }
 

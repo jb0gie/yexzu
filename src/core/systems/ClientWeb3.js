@@ -1,6 +1,8 @@
-import { System } from './System'
+import { BaseWeb3System } from './BaseWeb3System'
 import ControllerProvider from '@cartridge/controller'
 import { constants } from 'starknet'
+import { web3Logger } from '../utils/web3Logger.js'
+import { web3Environment } from '../utils/web3Environment.js'
 
 /**
  * Client Web3 System
@@ -13,30 +15,26 @@ import { constants } from 'starknet'
  * Apps access this through the world.web3 API which is injected into their environment
  *
  */
-export class ClientWeb3 extends System {
+export class ClientWeb3 extends BaseWeb3System {
   constructor(world) {
     super(world)
     this.controller = null
     this.account = null
-    this.isConnected = false
-    this.address = null
-    this.networkId = null
-    this.listeners = new Map()
     this.isInitializing = false
-    this.initError = null
   }
 
   async init(options = {}) {
     try {
-      // console.log('[ClientWeb3] Initializing Web3 system...')
-      // console.log('[ClientWeb3] Environment:', typeof window !== 'undefined' ? 'Browser' : 'Unknown')
+      web3Logger.info('Initializing Web3 system...')
+      web3Logger.info(`Environment: ${web3Environment.isBrowser() ? 'Browser' : 'Unknown'}`)
 
       // We operate at the system level, not inside SES sandbox
       this.isInitializing = true
+      await super.init(options)
       this.initWeb3({})
-      // console.log('[ClientWeb3] Web3 system initialized successfully')
+      web3Logger.success('Web3 system initialized successfully')
     } catch (error) {
-      console.error('[ClientWeb3] Failed to initialize Web3 system:', error)
+      web3Logger.error('Failed to initialize Web3 system:', error)
       this.initError = error
       // Create a functioning mock API for graceful degradation
       this.createFunctionalMockAPI()
@@ -52,15 +50,13 @@ export class ClientWeb3 extends System {
     keychainUrl = 'https://x.cartridge.gg',
     requireCartridge = true, // Make cartridge requirement explicit
   } = {}) {
-    // console.log('[ClientWeb3] ===== CARTRIDGE ENGINE FEATURE INITIALIZATION =====')
-    // console.log('[ClientWeb3] Forcing cartridge initialization as engine requirement...')
+    web3Logger.info('===== CARTRIDGE ENGINE FEATURE INITIALIZATION =====')
+    web3Logger.info('Forcing cartridge initialization as engine requirement...')
 
     // Cartridge is now a required engine feature - fail fast if not available
-    if (typeof window === 'undefined') {
-      throw new Error('CARTRIDGE ENGINE ERROR: Browser environment required for cartridge integration. This deployment requires client-side execution.')
-    }
+    web3Environment.validateBrowser(['browser', 'localStorage', 'websocket'])
 
-    if (!localStorage) {
+    if (!web3Environment.hasLocalStorage()) {
       throw new Error('CARTRIDGE ENGINE ERROR: LocalStorage required for cartridge integration. Browser security settings may be blocking access.')
     }
 
@@ -85,73 +81,79 @@ export class ClientWeb3 extends System {
       ]
     }
 
-    // console.log('[ClientWeb3] Environment Validation:')
-    // console.log('[ClientWeb3] ✅ window:', typeof window !== 'undefined')
-    // console.log('[ClientWeb3] ✅ localStorage:', typeof localStorage !== 'undefined')
-    // console.log('[ClientWeb3] ✅ WebSocket:', typeof WebSocket !== 'undefined')
+    const env = web3Environment.detectEnvironment()
+    web3Logger.info('Environment Validation:')
+    web3Logger.success(`✅ window: ${env.isBrowser}`)
+    web3Logger.success(`✅ localStorage: ${env.hasLocalStorage}`)
+    web3Logger.success(`✅ WebSocket: ${env.hasWebSocket}`)
 
     // === ENGINE FEATURE: CARTRIDGE CONTROLLER INITIALIZATION ===
-    // console.log('[ClientWeb3] ===== INITIALIZING CARTRIDGE CONTROLLER (ENGINE LEVEL) =====')
-    // console.log('[ClientWeb3] Configuration:', config)
+    web3Logger.info('===== INITIALIZING CARTRIDGE CONTROLLER (ENGINE LEVEL) =====')
+    web3Logger.info('Configuration:', config)
 
     try {
+      web3Logger.info('🎯 Attempting to create ControllerProvider...')
+      web3Logger.debug(`ControllerProvider import check: ${typeof ControllerProvider}`)
+      web3Logger.debug('Config being passed:', JSON.stringify(config, null, 2))
       this.controller = new ControllerProvider(config)
+      web3Logger.success('✅ ControllerProvider created successfully')
     } catch (error) {
       // ===== ENGINE FAILURE: CARTRIDGE FEATURE NOT INITIALIZED =====
-      console.error('[ClientWeb3] ======================================================')
-      console.error('[ClientWeb3] ❌ CARTRIDGE ENGINE FEATURE INITIALIZATION FAILED')
-      console.error('[ClientWeb3] ======================================================')
-      console.error('[ClientWeb3] CRITICAL ERROR: Cartridge controller could not be initialized')
-      console.error('[ClientWeb3] Engine Status: FAILED')
-      console.error('[ClientWeb3] Error:', error.message)
-      console.error('[ClientWeb3] Stack:', error.stack)
-      console.error('[ClientWeb3] ======================================================')
-      console.error('[ClientWeb3] SOLUTIONS:')
-      console.error('[ClientWeb3] 1. Ensure running in browser environment (not Node.js)')
-      console.error('[ClientWeb3] 2. Check cartridge dependencies: npm install @cartridge/controller')
-      console.error('[ClientWeb3] 3. Verify browser supports required APIs (LocalStorage, WebSocket)')
-      console.error('[ClientWeb3] 4. Check network connectivity to Cartridge infrastructure')
-      console.error('[ClientWeb3] ======================================================')
+      web3Logger.error('======================================================')
+      web3Logger.error('❌ CARTRIDGE ENGINE FEATURE INITIALIZATION FAILED')
+      web3Logger.error('======================================================')
+      web3Logger.error('CRITICAL ERROR: Cartridge controller could not be initialized')
+      web3Logger.error('Engine Status: FAILED')
+      web3Logger.error('Error:', error.message)
+      web3Logger.error('Stack:', error.stack)
+      web3Logger.error('======================================================')
+      web3Logger.error('SOLUTIONS:')
+      web3Logger.error('1. Ensure running in browser environment (not Node.js)')
+      web3Logger.error('2. Check cartridge dependencies: npm install @cartridge/controller')
+      web3Logger.error('3. Verify browser supports required APIs (LocalStorage, WebSocket)')
+      web3Logger.error('4. Check network connectivity to Cartridge infrastructure')
+      web3Logger.error('======================================================')
 
       // Store initialization error for later retrieval
       this.initError = error
+      web3Logger.error(`🚨 Storing initialization error for debugging: ${error.message}`)
 
       // FAIL HARD - Cartridge is a required engine feature
       throw new Error(`CRITICAL ENGINE FAILURE: Cartridge controller initialization failed - ${error.message}. Cartridge integration is required for this Hyperfy deployment.`)
     }
 
     // ===== SUCCESS: CARTRIDGE ENGINE FEATURE INITIALIZED =====
-    // console.log('[ClientWeb3] ======================================================')
-    // console.log('[ClientWeb3] ✅ CARTRIDGE ENGINE FEATURE INITIALIZED SUCCESSFULLY')
-    // console.log('[ClientWeb3] ======================================================')
-    // console.log('[ClientWeb3] Engine Status: OPERATIONAL')
-    // console.log('[ClientWeb3] Feature: Cartridge Controller v0.10.7')
-    // console.log('[ClientWeb3] Environment: Browser Client')
-    // console.log('[ClientWeb3] Networks: Sepolia + Mainnet Ready')
-    // console.log('[ClientWeb3] API: world.web3 available for apps')
-    // console.log('[ClientWeb3] ======================================================')
+    web3Logger.info('======================================================')
+    web3Logger.success('✅ CARTRIDGE ENGINE FEATURE INITIALIZED SUCCESSFULLY')
+    web3Logger.info('======================================================')
+    web3Logger.info('Engine Status: OPERATIONAL')
+    web3Logger.info('Feature: Cartridge Controller v0.10.7')
+    web3Logger.info('Environment: Browser Client')
+    web3Logger.info('Networks: Sepolia + Mainnet Ready')
+    web3Logger.info('API: world.web3 available for apps')
+    web3Logger.info('======================================================')
 
     // Create the world.web3 API with proper binding
     this.createWorldWeb3API()
-    // console.log('[ClientWeb3] ✅ World API attached: world.web3')
+    web3Logger.success('✅ World API attached: world.web3')
   }
 
   getControllerInitError() {
     if (this.initError) {
       return this.initError.message
     }
-    if (typeof window === 'undefined') {
+    if (!web3Environment.isBrowser()) {
       return 'Browser environment required'
     }
     return 'Unknown initialization error'
   }
 
   createFunctionalMockAPI() {
-    // console.log('[ClientWeb3] ❌ CARTRIDGE ENGINE FEATURE REQUIRED - FAILED TO INITIALIZE')
-    // console.log('[ClientWeb3] ==========================================================')
-    // console.log('[ClientWeb3] CRITICAL: Cartridge controller is a required engine feature')
-    // console.log('[ClientWeb3] This deployment cannot proceed without cartridge integration')
-    // console.log('[ClientWeb3] ==========================================================')
+    web3Logger.error('❌ CARTRIDGE ENGINE FEATURE REQUIRED - FAILED TO INITIALIZE')
+    web3Logger.error('==========================================================')
+    web3Logger.error('CRITICAL: Cartridge controller is a required engine feature')
+    web3Logger.error('This deployment cannot proceed without cartridge integration')
+    web3Logger.error('==========================================================')
 
     // Cartridge is now required - no fallback simulation, only clear error messages
     this.world.web3 = {
@@ -179,12 +181,12 @@ export class ClientWeb3 extends System {
         throw new Error('CARTRIDGE ENGINE ERROR: Cannot execute transactions - cartridge controller not initialized. This deployment requires cartridge integration.')
       },
 
-      // Event listeners
-      on: this.on,
-      off: this.off,
+      // Event listeners - use base class methods
+      on: this.on.bind(this),
+      off: this.off.bind(this),
 
       // Configuration
-      init: this.initWeb3,
+      init: this.initWeb3.bind(this),
 
       // Direct controller access for advanced usage
       getController: () => {
@@ -192,15 +194,12 @@ export class ClientWeb3 extends System {
       },
 
       // Debug information - enhanced to show critical failure
-      getDebugInfo: () => ({
+      getDebugInfo: () => this.createDebugInfo({
         initialized: false,
         engineFeatureRequired: 'CARTRIDGE CONTROLLER',
         status: 'CRITICAL FAILURE',
         error: this.initError?.message || 'Cartridge controller initialization failed',
-        environment: typeof window !== 'undefined' ? 'browser' : 'unknown',
-        hasWindow: typeof window !== 'undefined',
-        hasLocalStorage: typeof localStorage !== 'undefined',
-        hasWebSocket: typeof WebSocket !== 'undefined',
+        environment: web3Environment.detectEnvironment(),
         requirementsMet: false,
         deploymentStatus: 'FAILED - Cartridge integration required'
       })
@@ -208,13 +207,13 @@ export class ClientWeb3 extends System {
   }
 
   createWorldWeb3API() {
-    // console.log('[ClientWeb3] 🔧 CREATING WORLD WEB3 API - REAL CARTRIDGE INTEGRATION')
-    // console.log('[ClientWeb3] ======================================================')
-    // console.log('[ClientWeb3] ✅ Engine Feature: Cartridge Controller v0.10.7')
-    // console.log('[ClientWeb3] ✅ Integration: Real @cartridge/controller')
-    // console.log('[ClientWeb3] ✅ Networks: StarkNet Sepolia + Mainnet')
-    // console.log('[ClientWeb3] ✅ API: Real transaction execution')
-    // console.log('[ClientWeb3] ======================================================')
+    web3Logger.info('🔧 CREATING WORLD WEB3 API - REAL CARTRIDGE INTEGRATION')
+    web3Logger.info('======================================================')
+    web3Logger.info('✅ Engine Feature: Cartridge Controller v0.10.7')
+    web3Logger.info('✅ Integration: Real @cartridge/controller')
+    web3Logger.info('✅ Networks: StarkNet Sepolia + Mainnet')
+    web3Logger.info('✅ API: Real transaction execution')
+    web3Logger.info('======================================================')
 
     // Create the real world.web3 API with actual cartridge integration
     this.world.web3 = {
@@ -231,7 +230,7 @@ export class ClientWeb3 extends System {
       // Transaction methods - real StarkNet execution
       execute: this.execute.bind(this),
 
-      // Event listeners
+      // Event listeners - use base class methods
       on: this.on.bind(this),
       off: this.off.bind(this),
 
@@ -242,42 +241,48 @@ export class ClientWeb3 extends System {
       getController: () => this.controller,
 
       // Debug information - enhanced to show real integration status
-      getDebugInfo: () => ({
-        initialized: true,
+      getDebugInfo: () => this.createDebugInfo({
         engineFeatureStatus: 'OPERATIONAL',
         integrationType: 'REAL CARTRIDGE CONTROLLER',
         hasController: !!this.controller,
         controllerVersion: 'v0.10.7',
-        isConnected: this.isConnected,
-        environment: typeof window !== 'undefined' ? 'browser' : 'unknown',
+        environment: web3Environment.detectEnvironment(),
         supportedNetworks: ['SN_SEPOLIA', 'SN_MAINNET'],
-        error: this.initError?.message,
         deploymentStatus: 'READY - Cartridge engine feature active'
       })
     }
 
-    // console.log('[ClientWeb3] ✅ WORLD WEB3 API CREATED - Real cartridge integration ready')
+    web3Logger.success('✅ WORLD WEB3 API CREATED - Real cartridge integration ready')
   }
 
   connect = async () => {
     try {
-      // console.log('[ClientWeb3] 🌐 CONNECTING TO CARTRIDGE CONTROLLER (REAL INTEGRATION)')
-      // console.log('[ClientWeb3] ======================================================')
+      this.isConnecting = true
+      web3Logger.network('🌐 CONNECTING TO CARTRIDGE CONTROLLER (REAL INTEGRATION)')
+      web3Logger.info('======================================================')
+      web3Logger.info(`Controller exists: ${!!this.controller}`)
+      web3Logger.info(`Controller type: ${typeof this.controller}`)
+      web3Logger.info(`Controller.connect type: ${typeof this.controller?.connect}`)
 
       this.account = await this.controller.connect()
+      web3Logger.info(`Connect result: ${!!this.account}`)
+      web3Logger.info(`Account object type: ${typeof this.account}`)
 
       if (this.account) {
+        web3Logger.info(`Account.address: ${this.account.address}`)
+        web3Logger.debug(`Account object methods: ${Object.getOwnPropertyNames(this.account).filter(name => typeof this.account[name] === 'function').join(', ')}`)
+
         this.isConnected = true
         this.address = this.account.address
         this.networkId = await this.account.getChainId()
 
-        // console.log('[ClientWeb3] ✅ REAL CARTRIDGE CONNECTION ESTABLISHED:')
-        // console.log('[ClientWeb3]   Address:', this.address)
-        // console.log('[ClientWeb3]   Network ID:', this.networkId)
-        // console.log('[ClientWeb3]   Controller: @cartridge/controller v0.10.7')
-        // console.log('[ClientWeb3]   Integration: REAL (no simulation)')
+        web3Logger.success('✅ REAL CARTRIDGE CONNECTION ESTABLISHED:')
+        web3Logger.info(`  Address: ${this.address}`)
+        web3Logger.info(`  Network ID: ${this.networkId}`)
+        web3Logger.info('  Controller: @cartridge/controller v0.10.7')
+        web3Logger.info('  Integration: REAL (no simulation)')
 
-        this.emit('connected', {
+        this.emitSafe('connected', {
           address: this.address,
           chainId: this.networkId,
           integration: 'REAL_CARTRIDGE_CONTROLLER',
@@ -293,16 +298,18 @@ export class ClientWeb3 extends System {
 
       throw new Error('REAL CARTRIDGE CONNECTION FAILED: No account returned from controller')
     } catch (error) {
-      console.error('[ClientWeb3] ❌ REAL CARTRIDGE CONNECTION FAILED:', error)
-      console.error('[ClientWeb3] This is a real cartridge controller connection failure')
-      this.emit('error', { type: 'connection', error, integration: 'REAL_CARTRIDGE' })
+      web3Logger.error('❌ REAL CARTRIDGE CONNECTION FAILED:', error)
+      web3Logger.error('This is a real cartridge controller connection failure')
+      this.emitSafe('error', { type: 'connection', error, integration: 'REAL_CARTRIDGE' })
       throw error
+    } finally {
+      this.isConnecting = false
     }
   }
 
   disconnect = async () => {
     try {
-      // console.log('[ClientWeb3] Disconnecting...')
+      web3Logger.info('Disconnecting...')
 
       if (this.controller && this.controller.disconnect) {
         await this.controller.disconnect()
@@ -313,12 +320,12 @@ export class ClientWeb3 extends System {
       this.address = null
       this.networkId = null
 
-      this.emit('disconnected')
+      this.emitSafe('disconnected')
 
-      // console.log('[ClientWeb3] Disconnected')
+      web3Logger.success('Disconnected')
     } catch (error) {
-      console.error('[ClientWeb3] Disconnect failed:', error)
-      this.emit('error', { type: 'disconnect', error })
+      web3Logger.error('Disconnect failed:', error)
+      this.emitSafe('error', { type: 'disconnect', error })
       throw error
     }
   }
@@ -329,22 +336,22 @@ export class ClientWeb3 extends System {
     }
 
     try {
-      // console.log('[ClientWeb3] 💰 EXECUTING REAL STARKNET TRANSACTION')
-      // console.log('[ClientWeb3] =========================================')
-      // console.log('[ClientWeb3] Calls:', calls)
-      // console.log('[ClientWeb3] Options:', options)
-      // console.log('[ClientWeb3] Network:', this.networkId)
-      // console.log('[ClientWeb3] Controller: @cartridge/controller v0.10.7')
+      web3Logger.transaction('💰 EXECUTING REAL STARKNET TRANSACTION')
+      web3Logger.info('=========================================')
+      web3Logger.info('Calls:', calls)
+      web3Logger.info('Options:', options)
+      web3Logger.info(`Network: ${this.networkId}`)
+      web3Logger.info('Controller: @cartridge/controller v0.10.7')
 
       const result = await this.account.execute(calls, options)
 
-      // console.log('[ClientWeb3] ✅ REAL STARKNET TRANSACTION EXECUTED:')
-      // console.log('[ClientWeb3]   Transaction Hash:', result.transaction_hash)
-      // console.log('[ClientWeb3]   Network:', this.networkId)
-      // console.log('[ClientWeb3]   Integration: REAL (no simulation)')
-      // console.log('[ClientWeb3]   Status: Broadcast to StarkNet')
+      web3Logger.success('✅ REAL STARKNET TRANSACTION EXECUTED:')
+      web3Logger.info(`  Transaction Hash: ${result.transaction_hash}`)
+      web3Logger.info(`  Network: ${this.networkId}`)
+      web3Logger.info('  Integration: REAL (no simulation)')
+      web3Logger.info('  Status: Broadcast to StarkNet')
 
-      this.emit('transaction', {
+      this.emitSafe('transaction', {
         result,
         integration: 'REAL_CARTRIDGE_CONTROLLER',
         network: this.networkId
@@ -352,44 +359,19 @@ export class ClientWeb3 extends System {
 
       return result
     } catch (error) {
-      console.error('[ClientWeb3] ❌ REAL STARKNET TRANSACTION FAILED:', error)
-      console.error('[ClientWeb3] This is a real transaction failure on StarkNet network')
-      this.emit('error', { type: 'transaction', error, integration: 'REAL_CARTRIDGE' })
+      web3Logger.error('❌ REAL STARKNET TRANSACTION FAILED:', error)
+      web3Logger.error('This is a real transaction failure on StarkNet network')
+      this.emitSafe('error', { type: 'transaction', error, integration: 'REAL_CARTRIDGE' })
       throw error
-    }
-  }
-
-  on = (event, callback) => {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set())
-    }
-    this.listeners.get(event).add(callback)
-  }
-
-  off = (event, callback) => {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event).delete(callback)
-    }
-  }
-
-  emit = (event, data) => {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event).forEach(callback => {
-        try {
-          callback(data)
-        } catch (error) {
-          console.error(`[ClientWeb3] Event listener error (${event}):`, error)
-        }
-      })
     }
   }
 
   destroy() {
     this.disconnect()
-    this.listeners.clear()
     if (this.world.web3) {
       delete this.world.web3
     }
-    // console.log('[ClientWeb3] Destroyed')
+    super.destroy()
+    web3Logger.info('Destroyed')
   }
 }

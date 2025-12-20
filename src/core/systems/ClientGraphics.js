@@ -68,31 +68,31 @@ export class ClientGraphics extends System {
     // AO effect (special case - needs world.stage.scene)
     this.effects.ao = this.effectRegistry.createEffect('ao', this.world.camera, this.world)
     if (this.effects.ao) {
-      console.log('[ClientGraphics] AO effect created successfully')
+      // console.log('[ClientGraphics] AO effect created successfully')
       this.composer.addPass(this.effects.ao)
     }
 
     // Create postprocessing effects
     this.effects.bloom = this.effectRegistry.createEffect('bloom', this.world.camera, this.world)
     if (this.effects.bloom) {
-      console.log('[ClientGraphics] Bloom effect created successfully')
+      // console.log('[ClientGraphics] Bloom effect created successfully')
     }
 
     this.effects.smaa = this.effectRegistry.createEffect('smaa', this.world.camera, this.world)
     if (this.effects.smaa) {
-      console.log('[ClientGraphics] SMAA effect created successfully')
+      // console.log('[ClientGraphics] SMAA effect created successfully')
     }
 
     this.effects.tonemapping = this.effectRegistry.createEffect('tonemapping', this.world.camera, this.world)
     if (this.effects.tonemapping) {
-      console.log('[ClientGraphics] ToneMapping effect created successfully')
+      // console.log('[ClientGraphics] ToneMapping effect created successfully')
     }
 
     // Create DOF effect if enabled
     if (this.world.prefs.dofEnabled) {
       this.effects.dof = this.effectRegistry.createEffect('dof', this.world.camera, this.world)
       if (this.effects.dof) {
-        console.log('[ClientGraphics] DOF effect created successfully')
+        // console.log('[ClientGraphics] DOF effect created successfully')
       }
     }
 
@@ -186,7 +186,7 @@ export class ClientGraphics extends System {
 
       // Update effect if preferences changed
       if (this.effectRegistry.updateEffectFromPrefs(effectName, changes)) {
-        console.log(`[ClientGraphics] Updated ${effectName} from preferences`)
+        // console.log(`[ClientGraphics] Updated ${effectName} from preferences`)
       }
     }
 
@@ -246,7 +246,7 @@ export class ClientGraphics extends System {
           this.xrWidth = baseLayer.framebufferWidth
           this.xrHeight = baseLayer.framebufferHeight
           this.xrDimensionsNeeded = false
-          console.log({ xrWidth: this.xrWidth, xrHeight: this.xrHeight })
+          // console.log({ xrWidth: this.xrWidth, xrHeight: this.xrHeight })
         }
       }
     }
@@ -255,7 +255,7 @@ export class ClientGraphics extends System {
   onSettingsChange = changes => {
     if (changes.ao && this.effects.ao) {
       this.effects.ao.enabled = changes.ao.value && this.world.prefs.ao
-      console.log(this.effects.ao.enabled)
+      // console.log(this.effects.ao.enabled)
     }
   }
 
@@ -281,13 +281,13 @@ export class ClientGraphics extends System {
 
       if (shouldInclude) {
         effects.push(effect)
-        console.log(`[ClientGraphics] Added ${effectName} to effect pass`)
+        // console.log(`[ClientGraphics] Added ${effectName} to effect pass`)
       }
     }
 
     this.effectPass.setEffects(effects)
     this.effectPass.recompile()
-    console.log(`[ClientGraphics] Updated postprocessing effects: ${effects.length} effects active`)
+    // console.log(`[ClientGraphics] Updated postprocessing effects: ${effects.length} effects active`)
   }
 
   recreateEffectPass() {
@@ -303,7 +303,7 @@ export class ClientGraphics extends System {
     this.updatePostProcessingEffects()
     this.composer.addPass(this.effectPass)
 
-    console.log('[ClientGraphics] EffectPass recreated for clean WebGL state')
+    // console.log('[ClientGraphics] EffectPass recreated for clean WebGL state')
   }
 
   destroy() {

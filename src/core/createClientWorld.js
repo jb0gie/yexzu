@@ -25,7 +25,7 @@ import { Wind } from './systems/Wind'
 import { XR } from './systems/XR'
 import { ClientAI } from './systems/ClientAI'
 import { DojoSystem } from './systems/DojoSystem'
-import { EVM } from './systems/EVMClient'
+import { EVMSystem } from './systems/EVMSystem'
 
 export function createClientWorld() {
   const world = new World()
@@ -54,7 +54,7 @@ export function createClientWorld() {
   world.register('xr', XR)
   world.register('ai', ClientAI)
   world.register('dojo', DojoSystem)
-  world.register('evm', EVM)
+  world.register('evm', EVMSystem)
 
   // Initialize DojoSystem after registration
   if (world.dojo?.init) {

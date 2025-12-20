@@ -50,6 +50,15 @@ export class Apps extends System {
       isClient(entity) {
         return world.network.isClient
       },
+      web3(entity) {
+        return world.web3
+      },
+      evm(entity) {
+        return world.evm
+      },
+      dojo(entity) {
+        return world.dojo
+      },
     }
     this.worldSetters = {
       // ...
