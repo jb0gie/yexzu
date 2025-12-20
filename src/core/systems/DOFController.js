@@ -47,6 +47,11 @@ export class DOFController {
     if (!this.world.prefs?.dofEnabled) return
     if (!this.world.camera) return
 
+    // Update camera position/rotation for accurate raycasting
+    if (this.world.camera.parent) {
+      this.world.camera.updateMatrixWorld()
+    }
+
     // Calculate target focus distance
     this._updateTargetFocusDistance()
 
@@ -89,37 +94,32 @@ export class DOFController {
 
   /**
    * Get focus distance via raycast
-   * Priority 1: Player head bone
-   * Priority 2: Reticle/camera center
+   * Priority 1: Camera position (what player actually sees)
+   * Priority 2: Reticle/camera center screen point
    */
   _getRaycastFocusDistance() {
-    // Try head bone raycast first
-    if (this.useHeadBoneRaycast) {
-      const headFocus = this._raycastFromPlayerHead()
-      if (headFocus !== null) return headFocus
-    }
+    // Use camera raycast first (most accurate for what player sees)
+    const cameraFocus = this._raycastFromCamera()
+    if (cameraFocus !== null) return cameraFocus
 
     // Fallback to reticle raycast
     return this._raycastFromReticle()
   }
 
   /**
-   * Raycast from player head bone
+   * Raycast from camera (what player actually sees)
    */
-  _raycastFromPlayerHead() {
-    const player = this.world.entities.player
-    if (!player?.avatar) return null
+  _raycastFromCamera() {
+    if (!this.world.camera) return null
 
     try {
-      const headMatrix = player.avatar.getBoneTransform('head')
-      if (!headMatrix) return null
+      // Get camera position and direction
+      const cameraPos = this.v1.setFromMatrixPosition(this.world.camera.matrixWorld)
+      const forward = this.v3.set(0, 0, -1).transformDirection(this.world.camera.matrixWorld)
 
-      const headPos = this.v1.setFromMatrixPosition(headMatrix)
-      const forward = this.v3.set(0, 0, -1).transformDirection(headMatrix)
-
-      return this._performRaycast(headPos, forward)
+      return this._performRaycast(cameraPos, forward)
     } catch (err) {
-      console.error('[DOF] Head raycast error:', err)
+      console.error('[DOF] Camera raycast error:', err)
       return null
     }
   }
