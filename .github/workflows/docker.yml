@@ -9,6 +9,7 @@ on:
       - 'dev'
       - 'solana-v2'
       - 'ai'
+      - 'dojo'
     tags:
       - 'v*.*.*'
 
