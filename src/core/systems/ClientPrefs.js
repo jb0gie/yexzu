@@ -47,7 +47,7 @@ export class ClientPrefs extends System {
     this.v = data.v
 
     // DOF preferences - DISABLED BY DEFAULT due to excessive blur issues
-    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : false
+    this.dofEnabled = isBoolean(data.dofEnabled) ? data.dofEnabled : true
     this.dofFocusDistance = isNumber(data.dofFocusDistance) ? data.dofFocusDistance : 50
     this.dofFocalLength = isNumber(data.dofFocalLength) ? data.dofFocalLength : 24
     this.dofBokehScale = isNumber(data.dofBokehScale) ? data.dofBokehScale : 0.01 // Minimal blur
