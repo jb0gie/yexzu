@@ -1,712 +1,544 @@
-// 🧩 FRAGMENT COLLECTOR - Entity-based Architecture
-// Collect fragments → combine → deploy → get blockchain buffs!
+// Fragment Collector - Code Fragment Collection Game
+// Players collect 10 code fragments and deploy completion proof
+
+console.log('🎮 Fragment Collector Initializing...')
 
 app.configure([
   {
-    key: 'gameEnabled',
-    type: 'toggle',
-    label: 'Enable Game',
-    trueLabel: 'Playing',
-    falseLabel: 'Paused',
-    initial: 'playing'
+    key: 'fragmentCount',
+    type: 'number',
+    label: 'Number of Fragments',
+    initial: 10,
+    min: 5,
+    max: 20,
   },
   {
-    key: 'spawnRate',
-    type: 'range',
-    label: 'Fragment Spawn Rate',
-    min: 1,
-    max: 10,
-    step: 1,
-    initial: 5
-  }
+    key: 'gameMode',
+    type: 'switch',
+    label: 'Game Mode',
+    options: [
+      { label: 'Blockchain', value: 'blockchain' },
+      { label: 'Offline', value: 'offline' },
+    ],
+    initial: 'blockchain',
+  },
 ])
 
 // Game state
-app.state.fragments = []           // Collected fragments
-app.state.activeBuffs = []         // Active blockchain buffs
-app.state.fragmentEntities = []    // Active fragment entities
-app.state.lastExpirationCheck = 0  // Performance optimization
+app.state.gameStarted = false
+app.state.fragments = []
+app.state.fragmentsCollected = 0
+app.state.totalFragments = app.props.fragmentCount
+app.state.player = null
+app.state.deployUI = null
 
-// Fragment types with their properties
-const FRAGMENT_TYPES = {
-  speed: {
-    name: 'Speed Fragment',
-    color: '#ff6b6b',
-    buffType: 'speed',
-    buffValue: 15,
-    rarity: 'common'
-  },
-  jump: {
-    name: 'Jump Fragment',
-    color: '#4ecdc4',
-    buffType: 'jump',
-    buffValue: 25,
-    rarity: 'common'
-  },
-  health: {
-    name: 'Health Fragment',
-    color: '#95e77e',
-    buffType: 'health',
-    buffValue: 20,
-    rarity: 'common'
-  },
-  rare: {
-    name: 'Rare Fragment',
-    color: '#f7b731',
-    buffType: 'speed',
-    buffValue: 30,
-    rarity: 'rare'
+// Initialize game
+app.on('init', () => {
+  console.log('🚀 Game init triggered')
+  initGame()
+})
+
+async function initGame() {
+  console.log('🎯 Initializing Fragment Collector...')
+
+  // Wait for Dojo if in blockchain mode
+  if (app.props.gameMode === 'blockchain') {
+    await waitForDojo()
+  } else {
+    console.log('⚠️ OFFLINE MODE - No blockchain sync')
   }
+
+  createArena()
+  spawnFragments(app.state.totalFragments)
+  setupCollection()
+  createGameUI()
+
+  app.state.gameStarted = true
+  console.log('✅ Game initialized')
 }
 
-// 🧩 FRAGMENT ENTITY CLASS
-class FragmentEntity {
-  constructor(position, typeKey) {
-    this.typeKey = typeKey
-    this.data = FRAGMENT_TYPES[typeKey]
-    this.position = [...position]
-    this.floatOffset = 0
-    this.collected = false
+async function waitForDojo() {
+  console.log('⏳ Waiting for Dojo connection...')
 
-    this.spawnTime = Date.now()
-    this.id = `fragment_${this.spawnTime}_${Math.random().toString(36).substr(2, 9)}`
+  return new Promise(resolve => {
+    const checkInterval = setInterval(() => {
+      if (world.dojo?.isConnected()) {
+        clearInterval(checkInterval)
+        console.log('✅ Dojo connected:', world.dojo.getNetwork())
+        resolve()
+      } else {
+        console.log('⏳ Still waiting for Dojo...')
+      }
+    }, 1000)
 
-    this.createVisuals()
-    this.createCollision()
-  }
-
-  createVisuals() {
-    // Create main container
-    this.container = app.create('empty', {
-      position: this.position
-    })
-
-    // Create glowing orb
-    this.orb = app.create('sphere', {
-      radius: 0.2,
-      color: this.data.color,
-      emissive: this.data.color,
-      emissiveIntensity: 2,
-      parent: this.container
-    })
-
-    // Create particle effects
-    this.particles = app.create('particles', {
-      rate: 3,
-      speed: 0.5,
-      lifetime: 2,
-      size: 0.1,
-      color: this.data.color,
-      parent: this.container
-    })
-
-    // Store reference for cleanup
-    this.container.entity = this
-  }
-
-  createCollision() {
-    // Create trigger zone for collection
-    this.trigger = app.create('trigger', {
-      position: this.position,
-      size: [1.5, 1.5, 1.5],
-      onEnter: () => this.onCollection()
-    })
-    this.trigger.entity = this
-  }
-
-  update(delta) {
-    if (this.collected) return
-
-    // Floating animation
-    this.floatOffset += delta * 2
-    this.container.position[1] = this.position[1] + Math.sin(this.floatOffset) * 0.2
-    this.container.rotation[1] += delta
-
-    // Update trigger position
-    this.trigger.position[1] = this.container.position[1]
-  }
-
-  onCollection() {
-    if (this.collected) return
-
-    this.collected = true
-    console.log(`✅ Collected ${this.data.name}!`)
-
-    // Add to inventory
-    app.state.fragments.push({
-      type: this.typeKey,
-      ...this.data,
-      id: this.id,
-      collectedAt: Date.now()
-    })
-
-    // Create collection effect
-    EffectManager.createCollectionEffect(this)
-
-    // Remove from world
-    this.destroy()
-
-    // Check if player has enough fragments
-    if (app.state.fragments.length >= 3) {
-      setTimeout(() => {
-        console.log('🔧 You have enough fragments! Type app.combinations() to combine...')
-      }, 1000)
-    }
-  }
-
-  destroy() {
-    // Clean up all entities
-    try {
-      app.remove(this.container)
-      app.remove(this.trigger)
-      app.remove(this.particles)
-    } catch (e) {
-      // Ignore errors during cleanup
-    }
-
-    // Remove from active list
-    const index = app.state.fragmentEntities.indexOf(this)
-    if (index > -1) {
-      app.state.fragmentEntities.splice(index, 1)
-    }
-  }
-}
-
-// ⚡ BUFF INDICATOR ENTITY CLASS
-class BuffIndicator {
-  constructor(player, buffData) {
-    this.player = player
-    this.buffData = buffData
-    this.active = true
-
-    this.createVisuals()
-  }
-
-  createVisuals() {
-    const playerPos = this.player.position || [0, 1, 0]
-    const buffColor = this.getBuffColor()
-
-    // Create floating indicator sphere
-    this.indicator = app.create('sphere', {
-      position: [playerPos[0], playerPos[1] + 0.5, playerPos[2]],
-      radius: 0.1,
-      color: buffColor,
-      emissive: buffColor,
-      emissiveIntensity: 1
-    })
-
-    // Create additional indicator ring using particles
-    this.ringParticles = app.create('particles', {
-      position: [playerPos[0], playerPos[1] + 0.5, playerPos[2]],
-      rate: 2,
-      speed: 0.3,
-      lifetime: 3,
-      size: 0.05,
-      color: buffColor
-    })
-  }
-
-  getBuffColor() {
-    switch (this.buffData.buffType) {
-      case 'speed': return '#ff6b6b'
-      case 'jump': return '#4ecdc4'
-      case 'health': return '#95e77e'
-      default: return '#f7b731'
-    }
-  }
-
-  update() {
-    if (!this.active || !this.player) return
-
-    // Follow player
-    const playerPos = this.player.position || [0, 1, 0]
-    this.indicator.position[0] = playerPos[0]
-    this.indicator.position[1] = playerPos[1] + 0.5
-    this.indicator.position[2] = playerPos[2]
-
-    this.ringParticles.position[0] = playerPos[0]
-    this.ringParticles.position[1] = playerPos[1] + 0.5
-    this.ringParticles.position[2] = playerPos[2]
-  }
-
-  remove() {
-    this.active = false
-    try {
-      app.remove(this.indicator)
-      app.remove(this.ringParticles)
-    } catch (e) {
-      // Ignore cleanup errors
-    }
-  }
-}
-
-// 🎨 EFFECT MANAGER
-const EffectManager = {
-  createCollectionEffect(fragment) {
-    // Create burst effect at fragment position
-    const burst = app.create('particles', {
-      position: fragment.container.position,
-      rate: 15,
-      speed: 2,
-      lifetime: 1,
-      size: 0.15,
-      color: fragment.data.color
-    })
-
-    // Create additional visual indicator using multiple bursts
-    const indicator = app.create('particles', {
-      position: [
-        fragment.container.position[0],
-        fragment.container.position[1] + 1,
-        fragment.container.position[2]
-      ],
-      rate: 10,
-      speed: 1,
-      lifetime: 2,
-      size: 0.1,
-      color: fragment.data.color
-    })
-
-    // Clean up effects
+    // Timeout after 10 seconds
     setTimeout(() => {
-      try {
-        app.remove(burst)
-        app.remove(indicator)
-      } catch (e) { /* ignore */ }
-    }, 1500)
-  },
+      clearInterval(checkInterval)
+      console.warn('⚠️ Dojo timeout - continuing in offline mode')
+      app.props.gameMode = 'offline'
+      resolve()
+    }, 10000)
+  })
+}
 
-  createDeploymentEffect(contractData) {
-    const player = app.getPlayer()
-    if (!player) return
+function createArena() {
+  console.log('🏗️ Creating arena...')
 
-    const playerPos = player.position
-    const colors = ['#ff6b6b', '#4ecdc4', '#95e77e', '#f7b731', '#a55eea']
-    const effectColor = colors[Math.floor(Math.random() * colors.length)]
+  // Floor
+  const floor = app.create('prim', {
+    type: 'box',
+    scale: [30, 0.2, 30],
+    position: [0, -0.1, 0],
+    color: '#1a1a2e',
+    metalness: 0.1,
+    roughness: 0.9,
+    physics: 'static',
+  })
+  app.add(floor)
 
-    // Multiple particle bursts
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        const burst = app.create('particles', {
-          position: [playerPos[0], playerPos[1] + 1, playerPos[2]],
-          rate: 20,
-          speed: 2 + i * 0.5,
-          lifetime: 2 + i,
-          size: 0.1 + i * 0.05,
-          color: effectColor
-        })
+  // Walls
+  const wallHeight = 5
+  const wallThickness = 0.5
+  const arenaSize = 30
 
-        setTimeout(() => {
-          try { app.remove(burst) } catch (e) { /* ignore */ }
-        }, (2 + i) * 1000)
-      }, i * 200)
+  // North wall
+  app.add(
+    app.create('prim', {
+      type: 'box',
+      scale: [arenaSize, wallHeight, wallThickness],
+      position: [0, wallHeight / 2, -arenaSize / 2],
+      color: '#16213e',
+      physics: 'static',
+    })
+  )
+
+  // South wall
+  app.add(
+    app.create('prim', {
+      type: 'box',
+      scale: [arenaSize, wallHeight, wallThickness],
+      position: [0, wallHeight / 2, arenaSize / 2],
+      color: '#16213e',
+      physics: 'static',
+    })
+  )
+
+  // East wall
+  app.add(
+    app.create('prim', {
+      type: 'box',
+      scale: [wallThickness, wallHeight, arenaSize],
+      position: [arenaSize / 2, wallHeight / 2, 0],
+      color: '#16213e',
+      physics: 'static',
+    })
+  )
+
+  // West wall
+  app.add(
+    app.create('prim', {
+      type: 'box',
+      scale: [wallThickness, wallHeight, arenaSize],
+      position: [-arenaSize / 2, wallHeight / 2, 0],
+      color: '#16213e',
+      physics: 'static',
+    })
+  )
+
+  console.log('✅ Arena created')
+}
+
+function spawnFragments(count) {
+  console.log(`🎯 Spawning ${count} fragments...`)
+
+  app.state.fragments = []
+
+  for (let i = 0; i < count; i++) {
+    const fragment = createFragment(i)
+    app.state.fragments.push(fragment)
+    app.add(fragment)
+  }
+
+  console.log('✅ Fragments spawned')
+}
+
+function createFragment(index) {
+  const x = (Math.random() - 0.5) * 25
+  const y = 0.5 + Math.random() * 3
+  const z = (Math.random() - 0.5) * 25
+
+  const fragment = app.create('prim', {
+    type: 'cylinder',
+    scale: [0.3, 0.8, 0.3],
+    position: [x, y, z],
+    color: '#00ff00',
+    emissive: '#00ff00',
+    emissiveIntensity: 3,
+    metalness: 0.8,
+    roughness: 0.2,
+    trigger: true,
+    tag: `fragment_${index}`,
+  })
+
+  // Add Dojo sync if available
+  if (world.dojo?.isConnected() && app.props.gameMode === 'blockchain') {
+    fragment.add('dojo', {
+      components: ['Position', 'Owner', 'Collected'],
+      syncInterval: 1000,
+    })
+  }
+
+  fragment.isCollected = false
+  fragment.fragmentId = `fragment_${index}`
+
+  // Add floating animation
+  fragment.baseY = y
+  fragment.floatOffset = Math.random() * Math.PI * 2
+
+  return fragment
+}
+
+function setupCollection() {
+  console.log('🔧 Setting up collection handlers...')
+
+  app.on('triggerenter', event => {
+    const { object, other } = event
+
+    if (other.playerId && object.tag?.startsWith('fragment_')) {
+      const fragment = app.state.fragments.find(f => f === object)
+      if (fragment) {
+        collectFragment(fragment, other)
+      }
     }
+  })
 
-    // Create floating contract indicator using particles and light
-    const contractIndicator = app.create('sphere', {
-      position: [playerPos[0], playerPos[1] + 2, playerPos[2]],
-      radius: 0.3,
-      color: effectColor,
-      emissive: effectColor,
-      emissiveIntensity: 3
-    })
+  console.log('✅ Collection handlers set up')
+}
 
-    // Animated effect
-    let floatTime = 0
-    const anim = setInterval(() => {
-      floatTime += 0.016
-      contractIndicator.position[1] = playerPos[1] + 2 + floatTime
-      contractIndicator.emissiveIntensity = 3 * (1 - floatTime / 3)
+async function collectFragment(fragment, player) {
+  if (fragment.isCollected) return
 
-      if (floatTime > 3) {
-        clearInterval(anim)
-        try { app.remove(contractIndicator) } catch (e) { /* ignore */ }
+  console.log(`💎 Collecting fragment: ${fragment.fragmentId}`)
+
+  // Visual feedback
+  createCollectEffect(fragment.position)
+  app.remove(fragment)
+  fragment.isCollected = true
+
+  // Update state
+  app.state.fragmentsCollected++
+  updateUI()
+
+  // Onchain transaction if available
+  if (app.props.gameMode === 'blockchain' && world.dojo?.isConnected()) {
+    try {
+      const playerEntity = world.entities.getLocalPlayer()
+      if (playerEntity) {
+        // Format for StarkNet execute (contractAddress, entrypoint, calldata)
+        const calls = [
+          {
+            contractAddress: world.dojo.getWorldAddress(),
+            entrypoint: 'collect_fragment',
+            calldata: [playerEntity.data.id, fragment.fragmentId],
+          },
+        ]
+
+        console.log('📡 Sending transaction to blockchain:', calls)
+        const result = await world.dojo.execute(calls)
+        console.log('✅ Fragment collection synced to blockchain! Tx:', result.transaction_hash)
       }
-    }, 16)
-  },
+    } catch (error) {
+      console.warn('⚠️ Onchain sync failed:', error.message)
+    }
+  }
 
-  createBuffNotification(buff) {
-    const player = app.getPlayer()
-    if (!player) return
-
-    const playerPos = player.position
-    const buffColor = buff.buffType === 'speed' ? '#ff6b6b' :
-                     buff.buffType === 'jump' ? '#4ecdc4' :
-                     buff.buffType === 'health' ? '#95e77e' : '#f7b731'
-
-    // Create visual notification using rings of particles
-    const notification = app.create('particles', {
-      position: [playerPos[0], playerPos[1] + 1.5, playerPos[2]],
-      rate: 15,
-      speed: 2,
-      lifetime: 3,
-      size: 0.2,
-      color: buffColor
-    })
-
-    // Create a glowing sphere as the main indicator
-    const glowSphere = app.create('sphere', {
-      position: [playerPos[0], playerPos[1] + 1.5, playerPos[2]],
-      radius: 0.2,
-      color: buffColor,
-      emissive: buffColor,
-      emissiveIntensity: 2
-    })
-
-    // Float up animation
-    let floatTime = 0
-    const anim = setInterval(() => {
-      floatTime += 0.016
-      notification.position[1] = playerPos[1] + 1.5 + (floatTime * 0.5)
-      glowSphere.position[1] = playerPos[1] + 1.5 + (floatTime * 0.5)
-      glowSphere.emissiveIntensity = 2 * (1 - floatTime / 4)
-
-      if (floatTime > 4) {
-        clearInterval(anim)
-        try {
-          app.remove(notification)
-          app.remove(glowSphere)
-        } catch (e) { /* ignore */ }
-      }
-    }, 16)
-  },
-
-  createExpirationEffect(expiredBuff) {
-    const player = app.getPlayer()
-    if (!player) return
-
-    const playerPos = player.position
-
-    // Fading primary particles
-    const fadeEffect = app.create('particles', {
-      position: [playerPos[0], playerPos[1] + 0.5, playerPos[2]],
-      rate: 5,
-      speed: 0.5,
-      lifetime: 1.5,
-      size: 0.1,
-      color: '#666666'
-    })
-
-    // Expiration indicator using dimming sphere
-    const expirationIndicator = app.create('sphere', {
-      position: [playerPos[0], playerPos[1] + 1, playerPos[2]],
-      radius: 0.15,
-      color: '#666666',
-      emissive: '#333333',
-      emissiveIntensity: 1
-    })
-
-    // Dimming animation
-    let fadeTime = 0
-    const fadeAnim = setInterval(() => {
-      fadeTime += 0.016
-      expirationIndicator.emissiveIntensity = Math.max(0, 1 - fadeTime / 2)
-      expirationIndicator.radius = Math.max(0.05, 0.15 - fadeTime * 0.05)
-
-      if (fadeTime > 2) {
-        clearInterval(fadeAnim)
-        try {
-          app.remove(fadeEffect)
-          app.remove(expirationIndicator)
-        } catch (e) { /* ignore */ }
-      }
-    }, 16)
+  // Check completion
+  if (app.state.fragmentsCollected >= app.state.totalFragments) {
+    showCompletionUI()
   }
 }
 
-// 💎 GAME MANAGER
-const GameManager = {
-  spawnFragment() {
-    if (!app.props.gameEnabled || app.state.fragmentEntities.length >= 10) return
-
-    // Random fragment type
-    const types = Object.keys(FRAGMENT_TYPES)
-    const typeKey = types[Math.floor(Math.random() * types.length)]
-
-    // Random position around player
-    const angle = Math.random() * Math.PI * 2
-    const distance = 3 + Math.random() * 7
-    const position = [
-      Math.sin(angle) * distance,
-      1 + Math.random() * 2,
-      Math.cos(angle) * distance
-    ]
-
-    // Create fragment entity
-    const fragment = new FragmentEntity(position, typeKey)
-    app.state.fragmentEntities.push(fragment)
-
-    console.log(`💎 Spawned ${fragment.data.name}`)
-  },
-
-  async combineFragments() {
-    if (app.state.fragments.length < 3) {
-      console.log('❌ Need at least 3 fragments to combine!')
-      return
-    }
-
-    console.log('🔧 COMBINING FRAGMENTS...')
-
-    // Take first 3 fragments
-    const used = app.state.fragments.splice(0, 3)
-
-    // Create contract data
-    const contractData = {
-      id: Date.now(),
-      fragments: used,
-      combinedAt: Date.now(),
-      buffType: used[0].buffType,
-      buffValue: Math.round(used.reduce((sum, f) => sum + f.buffValue, 0) / used.length),
-      duration: 7 * 24 * 60 * 60, // 7 days
-      deployed: false
-    }
-
-    console.log('📜 Contract Created:')
-    console.log(`   Type: ${contractData.buffType}`)
-    console.log(`   Value: ${contractData.buffValue}%`)
-    console.log(`   Duration: 7 days`)
-
-    // Deploy contract
-    await this.deployContract(contractData)
-    return contractData
-  },
-
-  async deployContract(contractData) {
-    console.log('⛓️ Deploying to blockchain...')
-    console.log(`📜 Contract: ${contractData.buffType} Boost (${contractData.buffValue}%)`)
-
-    const deploymentSteps = [
-      { delay: 500, message: '🔍 Validating contract bytecode...' },
-      { delay: 800, message: '⛽ Estimating gas fees...' },
-      { delay: 600, message: '📤 Submitting transaction...' },
-      { delay: 1000, message: '⏳ Waiting for block confirmation...' },
-      { delay: 700, message: '✅ Transaction confirmed!' },
-      { delay: 400, message: '🎯 Contract deployed successfully!' }
-    ]
-
-    // Execute deployment steps
-    for (const step of deploymentSteps) {
-      await new Promise(resolve => setTimeout(resolve, step.delay))
-      console.log(step.message)
-    }
-
-    // Generate contract details
-    const contractAddress = this.generateContractAddress(contractData)
-    const transactionHash = this.generateTransactionHash()
-
-    console.log(`📍 Contract Address: ${contractAddress}`)
-    console.log(`🔗 Transaction: ${transactionHash}`)
-    console.log(`🕐 Block: ${Math.floor(Math.random() * 1000000) + 4000000}`)
-
-    // Try real blockchain deployment if available
-    let deployedOnChain = false
-    if (world.dojo && world.dojo.isConnected?.()) {
-      try {
-        console.log('🚀 Attempting real Dojo deployment...')
-        await world.dojo.execute({
-          contract: 'FragmentBuff',
-          method: 'createBuff',
-          args: [contractData.buffType, contractData.buffValue]
-        })
-        deployedOnChain = true
-        console.log('✅ Real blockchain deployment successful!')
-      } catch (realError) {
-        console.log('⚠️ Real deployment failed, using simulation:', realError.message)
-      }
-    }
-
-    // Store complete contract information
-    const deployedContract = {
-      ...contractData,
-      address: contractAddress,
-      transactionHash,
-      blockNumber: Date.now(),
-      deployedOnChain,
-      createdAt: Date.now()
-    }
-
-    // Apply buff to player
-    this.applyBuff(deployedContract)
-
-    // Create deployment celebration
-    EffectManager.createDeploymentEffect(deployedContract)
-
-    return deployedContract
-  },
-
-  generateContractAddress(contractData) {
-    const timestamp = Date.now().toString(16)
-    const type = contractData.buffType.slice(0, 4).toUpperCase()
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-    return `0x${type}${timestamp.slice(-8)}${random}`
-  },
-
-  generateTransactionHash() {
-    const timestamp = Date.now().toString(16)
-    const random1 = Math.random().toString(36).substring(2, 12)
-    const random2 = Math.random().toString(36).substring(2, 8)
-    return `0x${timestamp.slice(-6)}${random1}${random2}`.toUpperCase()
-  },
-
-  applyBuff(contractData) {
-    const player = app.getPlayer()
-    if (!player) {
-      console.log('⚠️ Cannot apply buff - no player found')
-      return
-    }
-
-    const buff = {
-      ...contractData,
-      startTime: Date.now(),
-      endTime: Date.now() + (contractData.duration * 1000),
-      active: true,
-      originalValues: {}
-    }
-
-    // Store original values
-    if (player.moveSpeed) buff.originalValues.moveSpeed = player.moveSpeed
-    if (player.jumpForce) buff.originalValues.jumpForce = player.jumpForce
-    if (player.maxHealth) buff.originalValues.maxHealth = player.maxHealth
-    if (player.health !== undefined) buff.originalValues.health = player.health
-
-    // Apply buff effects
-    switch (contractData.buffType) {
-      case 'speed':
-        const speedMult = 1 + (contractData.buffValue / 100)
-        player.moveSpeed = (buff.originalValues.moveSpeed || 5) * speedMult
-        console.log(`🏃 Speed increased to ${player.moveSpeed.toFixed(2)} (${speedMult.toFixed(2)}x)`)
-        break
-
-      case 'jump':
-        const jumpMult = 1 + (contractData.buffValue / 100)
-        player.jumpForce = (buff.originalValues.jumpForce || 10) * jumpMult
-        console.log(`🦘 Jump force increased to ${player.jumpForce.toFixed(2)} (${jumpMult.toFixed(2)}x)`)
-        break
-
-      case 'health':
-        const healthMult = 1 + (contractData.buffValue / 100)
-        player.maxHealth = (buff.originalValues.maxHealth || 100) * healthMult
-        if (player.health !== undefined) {
-          player.health = Math.min(player.health * healthMult, player.maxHealth)
-        }
-        console.log(`❤️ Health increased to ${player.maxHealth.toFixed(2)} (${healthMult.toFixed(2)}x)`)
-        break
-    }
-
-    app.state.activeBuffs.push(buff)
-
-    console.log(`🎉 ${contractData.buffType} buff active for 7 days!`)
-    console.log(`📊 Total active buffs: ${app.state.activeBuffs.length}`)
-
-    // Create visual feedback
-    buff.indicator = new BuffIndicator(player, buff)
-    EffectManager.createBuffNotification(buff)
-  },
-
-  removeExpiredBuffs() {
-    const now = Date.now()
-    const player = app.getPlayer()
-    if (!player) return
-
-    const expiredBuffs = app.state.activeBuffs.filter(buff => buff.endTime < now)
-
-    expiredBuffs.forEach(buff => {
-      console.log(`⏰ ${buff.buffType} buff expired!`)
-
-      // Restore original values
-      if (buff.originalValues.moveSpeed && player.moveSpeed) {
-        player.moveSpeed = buff.originalValues.moveSpeed
-        console.log(`🏃 Speed restored to ${player.moveSpeed}`)
-      }
-
-      if (buff.originalValues.jumpForce && player.jumpForce) {
-        player.jumpForce = buff.originalValues.jumpForce
-        console.log(`🦘 Jump force restored to ${player.jumpForce}`)
-      }
-
-      if (buff.originalValues.maxHealth && player.maxHealth) {
-        player.maxHealth = buff.originalValues.maxHealth
-        if (player.health !== undefined && player.health > player.maxHealth) {
-          player.health = player.maxHealth
-        }
-        console.log(`❤️ Health restored to ${player.maxHealth}`)
-      }
-
-      // Remove visual indicator
-      if (buff.indicator) {
-        buff.indicator.remove()
-      }
-
-      // Create expiration effect
-      EffectManager.createExpirationEffect(buff)
+function createCollectEffect(position) {
+  const particles = []
+  for (let i = 0; i < 12; i++) {
+    const particle = app.create('prim', {
+      type: 'sphere',
+      scale: [0.1, 0.1, 0.1],
+      position: [...position],
+      color: '#00ff00',
+      emissive: '#00ff00',
+      emissiveIntensity: 5,
     })
 
-    // Remove expired buffs
-    app.state.activeBuffs = app.state.activeBuffs.filter(buff => buff.endTime >= now)
-
-    if (expiredBuffs.length > 0) {
-      console.log(`📊 Remaining active buffs: ${app.state.activeBuffs.length}`)
-    }
-  },
-
-  update(delta) {
-    if (!app.props.gameEnabled) return
-
-    // Update fragment entities
-    app.state.fragmentEntities.forEach(fragment => {
-      fragment.update(delta)
+    app.add(particle)
+    particles.push({
+      prim: particle,
+      velocity: [(Math.random() - 0.5) * 8, Math.random() * 6 + 3, (Math.random() - 0.5) * 8],
+      lifetime: 1,
     })
+  }
 
-    // Update buff indicators
-    app.state.activeBuffs.forEach(buff => {
-      if (buff.indicator) {
-        buff.indicator.update()
+  // Animate particles
+  let elapsed = 0
+  const updateParticles = dt => {
+    elapsed += dt
+    particles.forEach(p => {
+      p.prim.position.x += p.velocity[0] * dt
+      p.prim.position.y += p.velocity[1] * dt - 9.8 * dt * dt
+      p.prim.position.z += p.velocity[2] * dt
+      p.lifetime -= dt
+
+      if (p.lifetime <= 0) {
+        app.remove(p.prim)
       }
     })
 
-    // Spawn new fragments
-    if (Math.random() < 0.001 * app.props.spawnRate) {
-      this.spawnFragment()
+    if (elapsed > 1) {
+      app.off('update', updateParticles)
     }
+  }
 
-    // Check buff expiration
-    const now = Date.now()
-    if (!app.state.lastExpirationCheck || now - app.state.lastExpirationCheck > 5000) {
-      this.removeExpiredBuffs()
-      app.state.lastExpirationCheck = now
+  app.on('update', updateParticles)
+}
+
+function createGameUI() {
+  console.log('🎨 Creating game UI...')
+
+  // Main UI backdrop
+  const backdrop = app.create('ui', {
+    width: 350,
+    height: 200,
+    position: [0, 3, -2],
+    backgroundColor: [0.1, 0.1, 0.15, 0.9],
+    borderRadius: 10,
+  })
+
+  // Title
+  const title = app.create('uitext', {
+    text: '💎 Fragment Collector',
+    position: [0, 80, 0],
+    fontSize: 20,
+    color: [0.2, 1, 0.2],
+  })
+  backdrop.add(title)
+
+  // Status
+  app.state.statusText = app.create('uitext', {
+    text: `Fragments: 0 / ${app.state.totalFragments}`,
+    position: [0, 40, 0],
+    fontSize: 16,
+    color: [0.8, 0.8, 0.8],
+  })
+  backdrop.add(app.state.statusText)
+
+  // Mode indicator
+  const modeText = app.create('uitext', {
+    text: app.props.gameMode === 'blockchain' ? '🌐 Blockchain Mode' : '⚠️ Offline Mode',
+    position: [0, 10, 0],
+    fontSize: 12,
+    color: app.props.gameMode === 'blockchain' ? [0.2, 0.8, 0.2] : [0.8, 0.6, 0.2],
+  })
+  backdrop.add(modeText)
+
+  // Instructions
+  const instructions = app.create('uitext', {
+    text: 'Walk into green cylinders to collect code fragments',
+    position: [0, -30, 0],
+    fontSize: 11,
+    color: [0.5, 0.5, 0.5],
+  })
+  backdrop.add(instructions)
+
+  app.state.ui = { backdrop, title }
+
+  // Make UI face camera
+  backdrop.lookAt = () => {
+    if (world.camera) {
+      const cameraPos = world.camera.position
+      const uiPos = backdrop.position
+      const direction = cameraPos.clone().sub(uiPos).normalize()
+      backdrop.quaternion.setFromUnitVectors([0, 0, 1], direction.toArray())
     }
+  }
+
+  console.log('✅ Game UI created')
+}
+
+function updateUI() {
+  if (app.state.statusText) {
+    app.state.statusText.text = `Fragments: ${app.state.fragmentsCollected} / ${app.state.totalFragments}`
   }
 }
 
-// 🚀 INITIALIZATION
-console.log('🧩 FRAGMENT COLLECTOR LOADED!')
-console.log('💎 Walk near glowing fragments to collect them!')
-console.log('💡 Tip: Type app.combinations() when you have 3+ fragments')
+function showCompletionUI() {
+  console.log('🎉 Showing completion UI...')
 
-// Periodic stats update via console instead of UI
-setInterval(() => {
-  console.log(`📊 Stats: 💎 ${app.state.fragments.length} fragments | ⚡ ${app.state.activeBuffs.length} active buffs`)
-}, 30000) // Every 30 seconds
+  // Remove game UI
+  if (app.state.ui?.backdrop) {
+    app.remove(app.state.ui.backdrop)
+  }
 
-// Game update loop
-app.on('tick', GameManager.update.bind(GameManager))
+  // Create completion UI
+  const deployUI = app.create('ui', {
+    width: 600,
+    height: 400,
+    position: [0, 2, -3],
+    backgroundColor: [0.1, 0.1, 0.15, 0.95],
+    borderRadius: 15,
+  })
 
-// Expose combine function
-app.combinations = GameManager.combineFragments.bind(GameManager)
+  const title = app.create('uitext', {
+    text: '🎉 All Fragments Collected!',
+    position: [0, 150, 0],
+    fontSize: 28,
+    color: [0.2, 1, 0.2],
+  })
+  deployUI.add(title)
 
-// Auto-save inventory
-setInterval(() => {
+  const subtitle = app.create('uitext', {
+    text: 'Deploy your completion proof to the blockchain',
+    position: [0, 100, 0],
+    fontSize: 16,
+    color: [0.8, 0.8, 0.8],
+  })
+  deployUI.add(subtitle)
+
+  const deployButton = app.create('uibutton', {
+    text: '🚀 Deploy Smart Contract',
+    position: [0, 0, 0],
+    width: 280,
+    height: 60,
+    backgroundColor: [0.2, 0.8, 0.2],
+    borderRadius: 10,
+    onClick: () => deployCompletionContract(),
+  })
+  deployUI.add(deployButton)
+
+  // Make UI face camera
+  deployUI.lookAt = () => {
+    if (world.camera) {
+      const cameraPos = world.camera.position
+      const uiPos = deployUI.position
+      const direction = cameraPos.clone().sub(uiPos).normalize()
+      deployUI.quaternion.setFromUnitVectors([0, 0, 1], direction.toArray())
+    }
+  }
+
+  app.state.deployUI = deployUI
+  app.add(deployUI)
+
+  // Show notification
+  app.showNotification?.('🎉 Congratulations! All fragments collected!', [0.2, 1, 0.2], 5000)
+}
+
+async function deployCompletionContract() {
+  console.log('📜 Deploying completion contract...')
+  
+  app.showNotification?.('📜 Deploying completion proof to blockchain...', [0.2, 0.8, 1], 3000)
+  
   try {
-    const saveData = {
-      fragments: app.state.fragments,
-      activeBuffs: app.state.activeBuffs,
-      lastSaved: Date.now()
+    const playerEntity = world.entities.getLocalPlayer()
+    if (!playerEntity) {
+      throw new Error('No player entity found')
     }
-    localStorage.setItem('fragmentCollectorSave', JSON.stringify(saveData))
-  } catch (e) {
-    // Ignore save errors
+    
+    // Format for StarkNet execute (contractAddress, entrypoint, calldata)
+    const calls = [{
+      contractAddress: world.dojo.getWorldAddress(),
+      entrypoint: 'deploy_completion_nft',
+      calldata: [playerEntity.data.id, app.state.fragmentsCollected]
+    }]
+    
+    console.log('📡 Sending deployment transaction:', calls)
+    const result = await world.dojo.execute(calls)
+    
+    console.log('✅ Contract deployed! Tx:', result.transaction_hash)
+    
+    app.showNotification?.(`✅ Deployed! Tx: ${result.transaction_hash}`, [0.2, 1, 0.2], 5000)
+    
+    // Show transaction link
+    showTransactionLink(result.transaction_hash)
+    
+  } catch (error) {
+    console.error('❌ Deployment failed:', error)
+    app.showNotification?.(`❌ Deployment failed: ${error.message}`, [1, 0.2, 0.2], 5000)
   }
-}, 10000)
+}
 
-console.log('🎮 Game ready! Walk near glowing orbs to collect fragments!')
-console.log('💡 Tip: Type app.combinations() when you have 3+ fragments')
+    const result = await world.dojo.execute([
+      {
+        target: world.dojo.getWorldAddress(),
+        method: 'deploy_completion_nft',
+        args: [playerEntity.data.id, app.state.fragmentsCollected],
+      },
+    ])
+
+    console.log('✅ Contract deployed:', result.transaction_hash)
+
+    app.showNotification?.(`✅ Deployed! Tx: ${result.transaction_hash}`, [0.2, 1, 0.2], 5000)
+
+    // Show transaction link
+    showTransactionLink(result.transaction_hash)
+  } catch (error) {
+    console.error('❌ Deployment failed:', error)
+    app.showNotification?.(`❌ Deployment failed: ${error.message}`, [1, 0.2, 0.2], 5000)
+  }
+}
+
+function showTransactionLink(txHash) {
+  const linkUI = app.create('ui', {
+    width: 500,
+    height: 100,
+    position: [0, -1, -2],
+    backgroundColor: [0.1, 0.1, 0.15, 0.9],
+    borderRadius: 10,
+  })
+
+  const linkText = app.create('uitext', {
+    text: `🔗 Transaction: ${txHash.substring(0, 10)}...`,
+    position: [0, 20, 0],
+    fontSize: 14,
+    color: [0.2, 0.8, 1],
+  })
+  linkUI.add(linkText)
+
+  const copyButton = app.create('uibutton', {
+    text: 'Copy Transaction Hash',
+    position: [0, -20, 0],
+    width: 200,
+    height: 30,
+    onClick: () => {
+      navigator.clipboard?.writeText(txHash)
+      app.showNotification?.('📋 Copied to clipboard!', [0.2, 0.8, 1], 2000)
+    },
+  })
+  linkUI.add(copyButton)
+
+  app.add(linkUI)
+
+  // Auto-remove after 10 seconds
+  setTimeout(() => app.remove(linkUI), 10000)
+}
+
+// Main update loop
+app.on('update', () => {
+  if (!app.state.gameStarted) return
+
+  // Update UI to face camera
+  if (app.state.ui?.backdrop?.lookAt) {
+    app.state.ui.backdrop.lookAt()
+  }
+  if (app.state.deployUI?.lookAt) {
+    app.state.deployUI.lookAt()
+  }
+
+  // Animate fragments
+  app.state.fragments.forEach(fragment => {
+    if (!fragment.isCollected) {
+      fragment.position.y = fragment.baseY + Math.sin(Date.now() * 0.002 + fragment.floatOffset) * 0.2
+      fragment.rotation.y += 0.01
+    }
+  })
+})
+
+console.log('🎮 Fragment Collector script loaded')
