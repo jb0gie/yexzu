@@ -188,7 +188,10 @@ export class ClientLoader extends System {
       if (type === 'emote') {
         const buffer = await file.arrayBuffer()
         const glb = await this.gltfLoader.parseAsync(buffer)
-        const factory = createEmoteFactory(glb, url)
+
+        // Parse URL parameters and pass to factory
+        const queryParams = getQueryParams(url)
+        const factory = createEmoteFactory(glb, url, queryParams)
         const emote = {
           toClip(options) {
             return factory.toClip(options)
@@ -294,7 +297,9 @@ export class ClientLoader extends System {
     }
     if (type === 'emote') {
       promise = this.gltfLoader.loadAsync(localUrl).then(glb => {
-        const factory = createEmoteFactory(glb, url)
+        // Parse URL parameters and pass to factory
+        const queryParams = getQueryParams(url)
+        const factory = createEmoteFactory(glb, url, queryParams)
         const emote = {
           toClip(options) {
             return factory.toClip(options)
@@ -365,6 +370,20 @@ export class ClientLoader extends System {
     this.results.clear()
     this.preloadItems = []
   }
+}
+
+// Helper function to parse URL query parameters
+function getQueryParams(url) {
+  const params = {}
+  try {
+    const urlObj = new URL(url)
+    for (const [key, value] of urlObj.searchParams.entries()) {
+      params[key] = value
+    }
+  } catch (e) {
+    // Invalid URL, return empty params
+  }
+  return params
 }
 
 function createVideoFactory(world, url) {

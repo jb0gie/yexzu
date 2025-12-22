@@ -4,10 +4,18 @@ const q1 = new THREE.Quaternion()
 const restRotationInverse = new THREE.Quaternion()
 const parentRestWorldRotation = new THREE.Quaternion()
 
-export function createEmoteFactory(glb, url) {
+export function createEmoteFactory(glb, url, queryParams = {}) {
   // console.time('emote-init')
 
-  const clip = glb.animations[0]
+  // Extract animation name from URL parameters
+  const animName = queryParams.name || queryParams.animation
+
+  // Find the requested animation, fallback to first
+  let clip = glb.animations[0]
+  if (animName && glb.animations.length > 1) {
+    const found = glb.animations.find(a => a.name === animName)
+    if (found) clip = found
+  }
 
   // Safety check: ensure GLB has children before accessing scale
   if (!glb.scene.children || glb.scene.children.length === 0) {
