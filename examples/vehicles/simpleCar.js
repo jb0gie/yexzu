@@ -289,8 +289,7 @@ const seatNodes = [
 ]
 
 if (!car || !body) {
-  console.error('Critical car components missing')
-  return
+  throw new Error('Critical car components missing')
 }
 
 // Enhanced car setup
@@ -416,8 +415,8 @@ const wheels = [
     front: true,
     left: true,
     spring: safeExecute(() => car.get('SpringFL')),
-    hub: safeExecute(() => body.getBone('HubFL')),
-    tire: safeExecute(() => body.getBone('TireFL')),
+    hub: safeExecute(() => body.getBone( 'HubFL')),
+    tire: safeExecute(() => body.getBone( 'TireFL')),
     grounded: false,
     compression: 0,
     powered: driveTrain === 'fwd' || driveTrain === '4wd',
@@ -431,8 +430,8 @@ const wheels = [
     front: true,
     right: true,
     spring: safeExecute(() => car.get('SpringFR')),
-    hub: safeExecute(() => body.getBone('HubFR')),
-    tire: safeExecute(() => body.getBone('TireFR')),
+    hub: safeExecute(() => body.getBone( 'HubFR')),
+    tire: safeExecute(() => body.getBone( 'TireFR')),
     grounded: false,
     compression: 0,
     powered: driveTrain === 'fwd' || driveTrain === '4wd',
@@ -446,8 +445,8 @@ const wheels = [
     rear: true,
     left: true,
     spring: safeExecute(() => car.get('SpringBL')),
-    hub: safeExecute(() => body.getBone('HubBL')),
-    tire: safeExecute(() => body.getBone('TireBL')),
+    hub: safeExecute(() => body.getBone( 'HubBL')),
+    tire: safeExecute(() => body.getBone( 'TireBL')),
     grounded: false,
     compression: 0,
     powered: driveTrain === 'rwd' || driveTrain === '4wd',
@@ -461,8 +460,8 @@ const wheels = [
     rear: true,
     right: true,
     spring: safeExecute(() => car.get('SpringBR')),
-    hub: safeExecute(() => body.getBone('HubBR')),
-    tire: safeExecute(() => body.getBone('TireBR')),
+    hub: safeExecute(() => body.getBone( 'HubBR')),
+    tire: safeExecute(() => body.getBone( 'TireBR')),
     grounded: false,
     compression: 0,
     powered: driveTrain === 'rwd' || driveTrain === '4wd',
@@ -1549,6 +1548,23 @@ function simulateMode() {
         const angularVelocity = Math.abs(forwardVelocity) / wheel.radius
         const rotationAmount = Math.sign(forwardVelocity) * -1 * angularVelocity * delta
         wheel.tire.rotation.x += rotationAmount
+
+        // Force Three.js to update the bone matrix and skeleton
+        wheel.tire.updateMatrixWorld(true)
+      }
+
+
+      // Update the skinned mesh skeleton after all bone changes
+      // Only needed on client, server doesn't render
+      if (world.isClient && body && body.obj && body.obj.skeleton) {
+        body.obj.skeleton.update()
+      }
+
+      // Update particle positions after skeleton update to ensure correct alignment
+      for (const wheel of wheels) {
+        if (wheel.rear && wheel.particles) {
+          wheel.particles.position.copy(wheel.hub.position)
+        }
       }
 
       updateTireTemperature(delta)

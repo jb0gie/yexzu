@@ -404,8 +404,7 @@ turretBarrelBone = safeExecute(() => body.getBone('TurretBarrel')) || safeExecut
 turretMuzzleBone = safeExecute(() => body.getBone('TurretMuzzle'))
 
 if (!car || !body) {
-  console.error('Critical car components missing')
-  return
+  throw new Error('Critical car components missing')
 }
 
 if (!turretBaseBone || !turretGunBone || !turretMuzzleBone) {

@@ -318,7 +318,6 @@ const seatNodes = [
 ]
 // Note: animationBone is retrieved but not used for playing animations
 // Animations are played on the SkinnedMesh (body) itself, not individual bones
-const animationBone = safeExecute(() => body?.getBone(props.animationBone || 'Engine'))
 
 // Enhanced car setup
 car.mass = 1
@@ -448,6 +447,8 @@ for (const audio of Object.values(audioSources)) {
 }
 
 // Enhanced wheel system with tire temperature
+// Helper to get bone data from transform matrix
+
 const wheels = [
   {
     idx: 0,
@@ -1327,7 +1328,8 @@ if (world.isServer) {
     state.sitting[seatIdx] = playerId
     if (seatIdx === 0) {
       app.send('authority', playerId)
-      setMode(viewerMode)
+      // Server always stays in simulateMode for authoritative physics
+      // Only send authority event to clients, don't change server mode
     }
     app.send('seat', [seatIdx, playerId])
   })
@@ -1512,6 +1514,12 @@ if (world.isClient) {
       }
     })
 
+    // Check if we already have authority from init state
+    // This handles race condition where authority event might fire before client initializes
+    if (state.authority === player.id) {
+      setMode(simulateMode)
+    }
+
     app.on('camera-mode', mode => {
       currentCameraMode = mode
     })
@@ -1553,7 +1561,11 @@ if (world.isClient) {
       }
     })
 
-    setMode(viewerMode)
+    // Only start in viewer mode if we don't have authority
+    // This ensures proper mode initialization even if authority event fired before init
+    if (state.authority !== player.id) {
+      setMode(viewerMode)
+    }
   }
 }
 
@@ -1820,6 +1832,22 @@ function simulateMode() {
         const angularVelocity = Math.abs(forwardVelocity) / wheel.radius
         const rotationAmount = Math.sign(forwardVelocity) * -1 * angularVelocity * delta
         wheel.tire.rotation.x += rotationAmount
+
+        // Force Three.js to update the bone matrix and skeleton
+        wheel.tire.updateMatrixWorld(true)
+      }
+
+      // Update the skinned mesh skeleton after all bone changes
+      // Only needed on client, server doesn't render
+      if (world.isClient && body && body.obj && body.obj.skeleton) {
+        body.obj.skeleton.update()
+      }
+
+      // Update particle positions after skeleton update to ensure correct alignment
+      for (const wheel of wheels) {
+        if (wheel.rear && wheel.particles) {
+          wheel.particles.position.copy(wheel.hub.position)
+        }
       }
 
       // Track landing from hop to start drift
