@@ -30,9 +30,16 @@ export class SkinnedMesh extends Node {
     this.actions = {}
     this.bones = null
     this.animNames = []
+    this.boneHandles = {}
   }
 
   mount() {
+    this.clips = {}
+    this.actions = {}
+    this.bones = null
+    this.animNames = []
+    this.boneHandles = {}
+
     this.obj = SkeletonUtils.clone(this._object3d)
     this.obj.matrixWorld.copy(this.matrixWorld)
     this.obj.matrixAutoUpdate = false
@@ -77,6 +84,7 @@ export class SkinnedMesh extends Node {
       this.obj = null
       this.bones = null
       this.animNames = []
+      this.boneHandles = {}
     }
   }
 
@@ -178,6 +186,58 @@ export class SkinnedMesh extends Node {
     return m1.copy(bone.matrixWorld)
   }
 
+  readBone(name) {
+    if (!this.obj) return null
+    if (!this.bones) {
+      this.bones = {}
+      this.obj.traverse(child => {
+        if (child.isBone) this.bones[child.name] = child
+      })
+    }
+    const bone = this.bones[name]
+    if (!bone) {
+      console.warn(`[skinnedmesh] bone not found: ${name}`)
+      return null
+    }
+    return bone
+  }
+
+  getBone(name) {
+    let handle = this.boneHandles[name]
+    if (!handle) {
+      const self = this
+      handle = {
+        get position() {
+          return self.readBone(name)?.position
+        },
+        get quaternion() {
+          return self.readBone(name)?.quaternion
+        },
+        get rotation() {
+          return self.readBone(name)?.rotation
+        },
+        get scale() {
+          return self.readBone(name)?.scale
+        },
+        get matrixWorld() {
+          const bone = self.readBone(name)
+          if (!bone) return null
+          bone.updateMatrixWorld(true)
+          return bone.matrixWorld
+        },
+        set matrixWorld(mat) {
+          const bone = self.readBone(name)
+          if (!bone) return
+          bone.matrixAutoUpdate = false
+          bone.matrixWorldAutoUpdate = false
+          bone.matrixWorld.copy(mat)
+        },
+      }
+      this.boneHandles[name] = handle
+    }
+    return handle
+  }
+
   getProxy() {
     var self = this
     if (!this.proxy) {
@@ -208,6 +268,14 @@ export class SkinnedMesh extends Node {
         },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
+      // Override getBone to ensure it uses the correct method
+      proxy = Object.defineProperties(proxy, {
+        getBone: {
+          value: (name) => self.getBone(name),
+          enumerable: true,
+          configurable: true,
+        },
+      })
       this.proxy = proxy
     }
     return this.proxy
