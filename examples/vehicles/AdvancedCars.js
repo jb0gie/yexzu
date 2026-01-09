@@ -2675,20 +2675,9 @@ function simulateMode() {
         const angularVelocity = Math.abs(forwardVelocity) / wheel.radius
         const rotationAmount = Math.sign(forwardVelocity) * -1 * angularVelocity * delta
         wheel.tire.rotation.x += rotationAmount
-
-        // Force Three.js to update the bone matrix and skeleton
-        wheel.tire.updateMatrixWorld(true)
       }
 
-      // Tire temperature updates
-
-      // Update the skinned mesh skeleton after all bone changes
-      // Only needed on client, server doesn't render
-      if (world.isClient && body && body.obj && body.obj.skeleton) {
-        body.obj.skeleton.update()
-      }
-
-      // Update particle positions after skeleton update to ensure correct alignment
+      // Update particle positions to ensure correct alignment
       for (const wheel of wheels) {
         if (wheel.rear && wheel.particles) {
           wheel.particles.position.copy(wheel.hub.position)

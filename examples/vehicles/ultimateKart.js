@@ -1,5 +1,3 @@
-
-
 // ULTIMATE Simple Go Kart
 // Features: Intuitive controls, hop/drift mechanics, multi-platform support
 // Philosophy: Maximum fun with minimum complexity
@@ -1544,9 +1542,6 @@ function simulateMode() {
         const angularVelocity = Math.abs(forwardVelocity) / wheel.radius
         const rotationAmount = Math.sign(forwardVelocity) * -1 * angularVelocity * delta
         wheel.tire.rotation.x += rotationAmount
-
-        // Force Three.js to update the bone matrix and skeleton
-        wheel.tire.updateMatrixWorld(true)
       }
 
       // Hop/Drift mechanics
