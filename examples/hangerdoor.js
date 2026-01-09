@@ -50,9 +50,7 @@ let debugAction = null
 let openSoundUrl = null
 let closeSoundUrl = null
 const debug = props.debug
-const logDebug = msg => {
-  if (debug) console.log(`[GARAGEDOOR DEBUG] ${msg}`)
-}
+const logDebug = msg => {if (debug) console.log(`[GARAGEDOOR DEBUG] ${msg}`)}
 
 // Safe audio creation function
 function createSafeAudio(soundUrl, label) {
