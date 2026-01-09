@@ -45,54 +45,64 @@ function Logic({ world }) {
   const config = useConfig()
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
   const [initialized, setInitialized] = useState(false)
+  // useEffect(() => {
+  //   if (initialized) return
+  //   setInitialized(true)
+
+  //   let evm = { actions: {}, utils }
+  //   for (const [action, fn] of Object.entries(evmActions)) {
+  //     evm.actions[action] = (...args) => fn(config, ...args)
+  //   }
+  //   evm.abis = {
+  //     erc20: erc20Abi,
+  //     erc721: null,
+  //   }
+
+  //   world.evm = evm
+  // }, [config])
+
+  // useEffect(() => {
+  //   const handlePlayer = player => {
+  //     // console.log({ player, address })
+  //     world.entities.player.modify({ evm: address })
+  //     world.off('player', handlePlayer)
+  //   }
+  //   world.on('player', handlePlayer)
+
+  //   if (!world.entities?.player) return
+  //   world.entities.player.modify({ evm: address })
+
+  //   return () => {
+  //     world.off(handlePlayer)
+  //   }
+  // }, [address, world.entities?.player])
 
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
   useEffect(() => {
-    if (initialized) return
-    if (!world.systems?.evm) {
-      console.warn('[EVM] EVM system not available')
-      return
-    }
-    setInitialized(true)
-
     let actions = {}
-    for (const [action, fn] of Object.entries(evmActions)) {
-      actions[action] = (...args) => fn(config, ...args)
+
+    // for (const [action, fn] of Object.entries(evmActions)) {
+    //   actions[action] = (...args) => fn(config, ...args)
+    // }
+    const abis = {
+      erc20: erc20Abi,
+      erc721: null,
     }
 
-    try {
-      world.systems.evm.bind({
-        actions,
-        utils,
-        abis: { erc20: erc20Abi, erc721: null },
-        config,
-        address,
-        isConnected,
-        isConnecting: isConnecting || isReconnecting,
-        isDisconnected,
-        connect: connect || (() => {}),
-        disconnect: disconnect || (() => {}),
-        connectors: connectors || [],
-      })
-    } catch (error) {
-      console.error('[EVM] Failed to bind EVM system:', error)
-    }
-  }, [config, initialized])
-
-  useEffect(() => {
-    if (!world.systems?.evm) return
-
-    try {
-      world.systems.evm.address = address
-      world.systems.evm.isConnected = isConnected
-      world.systems.evm.isConnecting = isConnecting || isReconnecting
-      world.systems.evm.isDisconnected = isDisconnected
-    } catch (error) {
-      console.error('[EVM] Failed to update EVM state:', error)
-    }
-  }, [address, isConnected, isConnecting, isReconnecting, isDisconnected, world.systems])
+    world.evm.bind({
+      connectors,
+      connect,
+      disconnect,
+      address,
+      actions: evmActions,
+      abis,
+      config,
+      isConnected,
+      isConnecting,
+    })
+  }, [isConnected, isConnecting, address])
 
   return null
 }
