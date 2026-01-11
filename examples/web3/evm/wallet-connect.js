@@ -11,15 +11,15 @@ app.configure([
     type: 'text',
     label: 'Toggle UI Hotkey',
     hint: 'Keyboard key to show/hide the wallet UI (single character).',
-    initial: 'I'
+    initial: 'I',
   },
   {
     key: 'hotKeyConnect',
     type: 'text',
     label: 'Quick Connect Hotkey',
     hint: 'Keyboard key for quick wallet connect (single character).',
-    initial: 'Q'
-  }
+    initial: 'Q',
+  },
 ])
 
 // State
@@ -40,23 +40,23 @@ const mainUI = app.create('ui', {
   pivot: 'top-center',
   position: [0.9, 0.05, 0],
   width: 250,
-  height: 200,
+  height: 145,
   backgroundColor: 'rgba(0, 0, 0, 0.8)',
   borderRadius: 12,
   padding: 16,
   flexDirection: 'column',
-  gap: 12
+  gap: 12,
 })
 
 // Button container (clickable)
 const connectButton = app.create('uiview', {
   width: 220,
-  height: 45,
+  height: 55,
   backgroundColor: '#6366f1',
   borderRadius: 8,
   justifyContent: 'center',
   alignItems: 'center',
-  cursor: 'not-allowed'
+  cursor: 'not-allowed',
 })
 
 // Button text (child of button)
@@ -65,7 +65,7 @@ const buttonText = app.create('uitext', {
   color: '#ffffff',
   fontSize: 16,
   fontWeight: 'bold',
-  textAlign: 'center'
+  textAlign: 'center',
 })
 
 // Status text (child of ui, not app)
@@ -73,7 +73,7 @@ const statusText = app.create('uitext', {
   value: '🌐 Disconnected',
   color: '#cccccc',
   fontSize: 14,
-  textAlign: 'center'
+  textAlign: 'center',
 })
 
 // Hotkey hints text
@@ -82,7 +82,7 @@ const hotkeysText = app.create('uitext', {
   color: '#64748b',
   fontSize: 10,
   textAlign: 'center',
-  opacity: 0.7
+  opacity: 0.7,
 })
 
 // Add text to button, button to ui, ui to app
@@ -115,8 +115,10 @@ function initHotkeys() {
       if (hotKeyConnectCtrl) hotKeyConnectCtrl.capture = false
 
       // Get keys from app props - try both app.props and global props
-      const toggleKey = (app.props && app.props.hotKeyToggle) || (typeof props !== 'undefined' && props.hotKeyToggle) || 'I'
-      const connectKey = (app.props && app.props.hotKeyConnect) || (typeof props !== 'undefined' && props.hotKeyConnect) || 'Q'
+      const toggleKey =
+        (app.props && app.props.hotKeyToggle) || (typeof props !== 'undefined' && props.hotKeyToggle) || 'I'
+      const connectKey =
+        (app.props && app.props.hotKeyConnect) || (typeof props !== 'undefined' && props.hotKeyConnect) || 'Q'
 
       hotKeyToggleCtrl = resolveKey(toggleKey, 'I')
       hotKeyConnectCtrl = resolveKey(connectKey, 'Q')
@@ -135,7 +137,7 @@ function initHotkeys() {
         toggle: toggleKey,
         connect: connectKey,
         toggleControl: !!hotKeyToggleCtrl,
-        connectControl: !!hotKeyConnectCtrl
+        connectControl: !!hotKeyConnectCtrl,
       })
     }
 
@@ -143,7 +145,6 @@ function initHotkeys() {
     refreshKeyBindings()
     // Store on control for access in update loop
     control._refreshWalletKeyBindings = refreshKeyBindings
-
   } catch (error) {
     console.error('[Wallet] Error initializing hotkeys:', error)
   }
