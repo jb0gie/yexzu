@@ -19,6 +19,10 @@ export const Providers = ({ children }) => (
       transports,
       connectors: [injected()],
       multiInjectedProviderDiscovery: false,
+      // CRITICAL: Disable storage to prevent auto-reconnect
+      storage: null,
+      // Also explicitly disable persistance
+      ssr: true,
     })}
   >
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -26,6 +30,15 @@ export const Providers = ({ children }) => (
 )
 
 export function EVM({ world }) {
+  // console.log('[EVM] component rendering!')
+  // console.log('[EVM] world parameter:', world)
+  // console.log('[EVM] world.evm exists:', !!world?.evm)
+
+  // Store the latest connection data for EVMClient to access
+  if (world.evm && !world.evm._reactData) {
+    world.evm._reactData = {}
+  }
+
   return (
     <Providers>
       <Logic world={world} />
@@ -81,6 +94,22 @@ function Logic({ world }) {
   const { disconnect } = useDisconnect()
 
   useEffect(() => {
+    //console.log('[EVM] useEffect running, wagmi state:')
+    //console.log('[EVM] - isConnected:', isConnected)
+    //console.log('[EVM] - isConnecting:', isConnecting)
+    //console.log('[EVM] - address:', address)
+    //console.log('[EVM] - connectors:', connectors)
+    //console.log('[EVM] - connect function type:', typeof connect)
+    //console.log('[EVM] - disconnect function type:', typeof disconnect)
+
+    // Store latest data for EVMClient to access
+    if (world.evm._reactData) {
+      world.evm._reactData.address = address
+      world.evm._reactData.isConnected = isConnected
+      world.evm._reactData.isConnecting = isConnecting
+      console.log('[EVM React Component] Stored address in _reactData:', address)
+    }
+
     let actions = {}
 
     // for (const [action, fn] of Object.entries(evmActions)) {
@@ -90,6 +119,8 @@ function Logic({ world }) {
       erc20: erc20Abi,
       erc721: null,
     }
+
+    // console.log('[EVM] Calling world.evm.bind()...')
 
     world.evm.bind({
       connectors,
@@ -102,6 +133,9 @@ function Logic({ world }) {
       isConnected,
       isConnecting,
     })
+
+    // console.log('[EVM] world.evm.bind() called successfully')
+    // console.log('[EVM] world.evm.connection:', world.evm.connection)
   }, [isConnected, isConnecting, address])
 
   return null
