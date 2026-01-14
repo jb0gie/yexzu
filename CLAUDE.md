@@ -229,6 +229,14 @@ npm run dev
 - Ensure clean collections in world/collections/ from src/world/collections/
 - Don't create duplicate files in collections (prevents SES errors)
 
+**7. DOM Layering and Z-Index Critical**:
+- CSS3D layer: z-index: 0 (CSS3DRenderer domElement)
+- WebGL canvas: z-index: 1 (Three.js renderer canvas)
+- UI layer: z-index: 2 (React UI, reticule, etc.)
+- **CRITICAL**: UI must be z-index: 2 to be visible above WebView/CSS3D layer
+- Changing UI to z-index: 1 will hide reticule and core UI behind WebViews
+- This is set in src/client/world-client.js line 74
+
 **hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/touchstart/touchend) and the interacting flag. If interaction fails, check:
 - CSS3DObject positioning sync in ClientCSS.js lateUpdate
 - Browser iframe interaction policies
