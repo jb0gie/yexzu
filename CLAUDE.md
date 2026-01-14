@@ -75,12 +75,106 @@ World (World.js)
 │   ├── Physics - PhysX integration (60Hz fixed)
 │   ├── Networks - WebSocket messaging
 │   ├── Graphics - Three.js rendering
+│   ├── CSS - CSS3D rendering (for WebView)
 │   └── 10+ more specialized systems
 ├── Nodes - Scene graph hierarchy
-│   ├── Mesh, Camera, Audio, UI
+│   ├── Mesh, Camera, Audio, UI, WebView
 │   ├── RigidBody, Collider, Joint
 │   └── 15+ more node types
 └── Apps - Sandbox JavaScript applications
+```
+
+## WebView Nodes
+
+WebView nodes display interactive web content in both 3D world space and 2D screen space. Implemented based on https://github.com/saori-eth/agentic-hyperfy/tree/iframe
+
+### World-Space WebView (3D)
+
+Display websites in the 3D world with depth and occlusion:
+
+```javascript
+// Basic world-space WebView
+const webview = app.create('webview', {
+  src: 'https://example.com',  // URL to display
+  width: 2,                    // Width in meters
+  height: 1.5,                 // Height in meters
+  position: [0, 1.5, -3],      // 3D position
+  pointerEvents: false         // Enable for interaction
+});
+app.add(webview);
+
+// With pointer interaction
+const interactiveWebview = app.create('webview', {
+  src: 'https://github.com',
+  width: 3,
+  height: 2,
+  position: [5, 2, -5],
+  pointerEvents: true,  // Enable Hyperfy reticle/mouse interaction
+  factor: 100           // Pixels per meter (default: 100)
+});
+app.add(interactiveWebview);
+```
+
+### Screen-Space WebView (UI Overlay)
+
+Display web content as 2D UI overlay:
+
+```javascript
+const uiWebview = app.create('webview', {
+  src: 'https://threejs.org',
+  width: 800,
+  height: 600,
+  space: 'screen',      // Screen space instead of world space
+  position: [0.5, 0.1, 0]  // Screen coordinates (0-1)
+});
+app.add(uiWebview);
+```
+
+### WebView Properties
+
+- `src`: URL to load in iframe (string)
+- `html`: HTML content to use instead of src (string, optional)
+- `width`: Width in world units (number, default: 1)
+- `height`: Height in world units (number, default: 1)
+- `factor`: Pixel density factor for iframe (number, default: 100)
+- `doubleside`: Render both sides (boolean, default: false)
+- `space`: 'world' or 'screen' (string, default: 'world')
+- `pointerEvents`: Enable interaction (boolean, default: false)
+
+### Interaction Modes
+
+**Desktop**: Pointer events toggle on mouse hover
+- Mouse cursor unlock required for interaction
+- `pointerEvents: true` required
+
+**Mobile**: Pointer events always enabled
+- Touch input works automatically
+- No cursor unlock needed
+
+### Technical Implementation
+
+- Uses three.js CSS3DRenderer for DOM rendering
+- Three.js Mesh with opacity: 0 for depth/stencil buffer (cutout effect)
+- DOM layering: CSS3D (z:0) → WebGL canvas (z:1) → UI (z:2)
+- Dynamic rebuild on property changes via setDirty()
+- Clean resource management on destroy
+
+### Performance Notes
+
+- WebViews render to offscreen DOM layer
+- Limited to ~10-20 webviews per scene for performance
+- Complex pages may reduce FPS
+- Mobile devices may throttle background iframes
+
+### Test File
+
+Run: `npm run dev` and load `examples/test-webview-runtime.app.js`
+
+```bash
+# Creates 3 world-space webviews + ground plane
+# Left: Three.js website (non-interactive)
+# Center: Google (non-interactive)
+# Right: GitHub (interactive with pointerEvents: true)
 ```
 
 ## Critical Architecture Patterns
