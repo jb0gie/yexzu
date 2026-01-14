@@ -143,74 +143,16 @@ export class WebView extends Node {
         iframe.style.pointerEvents = 'auto'
       }
 
-      // Enable pointer events when interacting with the CSS3DObject
-      // Listen on the container element (CSS3DObject.element) for proper event handling
-      // This ensures events work correctly through CSS3D transformations
-      const enableInteraction = () => {
-        if (this._pointerEvents) {
-          this.objectCSS.interacting = true
-          iframe.style.pointerEvents = 'auto'
-        }
-      }
-
-      const disableInteraction = () => {
-        if (isDesktop) {
-          this.objectCSS.interacting = false
-          iframe.style.pointerEvents = 'none'
-        }
-      }
-
-      // Desktop: mouse events
-      if (isDesktop) {
-        this.objectCSS.element.addEventListener('mouseenter', enableInteraction)
-        this.objectCSS.element.addEventListener('mouseleave', disableInteraction)
-      }
-
-      // Mobile: touch events (always enabled)
-      this.objectCSS.element.addEventListener('touchstart', () => {
+      // ULTIMATE SIMPLIFIED: Just set pointer-events on iframe
+      // Canvas alpha compositing lets events pass through to CSS3D layer
+      // No event listeners needed - let browser handle it naturally
+      if (this._pointerEvents) {
         iframe.style.pointerEvents = 'auto'
-      }, { passive: true })
-
-      this.objectCSS.element.addEventListener('touchend', () => {
-        if (isDesktop) {
-          setTimeout(() => {
-            iframe.style.pointerEvents = 'none'
-          }, 100)
-        }
-      }, { passive: true })
-
-      // Track when interacting with ANY iframe for interaction stabilization
-      const clickStart = () => {
-        if (!this.objectCSS) return
-        if (this.objectCSS.interacting) return
-        this.objectCSS.interacting = true
+        console.log('WebView: pointer-events set to auto (natural interaction)')
       }
 
-      const clickEnd = () => {
-        if (!this.objectCSS) return
-        if (!this.objectCSS.interacting) return
-        setTimeout(() => {
-          if (this.objectCSS) {
-            this.objectCSS.interacting = false
-          }
-        }, 500)
-      }
-
-      document.addEventListener('pointerdown', clickStart)
-      document.addEventListener('pointerup', clickEnd)
-
-      // Store cleanup functions
+      // Store cleanup function
       this.cleanup = () => {
-        // Remove CSS3DObject element listeners
-        this.objectCSS.element.removeEventListener('mouseenter', enableInteraction)
-        this.objectCSS.element.removeEventListener('mouseleave', disableInteraction)
-        this.objectCSS.element.removeEventListener('touchstart', () => {})
-        this.objectCSS.element.removeEventListener('touchend', () => {})
-
-        // Remove document listeners
-        document.removeEventListener('pointerdown', clickStart)
-        document.removeEventListener('pointerup', clickEnd)
-
         // Reset iframe pointer events
         if (this.iframe) this.iframe.style.pointerEvents = 'none'
       }
