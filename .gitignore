@@ -9,3 +9,4 @@ build/
 /world
 *.vexify.db
 .code-search/
+.glootie-stop-verified
