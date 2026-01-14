@@ -237,6 +237,12 @@ npm run dev
 - Changing UI to z-index: 1 will hide reticule and core UI behind WebViews
 - This is set in src/client/world-client.js line 74
 
+**8. Iframe Scrolling Requires Explicit Attributes**:
+- iframe.scrolling = 'yes' must be set to enable scroll wheel
+- iframe.style.overflow = 'auto' ensures scrollbars appear when needed
+- Without these, pages won't scroll even with pointer-events enabled
+- Also add pointer-events to container and inner div for best compatibility
+
 **hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/touchstart/touchend) and the interacting flag. If interaction fails, check:
 - CSS3DObject positioning sync in ClientCSS.js lateUpdate
 - Browser iframe interaction policies
