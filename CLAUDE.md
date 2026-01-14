@@ -166,16 +166,27 @@ app.add(uiWebview);
 - Complex pages may reduce FPS
 - Mobile devices may throttle background iframes
 
-### Test File
+### Test Files
 
-Run: `npm run dev` and load `examples/test-webview-runtime.app.js`
+**Runtime Test**: `examples/test-webview-runtime.app.js` - Creates 3 webviews to verify rendering
+
+**Interaction Test**: `examples/test-webview-interaction.app.js` - Single interactive webview for testing pointer events
 
 ```bash
-# Creates 3 world-space webviews + ground plane
-# Left: Three.js website (non-interactive)
-# Center: Google (non-interactive)
-# Right: GitHub (interactive with pointerEvents: true)
+# For interaction testing:
+npm run dev
+# Load: examples/test-webview-interaction.app.js
+# Move close to webview, unlock cursor (ESC), hover/click to interact
 ```
+
+### Technical Caveats
+
+**hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/pointer*) and the interacting flag. If interaction fails, check:
+- CSS3DObject positioning sync in ClientCSS.js lateUpdate
+- Browser iframe interaction policies
+- Reticle raycasting against CSS3D layer
+
+**Performance**: Limit to ~10-20 webviews per scene. Complex pages reduce FPS. Mobile may throttle background iframes.
 
 ## Critical Architecture Patterns
 
