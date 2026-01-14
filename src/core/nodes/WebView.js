@@ -143,21 +143,41 @@ export class WebView extends Node {
         iframe.style.pointerEvents = 'auto'
       }
 
-      // Enable pointer events when mouse enters the iframe wrapper
-      // This allows the Hyperfy reticle to interact with the webview
-      inner.addEventListener('mouseenter', () => {
-        if (isDesktop) {
+      // Enable pointer events when interacting with the CSS3DObject
+      // Listen on the container element (CSS3DObject.element) for proper event handling
+      // This ensures events work correctly through CSS3D transformations
+      const enableInteraction = () => {
+        if (this._pointerEvents) {
           this.objectCSS.interacting = true
-          iframe.style.pointerEvents = this._pointerEvents ? 'auto' : 'none'
+          iframe.style.pointerEvents = 'auto'
         }
-      })
+      }
 
-      inner.addEventListener('mouseleave', () => {
+      const disableInteraction = () => {
         if (isDesktop) {
           this.objectCSS.interacting = false
           iframe.style.pointerEvents = 'none'
         }
-      })
+      }
+
+      // Desktop: mouse events
+      if (isDesktop) {
+        this.objectCSS.element.addEventListener('mouseenter', enableInteraction)
+        this.objectCSS.element.addEventListener('mouseleave', disableInteraction)
+      }
+
+      // Mobile: touch events (always enabled)
+      this.objectCSS.element.addEventListener('touchstart', () => {
+        iframe.style.pointerEvents = 'auto'
+      }, { passive: true })
+
+      this.objectCSS.element.addEventListener('touchend', () => {
+        if (isDesktop) {
+          setTimeout(() => {
+            iframe.style.pointerEvents = 'none'
+          }, 100)
+        }
+      }, { passive: true })
 
       // Track when interacting with ANY iframe for interaction stabilization
       const clickStart = () => {
@@ -181,10 +201,17 @@ export class WebView extends Node {
 
       // Store cleanup functions
       this.cleanup = () => {
-        inner.removeEventListener('mouseenter', () => {})
-        inner.removeEventListener('mouseleave', () => {})
+        // Remove CSS3DObject element listeners
+        this.objectCSS.element.removeEventListener('mouseenter', enableInteraction)
+        this.objectCSS.element.removeEventListener('mouseleave', disableInteraction)
+        this.objectCSS.element.removeEventListener('touchstart', () => {})
+        this.objectCSS.element.removeEventListener('touchend', () => {})
+
+        // Remove document listeners
         document.removeEventListener('pointerdown', clickStart)
         document.removeEventListener('pointerup', clickEnd)
+
+        // Reset iframe pointer events
         if (this.iframe) this.iframe.style.pointerEvents = 'none'
       }
 
