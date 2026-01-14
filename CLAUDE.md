@@ -88,31 +88,43 @@ World (World.js)
 
 WebView nodes display interactive web content in both 3D world space and 2D screen space. Implemented based on https://github.com/saori-eth/agentic-hyperfy/tree/iframe
 
-### World-Space WebView (3D)
+### Simple Working Pattern
 
-Display websites in the 3D world with depth and occlusion:
+Based on user testing, the simplest pattern works best:
 
 ```javascript
-// Basic world-space WebView
+// Simple WebView example - displays a 3D webpage in the world
 const webview = app.create('webview', {
-  src: 'https://example.com',  // URL to display
+  src: 'https://irb0gie.vercel.app',
+  width: 4, // Width in meters
+  height: 3, // Height in meters
+  factor: 100, // Pixels per meter (higher = sharper)
+  space: 'world', // 'world' for 3D positioned, 'screen' for 2D overlay
+  position: [0, 1.5, -3], // Position in front of player at eye level
+  pointerEvents: true, // Enable interaction with iframe
+})
+
+app.add(webview)
+
+// Keep app running
+app.keepActive = true
+```
+
+**Important**: Do NOT use `app.on('init', () => { ... })` wrapper pattern. It does nothing and over-complicates the code. Create webviews directly at the top level.
+
+### World-Space WebView (3D)
+
+Display websites in the 3D world:
+
+```javascript
+const webview = app.create('webview', {
+  src: 'https://example.com',
   width: 2,                    // Width in meters
   height: 1.5,                 // Height in meters
-  position: [0, 1.5, -3],      // 3D position
-  pointerEvents: false         // Enable for interaction
+  position: [0, 1.5, -3],      // 3D position [x, y, z]
+  pointerEvents: true         // Enable for interaction
 });
 app.add(webview);
-
-// With pointer interaction
-const interactiveWebview = app.create('webview', {
-  src: 'https://github.com',
-  width: 3,
-  height: 2,
-  position: [5, 2, -5],
-  pointerEvents: true,  // Enable Hyperfy reticle/mouse interaction
-  factor: 100           // Pixels per meter (default: 100)
-});
-app.add(interactiveWebview);
 ```
 
 ### Screen-Space WebView (UI Overlay)
@@ -143,21 +155,38 @@ app.add(uiWebview);
 
 ### Interaction Modes
 
-**Desktop**: Pointer events toggle on mouse hover
-- Mouse cursor unlock required for interaction
+**Desktop**:
 - `pointerEvents: true` required
+- Mouse cursor unlock required (press ESC)
+- Hover over webview to interact
+- Scroll and click work naturally
 
-**Mobile**: Pointer events always enabled
-- Touch input works automatically
+**Mobile**:
+- `pointerEvents: true` required
+- Touch events work automatically
 - No cursor unlock needed
+- Single tap to interact, pinch to zoom
+
+### Test File
+
+**Working Example**: `examples/webview-simple.app.js`
+
+```bash
+# Load and test:
+npm run dev
+# Load: examples/webview-simple.app.js
+# You should see a webpage at position [0, 1.5, -3]
+# Desktop: Move close, unlock cursor (ESC), hover/click
+# Mobile: Touch the webview directly
+```
 
 ### Technical Implementation
 
 - Uses three.js CSS3DRenderer for DOM rendering
-- Three.js Mesh with opacity: 0 for depth/stencil buffer (cutout effect)
+- Canvas alpha compositing: WebGL canvas with `alpha: true` allows pointer events to pass through to CSS layer
 - DOM layering: CSS3D (z:0) → WebGL canvas (z:1) → UI (z:2)
-- Dynamic rebuild on property changes via setDirty()
-- Clean resource management on destroy
+- Interaction via `pointer-events: auto` on iframe element
+- **NO complex event listeners needed** - browser handles interaction naturally
 
 ### Performance Notes
 
@@ -166,24 +195,39 @@ app.add(uiWebview);
 - Complex pages may reduce FPS
 - Mobile devices may throttle background iframes
 
-### Test Files
+### Technical Caveats Discovered During Implementation
 
-**Runtime Test**: `examples/test-webview-runtime.app.js` - Creates 3 webviews to verify rendering
+**1. Simplified Event Handling is Key**:
+- Initially tried complex `mouseenter`/`mouseleave`/`touchstart` event listeners on inner div
+- These break after CSS3D transforms (coordinates get messed up)
+- **SOLUTION**: Simply set `iframe.style.pointerEvents = 'auto'` and let browser handle it
+- No event listeners needed at all!
 
-**Interaction Test**: `examples/test-webview-interaction.app.js` - Single interactive webview for testing pointer events
+**2. Canvas Alpha Compositing Required**:
+- WebGL renderer MUST have `alpha: true` (line 17 in ClientGraphics.js)
+- Without this, canvas blocks pointer events to CSS layer
+- Alpha compositing lets events pass through to iframe
 
-```bash
-# For interaction testing:
-npm run dev
-# Load: examples/test-webview-interaction.app.js
-# Move close to webview, unlock cursor (ESC), hover/click to interact
-```
+**3. Mobile Works Naturally**:
+- `pointer-events: auto` works for both desktop AND mobile
+- No special mobile handling needed
+- Touch events work the same as mouse events
 
-### Technical Caveats
+**4. Over-Engineering Breaks Things**:
+- Initial test files had `app.on('init', ...)` wrappers and multiple webviews
+- These didn't work at all
+- **SIMPLE pattern works**: Direct creation, single webview, no wrappers
+- See examples/webview-simple.app.js for correct pattern
 
-**Event Handling**: Events are attached to `CSS3DObject.element` (the container div) NOT the inner div. This ensures proper event handling through CSS3D transforms. The CSS3DRenderer transforms the container element, so DOM events must be on that element to work correctly.
+**5. CSS3DObject.element is the Container**:
+- Events should be on `CSS3DObject.element` (container div), not inner div
+- CSS3DRenderer transforms the container, so that's where events work
+- We don't attach events at all now (see point 1)
 
-**Mobile Support**: Mobile devices always have pointer events enabled (`pointer-events: auto`). Touch events (touchstart/touchend) are automatically handled. No cursor unlock needed on mobile.
+**6. File Organization Matters**:
+- Collections copying during startup can cause race conditions
+- Ensure clean collections in world/collections/ from src/world/collections/
+- Don't create duplicate files in collections (prevents SES errors)
 
 **hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/touchstart/touchend) and the interacting flag. If interaction fails, check:
 - CSS3DObject positioning sync in ClientCSS.js lateUpdate
