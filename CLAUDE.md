@@ -181,10 +181,15 @@ npm run dev
 
 ### Technical Caveats
 
-**hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/pointer*) and the interacting flag. If interaction fails, check:
+**Event Handling**: Events are attached to `CSS3DObject.element` (the container div) NOT the inner div. This ensures proper event handling through CSS3D transforms. The CSS3DRenderer transforms the container element, so DOM events must be on that element to work correctly.
+
+**Mobile Support**: Mobile devices always have pointer events enabled (`pointer-events: auto`). Touch events (touchstart/touchend) are automatically handled. No cursor unlock needed on mobile.
+
+**hitPoint Property**: hitPoint is NOT a WebView property. It's an internal THREE.js/Hyperfy property set by the raycasting system during interaction. Our implementation handles interaction via event listeners (mouseenter/mouseleave/touchstart/touchend) and the interacting flag. If interaction fails, check:
 - CSS3DObject positioning sync in ClientCSS.js lateUpdate
 - Browser iframe interaction policies
 - Reticle raycasting against CSS3D layer
+- Events are on CSS3DObject.element, not inner div
 
 **Performance**: Limit to ~10-20 webviews per scene. Complex pages reduce FPS. Mobile may throttle background iframes.
 
