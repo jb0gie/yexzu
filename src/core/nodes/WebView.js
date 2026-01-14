@@ -103,11 +103,14 @@ export class WebView extends Node {
       inner.style.width = widthPx
       inner.style.height = heightPx
       inner.style.backgroundColor = '#000'
+      inner.style.pointerEvents = 'auto'
 
       // Iframe
       const iframe = document.createElement('iframe')
       iframe.frameBorder = '0'
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+      iframe.scrolling = 'yes'
+      iframe.style.overflow = 'auto'
       iframe.allowFullscreen = true
       iframe.style.width = widthPx
       iframe.style.height = heightPx
@@ -143,6 +146,7 @@ export class WebView extends Node {
         iframe.style.pointerEvents = 'auto'
       }
 
+      container.style.pointerEvents = 'auto'
       // ULTIMATE SIMPLIFIED: Just set pointer-events on iframe
       // Canvas alpha compositing lets events pass through to CSS3D layer
       // No event listeners needed - let browser handle it naturally
