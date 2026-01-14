@@ -25,3 +25,5 @@ export { Controller as controller } from './Controller.js'
 export { RigidBody as rigidbody } from './RigidBody.js'
 export { Collider as collider } from './Collider.js'
 export { Joint as joint } from './Joint.js'
+
+export { WebView as webview } from './WebView.js'

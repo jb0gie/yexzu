@@ -1,464 +1,422 @@
-import { Node } from './Node.js'
-import * as THREE from 'three'
+import { isBoolean, isNumber, isString } from 'lodash-es'
+import * as THREE from '../extras/three'
 import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
+
+import { Node } from './Node'
 
 const defaults = {
   src: null,
-  width: 640,           // pixel width
-  height: 480,          // pixel height
-  worldWidth: 1.6,      // width in meters (default: 1.6m for 640px)
-  worldHeight: 1.2,     // height in meters (default: 1.2m for 480px)
+  html: null,
+  width: 1,
+  height: 1,
+  factor: 100,
+  doubleside: false,
   space: 'world',
-  billboard: 'none',
-  pointerEvents: false, // NEW: configurable pointer events
-  visible: true,
-  opacity: 1,
+  pointerEvents: false, // Enable to allow iframe interaction
 }
+
+const v1 = new THREE.Vector3()
 
 export class WebView extends Node {
   constructor(data = {}) {
-    super('webview', data)
+    super(data)
+    this.name = 'webview'
 
-    // Apply defaults
-    Object.assign(this, defaults, data)
-
-    // Store original values
-    this._src = this.src
-    this._width = this.width
-    this._height = this.height
-    this._worldWidth = this.worldWidth
-    this._worldHeight = this.worldHeight
-    this._space = this.space
-    this._billboard = this.billboard
-    this._pointerEvents = this.pointerEvents
-    this._visible = this.visible
-    this._opacity = this.opacity
-
-    // WebView-specific properties
-    this.canvas = null
-    this.canvasCtx = null
-    this.texture = null
-    this.material = null
-    this.geometry = null
-    this.mesh = null
-    this.cssObject = null
-    this.iframeElement = null
-    this.containerElement = null
-    this.updateInterval = null
+    this.src = data.src
+    this.html = data.html
+    this.width = data.width
+    this.height = data.height
+    this.factor = data.factor
+    this.doubleside = data.doubleside
+    this.space = data.space
+    this.pointerEvents = data.pointerEvents
   }
 
-  get src() {
-    return this._src
-  }
-
-  set src(value = defaults.src) {
-    if (this._src === value) return
-    this._src = value
-    if (this.ctx && this.ctx.world && !this.ctx.world.network?.isServer) {
-      this.createWebView()
-    }
-  }
-
-  get width() {
-    return this._width
-  }
-
-  set width(value = defaults.width) {
-    if (this._width === value) return
-    this._width = value
-    if (this.ctx && this.ctx.world && !this.ctx.world.network?.isServer) {
-      this.createWebView()
-    }
-  }
-
-  get height() {
-    return this._height
-  }
-
-  set height(value = defaults.height) {
-    if (this._height === value) return
-    this._height = value
-    if (this.ctx && this.ctx.world && !this.ctx.world.network?.isServer) {
-      this.createWebView()
-    }
-  }
-
-  get space() {
-    return this._space
-  }
-
-  set space(value = defaults.space) {
-    const validSpaces = ['world', 'screen']
-    if (!validSpaces.includes(value)) {
-      throw new Error(`[webview] space must be 'world' or 'screen'`)
-    }
-    if (this._space === value) return
-    this._space = value
-    if (this.ctx && this.ctx.world && !this.ctx.world.network?.isServer) {
-      this.createWebView()
-    }
-  }
-
-  get size() {
-    return this._size
-  }
-
-  set size(value = defaults.size) {
-    if (this._size === value) return
-    this._size = value
-    if (this.ctx && this.ctx.world && !this.ctx.world.network?.isServer) {
-      this.createWebView()
-    }
-  }
-
-  get billboard() {
-    return this._billboard
-  }
-
-  set billboard(value = defaults.billboard) {
-    const validBillboards = ['none', 'full', 'y']
-    if (!validBillboards.includes(value)) {
-      throw new Error(`[webview] billboard must be 'none', 'full', or 'y'`)
-    }
-    if (this._billboard === value) return
-    this._billboard = value
-  }
-
-  get worldWidth() {
-    return this._worldWidth
-  }
-
-  set worldWidth(value = defaults.worldWidth) {
-    if (this._worldWidth === value) return
-    this._worldWidth = value
-    if (this.cssObject && this._space === 'world') {
-      const scaleX = (this._worldWidth / this._width) * 0.001
-      this.cssObject.scale.x = scaleX
-    }
-  }
-
-  get worldHeight() {
-    return this._worldHeight
-  }
-
-  set worldHeight(value = defaults.worldHeight) {
-    if (this._worldHeight === value) return
-    this._worldHeight = value
-    if (this.cssObject && this._space === 'world') {
-      const scaleY = (this._worldHeight / this._height) * 0.001
-      this.cssObject.scale.y = scaleY
-    }
-  }
-
-  get pointerEvents() {
-    return this._pointerEvents
-  }
-
-  set pointerEvents(value = defaults.pointerEvents) {
-    if (this._pointerEvents === value) return
-    this._pointerEvents = value
-    if (this.iframeElement) {
-      this.iframeElement.style.pointerEvents = value ? 'auto' : 'none'
-    }
-    if (this.containerElement) {
-      this.containerElement.style.pointerEvents = value ? 'auto' : 'none'
-    }
-  }
-
-  get visible() {
-    return this._visible
-  }
-
-  set visible(value = defaults.visible) {
-    if (this._visible === value) return
-    this._visible = value
-    if (this.mesh) {
-      this.mesh.visible = value
-    }
-    if (this.containerElement) {
-      this.containerElement.style.display = value ? 'block' : 'none'
-    }
-  }
-
-  get opacity() {
-    return this._opacity
-  }
-
-  set opacity(value = defaults.opacity) {
-    if (this._opacity === value) return
-    this._opacity = value
-    if (this.material) {
-      this.material.opacity = value
-    }
-    if (this.containerElement) {
-      this.containerElement.style.opacity = value
-    }
+  copy(source, recursive) {
+    super.copy(source, recursive)
+    this._src = source._src
+    this._html = source._html
+    this._width = source._width
+    this._height = source._height
+    this._factor = source._factor
+    this._doubleside = source._doubleside
+    this._space = source._space
+    this._pointerEvents = source._pointerEvents
+    return this
   }
 
   mount() {
-    if (!this.ctx || !this.ctx.world) return
-    if (this.ctx.world.network?.isServer) return
+    this.build()
+  }
 
-    // Add global click debugging (only once)
-    if (!window.webviewClickDebugAdded) {
-      window.webviewClickDebugAdded = true
-      document.addEventListener('click', (e) => {
-        console.log('[WebView] Global click detected:', e.target, 'src:', e.target.src || 'no src')
-        if (e.target.src && e.target.src.includes('camera-webgi')) {
-          console.log('[WebView] ALERT: Click on camera-webgi iframe detected!', e.target.src)
+  build() {
+    this.needsRebuild = false
+    if (this.ctx.world.network.isServer) return
+    this.unbuild()
+
+    if (this._space === 'screen') {
+      this.buildScreen()
+    } else {
+      this.buildWorld()
+    }
+  }
+
+  buildWorld() {
+    const hasContent = this._src || this._html
+
+    // Create the black mesh (cutout)
+    const geometry = new THREE.PlaneGeometry(this._width, this._height)
+    const material = new THREE.MeshBasicMaterial({
+      opacity: 0,
+      color: new THREE.Color('black'),
+      blending: hasContent ? THREE.NoBlending : THREE.NormalBlending,
+      side: this._doubleside ? THREE.DoubleSide : THREE.FrontSide,
+    })
+    this.mesh = new THREE.Mesh(geometry, material)
+    this.mesh.matrixWorld.copy(this.matrixWorld)
+    this.mesh.matrixAutoUpdate = false
+    this.mesh.matrixWorldAutoUpdate = false
+    this.ctx.world.stage.scene.add(this.mesh)
+
+    // Add to octree for raycasting
+    this.sItem = {
+      matrix: this.matrixWorld,
+      geometry,
+      material,
+      getEntity: () => this.ctx.entity,
+      node: this,
+    }
+    this.ctx.world.stage.octree.insert(this.sItem)
+
+    // Create the CSS3D iframe (only if we have content)
+    if (hasContent) {
+      const widthPx = `${this._width * this._factor}px`
+      const heightPx = `${this._height * this._factor}px`
+
+      // Container
+      const container = document.createElement('div')
+      container.style.width = widthPx
+      container.style.height = heightPx
+
+      // Inner wrapper (for mouse events)
+      const inner = document.createElement('div')
+      inner.style.width = widthPx
+      inner.style.height = heightPx
+      inner.style.backgroundColor = '#000'
+
+      // Iframe
+      const iframe = document.createElement('iframe')
+      iframe.frameBorder = '0'
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+      iframe.allowFullscreen = true
+      iframe.style.width = widthPx
+      iframe.style.height = heightPx
+      iframe.style.border = '0px'
+      iframe.style.pointerEvents = 'none'
+      if (this._html) {
+        iframe.srcdoc = this._html
+      } else {
+        iframe.src = this._src
+      }
+
+      container.appendChild(inner)
+      inner.appendChild(iframe)
+
+      // Create CSS3DObject
+      this.objectCSS = new CSS3DObject(container)
+      this.objectCSS.target = this.mesh // important: the mesh to follow
+      this.mesh.updateMatrixWorld()
+      this.mesh.matrixWorld.decompose(this.objectCSS.position, this.objectCSS.quaternion, v1)
+      this.objectCSS.scale.setScalar(1 / this._factor)
+
+      // Store references
+      this.iframe = iframe
+      this.inner = inner
+
+      // Set pointer events based on property (desktop only)
+      // For mobile, always enable pointer events
+      const isDesktop = !this.ctx.world.network.isServer &&
+        this.ctx.world.controls &&
+        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
+
+      if (!isDesktop) {
+        iframe.style.pointerEvents = 'auto'
+      }
+
+      // Enable pointer events when mouse enters the iframe wrapper
+      // This allows the Hyperfy reticle to interact with the webview
+      inner.addEventListener('mouseenter', () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = true
+          iframe.style.pointerEvents = this._pointerEvents ? 'auto' : 'none'
         }
-      }, true) // Use capture phase
+      })
+
+      inner.addEventListener('mouseleave', () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = false
+          iframe.style.pointerEvents = 'none'
+        }
+      })
+
+      // Track when interacting with ANY iframe for interaction stabilization
+      const clickStart = () => {
+        if (!this.objectCSS) return
+        if (this.objectCSS.interacting) return
+        this.objectCSS.interacting = true
+      }
+
+      const clickEnd = () => {
+        if (!this.objectCSS) return
+        if (!this.objectCSS.interacting) return
+        setTimeout(() => {
+          if (this.objectCSS) {
+            this.objectCSS.interacting = false
+          }
+        }, 500)
+      }
+
+      document.addEventListener('pointerdown', clickStart)
+      document.addEventListener('pointerup', clickEnd)
+
+      // Store cleanup functions
+      this.cleanup = () => {
+        inner.removeEventListener('mouseenter', () => {})
+        inner.removeEventListener('mouseleave', () => {})
+        document.removeEventListener('pointerdown', clickStart)
+        document.removeEventListener('pointerup', clickEnd)
+        if (this.iframe) this.iframe.style.pointerEvents = 'none'
+      }
+
+      this.ctx.world.css.add(this.objectCSS)
     }
 
-    if (this._src) {
-      this.createWebView()
+    this.ctx.world.setHot(this, true)
+  }
+
+  buildScreen() {
+    const widthPx = `${this._width * this._factor}px`
+    const heightPx = `${this._height * this._factor}px`
+
+    const container = document.createElement('div')
+    container.style.position = 'absolute'
+    container.style.width = widthPx
+    container.style.height = heightPx
+
+    const inner = document.createElement('div')
+    inner.style.width = widthPx
+    inner.style.height = heightPx
+
+    const iframe = document.createElement('iframe')
+    iframe.frameBorder = '0'
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+    iframe.allowFullscreen = true
+    iframe.style.width = widthPx
+    iframe.style.height = heightPx
+    iframe.style.border = '0px'
+    if (this._html) {
+      iframe.srcdoc = this._html
+    } else {
+      iframe.src = this._src
     }
+
+    container.appendChild(inner)
+    inner.appendChild(iframe)
+
+    this.ctx.world.ui.appendChild(container)
+    this.container = container
+    this.iframe = iframe
   }
 
   commit(didMove) {
-    if (!this.ctx || !this.ctx.world) return
-    if (this.ctx.world.network?.isServer) return
-
-    if (this._space === 'world' && this.mesh && this.cssObject) {
-      if (didMove) {
+    if (this.needsRebuild) {
+      this.build()
+      return
+    }
+    if (didMove) {
+      if (this.mesh) {
         this.mesh.matrixWorld.copy(this.matrixWorld)
       }
-      // Always sync CSS3D to mesh (handles billboard too)
-      this.cssObject.matrix.copy(this.mesh.matrixWorld)
-      this.cssObject.matrix.decompose(
-        this.cssObject.position,
-        this.cssObject.quaternion,
-        this.cssObject.scale
-      )
-    }
-
-    if (this._space === 'screen' && didMove) {
-      this.updateScreenPosition()
-    }
-  }
-
-  lateUpdate(delta) {
-    if (!this.ctx || !this.ctx.world) return
-    if (this.ctx.world.network?.isServer) return
-    if (this._space !== 'world' || !this.mesh) return
-
-    // Apply billboard to mesh (same as before)
-    if (this._billboard === 'full') {
-      const world = this.ctx.world
-      const pos = new THREE.Vector3()
-      const qua = new THREE.Quaternion()
-      const sca = new THREE.Vector3()
-      this.matrixWorld.decompose(pos, qua, sca)
-      qua.copy(world.rig.quaternion)
-      this.mesh.matrixWorld.compose(pos, qua, sca)
-    } else if (this._billboard === 'y') {
-      const world = this.ctx.world
-      const pos = new THREE.Vector3()
-      const qua = new THREE.Quaternion()
-      const sca = new THREE.Vector3()
-      this.matrixWorld.decompose(pos, qua, sca)
-      const euler = new THREE.Euler()
-      euler.setFromQuaternion(world.rig.quaternion)
-      euler.x = 0
-      euler.z = 0
-      qua.setFromEuler(euler)
-      this.mesh.matrixWorld.compose(pos, qua, sca)
-    } else {
-      this.mesh.matrixWorld.copy(this.matrixWorld)
-    }
-
-    // Sync CSS3D object to mesh position
-    if (this.cssObject) {
-      this.cssObject.matrix.copy(this.mesh.matrixWorld)
-      this.cssObject.matrix.decompose(
-        this.cssObject.position,
-        this.cssObject.quaternion,
-        this.cssObject.scale
-      )
+      if (this.sItem) {
+        this.ctx.world.stage.octree.move(this.sItem)
+      }
     }
   }
 
   unmount() {
-    if (!this.ctx || !this.ctx.world) return
-    if (this.ctx.world.network?.isServer) return
+    this.unbuild()
+  }
 
-    // Clean up CSS3D
-    if (this.cssObject) {
-      this.ctx.world.graphics.css3dScene.remove(this.cssObject)
-      this.cssObject = null
+  unbuild() {
+    // Clean up CSS3D object
+    if (this.objectCSS) {
+      this.ctx.world.css.remove(this.objectCSS)
+      this.objectCSS = null
+    }
+
+    // Clean up iframe
+    if (this.iframe) {
+      this.iframe.remove()
+      this.iframe = null
+    }
+
+    // Clean up container div
+    if (this.container) {
+      this.container.remove()
+      this.container = null
+    }
+
+    // Clean up screen-space elements
+    if (this.inner) {
+      this.inner.remove()
+      this.inner = null
     }
 
     // Clean up mesh
     if (this.mesh) {
       this.ctx.world.stage.scene.remove(this.mesh)
-      this.material?.dispose()
-      this.geometry?.dispose()
+      if (this.sItem) {
+        this.ctx.world.stage.octree.remove(this.sItem)
+        this.sItem = null
+      }
+      this.mesh.geometry.dispose()
+      this.mesh.material.dispose()
       this.mesh = null
-      this.ctx.world.setHot(this, false)
     }
 
-    // Clean up iframe
-    if (this.iframeElement) {
-      this.iframeElement.remove()
-      this.iframeElement = null
-    }
-
-    // Clean up screen-space
-    if (this.containerElement) {
-      this.containerElement.remove()
-      this.containerElement = null
-    }
-
-    // Clear update interval
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval)
-      this.updateInterval = null
-    }
-
-    this.canvas = null
-    this.canvasCtx = null
+    this.ctx.world.setHot(this, false)
   }
 
-  createWebView() {
-    this.destroyWebView()
-
-    if (this._space === 'world') {
-      // Create iframe element
-      this.iframeElement = document.createElement('iframe')
-      this.iframeElement.src = this._src
-      this.iframeElement.width = this._width
-      this.iframeElement.height = this._height
-      this.iframeElement.style.border = 'none'
-      this.iframeElement.style.pointerEvents = this._pointerEvents ? 'auto' : 'none'
-
-      // Create CSS3DObject with proper scaling
-      this.cssObject = new CSS3DObject(this.iframeElement)
-      // CSS3DObject scaling is different - we need much smaller values
-      // Convert world dimensions to appropriate CSS3D scale (roughly 1/1000 scale factor)
-      const scaleX = (this._worldWidth / this._width) * 0.001
-      const scaleY = (this._worldHeight / this._height) * 0.001
-      this.cssObject.scale.set(scaleX, scaleY, 1)
-
-      // Debug logging
-      console.log('[WebView] Created world-space WebView:', {
-        src: this._src,
-        width: this._width,
-        height: this._height,
-        worldWidth: this._worldWidth,
-        worldHeight: this._worldHeight,
-        scaleX,
-        scaleY,
-        finalScale: { x: scaleX, y: scaleY, z: 1 }
-      })
-
-      // Create geometry and material for collision detection
-      this.geometry = new THREE.PlaneGeometry(this._worldWidth, this._worldHeight)
-      this.material = new THREE.MeshBasicMaterial({
-        opacity: 0,
-        transparent: true,
-        side: THREE.DoubleSide
-      })
-
-      // Create mesh for collision detection
-      this.mesh = new THREE.Mesh(this.geometry, this.material)
-      this.mesh.matrixAutoUpdate = false
-      this.mesh.matrixWorldAutoUpdate = false
-      this.mesh.matrixWorld.copy(this.matrixWorld)
-
-      // Add to scenes
-      this.ctx.world.stage.scene.add(this.mesh)
-      this.ctx.world.graphics.css3dScene.add(this.cssObject)
-
-      this.ctx.world.setHot(this, true)
-
-    } else {
-      // Screen-space WebView
-      this.containerElement = document.createElement('div')
-      this.containerElement.style.position = 'absolute'
-      this.containerElement.style.width = `${this._width}px`
-      this.containerElement.style.height = `${this._height}px`
-      this.containerElement.style.maxWidth = `${this._width}px`
-      this.containerElement.style.maxHeight = `${this._height}px`
-      this.containerElement.style.overflow = 'hidden'
-      this.containerElement.style.pointerEvents = this._pointerEvents ? 'auto' : 'none'
-      this.containerElement.style.zIndex = '1000'
-
-      this.iframeElement = document.createElement('iframe')
-      this.iframeElement.src = this._src
-      this.iframeElement.style.width = '100%'
-      this.iframeElement.style.height = '100%'
-      this.iframeElement.style.border = 'none'
-      this.iframeElement.style.display = 'block'
-      this.iframeElement.style.pointerEvents = this._pointerEvents ? 'auto' : 'none'
-
-      this.containerElement.appendChild(this.iframeElement)
-      document.body.appendChild(this.containerElement)
-
-      this.updateScreenPosition()
-    }
+  set src(value) {
+    if (this._src === value) return
+    this._src = isString(value) ? value : null
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get src() {
+    return this._src
   }
 
-
-  updateScreenPosition() {
-    if (!this.containerElement) return
-
-    // Convert normalized position to screen coordinates
-    const x = this.position.x * window.innerWidth
-    const y = this.position.y * window.innerHeight
-
-    this.containerElement.style.left = `${x}px`
-    this.containerElement.style.top = `${y}px`
-
-    // Ensure the container doesn't exceed screen bounds
-    this.containerElement.style.maxWidth = `${this._width}px`
-    this.containerElement.style.maxHeight = `${this._height}px`
-    this.containerElement.style.overflow = 'hidden'
+  set html(value) {
+    if (this._html === value) return
+    this._html = isString(value) ? value : null
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get html() {
+    return this._html
   }
 
-  destroyWebView() {
-    // Clear update interval
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval)
-      this.updateInterval = null
-    }
-
-    // Clean up world-space mesh
-    if (this.mesh) {
-      this.ctx.world.stage.scene.remove(this.mesh)
-      this.texture?.dispose()
-      this.material?.dispose()
-      this.geometry?.dispose()
-      this.mesh = null
-      this.ctx.world.setHot(this, false)
-    }
-
-    // Clean up DOM elements
-    if (this.iframeElement) {
-      this.iframeElement.remove()
-      this.iframeElement = null
-    }
-
-    if (this.containerElement) {
-      this.containerElement.remove()
-      this.containerElement = null
-    }
-
-    this.canvas = null
-    this.canvasCtx = null
+  set width(value) {
+    if (this._width === value) return
+    this._width = isNumber(value) ? value : defaults.width
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get width() {
+    return this._width
   }
 
-  copy(source) {
-    super.copy(source)
-    this.src = source.src
-    this.width = source.width
-    this.height = source.height
-    this.worldWidth = source.worldWidth
-    this.worldHeight = source.worldHeight
-    this.space = source.space
-    this.billboard = source.billboard
-    this.pointerEvents = source.pointerEvents
-    this.visible = source.visible
-    this.opacity = source.opacity
-    return this
+  set height(value) {
+    if (this._height === value) return
+    this._height = isNumber(value) ? value : defaults.height
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get height() {
+    return this._height
+  }
+
+  set factor(value) {
+    if (this._factor === value) return
+    this._factor = isNumber(value) ? value : defaults.factor
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get factor() {
+    return this._factor
+  }
+
+  set doubleside(value) {
+    if (this._doubleside === value) return
+    this._doubleside = isBoolean(value) ? value : defaults.doubleside
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get doubleside() {
+    return this._doubleside
+  }
+
+  set space(value) {
+    if (this._space === value) return
+    this._space = value === 'screen' || value === 'world' ? value : defaults.space
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get space() {
+    return this._space
+  }
+
+  set pointerEvents(value) {
+    if (this._pointerEvents === value) return
+    this._pointerEvents = isBoolean(value) ? value : defaults.pointerEvents
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get pointerEvents() {
+    return this._pointerEvents
+  }
+
+  getProxy() {
+    if (!this.proxy) {
+      const self = this
+      let proxy = {
+        get src() {
+          return self.src
+        },
+        set src(value) {
+          self.src = value
+        },
+        get html() {
+          return self.html
+        },
+        set html(value) {
+          self.html = value
+        },
+        get width() {
+          return self.width
+        },
+        set width(value) {
+          self.width = value
+        },
+        get height() {
+          return self.height
+        },
+        set height(value) {
+          self.height = value
+        },
+        get factor() {
+          return self.factor
+        },
+        set factor(value) {
+          self.factor = value
+        },
+        get doubleside() {
+          return self.doubleside
+        },
+        set doubleside(value) {
+          self.doubleside = value
+        },
+        get space() {
+          return self.space
+        },
+        set space(value) {
+          self.space = value
+        },
+      }
+      proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy()))
+      this.proxy = proxy
+    }
+    return this.proxy
   }
 }

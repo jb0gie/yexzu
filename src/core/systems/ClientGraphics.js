@@ -14,6 +14,7 @@ function getRenderer() {
     renderer = new THREE.WebGLRenderer({
       powerPreference: 'high-performance',
       antialias: true,
+      alpha: true, // Required for CSS3D WebView occlusion
       // logarithmicDepthBuffer: true,
       // reverseDepthBuffer: true,
     })
@@ -110,6 +111,9 @@ export class ClientGraphics extends System {
       this.resize(this.viewport.offsetWidth, this.viewport.offsetHeight)
     })
     this.viewport.appendChild(this.renderer.domElement)
+    // Ensure canvas is above CSS3D layer for WebView occlusion
+    this.renderer.domElement.style.position = 'relative'
+    this.renderer.domElement.style.zIndex = '1'
     this.resizer.observe(this.viewport)
 
     this.xrWidth = null
@@ -137,11 +141,12 @@ export class ClientGraphics extends System {
   }
 
   render() {
-    // Render WebGL scene using world.camera
+    // Render CSS3D layer first (behind WebGL)
+    this.world.css?.render()
+    // Then render WebGL
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
       this.renderer.render(this.world.stage.scene, this.world.camera)
     } else {
-      // Use the default composer (includes DOF effect)
       this.composer.render()
     }
     if (this.xrDimensionsNeeded) {
