@@ -140,86 +140,24 @@ export class WebView extends Node {
       this.iframe = iframe
       this.inner = inner
 
-      // Track pointer interaction state
-      this._pointerOver = false
-      this._pointerDown = false
-
-      // Add pointer event handlers that bridge Three.js raycasting to DOM events
-      this.onPointerEnter = (event) => {
-        if (!this._pointerOver) {
-          this._pointerOver = true
-          this.enableInteraction()
-          console.log('WebView: Pointer enter')
-        }
-      }
-
-      this.onPointerLeave = (event) => {
-        if (this._pointerOver) {
-          this._pointerOver = false
-          this.disableInteraction()
-          console.log('WebView: Pointer leave')
-        }
-      }
-
-      this.onPointerDown = (event) => {
-        this._pointerDown = true
-        this.enableInteraction()
-        console.log('WebView: Pointer down')
-      }
-
-      this.onPointerUp = (event) => {
-        this._pointerDown = false
-        if (!this._pointerOver) {
-          this.disableInteraction()
-        }
-        console.log('WebView: Pointer up')
-      }
-
-      // Set pointer events based on property (desktop only)
-      // For mobile, always enable pointer events
-      const isDesktop = !this.ctx.world.network.isServer &&
-        this.ctx.world.controls &&
-        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
-
-      if (!isDesktop) {
+      // Set pointer events based on property
+      // Enable all pointer events by default when pointerEvents is true
+      if (this._pointerEvents) {
+        container.style.pointerEvents = 'auto'
+        inner.style.pointerEvents = 'auto'
         iframe.style.pointerEvents = 'auto'
       }
 
-      // Enable pointer events when interacting with the CSS3DObject
-      // Listen on the container element (CSS3DObject.element) for proper event handling
-      // This ensures events work correctly through CSS3D transformations
-      this.enableInteraction = () => {
-        if (this._pointerEvents) {
-          this.objectCSS.interacting = true
-          iframe.style.pointerEvents = 'auto'
-        }
-      }
+      // Track interaction stabilization
+      this.objectCSS.element.addEventListener('mousedown', () => {
+        this.objectCSS.interacting = true
+      })
 
-      this.disableInteraction = () => {
-        if (isDesktop) {
+      this.objectCSS.element.addEventListener('mouseup', () => {
+        setTimeout(() => {
           this.objectCSS.interacting = false
-          iframe.style.pointerEvents = 'none'
-        }
-      }
-
-      // Desktop: mouse events
-      if (isDesktop) {
-        this.objectCSS.element.addEventListener('mouseenter', this.enableInteraction)
-        this.objectCSS.element.addEventListener('mouseleave', this.disableInteraction)
-      }
-
-      // Mobile: touch events (always enabled)
-      this.objectCSS.element.addEventListener('touchstart', () => {
-        iframe.style.pointerEvents = 'auto'
-      }, { passive: true })
-
-      this.objectCSS.element.addEventListener('touchend', () => {
-        if (isDesktop) {
-          setTimeout(() => {
-            iframe.style.pointerEvents = 'none'
-          }, 100)
-        }
-      }, { passive: true })
+        }, 100)
+      })
 
       // Track when interacting with ANY iframe for interaction stabilization
       const clickStart = () => {
@@ -241,27 +179,8 @@ export class WebView extends Node {
       document.addEventListener('pointerdown', clickStart)
       document.addEventListener('pointerup', clickEnd)
 
-      // Mobile touch handlers (stored for cleanup)
-      const touchStartHandler = () => {
-        iframe.style.pointerEvents = 'auto'
-      }
-      const touchEndHandler = () => {
-        if (isDesktop) {
-          setTimeout(() => {
-            iframe.style.pointerEvents = 'none'
-          }, 100)
-        }
-      }
-
-      this.objectCSS.element.addEventListener('touchstart', touchStartHandler, { passive: true })
-      this.objectCSS.element.addEventListener('touchend', touchEndHandler, { passive: true })
-
       // Store cleanup functions
       this.cleanup = () => {
-        this.objectCSS.element.removeEventListener('mouseenter', this.enableInteraction)
-        this.objectCSS.element.removeEventListener('mouseleave', this.disableInteraction)
-        this.objectCSS.element.removeEventListener('touchstart', touchStartHandler)
-        this.objectCSS.element.removeEventListener('touchend', touchEndHandler)
         document.removeEventListener('pointerdown', clickStart)
         document.removeEventListener('pointerup', clickEnd)
         if (this.iframe) this.iframe.style.pointerEvents = 'none'
