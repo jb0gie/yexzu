@@ -115,8 +115,9 @@ export class WebView extends Node {
       iframe.frameBorder = '0'
       iframe.scrolling = 'yes'
       iframe.style.overflow = 'auto'
-      // CRITICAL: iframe must have pointer-events:auto to receive clicks
-      // Setting this permanently instead of toggling - toggling breaks interaction
+      // CRITICAL: Container and inner div must allow events to reach iframe
+      container.style.pointerEvents = 'auto'
+      inner.style.pointerEvents = 'auto'
       iframe.style.pointerEvents = 'auto'
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
       iframe.allowFullscreen = true
@@ -128,6 +129,18 @@ export class WebView extends Node {
       } else {
         iframe.src = this._src
       }
+
+      // DEBUG: Log all clicks on container and iframe
+      const logClick = (e) => {
+        console.log('[WebView] Click on:', e.currentTarget.tagName, e.currentTarget.className)
+        console.log('[WebView] Event target:', e.target.tagName)
+        console.log('[WebView] Pointer events - container:', container.style.pointerEvents)
+        console.log('[WebView] Pointer events - inner:', inner.style.pointerEvents)
+        console.log('[WebView] Pointer events - iframe:', iframe.style.pointerEvents)
+      }
+      container.addEventListener('click', logClick, true)
+      inner.addEventListener('click', logClick, true)
+      iframe.addEventListener('click', logClick, true)
 
       container.appendChild(inner)
       inner.appendChild(iframe)
