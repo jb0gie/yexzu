@@ -76,6 +76,8 @@ export class WebView extends Node {
       visible: true, // Ensure visible for raycasting
     })
     this.mesh = new THREE.Mesh(geometry, material)
+    // Link mesh back to this WebView node for pointer events
+    this.mesh.node = this
     // Copy world matrix to mesh for proper positioning
     this.mesh.matrixWorld.copy(this.matrixWorld)
     this.mesh.matrixAutoUpdate = false
@@ -159,21 +161,6 @@ export class WebView extends Node {
         iframe.style.pointerEvents = 'auto'
       }
 
-      // Key: Events on inner div (not container) for proper coordinates
-      inner.addEventListener('mouseenter', () => {
-        if (isDesktop) {
-          this.objectCSS.interacting = true
-          iframe.style.pointerEvents = 'auto'
-        }
-      })
-
-      inner.addEventListener('mouseleave', () => {
-        if (isDesktop) {
-          this.objectCSS.interacting = false
-          iframe.style.pointerEvents = 'none'
-        }
-      })
-
       // onPointerDown handler on WebView node itself
       // This is critical - unlocks pointer when clicking on WebView
       this.onPointerDown = (e) => {
@@ -182,6 +169,12 @@ export class WebView extends Node {
         // Unlock pointer so user can interact with iframe
         if (this.ctx.world.controls?.pointer?.locked) {
           this.ctx.world.controls.unlockPointer()
+        }
+        // Immediately enable iframe pointer events for this interaction
+        // This ensures the iframe is clickable right after unlocking pointer
+        if (this.iframe && isDesktop) {
+          this.iframe.style.pointerEvents = 'auto'
+          this.objectCSS.interacting = true
         }
       }
 

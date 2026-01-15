@@ -946,6 +946,26 @@ async function connect() {
 }
 ```
 
+**6. WebView Nodes Require Special Pointer Handling**
+```javascript
+// WebViews render in CSS3D layer (DOM) separate from WebGL scene
+// A proxy mesh in WebGL receives raycast hits, but iframe interaction
+// requires explicit pointer-events management due to pointer lock
+
+// ✅ CORRECT - Desktop: First click unlocks pointer and enables iframe
+// The WebView node's onPointerDown handler:
+// 1. Unlocks pointer if locked
+// 2. Immediately sets iframe.style.pointerEvents = 'auto'
+// 3. Subsequent clicks go to iframe content
+
+// ✅ Mobile: iframe.pointerEvents always 'auto' (no pointer lock)
+
+// Common issues:
+// - If iframe doesn't receive clicks: Check onPointerDown enables pointer-events
+// - If scrolling doesn't work: Ensure iframe.scrolling = 'yes' and overflow = 'auto'
+// - If mouseleave disables too fast: Add interaction stabilization delay
+```
+
 ### UI System Limitations
 
 1. **No responsive sizing** - Must use explicit pixel values

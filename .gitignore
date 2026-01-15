@@ -10,3 +10,4 @@ build/
 *.vexify.db
 .code-search/
 .glootie-stop-verified
+.claude/
