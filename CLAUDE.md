@@ -1667,3 +1667,124 @@ inner.addEventListener('mouseleave', () => {
 - CSS3D updates still paused during interaction for smooth scrolling
 
 **Key insight from debugging:** The agentic-hyperfy approach works because it keeps pointer-events 'auto' during interaction. The toggle approach fails because mouseleave disables the iframe before the user can interact with it.
+
+**7. CSS Layer pointer-events MUST be 'auto' for WebView interaction**
+```javascript
+// In src/client/world-client.js, .App__cssLayer must have:
+// ❌ WRONG - Blocks ALL child elements from receiving events
+.App__cssLayer { pointer-events: none; }
+
+// ✅ CORRECT - Allows CSS3D elements to control their own event handling
+.App__cssLayer { pointer-events: auto; }
+```
+
+**Why:** When a parent element has `pointer-events: none`, ALL child elements are blocked from receiving events, regardless of their own pointer-events setting. This is standard CSS behavior - the parent's setting takes precedence.
+
+**How it works:**
+1. `cssLayer:pointer-events:auto` allows event propagation into the CSS3D layer
+2. Individual CSS3D elements control their own pointer-events:
+   - WebView iframes: `pointer-events: auto` (receives clicks)
+   - Non-interactive CSS3D objects: `pointer-events: none` (lets events fall through to WebGL)
+3. Empty space in CSS3D layer allows events to reach WebGL canvas below
+
+**WebView hierarchy for interaction:**
+```javascript
+// All elements in the chain must allow pointer-events:
+document.body (pointer-events: auto)
+  → cssLayer (pointer-events: auto)  // WAS 'none', CHANGED to 'auto'
+    → CSS3DObject.element (no explicit setting)
+      → container (pointer-events: auto)
+        → inner (pointer-events: auto)
+          → iframe (pointer-events: auto)  // Receives clicks!
+```
+
+**Common mistake:**
+```javascript
+// This breaks everything:
+// Even though iframe has pointer-events:auto, the parent cssLayer:none blocks it
+.cssLayer { pointer-events: none; }  // ❌ Blocks all child elements
+iframe { pointer-events: auto; }      // ❌ Still blocked by parent
+```
+
+**Testing:**
+- Open /world/simple-interaction.app.json
+- Click on the WebView
+- Should be able to click links and scroll content
+
+📝 **NOTE:** The agentic-hyperfy branch appears to work with `cssLayer:pointer-events:none` by toggling iframe pointer-events. This technically shouldn't work according to CSS specs, suggesting either:
+1. A browser bug/quirk that was version-specific
+2. CSS3DRenderer creates a special rendering context
+3. The implementation was buggy but worked in specific conditions
+
+Our testing shows that `cssLayer:pointer-events:auto` is the correct, spec-compliant approach.
+
+**8. WebView Interaction Requires Dynamic Canvas Pointer-Events**
+```javascript
+// The WebGL canvas renders at z-index:1, CSS3D layer at z-index:0
+// This means canvas is ON TOP of CSS3D content, blocking iframe clicks
+
+// Solution: Dynamically toggle canvas pointer-events
+// src/core/systems/ClientGraphics.js
+init() {
+  this.renderer.domElement.style.pointerEvents = 'none' // Start disabled
+}
+
+// src/core/nodes/WebView.js
+this.onPointerDown = () => {
+  // ... unlock pointer ...
+  // When interacting with WebView, disable canvas pointer-events
+  this.ctx.world.graphics.setCanvasPointerEvents(false) // 'none'
+}
+
+mouseEnterHandler = () => {
+  // Mouse over WebView - disable canvas to allow iframe clicks
+  this.ctx.world.graphics.setCanvasPointerEvents(false)
+}
+
+mouseLeaveHandler = () => {
+  // Mouse left WebView - enable canvas for WebGL interactions
+  this.ctx.world.graphics.setCanvasPointerEvents(true) // 'auto'
+}
+```
+
+**Why this is needed:**
+
+DOM structure in src/client/world-client.js:
+```
+viewport (z-index not set)
+  ├── cssLayer (z-index: 0)
+  ├── WebGL canvas (z-index: 1, position: relative) ← ON TOP
+  └── UI layer (z-index: 2)
+```
+
+Since WebGL canvas has both:
+- Higher z-index (1 vs 0)
+- `position: relative` (creates stacking context)
+
+It renders ON TOP of the CSS3D layer, blocking all clicks to iframes below.
+
+**The fix:** Dynamically set `canvas.style.pointerEvents`:
+- When over WebView: `pointer-events: none` (clicks fall through to CSS3D/iframe)
+- When not over WebView: `pointer-events: auto` (WebGL interactions work)
+
+**Alternative approaches considered:**
+1. ❌ Swap z-index (canvas:0, cssLayer:1) - Would hide WebGL content behind CSS3D
+2. ❌ Keep canvas pointer-events:none always - Would break WebGL click interactions
+3. ✅ Dynamic toggling - Best of both worlds!
+
+**Testing:**
+1. Run: npm run dev
+2. Open: /world/simple-interaction.app.json
+3. Click WebView to unlock pointer
+4. Verify: Can click links and scroll in iframe
+5. Verify: When mouse leaves WebView, WebGL clicks work again
+6. Verify: Camera controls work when not over WebView
+
+**Important note:** The combination of these changes is required:
+1. cssLayer: pointer-events: auto (from previous fix)
+2. WebView elements: pointer-events: auto (from previous fix)
+3. Canvas: dynamic pointer-events toggling (this fix)
+
+📝 **HISTORY:** We initially thought cssLayer:pointer-events:auto would fix it,
+but the canvas z-index issue was blocking events regardless. The complete fix
+requires BOTH cssLayer:auto AND dynamic canvas pointer-events control.
