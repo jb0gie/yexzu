@@ -76,8 +76,7 @@ export class WebView extends Node {
       visible: true, // Ensure visible for raycasting
     })
     this.mesh = new THREE.Mesh(geometry, material)
-    // Update world matrix before adding to ensure correct position
-    this.updateMatrixWorld()
+    // Copy world matrix to mesh for proper positioning
     this.mesh.matrixWorld.copy(this.matrixWorld)
     this.mesh.matrixAutoUpdate = false
     this.mesh.matrixWorldAutoUpdate = false
