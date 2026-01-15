@@ -86,6 +86,45 @@ World (World.js)
 
 ## WebView Nodes
 
+### WebView Technical Implementation Details
+
+**Critical Discovery**: WebView interaction requires a bridge between Three.js raycasting and DOM pointer events. The reticle raycast hits the invisible WebGL mesh, but pointer events only trigger on DOM elements. The solution adds onPointerEnter/Down/Up handlers to the WebView node that enable/disable iframe pointer-events.
+
+**Interaction Flow**:
+1. Reticle raycasts hit WebGL mesh (opaque but invisible)
+2. ClientPointer triggers onPointerEnter on WebView node
+3. WebView calls enableInteraction() → iframe.pointerEvents = 'auto'
+4. DOM mouse/touch events now reach the iframe
+5. User can click and scroll!
+6. onPointerLeave → disableInteraction() → iframe.pointerEvents = 'none'
+
+**Raycasting Requirements**:
+- Mesh must have computeBoundingBox() and computeBoundingSphere() called
+- Material must be visible (visible: true) despite opacity: 0
+- sItem.matrix must be cloned and updated on position changes
+- updateMatrixWorld() must be called before initial matrixWorld copy
+
+**Event Listener Placement**:
+- Event listeners MUST be on CSS3DObject.element (container), not the inner div
+- CSS3DRenderer transforms container coordinates, keeping event positions accurate
+- Mouse events for desktop (mouseenter/mouseleave)
+- Touch events always enabled for mobile (no hover state)
+
+**DOM Layering**:
+- CSS3D layer: z-index: 0 (behind WebGL)
+- WebGL canvas: z-index: 1 (WebView hit mesh)
+- UI layer: z-index: 2 (core UI, reticle)
+- WebGL canvas has alpha: true for pass-through compositing
+
+**Common Pitfalls**:
+- Reticle raycastReticle() uses center screen coordinates (0,0)
+- Octree requires proper bounding spheres for all items
+- Mesh.visible must be true even with opacity: 0 for raycasting
+- CSS3DObject.element is the correct event target, not child elements
+- Pointer-events must be explicitly enabled/disabled
+- Cleanup must remove all event listeners to prevent memory leaks
+
+
 WebView nodes display interactive web content in both 3D world space and 2D screen space. Implemented based on https://github.com/saori-eth/agentic-hyperfy/tree/iframe
 
 ### Simple Working Pattern

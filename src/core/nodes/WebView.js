@@ -66,13 +66,18 @@ export class WebView extends Node {
 
     // Create the black mesh (cutout)
     const geometry = new THREE.PlaneGeometry(this._width, this._height)
+    geometry.computeBoundingBox()
+    geometry.computeBoundingSphere()
     const material = new THREE.MeshBasicMaterial({
       opacity: 0,
       color: new THREE.Color('black'),
       blending: hasContent ? THREE.NoBlending : THREE.NormalBlending,
       side: this._doubleside ? THREE.DoubleSide : THREE.FrontSide,
+      visible: true, // Ensure visible for raycasting
     })
     this.mesh = new THREE.Mesh(geometry, material)
+    // Update world matrix before adding to ensure correct position
+    this.updateMatrixWorld()
     this.mesh.matrixWorld.copy(this.matrixWorld)
     this.mesh.matrixAutoUpdate = false
     this.mesh.matrixWorldAutoUpdate = false
@@ -80,7 +85,7 @@ export class WebView extends Node {
 
     // Add to octree for raycasting
     this.sItem = {
-      matrix: this.matrixWorld,
+      matrix: this.matrixWorld.clone(),
       geometry,
       material,
       getEntity: () => this.ctx.entity,
@@ -137,6 +142,41 @@ export class WebView extends Node {
       this.iframe = iframe
       this.inner = inner
 
+      // Track pointer interaction state
+      this._pointerOver = false
+      this._pointerDown = false
+
+      // Add pointer event handlers that bridge Three.js raycasting to DOM events
+      this.onPointerEnter = (event) => {
+        if (!this._pointerOver) {
+          this._pointerOver = true
+          this.enableInteraction()
+          console.log('WebView: Pointer enter')
+        }
+      }
+
+      this.onPointerLeave = (event) => {
+        if (this._pointerOver) {
+          this._pointerOver = false
+          this.disableInteraction()
+          console.log('WebView: Pointer leave')
+        }
+      }
+
+      this.onPointerDown = (event) => {
+        this._pointerDown = true
+        this.enableInteraction()
+        console.log('WebView: Pointer down')
+      }
+
+      this.onPointerUp = (event) => {
+        this._pointerDown = false
+        if (!this._pointerOver) {
+          this.disableInteraction()
+        }
+        console.log('WebView: Pointer up')
+      }
+
       // Set pointer events based on property (desktop only)
       // For mobile, always enable pointer events
       const isDesktop = !this.ctx.world.network.isServer &&
@@ -150,14 +190,14 @@ export class WebView extends Node {
       // Enable pointer events when interacting with the CSS3DObject
       // Listen on the container element (CSS3DObject.element) for proper event handling
       // This ensures events work correctly through CSS3D transformations
-      const enableInteraction = () => {
+      this.enableInteraction = () => {
         if (this._pointerEvents) {
           this.objectCSS.interacting = true
           iframe.style.pointerEvents = 'auto'
         }
       }
 
-      const disableInteraction = () => {
+      this.disableInteraction = () => {
         if (isDesktop) {
           this.objectCSS.interacting = false
           iframe.style.pointerEvents = 'none'
@@ -166,8 +206,8 @@ export class WebView extends Node {
 
       // Desktop: mouse events
       if (isDesktop) {
-        this.objectCSS.element.addEventListener('mouseenter', enableInteraction)
-        this.objectCSS.element.addEventListener('mouseleave', disableInteraction)
+        this.objectCSS.element.addEventListener('mouseenter', this.enableInteraction)
+        this.objectCSS.element.addEventListener('mouseleave', this.disableInteraction)
       }
 
       // Mobile: touch events (always enabled)
@@ -203,28 +243,29 @@ export class WebView extends Node {
       document.addEventListener('pointerdown', clickStart)
       document.addEventListener('pointerup', clickEnd)
 
+      // Mobile touch handlers (stored for cleanup)
+      const touchStartHandler = () => {
+        iframe.style.pointerEvents = 'auto'
+      }
+      const touchEndHandler = () => {
+        if (isDesktop) {
+          setTimeout(() => {
+            iframe.style.pointerEvents = 'none'
+          }, 100)
+        }
+      }
+
+      this.objectCSS.element.addEventListener('touchstart', touchStartHandler, { passive: true })
+      this.objectCSS.element.addEventListener('touchend', touchEndHandler, { passive: true })
+
       // Store cleanup functions
       this.cleanup = () => {
-        this.objectCSS.element.removeEventListener('mouseleave', disableInteraction)
-
-        // Remove document listeners (if they exist)
-        if (this._pointerDownHandler) {
-          document.removeEventListener('pointerdown', this._pointerDownHandler)
-        }
-        if (this._pointerUpHandler) {
-          document.removeEventListener('pointerup', this._pointerUpHandler)
-        }
-
-        // Reset iframe pointer events
-        if (this.iframe) this.iframe.style.pointerEvents = 'none'
-        this.objectCSS.element.removeEventListener('touchstart', () => {})
-        this.objectCSS.element.removeEventListener('touchend', () => {})
-
-        // Remove document listeners
+        this.objectCSS.element.removeEventListener('mouseenter', this.enableInteraction)
+        this.objectCSS.element.removeEventListener('mouseleave', this.disableInteraction)
+        this.objectCSS.element.removeEventListener('touchstart', touchStartHandler)
+        this.objectCSS.element.removeEventListener('touchend', touchEndHandler)
         document.removeEventListener('pointerdown', clickStart)
         document.removeEventListener('pointerup', clickEnd)
-
-        // Reset iframe pointer events
         if (this.iframe) this.iframe.style.pointerEvents = 'none'
       }
 
@@ -278,6 +319,7 @@ export class WebView extends Node {
         this.mesh.matrixWorld.copy(this.matrixWorld)
       }
       if (this.sItem) {
+        this.sItem.matrix.copy(this.matrixWorld)
         this.ctx.world.stage.octree.move(this.sItem)
       }
     }
