@@ -205,9 +205,18 @@ export class WebView extends Node {
 
       // Store cleanup functions
       this.cleanup = () => {
-        // Remove CSS3DObject element listeners
-        this.objectCSS.element.removeEventListener('mouseenter', enableInteraction)
         this.objectCSS.element.removeEventListener('mouseleave', disableInteraction)
+
+        // Remove document listeners (if they exist)
+        if (this._pointerDownHandler) {
+          document.removeEventListener('pointerdown', this._pointerDownHandler)
+        }
+        if (this._pointerUpHandler) {
+          document.removeEventListener('pointerup', this._pointerUpHandler)
+        }
+
+        // Reset iframe pointer events
+        if (this.iframe) this.iframe.style.pointerEvents = 'none'
         this.objectCSS.element.removeEventListener('touchstart', () => {})
         this.objectCSS.element.removeEventListener('touchend', () => {})
 
