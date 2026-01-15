@@ -90,19 +90,23 @@ World (World.js)
 
 **Critical Discovery**: WebView interaction requires a bridge between Three.js raycasting and DOM pointer events. The reticle raycast hits the invisible WebGL mesh, but pointer events only trigger on DOM elements. The solution adds onPointerEnter/Down/Up handlers to the WebView node that enable/disable iframe pointer-events.
 
-**Interaction Flow**:
-1. Reticle raycasts hit WebGL mesh (opaque but invisible)
-2. ClientPointer triggers onPointerEnter on WebView node
-3. WebView calls enableInteraction() → iframe.pointerEvents = 'auto'
-4. DOM mouse/touch events now reach the iframe
-5. User can click and scroll!
-6. onPointerLeave → disableInteraction() → iframe.pointerEvents = 'none'
+**Simplified Implementation**:
+WebViews directly enable pointer-events on the iframe when the pointerEvents property is true. The CSS3DObject handles DOM events naturally without any Three.js event bridging. This matches the proven pattern from agentic-hyperfy.
+
+**How It Works**:
+1. When pointerEvents: true is set
+2. iframe.style.pointerEvents = 'auto' is applied
+3. CSS3DRenderer renders the iframe in 3D space
+4. DOM events naturally propagate to the iframe
+5. User can click and scroll without any Three.js intervention
+
+**Key Change**: Removed over-engineered raycast bridge - now uses simple direct pointer-events enable/disable
 
 **Raycasting Requirements**:
 - Mesh must have computeBoundingBox() and computeBoundingSphere() called
 - Material must be visible (visible: true) despite opacity: 0
 - sItem.matrix must be cloned and updated on position changes
-- updateMatrixWorld() must be called before initial matrixWorld copy
+- Do NOT use updateMatrixWorld() - Node class doesn't have this method
 
 **Event Listener Placement**:
 - Event listeners MUST be on CSS3DObject.element (container), not the inner div
