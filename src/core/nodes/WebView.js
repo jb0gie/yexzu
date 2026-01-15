@@ -140,49 +140,74 @@ export class WebView extends Node {
       this.iframe = iframe
       this.inner = inner
 
-      // Set pointer events based on property
-      // Enable all pointer events by default when pointerEvents is true
-      if (this._pointerEvents) {
-        container.style.pointerEvents = 'auto'
-        inner.style.pointerEvents = 'auto'
+      // IFrame Pointer Events Handling
+      // Chrome has a bug where iframe receiving pointer-events breaks drag-and-drop.
+      // To fix: only enable pointer-events when mouse enters the iframe wrapper.
+      // For non-desktop, just enable pointer-events always.
+
+      // Interaction Stabilization
+      // When standing still, camera moves slightly with head idle animation.
+      // This movement causes CSS3DRenderer to constantly move iframes slightly,
+      // but browsers don't like this resulting in some click events not registering.
+      // To solve: stop rendering CSS3D when interacting with any iframe.
+
+      const isDesktop = !this.ctx.world.network.isServer &&
+        this.ctx.world.controls &&
+        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
+
+      if (!isDesktop) {
         iframe.style.pointerEvents = 'auto'
       }
 
-      // Track interaction stabilization
-      this.objectCSS.element.addEventListener('mousedown', () => {
-        this.objectCSS.interacting = true
+      // Key: Events on inner div (not container) for proper coordinates
+      inner.addEventListener('mouseenter', () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = true
+          iframe.style.pointerEvents = 'auto'
+        }
       })
 
-      this.objectCSS.element.addEventListener('mouseup', () => {
-        setTimeout(() => {
+      inner.addEventListener('mouseleave', () => {
+        if (isDesktop) {
           this.objectCSS.interacting = false
-        }, 100)
+          iframe.style.pointerEvents = 'none'
+        }
       })
 
-      // Track when interacting with ANY iframe for interaction stabilization
-      const clickStart = () => {
-        if (!this.objectCSS) return
-        if (this.objectCSS.interacting) return
-        this.objectCSS.interacting = true
+      // onPointerDown handler on WebView node itself
+      // This is critical - unlocks pointer when clicking on WebView
+      this.onPointerDown = (e) => {
+        // Don't unlock pointer in build mode
+        if (this.ctx.world.builder?.enabled) return
+        // Unlock pointer so user can interact with iframe
+        if (this.ctx.world.controls?.pointer?.locked) {
+          this.ctx.world.controls.unlockPointer()
+        }
       }
 
-      const clickEnd = () => {
-        if (!this.objectCSS) return
-        if (!this.objectCSS.interacting) return
-        setTimeout(() => {
-          if (this.objectCSS) {
-            this.objectCSS.interacting = false
-          }
-        }, 500)
+      // Store mouse event handlers for cleanup
+      const mouseEnterHandler = () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = true
+          iframe.style.pointerEvents = 'auto'
+        }
       }
 
-      document.addEventListener('pointerdown', clickStart)
-      document.addEventListener('pointerup', clickEnd)
+      const mouseLeaveHandler = () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = false
+          iframe.style.pointerEvents = 'none'
+        }
+      }
+
+      // Add event listeners
+      inner.addEventListener('mouseenter', mouseEnterHandler)
+      inner.addEventListener('mouseleave', mouseLeaveHandler)
 
       // Store cleanup functions
       this.cleanup = () => {
-        document.removeEventListener('pointerdown', clickStart)
-        document.removeEventListener('pointerup', clickEnd)
+        inner.removeEventListener('mouseenter', mouseEnterHandler)
+        inner.removeEventListener('mouseleave', mouseLeaveHandler)
         if (this.iframe) this.iframe.style.pointerEvents = 'none'
       }
 
