@@ -114,6 +114,9 @@ export class ClientGraphics extends System {
     // Ensure canvas is above CSS3D layer for WebView occlusion
     this.renderer.domElement.style.position = 'relative'
     this.renderer.domElement.style.zIndex = '1'
+    // CRITICAL: Start with pointer-events:none to allow CSS3D iframe clicks
+    // Will be toggled to 'auto' when not over WebViews
+    this.renderer.domElement.style.pointerEvents = 'none'
     this.resizer.observe(this.viewport)
 
     this.xrWidth = null
@@ -309,6 +312,17 @@ export class ClientGraphics extends System {
     this.composer.addPass(this.effectPass)
 
     // console.log('[ClientGraphics] EffectPass recreated for clean WebGL state')
+  }
+
+  // Control canvas pointer-events for WebView interaction
+  // When over WebViews: pointer-events:none allows iframe clicks
+  // When not over WebViews: pointer-events:auto allows WebGL interactions
+  setCanvasPointerEvents(enabled) {
+    if (this.renderer && this.renderer.domElement) {
+      this.renderer.domElement.style.pointerEvents = enabled ? 'auto' : 'none'
+      // DEBUG LOG
+      console.log('[ClientGraphics] Canvas pointer-events set to:', enabled ? 'auto' : 'none')
+    }
   }
 
   destroy() {

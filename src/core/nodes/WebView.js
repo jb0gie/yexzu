@@ -179,18 +179,28 @@ export class WebView extends Node {
         if (this.objectCSS && isDesktop) {
           this.objectCSS.interacting = true
         }
+        // Set canvas pointer-events to none to allow iframe interaction
+        // This is critical - canvas at z-index:1 blocks CSS3D layer otherwise
+        if (isDesktop && this.ctx.world.graphics) {
+          this.ctx.world.graphics.setCanvasPointerEvents(false)
+        }
       }
 
       // Track interaction via mouse events to know when to resume CSS3D updates
       const mouseEnterHandler = () => {
         if (isDesktop) {
           this.objectCSS.interacting = true
+          // Set canvas pointer-events to none to allow iframe clicks
+          // Only WebViews should call this, so we toggle directly
+          this.ctx.world.graphics.setCanvasPointerEvents(false)
         }
       }
 
       const mouseLeaveHandler = () => {
         if (isDesktop) {
           this.objectCSS.interacting = false
+          // Set canvas pointer-events back to auto for WebGL interactions
+          this.ctx.world.graphics.setCanvasPointerEvents(true)
         }
       }
 
