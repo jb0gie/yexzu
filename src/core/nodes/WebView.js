@@ -133,7 +133,6 @@ export class WebView extends Node {
       // Create CSS3DObject
       this.objectCSS = new CSS3DObject(container)
       this.objectCSS.target = this.mesh // important: the mesh to follow
-      this.mesh.updateMatrixWorld()
       this.mesh.matrixWorld.decompose(this.objectCSS.position, this.objectCSS.quaternion, v1)
       this.objectCSS.scale.setScalar(1 / this._factor)
 
