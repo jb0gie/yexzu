@@ -115,14 +115,14 @@ export class WebView extends Node {
       iframe.frameBorder = '0'
       iframe.scrolling = 'yes'
       iframe.style.overflow = 'auto'
-      container.style.pointerEvents = 'auto'
-      inner.style.pointerEvents = 'auto'
+      // CRITICAL: iframe must have pointer-events:auto to receive clicks
+      // Setting this permanently instead of toggling - toggling breaks interaction
+      iframe.style.pointerEvents = 'auto'
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
       iframe.allowFullscreen = true
       iframe.style.width = widthPx
       iframe.style.height = heightPx
       iframe.style.border = '0px'
-      iframe.style.pointerEvents = 'none'
       if (this._html) {
         iframe.srcdoc = this._html
       } else {
@@ -142,11 +142,6 @@ export class WebView extends Node {
       this.iframe = iframe
       this.inner = inner
 
-      // IFrame Pointer Events Handling
-      // Chrome has a bug where iframe receiving pointer-events breaks drag-and-drop.
-      // To fix: only enable pointer-events when mouse enters the iframe wrapper.
-      // For non-desktop, just enable pointer-events always.
-
       // Interaction Stabilization
       // When standing still, camera moves slightly with head idle animation.
       // This movement causes CSS3DRenderer to constantly move iframes slightly,
@@ -157,12 +152,8 @@ export class WebView extends Node {
         this.ctx.world.controls &&
         !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
 
-      if (!isDesktop) {
-        iframe.style.pointerEvents = 'auto'
-      }
-
       // onPointerDown handler on WebView node itself
-      // This is critical - unlocks pointer when clicking on WebView
+      // This unlocks pointer when clicking on WebView
       this.onPointerDown = (e) => {
         // Don't unlock pointer in build mode
         if (this.ctx.world.builder?.enabled) return
@@ -170,26 +161,23 @@ export class WebView extends Node {
         if (this.ctx.world.controls?.pointer?.locked) {
           this.ctx.world.controls.unlockPointer()
         }
-        // Immediately enable iframe pointer events for this interaction
-        // This ensures the iframe is clickable right after unlocking pointer
-        if (this.iframe && isDesktop) {
-          this.iframe.style.pointerEvents = 'auto'
+        // CSS3D interaction mode - stop CSS3D updates while interacting
+        // This prevents the iframe from moving slightly during interaction
+        if (this.objectCSS && isDesktop) {
           this.objectCSS.interacting = true
         }
       }
 
-      // Store mouse event handlers for cleanup
+      // Track interaction via mouse events to know when to resume CSS3D updates
       const mouseEnterHandler = () => {
         if (isDesktop) {
           this.objectCSS.interacting = true
-          iframe.style.pointerEvents = 'auto'
         }
       }
 
       const mouseLeaveHandler = () => {
         if (isDesktop) {
           this.objectCSS.interacting = false
-          iframe.style.pointerEvents = 'none'
         }
       }
 
@@ -201,7 +189,6 @@ export class WebView extends Node {
       this.cleanup = () => {
         inner.removeEventListener('mouseenter', mouseEnterHandler)
         inner.removeEventListener('mouseleave', mouseLeaveHandler)
-        if (this.iframe) this.iframe.style.pointerEvents = 'none'
       }
 
       this.ctx.world.css.add(this.objectCSS)
