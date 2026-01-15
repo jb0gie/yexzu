@@ -1626,3 +1626,44 @@ window.toggleDebug = (flag) => {
 - this doens't work in hyperfy
   app.import('/examples/essentials/stamina-system.js')
 - anything in /examples is to be considered untested until i say so
+### WebView Node Interaction - CRITICAL
+
+**iframe.pointerEvents must be 'auto' permanently** - Toggling pointer-events between 'auto' and 'none' breaks interaction entirely.
+
+**What works:**
+```javascript
+// ✅ CORRECT - Set once and never change
+iframe.style.pointerEvents = 'auto'  // Permanent
+
+// Mouse events only control CSS3D stabilization, not pointer-events
+inner.addEventListener('mouseenter', () => {
+  this.objectCSS.interacting = true  // Stop CSS3D updates
+})
+inner.addEventListener('mouseleave', () => {
+  this.objectCSS.interacting = false  // Resume CSS3D updates
+})
+```
+
+**What breaks:**
+```javascript
+// ❌ WRONG - Toggling pointer-events
+inner.addEventListener('mouseenter', () => {
+  iframe.style.pointerEvents = 'auto'  // Breaks interaction flow
+})
+inner.addEventListener('mouseleave', () => {
+  iframe.style.pointerEvents = 'none'   // iframe becomes dead
+})
+```
+
+**Why:** When pointer-events is toggled to 'none' on mouseleave, the iframe becomes non-interactive. The next click on the WebView will unlock the pointer (onPointerDown) but the iframe remains at pointer-events:none, preventing any interaction.
+
+**Desktop behavior:**
+1. Click WebView mesh → onPointerDown unlocks pointer 
+2. iframe already has pointer-events:auto → immediately interactive
+3. CSS3D updates paused during interaction (objectCSS.interacting = true)
+
+**Mobile behavior:**
+- No pointer lock → iframe always interactive
+- CSS3D updates still paused during interaction for smooth scrolling
+
+**Key insight from debugging:** The agentic-hyperfy approach works because it keeps pointer-events 'auto' during interaction. The toggle approach fails because mouseleave disables the iframe before the user can interact with it.
