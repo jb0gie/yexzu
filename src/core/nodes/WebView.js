@@ -115,10 +115,10 @@ export class WebView extends Node {
       iframe.frameBorder = '0'
       iframe.scrolling = 'yes'
       iframe.style.overflow = 'auto'
-      // CRITICAL: Container and inner div must allow events to reach iframe
-      container.style.pointerEvents = 'auto'
-      inner.style.pointerEvents = 'auto'
-      iframe.style.pointerEvents = 'auto'
+      // AGENTIC-HYPERFY APPROACH: Keep parent as none, only toggle iframe
+      // This seems counter-intuitive but apparently works with CSS3D
+      container.style.pointerEvents = 'none'
+      inner.style.pointerEvents = 'none'
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
       iframe.allowFullscreen = true
       iframe.style.width = widthPx
@@ -130,17 +130,44 @@ export class WebView extends Node {
         iframe.src = this._src
       }
 
-      // DEBUG: Log all clicks on container and iframe
-      const logClick = (e) => {
-        console.log('[WebView] Click on:', e.currentTarget.tagName, e.currentTarget.className)
-        console.log('[WebView] Event target:', e.target.tagName)
-        console.log('[WebView] Pointer events - container:', container.style.pointerEvents)
-        console.log('[WebView] Pointer events - inner:', inner.style.pointerEvents)
-        console.log('[WebView] Pointer events - iframe:', iframe.style.pointerEvents)
+      // AGENTIC-HYPERFY: Set mobile to always interactive
+      const isDesktop = !this.ctx.world.network.isServer &&
+        this.ctx.world.controls &&
+        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
+
+      // TESTING AGENTIC-HYPERFY APPROACH
+      if (!isDesktop) {
+        iframe.style.pointerEvents = 'auto'
       }
-      container.addEventListener('click', logClick, true)
-      inner.addEventListener('click', logClick, true)
-      iframe.addEventListener('click', logClick, true)
+
+      // For Desktop, toggle iframe pointer-events (not container/inner)
+      const mouseEnterHandler = () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = true
+          // Toggle ONLY iframe, not parents (agentic-hyperfy way)
+          iframe.style.pointerEvents = 'auto'
+          // Also disable canvas to ensure clicks reach iframe
+          if (this.ctx.world.graphics) {
+            this.ctx.world.graphics.setCanvasPointerEvents(false)
+          }
+        }
+      }
+
+      const mouseLeaveHandler = () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = false
+          // Disable iframe pointer-events when mouse leaves
+          iframe.style.pointerEvents = 'none'
+          // Restore canvas for WebGL interactions
+          if (this.ctx.world.graphics) {
+            this.ctx.world.graphics.setCanvasPointerEvents(true)
+          }
+        }
+      }
+
+      // Add event listeners
+      container.addEventListener('mouseenter', mouseEnterHandler)
+      container.addEventListener('mouseleave', mouseLeaveHandler)
 
       container.appendChild(inner)
       inner.appendChild(iframe)
