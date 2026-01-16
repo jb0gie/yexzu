@@ -1628,95 +1628,54 @@ window.toggleDebug = (flag) => {
 - anything in /examples is to be considered untested until i say so
 ### WebView Node Interaction - CRITICAL
 
-**iframe.pointerEvents must be 'auto' permanently** - Toggling pointer-events between 'auto' and 'none' breaks interaction entirely.
+**CSS3D iframes require SPECIAL pointer-events handling (NOT standard CSS)**
 
-**What works:**
+**⚠️ CRITICAL DISCOVERY:** After extensive debugging with 0 interaction results, we reverse-engineered agentic-hyperfy and discovered CSS3D iframes **DO NOT** follow normal CSS pointer-events rules!
+
+**The Working Approach (AGENTIC-HYPERFY):**
 ```javascript
-// ✅ CORRECT - Set once and never change
-iframe.style.pointerEvents = 'auto'  // Permanent
+// CSS3DRenderer creates special compositing layers
+// iframes in CSS3D BYPASS normal DOM parent-child pointer-events rules!
+cssLayer: pointer-events: none      // ← Works! (doesn't block iframe in CSS3D)
+container: pointer-events: none     // ← Works! (doesn't block iframe in CSS3D)
+inner: pointer-events: none          // ← Works! (doesn't block iframe in CSS3D)
 
-// Mouse events only control CSS3D stabilization, not pointer-events
-inner.addEventListener('mouseenter', () => {
-  this.objectCSS.interacting = true  // Stop CSS3D updates
-})
-inner.addEventListener('mouseleave', () => {
-  this.objectCSS.interacting = false  // Resume CSS3D updates
-})
+// ONLY iframe's own pointer-events matters in CSS3D context!
+iframe: pointer-events: TOGGLED     // ← This is what actually controls interaction
+
+// Desktop: Toggle on hover
+mouseenter → iframe.style.pointerEvents = 'auto'   // ENABLE
+mouseleave → iframe.style.pointerEvents = 'none'   // DISABLE
+
+// Mobile: Always on (no pointer lock on mobile)
+iframe.style.pointerEvents = 'auto'  // Always enabled
 ```
 
-**What breaks:**
+**Why it works:** CSS3DRenderer creates special compositing layers where iframes bypass normal DOM event propagation. In this context, parent pointer-events settings **DON'T** affect iframes. Only the iframe's own pointer-events setting controls interaction.
+
+**Our FAILED Approach (Standard CSS - 0 interaction):**
 ```javascript
-// ❌ WRONG - Toggling pointer-events
-inner.addEventListener('mouseenter', () => {
-  iframe.style.pointerEvents = 'auto'  // Breaks interaction flow
-})
-inner.addEventListener('mouseleave', () => {
-  iframe.style.pointerEvents = 'none'   // iframe becomes dead
-})
+// Standard CSS-compliant approach we tried:
+cssLayer: pointer-events: auto      // ← Enable all (should work per CSS spec)
+container: pointer-events: auto     // ← Enable all (should work per CSS spec)
+inner: pointer-events: auto         // ← Enable all (should work per CSS spec)
+iframe: pointer-events: auto        // ← Always on (should work per CSS spec)
+// Result: 0 interaction (CSS3D doesn't follow standard CSS!)
 ```
 
-**Why:** When pointer-events is toggled to 'none' on mouseleave, the iframe becomes non-interactive. The next click on the WebView will unlock the pointer (onPointerDown) but the iframe remains at pointer-events:none, preventing any interaction.
+**Key Insight:** CSS3D iframes are **rendering edge cases** that don't follow CSS spec. Always verify with actual implementation when working with CSS3D/WebGL hybrid rendering.
 
-**Desktop behavior:**
-1. Click WebView mesh → onPointerDown unlocks pointer 
-2. iframe already has pointer-events:auto → immediately interactive
-3. CSS3D updates paused during interaction (objectCSS.interacting = true)
-
-**Mobile behavior:**
-- No pointer lock → iframe always interactive
-- CSS3D updates still paused during interaction for smooth scrolling
-
-**Key insight from debugging:** The agentic-hyperfy approach works because it keeps pointer-events 'auto' during interaction. The toggle approach fails because mouseleave disables the iframe before the user can interact with it.
-
-**7. CSS Layer pointer-events MUST be 'auto' for WebView interaction**
-```javascript
-// In src/client/world-client.js, .App__cssLayer must have:
-// ❌ WRONG - Blocks ALL child elements from receiving events
-.App__cssLayer { pointer-events: none; }
-
-// ✅ CORRECT - Allows CSS3D elements to control their own event handling
-.App__cssLayer { pointer-events: auto; }
-```
-
-**Why:** When a parent element has `pointer-events: none`, ALL child elements are blocked from receiving events, regardless of their own pointer-events setting. This is standard CSS behavior - the parent's setting takes precedence.
-
-**How it works:**
-1. `cssLayer:pointer-events:auto` allows event propagation into the CSS3D layer
-2. Individual CSS3D elements control their own pointer-events:
-   - WebView iframes: `pointer-events: auto` (receives clicks)
-   - Non-interactive CSS3D objects: `pointer-events: none` (lets events fall through to WebGL)
-3. Empty space in CSS3D layer allows events to reach WebGL canvas below
-
-**WebView hierarchy for interaction:**
-```javascript
-// All elements in the chain must allow pointer-events:
-document.body (pointer-events: auto)
-  → cssLayer (pointer-events: auto)  // WAS 'none', CHANGED to 'auto'
-    → CSS3DObject.element (no explicit setting)
-      → container (pointer-events: auto)
-        → inner (pointer-events: auto)
-          → iframe (pointer-events: auto)  // Receives clicks!
-```
-
-**Common mistake:**
-```javascript
-// This breaks everything:
-// Even though iframe has pointer-events:auto, the parent cssLayer:none blocks it
-.cssLayer { pointer-events: none; }  // ❌ Blocks all child elements
-iframe { pointer-events: auto; }      // ❌ Still blocked by parent
-```
+**The Fix:**
+- Desktop: Toggle iframe.pointer-events on mouseenter/mouseleave
+- Mobile: iframe.pointer-events always 'auto' (no toggling needed)
+- Canvas.pointer-events toggles alongside iframe (for z-index layering)
 
 **Testing:**
-- Open /world/simple-interaction.app.json
-- Click on the WebView
-- Should be able to click links and scroll content
-
-📝 **NOTE:** The agentic-hyperfy branch appears to work with `cssLayer:pointer-events:none` by toggling iframe pointer-events. This technically shouldn't work according to CSS specs, suggesting either:
-1. A browser bug/quirk that was version-specific
-2. CSS3DRenderer creates a special rendering context
-3. The implementation was buggy but worked in specific conditions
-
-Our testing shows that `cssLayer:pointer-events:auto` is the correct, spec-compliant approach.
+- Copy code from `/world/webview-test-simple.app.js` into a world
+- Hover over WebView → Check console for canvas pointer-events logs
+- Click WebView → pointer unlocks
+- Try clicking links/scroll → should work!
+- Mouse away → iframe.pointer-events becomes 'none'
 
 **8. WebView Interaction Requires Dynamic Canvas Pointer-Events**
 ```javascript
