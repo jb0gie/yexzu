@@ -1,74 +1,67 @@
-// EVM WALLET CONNECT
-
-console.log('')
-console.log('🎯 EVM WALLET CONNECT - FINAL VERSION')
-console.log('')
+// EVM Wallet Connect - Cartridge-style implementation
 
 // Configuration
 app.configure([
   {
-    key: 'hotKeyToggle',
+    key: 'buttonText',
     type: 'text',
-    label: 'Toggle UI Hotkey',
-    hint: 'Keyboard key to show/hide the wallet UI (single character).',
-    initial: 'I',
+    label: 'Connect Button Text',
+    hint: 'Text displayed on the action button.',
+    initial: 'Connect Wallet',
   },
   {
-    key: 'hotKeyConnect',
-    type: 'text',
-    label: 'Quick Connect Hotkey',
-    hint: 'Keyboard key for quick wallet connect (single character).',
-    initial: 'Q',
+    key: 'buttonColor',
+    type: 'color',
+    label: 'Button Color',
+    hint: 'Color of the connect button.',
+    initial: '#6366f1',
+  },
+  {
+    key: 'quickActionEnabled',
+    type: 'switch',
+    label: 'Quick Action Key',
+    hint: 'Enable Q key for instant connect/disconnect.',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' }
+    ],
+    initial: 'enabled',
+  },
+  {
+    key: 'triggerZone',
+    type: 'switch',
+    label: 'Trigger Zone Control',
+    hint: 'Show/hide UI when player enters trigger zone.',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' }
+    ],
+    initial: 'enabled',
   },
 ])
 
 // State
-let connected = false
-let address = null
-let uiVisible = true
+app.state.connected = false
+app.state.address = null
 
-// Hotkey system variables
-let control = null
-let hotKeyToggleCtrl = null
-let hotKeyConnectCtrl = null
-let toggleKeyPrevPressed = false
-let connectKeyPrevPressed = false
+// Get entities
+const walletBody = app.get('WalletIcon')
+const triggerBody = app.get('AreaTrigger')
 
-// Create UI (must add to app at the end)
-const mainUI = app.create('ui', {
+// Create minimal status UI
+const statusUI = app.create('ui', {
   space: 'screen',
-  pivot: 'top-center',
-  position: [0.9, 0.05, 0],
-  width: 250,
-  height: 145,
+  position: [0.89, 0.1, 0],
+  width: 150,
+  height: 40,
   backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  borderRadius: 12,
-  padding: 16,
+  borderRadius: 6,
+  padding: 8,
   flexDirection: 'column',
-  gap: 12,
-})
-
-// Button container (clickable)
-const connectButton = app.create('uiview', {
-  width: 220,
-  height: 55,
-  backgroundColor: '#6366f1',
-  borderRadius: 8,
   justifyContent: 'center',
   alignItems: 'center',
-  cursor: 'not-allowed',
 })
 
-// Button text (child of button)
-const buttonText = app.create('uitext', {
-  value: 'Initializing...',
-  color: '#ffffff',
-  fontSize: 16,
-  fontWeight: 'bold',
-  textAlign: 'center',
-})
-
-// Status text (child of ui, not app)
 const statusText = app.create('uitext', {
   value: '🌐 Disconnected',
   color: '#cccccc',
@@ -76,235 +69,174 @@ const statusText = app.create('uitext', {
   textAlign: 'center',
 })
 
-// Hotkey hints text
-const hotkeysText = app.create('uitext', {
-  value: 'I: Toggle UI • Q: Quick Connect',
-  color: '#64748b',
-  fontSize: 10,
-  textAlign: 'center',
-  opacity: 0.7,
+statusUI.add(statusText)
+walletBody.add(statusUI)
+
+// Create Action for wallet connection
+const connectAction = app.create('action', {
+  label: app.state.connected ? 'Disconnect Wallet' : 'Connect Wallet',
+  distance: 4,
+  duration: 0.3,
+  onTrigger: () => {
+    if (app.state.connected) {
+      disconnectWallet()
+    } else {
+      connectWallet()
+    }
+  }
 })
 
-// Add text to button, button to ui, ui to app
-connectButton.add(buttonText)
-mainUI.add(connectButton)
-mainUI.add(statusText)
-mainUI.add(hotkeysText)
-app.add(mainUI)
+walletBody.add(connectAction)
 
-// Initialize hotkey system
-function initHotkeys() {
-  if (!world.isClient) return
+// Initialize trigger zone
+let isPlayerNearby = false
+const localPlayer = world.getPlayer()
 
-  try {
-    control = app.control()
-    if (!control) return
-
-    console.log('[Wallet] Initializing hotkey system')
-
-    // Function to map a single character to control key handle
-    function resolveKey(char, fallbackChar) {
-      const letter = (char || fallbackChar || '').trim().toUpperCase()
-      const k = control['key' + letter]
-      return k || control['key' + fallbackChar]
-    }
-
-    function refreshKeyBindings() {
-      // Release previous captures
-      if (hotKeyToggleCtrl) hotKeyToggleCtrl.capture = false
-      if (hotKeyConnectCtrl) hotKeyConnectCtrl.capture = false
-
-      // Get keys from app props - try both app.props and global props
-      const toggleKey =
-        (app.props && app.props.hotKeyToggle) || (typeof props !== 'undefined' && props.hotKeyToggle) || 'I'
-      const connectKey =
-        (app.props && app.props.hotKeyConnect) || (typeof props !== 'undefined' && props.hotKeyConnect) || 'Q'
-
-      hotKeyToggleCtrl = resolveKey(toggleKey, 'I')
-      hotKeyConnectCtrl = resolveKey(connectKey, 'Q')
-
-      // Capture the keys
-      if (hotKeyToggleCtrl) {
-        hotKeyToggleCtrl.capture = true
-        console.log('[Wallet] Bound toggle key:', toggleKey, 'to control:', hotKeyToggleCtrl)
+if (triggerBody && app.props.triggerZone === 'enabled') {
+  triggerBody.onTriggerEnter = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = true
+        connectAction.active = true
       }
-      if (hotKeyConnectCtrl) {
-        hotKeyConnectCtrl.capture = true
-        console.log('[Wallet] Bound connect key:', connectKey, 'to control:', hotKeyConnectCtrl)
-      }
-
-      console.log('[Wallet] Hotkeys configured:', {
-        toggle: toggleKey,
-        connect: connectKey,
-        toggleControl: !!hotKeyToggleCtrl,
-        connectControl: !!hotKeyConnectCtrl,
-      })
     }
-
-    // Initial binding
-    refreshKeyBindings()
-    // Store on control for access in update loop
-    control._refreshWalletKeyBindings = refreshKeyBindings
-  } catch (error) {
-    console.error('[Wallet] Error initializing hotkeys:', error)
   }
-}
 
-// Quick connect/disconnect function
-async function quickConnect() {
-  if (connected) {
-    disconnectWallet()
-  } else {
-    connectWallet()
+  triggerBody.onTriggerLeave = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = false
+        connectAction.active = false
+      }
+    }
   }
+} else {
+  connectAction.active = true
 }
 
-// Toggle UI visibility
-function toggleUI() {
-  uiVisible = !uiVisible
-  mainUI.active = uiVisible
-  console.log('[Wallet] UI', uiVisible ? 'shown' : 'hidden')
-}
-
-// Initialize hotkeys on client
-if (world.isClient) {
-  initHotkeys()
-}
-
-// CRITICAL: Enable button only after EVM is ready
-setTimeout(() => {
-  console.log('✅ EVM ready - enabling button')
-  connectButton.backgroundColor = '#00a000'
-  connectButton.cursor = 'pointer'
-  buttonText.value = 'Connect Wallet'
-  statusText.value = 'Ready to connect'
-}, 1500)
-
-// CRITICAL: Proper event handler for Hyperfy (from starknetkit pattern)
-connectButton.onPointerDown = () => {
-  console.log('[Wallet] Connect button clicked')
-
-  if (connected) {
-    disconnectWallet()
-  } else {
-    connectWallet()
-  }
-}
-
-// Hover effects (from starknetkit pattern)
-connectButton.onPointerOver = () => {
-  if (connected) {
-    connectButton.backgroundColor = '#cc0000' // Darker red on hover
-  } else {
-    connectButton.backgroundColor = '#008000' // Darker green on hover
-  }
-}
-
-connectButton.onPointerOut = () => {
-  if (connected) {
-    connectButton.backgroundColor = '#ff4444' // Red for disconnect
-  } else {
-    connectButton.backgroundColor = '#00a000' // Green for connect
-  }
-}
-
-// Connect wallet
+// Connection functions
 async function connectWallet() {
-  console.log('')
-  console.log('🎯 Connecting wallet...')
-
-  statusText.value = '⏳ Connecting...'
-  statusText.color = '#f59e0b'
-
   try {
-    // Wait for MetaMask to be ready
-    await new Promise(resolve => setTimeout(resolve, 300))
+    statusText.value = '⏳ Connecting...'
+    statusText.color = '#f59e0b'
 
-    const result = await world.evm.connect()
-    console.log('✅ Result:', result)
+    if (world.web3) {
+      console.log('[Wallet] Attempting to connect...')
+      const result = await world.web3.connect()
 
-    if (result.success && result.address) {
-      console.log('✅ CONNECTED! Address:', result.address)
-      connected = true
-      address = result.address
-      updateUI()
+      if (result && result.address) {
+        app.state.connected = true
+        app.state.address = result.address
+
+        // Update UI for connected state
+        const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
+        statusText.value = `✅ ${short}`
+        statusText.color = '#10b981'
+        connectAction.label = 'Disconnect Wallet'
+
+        app.emit('walletConnected', {
+          connected: true,
+          address: result.address,
+        })
+
+        console.log('[Wallet] Connected:', result.address)
+      } else {
+        // User cancelled
+        console.log('[Wallet] User cancelled connection')
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
     } else {
-      console.error('❌ Connection failed:', result.reason)
-      statusText.value = '❌ Failed: ' + (result.reason || 'Unknown error')
-      statusText.color = '#ff4444'
-      setTimeout(updateUI, 3000)
+      throw new Error('world.web3 not available')
     }
   } catch (error) {
-    console.error('❌ Caught exception:', error.message)
-    console.error('Error:', error)
-    statusText.value = '❌ Error: ' + error.message
-    statusText.color = '#ff4444'
-    setTimeout(updateUI, 3000)
+    // Check for user cancellation
+    if (
+      error.message &&
+      (error.message.includes('User cancelled') ||
+        error.message.includes('User rejected') ||
+        error.message.includes('User denied') ||
+        error.message.includes('Modal closed'))
+    ) {
+      console.log('[Wallet] User cancelled connection')
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+      return
+    }
+
+    // Real connection error
+    console.error('[Wallet] Connection failed:', error)
+    statusText.value = 'Connection failed'
+    statusText.color = '#ef4444'
+
+    setTimeout(() => {
+      if (!app.state.connected) {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
+    }, 2000)
   }
 }
 
-// Disconnect wallet
 async function disconnectWallet() {
-  console.log('')
-  console.log('🎯 Disconnecting wallet...')
-
   try {
-    const result = await world.evm.disconnect()
-    console.log('✅ Result:', result)
-
-    if (result.success) {
-      connected = false
-      address = null
-      updateUI()
-    } else {
-      statusText.value = '❌ Failed: ' + result.reason
-      statusText.color = '#ff4444'
-      setTimeout(updateUI, 3000)
+    if (world.web3 && app.state.connected) {
+      await world.web3.disconnect()
     }
-  } catch (error) {
-    console.error('❌ Error:', error.message)
-    statusText.value = '❌ Error'
-    statusText.color = '#ff4444'
-    setTimeout(updateUI, 3000)
-  }
-}
 
-// Update UI
-function updateUI() {
-  if (connected && address) {
-    const short = address.substring(0, 6) + '...' + address.substring(38)
-    statusText.value = `✅ ${short}`
-    statusText.color = '#00a000'
-    buttonText.value = 'Disconnect'
-    connectButton.backgroundColor = '#ff4444'
-  } else {
+    app.state.connected = false
+    app.state.address = null
+
+    // Update UI for disconnected state
     statusText.value = '🌐 Disconnected'
     statusText.color = '#cccccc'
-    buttonText.value = 'Connect Wallet'
-    connectButton.backgroundColor = '#00a000'
+    connectAction.label = 'Connect Wallet'
+
+    app.emit('walletDisconnected', {})
+
+    console.log('[Wallet] Disconnected')
+  } catch (error) {
+    console.error('[Wallet] Disconnect failed:', error)
   }
 }
 
-// Update loop for hotkey detection (inspired by starknetkit)
+// Quick action hotkey
+if (app.props.quickActionEnabled === 'enabled' && world.isClient) {
+  const control = app.control()
+  if (!control) {
+    console.log('[Wallet] Controls not available')
+  } else {
+    const quickKey = control.keyQ
+    if (quickKey) {
+      quickKey.capture = true
+    }
+
+    let quickKeyPressed = false
+
+    app.on('update', () => {
+      if (quickKey?.pressed && !quickKeyPressed) {
+        if (app.state.connected) {
+          disconnectWallet()
+        } else {
+          connectWallet()
+        }
+      }
+      quickKeyPressed = quickKey?.pressed
+    })
+  }
+}
+
+// Update loop for UI visibility based on trigger zone
 app.on('update', () => {
-  if (!world.isClient || !control) return
-
-  // Refresh key bindings in case props changed
-  if (control._refreshWalletKeyBindings) {
-    control._refreshWalletKeyBindings()
-  }
-
-  // Handle toggle UI hotkey
-  if (hotKeyToggleCtrl?.pressed && !toggleKeyPrevPressed) {
-    toggleUI()
-  }
-  toggleKeyPrevPressed = hotKeyToggleCtrl?.pressed
-
-  // Handle quick connect/disconnect hotkey
-  if (hotKeyConnectCtrl?.pressed && !connectKeyPrevPressed) {
-    quickConnect()
-  }
-  connectKeyPrevPressed = hotKeyConnectCtrl?.pressed
+  statusUI.active = triggerZoneVisible()
 })
 
-console.log('✅ App initialized, waiting for clicks...')
+function triggerZoneVisible() {
+  return !app.props.triggerZone || app.props.triggerZone === 'disabled' || isPlayerNearby
+}
+
+console.log('✅ Wallet connect app initialized')

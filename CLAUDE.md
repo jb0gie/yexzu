@@ -153,6 +153,206 @@ webview.geometry = customMesh;  // Rebuilds with custom geometry
 - Octree insertion uses custom geometry bounds
 - Mouse events work on custom shapes as expected
 
+## Web3 Wallet Connection Patterns
+
+**Standardized patterns for wallet connection apps**
+
+### API Usage
+
+**Use `world.web3` not `world.evm`:**
+- `world.web3.connect()` - Standard wallet connection method
+- `world.web3.disconnect()` - Standard wallet disconnection method
+- Returns objects with `{ address }` on success
+
+### State Management Pattern
+
+**Always use `app.state` for connection state:**
+```javascript
+app.state.connected = false
+app.state.address = null
+```
+
+**Avoid local variables** - Other systems may need to inspect connection state
+
+### UI Pattern
+
+**Minimal status UI attached to entity:**
+```javascript
+const statusUI = app.create('ui', {
+  space: 'screen',
+  position: [0.89, 0.1, 0],  // Top-right corner
+  width: 150,
+  height: 40,
+  backgroundColor: 'rgba(0, 0, 0, 0.8)'
+})
+const statusText = app.create('uitext', {
+  value: '🌐 Disconnected',
+  color: '#cccccc',
+  fontSize: 14
+})
+statusUI.add(statusText)
+entity.add(statusUI)  // Attach to world entity, not app
+```
+
+### Action System (Primary Interaction)
+
+**Use `app.create('action')` instead of clickable UI:**
+```javascript
+const connectAction = app.create('action', {
+  label: app.state.connected ? 'Disconnect Wallet' : 'Connect Wallet',
+  distance: 4,      // Interaction distance in meters
+  duration: 0.3,    // Hold duration in seconds
+  onTrigger: () => {
+    if (app.state.connected) {
+      disconnectWallet()
+    } else {
+      connectWallet()
+    }
+  }
+})
+entity.add(connectAction)
+```
+
+**Benefits:**
+- Consistent with Hyperfy interaction patterns
+- Works across desktop and VR
+- Automatic visual feedback (E key prompt)
+
+### Trigger Zone Pattern
+
+**Optional: Show UI/action only when nearby:**
+```javascript
+// Configure with app.configure()
+app.configure([{
+  key: 'triggerZone',
+  type: 'switch',
+  options: [{ label: 'Enabled', value: 'enabled' },
+            { label: 'Disabled', value: 'disabled' }],
+  initial: 'enabled'
+}])
+
+// Implementation in app code
+if (triggerBody && app.props.triggerZone === 'enabled') {
+  triggerBody.onTriggerEnter = (e) => {
+    if (e.playerId === world.getPlayer()?.id) {
+      isPlayerNearby = true
+      connectAction.active = true  // Show action
+    }
+  }
+  triggerBody.onTriggerLeave = (e) => {
+    if (e.playerId === world.getPlayer()?.id) {
+      isPlayerNearby = false
+      connectAction.active = false  // Hide action
+    }
+  }
+}
+```
+
+### Quick Action Hotkey
+
+**Optional: Q key for instant connect/disconnect:**
+```javascript
+app.configure([{
+  key: 'quickActionEnabled',
+  type: 'switch',
+  options: [{ label: 'Enabled', value: 'enabled' },
+            { label: 'Disabled', value: 'disabled' }],
+  initial: 'enabled'
+}])
+
+if (app.props.quickActionEnabled === 'enabled' && world.isClient) {
+  const control = app.control()
+  const quickKey = control.keyQ
+  if (quickKey) quickKey.capture = true
+
+  let quickKeyPressed = false
+  app.on('update', () => {
+    if (quickKey?.pressed && !quickKeyPressed) {
+      if (app.state.connected) disconnectWallet()
+      else connectWallet()
+    }
+    quickKeyPressed = quickKey?.pressed
+  })
+}
+```
+
+### Event Emissions
+
+**Emit events for cross-app communication:**
+```javascript
+app.emit('walletConnected', {
+  connected: true,
+  address: result.address
+})
+
+app.emit('walletDisconnected', {})
+```
+
+### Entity Assumption Pattern
+
+**Apps assume specific entity names exist:**
+- `cartridge.js` assumes entity named `'CartridgeLogo'`
+- `wallet-connect.js` assumes entity named `'WalletIcon'`
+- Apps get entity reference: `const entity = app.get('EntityName')`
+
+### Configuration Standards
+
+**Standard configuration options:**
+```javascript
+app.configure([
+  {
+    key: 'buttonText',
+    type: 'text',
+    label: 'Connect Button Text',
+    initial: 'Connect Wallet'
+  },
+  {
+    key: 'buttonColor',
+    type: 'color',
+    label: 'Button Color',
+    initial: '#6366f1'
+  },
+  {
+    key: 'quickActionEnabled',
+    type: 'switch',
+    label: 'Quick Action Key',
+    options: [{ label: 'Enabled', value: 'enabled' },
+              { label: 'Disabled', value: 'disabled' }],
+    initial: 'enabled'
+  },
+  {
+    key: 'triggerZone',
+    type: 'switch',
+    label: 'Trigger Zone Control',
+    options: [{ label: 'Enabled', value: 'enabled' },
+              { label: 'Disabled', value: 'disabled' }],
+    initial: 'enabled'
+  }
+])
+```
+
+### Error Handling Pattern
+
+**Distinguish user cancellation from errors:**
+```javascript
+try {
+  const result = await world.web3.connect()
+} catch (error) {
+  // User cancelled
+  if (error.message.includes('User cancelled') ||
+      error.message.includes('User rejected') ||
+      error.message.includes('Modal closed')) {
+    console.log('User cancelled connection')
+    return  // Silent return, not an error
+  }
+
+  // Real error
+  console.error('Connection failed:', error)
+  statusText.value = 'Connection failed'
+  statusText.color = '#ef4444'
+}
+```
+
 ## Docker Build Caveats
 
 **Native Module Compilation Requirements**
