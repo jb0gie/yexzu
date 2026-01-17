@@ -159,10 +159,15 @@ webview.geometry = customMesh;  // Rebuilds with custom geometry
 
 ### API Usage
 
-**Use `world.web3` not `world.evm`:**
-- `world.web3.connect()` - Standard wallet connection method
-- `world.web3.disconnect()` - Standard wallet disconnection method
-- Returns objects with `{ address }` on success
+**EVM Wallets (MetaMask, etc.) use `world.evm`:**
+- `world.evm.connect()` - Returns `{ success: boolean, address?: string, reason?: string }`
+- `world.evm.disconnect()` - Returns `{ success: boolean, reason?: string }`
+- Check `result.success` before using `result.address`
+
+**Cartridge (StarkNet) uses `world.web3`:**
+- `world.web3.connect()` - Returns `{ address: string }` or throws
+- `world.web3.disconnect()` - Returns void or throws
+- Different error handling pattern (see cartridge.js)
 
 ### State Management Pattern
 

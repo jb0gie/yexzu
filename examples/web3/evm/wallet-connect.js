@@ -124,34 +124,35 @@ async function connectWallet() {
     statusText.value = '⏳ Connecting...'
     statusText.color = '#f59e0b'
 
-    if (world.web3) {
-      console.log('[Wallet] Attempting to connect...')
-      const result = await world.web3.connect()
+    // Wait for MetaMask to be ready
+    await new Promise(resolve => setTimeout(resolve, 300))
 
-      if (result && result.address) {
-        app.state.connected = true
-        app.state.address = result.address
+    const result = await world.evm.connect()
+    console.log('✅ Result:', result)
 
-        // Update UI for connected state
-        const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
-        statusText.value = `✅ ${short}`
-        statusText.color = '#10b981'
-        connectAction.label = 'Disconnect Wallet'
+    if (result.success && result.address) {
+      console.log('✅ CONNECTED! Address:', result.address)
+      app.state.connected = true
+      app.state.address = result.address
 
-        app.emit('walletConnected', {
-          connected: true,
-          address: result.address,
-        })
+      // Update UI for connected state
+      const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
+      statusText.value = `✅ ${short}`
+      statusText.color = '#10b981'
+      connectAction.label = 'Disconnect Wallet'
 
-        console.log('[Wallet] Connected:', result.address)
-      } else {
-        // User cancelled
-        console.log('[Wallet] User cancelled connection')
+      app.emit('walletConnected', {
+        connected: true,
+        address: result.address,
+      })
+    } else {
+      console.error('❌ Connection failed:', result.reason)
+      statusText.value = '❌ Failed: ' + (result.reason || 'Unknown error')
+      statusText.color = '#ff4444'
+      setTimeout(() => {
         statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
-      }
-    } else {
-      throw new Error('world.web3 not available')
+      }, 3000)
     }
   } catch (error) {
     // Check for user cancellation
@@ -184,23 +185,32 @@ async function connectWallet() {
 
 async function disconnectWallet() {
   try {
-    if (world.web3 && app.state.connected) {
-      await world.web3.disconnect()
+    const result = await world.evm.disconnect()
+    console.log('✅ Result:', result)
+
+    if (result.success) {
+      app.state.connected = false
+      app.state.address = null
+
+      // Update UI for disconnected state
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+      connectAction.label = 'Connect Wallet'
+
+      app.emit('walletDisconnected', {})
+
+      console.log('[Wallet] Disconnected')
+    } else {
+      console.error('❌ Disconnect failed:', result.reason)
     }
-
-    app.state.connected = false
-    app.state.address = null
-
-    // Update UI for disconnected state
-    statusText.value = '🌐 Disconnected'
-    statusText.color = '#cccccc'
-    connectAction.label = 'Connect Wallet'
-
-    app.emit('walletDisconnected', {})
-
-    console.log('[Wallet] Disconnected')
   } catch (error) {
-    console.error('[Wallet] Disconnect failed:', error)
+    console.error('❌ Error:', error.message)
+    statusText.value = '❌ Error'
+    statusText.color = '#ff4444'
+    setTimeout(() => {
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+    }, 3000)
   }
 }
 
