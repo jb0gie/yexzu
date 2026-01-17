@@ -163,11 +163,7 @@ webview.geometry = customMesh;  // Rebuilds with custom geometry
 - `world.evm.connect()` - Returns `{ success: boolean, address?: string, reason?: string }`
 - `world.evm.disconnect()` - Returns `{ success: boolean, reason?: string }`
 - Check `result.success` before using `result.address`
-
-**Cartridge (StarkNet) uses `world.web3`:**
-- `world.web3.connect()` - Returns `{ address: string }` or throws
-- `world.web3.disconnect()` - Returns void or throws
-- Different error handling pattern (see cartridge.js)
+- Note: Cartridge/StarkNet wallets use different patterns (not covered here)
 
 ### State Management Pattern
 
@@ -178,6 +174,52 @@ app.state.address = null
 ```
 
 **Avoid local variables** - Other systems may need to inspect connection state
+
+### EVMClient State Synchronization (CRITICAL)
+
+**Understanding React/EVMClient state flow:**
+
+The EVM system uses a two-layer state management approach:
+
+1. **React Layer** (wagmi): Manages actual wallet connection
+2. **EVMClient Layer** (world.evm): Caches state for non-React code
+
+**Critical synchronization points:**
+```javascript
+// 1. React calls bind() when connection state changes
+world.evm.bind({ isConnected, address, ... })
+
+// 2. App calls connect() to initiate connection
+const result = await world.evm.connect()
+// ⚠️ May timeout before address is available
+
+// 3. React eventually provides address via bind()
+// 4. bind() emits evmConnect event
+```
+
+**Common race condition (FIXED):**
+- **Symptom**: "already_connected" error on reconnect after disconnect
+- **Cause**: Cached React state not cleared on disconnect
+- **Fix**: disconnect() now clears all cached state
+```javascript
+// disconnect() clears all cached state:
+this.connected = false
+this.address = null                    // Clear cached address
+this._cachedReactIsConnected = false   // Clear React state cache
+this._cachedReactAddress = null        // Clear React address cache
+```
+
+**State management rules:**
+1. **Use bind() for React updates**: Let bind() manage this.connected
+2. **Don't set connected on timeout**: connect() without address doesn't set state
+3. **Clear cache on disconnect**: Prevents stale state from previous sessions
+4. **Check for address, not just state**: already_connected requires address
+
+**Key implementation details in EVMClient.js:**
+- `bind()` sets `this.address = address` when connecting
+- `bind()` sets `this.address = null` when disconnecting
+- `connect()` checks for address before returning already_connected
+- `disconnect()` clears all cached React state
 
 ### UI Pattern
 
@@ -296,8 +338,7 @@ app.emit('walletDisconnected', {})
 ### Entity Assumption Pattern
 
 **Apps assume specific entity names exist:**
-- `cartridge.js` assumes entity named `'CartridgeLogo'`
-- `wallet-connect.js` assumes entity named `'WalletIcon'`
+- `wallet-connect.js` assumes entity named `'WalletConnectLogo'`
 - Apps get entity reference: `const entity = app.get('EntityName')`
 
 ### Configuration Standards
@@ -341,7 +382,7 @@ app.configure([
 **Distinguish user cancellation from errors:**
 ```javascript
 try {
-  const result = await world.web3.connect()
+  const result = await world.evm.connect()
 } catch (error) {
   // User cancelled
   if (error.message.includes('User cancelled') ||
@@ -355,6 +396,23 @@ try {
   console.error('Connection failed:', error)
   statusText.value = 'Connection failed'
   statusText.color = '#ef4444'
+}
+```
+
+**Handle edge case states correctly:**
+```javascript
+// "already_connected" and "not_connected" are not errors
+// The user/app called connect/disconnect when already in that state
+if (result.reason === 'already_connected') {
+  // Already connected, just update UI
+  statusText.value = 'Already connected'
+  statusText.color = '#10b981'
+}
+
+if (result.reason === 'not_connected') {
+  // Already disconnected, just update UI
+  statusText.value = '🌐 Disconnected'
+  statusText.color = '#cccccc'
 }
 ```
 

@@ -78,18 +78,23 @@ The `/examples` directory contains sample applications demonstrating Hyperfy pat
 - Minimal status UI with proximity trigger zone
 - Quick action hotkey (Q) for instant connect/disconnect
 - Uses `world.evm` API with `result.success/error` pattern
+- ENS name resolution with 5-minute caching
+- Fixed reconnection state management (see CLAUDE.md for details)
 
 **Cartridge Integration** (`/examples/web3/cartridge/cartridge.js`)
-- StarkNet wallet integration via Cartridge Controller
+- StarkNet wallet integration via Cartridge Controller  
 - Same UI patterns as EVM wallet (status bar, trigger zone)
-- Uses `world.web3` API (throws on error)
+- Uses different API pattern (see cartridge-specific docs)
 
-Both examples follow standardized patterns documented in `CLAUDE.md`:
+Both examples follow standardized patterns now documented in `CLAUDE.md`:
+- **EVMClient State Synchronization** - Critical state management rules
 - Entity-based interaction with Action system
 - Minimal screen-space UI attached to world entities
 - Optional proximity trigger zones
 - Configurable quick action keys
 - Event emissions for cross-app communication
+- Error handling with user cancellation detection
+
 
 ## 📏 Project Structure
 

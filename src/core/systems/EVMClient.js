@@ -78,10 +78,12 @@ export class EVM extends System {
     if (isConnectedChanged) {
       if (isConnected) {
         this.connected = true
+        this.address = address // Store the address too
         // Emit local event only - wallet connection is client-side
         this.emit('evmConnect', address)
       } else {
         this.connected = false
+        this.address = null // Clear address on disconnect
         // Emit local event only - wallet disconnection is client-side
         this.emit('evmDisconnect')
       }
@@ -105,11 +107,12 @@ export class EVM extends System {
       console.log('[EVM] Already connected locally, but React is still processing')
     }
 
-    // Check if already connected using both local state AND React state
-    const isAlreadyConnected = this.connected && this._reactData?.isConnected
+    // Check if already connected using both local state AND we have an address
+    // DON'T check this._reactData?.isConnected here - we might have stale bind() data
+    const isAlreadyConnected = this.connected && (this.address || this._reactData?.address || this._cachedReactAddress)
 
     if (isAlreadyConnected) {
-      console.log('[EVM] Already connected (both states), skipping...')
+      console.log('[EVM] Already connected (has connection and address), skipping...')
       // Get address from React data if available
       const address = this._reactData?.address || this.address
       return { success: false, reason: 'already_connected', address }
@@ -146,13 +149,16 @@ export class EVM extends System {
         const address = this._reactData?.address || this.address
         if (address) {
           console.log('[EVM] Address received:', address)
+          this.address = address
           this.connected = true
           return { success: true, connector, address }
         }
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      console.warn('[EVM] Address not received within timeout, connection may have issues')
+      console.warn('[EVM] Address not received within timeout')
+      // Don't set this.connected = true here - we don't have an address yet!
+      // Let bind() set it when React updates with the address
       return { success: true, connector, address: null }
     } catch (err) {
       // console.error('[EVM] Connection failed:', err.message)
@@ -209,6 +215,9 @@ export class EVM extends System {
       // Reset states
       //console.log('[EVM] Resetting EVMClient state...')
       this.connected = false
+      this.address = null // Clear cached address
+      this._cachedReactIsConnected = false // Clear cached React state
+      this._cachedReactAddress = null // Clear cached React address
       if (this._reactData) {
         //console.log('[EVM] Resetting _reactData...')
         this._reactData.isConnected = false
@@ -231,6 +240,7 @@ export class EVM extends System {
 
       // Even on error, reset our state to be safe
       this.connected = false
+      this._cachedReactIsConnected = false // Clear cached state even on error
       if (this._reactData) {
         this._reactData.isConnected = false
       }
