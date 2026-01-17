@@ -134,7 +134,12 @@ async function connectWallet() {
     await new Promise(resolve => setTimeout(resolve, 300))
 
     const result = await world.evm.connect()
-    console.log('✅ Result object:', JSON.stringify(result, null, 2))
+    // Log result safely (avoid circular reference errors)
+    try {
+      console.log('✅ Result:', result)
+    } catch (e) {
+      console.log('✅ Result:', { success: result.success, address: result.address, reason: result.reason })
+    }
 
     // Check if the result has the expected structure
     if (typeof result !== 'object' || result === null) {
@@ -254,7 +259,12 @@ async function disconnectWallet() {
 
   try {
     const result = await world.evm.disconnect()
-    console.log('✅ Result:', result)
+    // Log result safely (avoid circular reference errors)
+    try {
+      console.log('✅ Result:', result)
+    } catch (e) {
+      console.log('✅ Result:', { success: result.success, reason: result.reason })
+    }
 
     if (result.success) {
       app.state.connected = false
