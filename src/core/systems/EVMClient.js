@@ -9,8 +9,9 @@ export class EVM extends System {
     super(world)
     this.auths = storage.get(key, []) // [...{ address, signature }]
     this.connected = false
-    this._explicitOperationTimestamp = 0 // Timestamp of last explicit connect/disconnect
-    this._explicitOperationCooldown = 100 // ms to ignore bind() updates after explicit ops
+    // Store previous React state to detect actual changes
+    this._cachedReactIsConnected = false
+    this._cachedReactAddress = null
   }
 
   async bind({ connectors, connect, config, actions, abis, address, isConnected, isConnecting, disconnect }) {
@@ -54,23 +55,27 @@ export class EVM extends System {
       this._reactData.address = address
     }
 
-    // Check if we're in cooldown period after explicit connect/disconnect
-    const now = Date.now()
-    const inCooldown = now - this._explicitOperationTimestamp < this._explicitOperationCooldown
-
-    if (inCooldown) {
-      // Skip bind() updates during cooldown period to prevent race conditions
-      // React is probably still processing the explicit operation we just called
-      // console.log('[EVMClient.js] Skipping bind() update during cooldown period')
-      // console.log('[EVMClient.js] Time since explicit operation:', now - this._explicitOperationTimestamp, 'ms')
+    // Cache current React state for comparison next time
+    if (this._cachedReactIsConnected === undefined) {
+      this._cachedReactIsConnected = isConnected
+      this._cachedReactAddress = address
+      this.connected = isConnected  // Initialize on first bind
+      if (isConnected) {
+        this.emit('evmConnect', address)
+      }
       return
     }
 
-    // Only update this.connected if React has flipped the connection state
-    // This prevents bind() from overriding explicit connect()/disconnect() calls
-    const reactStateChanged = (isConnected && !this.connected) || (!isConnected && this.connected)
+    // Only update this.connected if React state has ACTUALLY changed
+    const isConnectedChanged = isConnected !== this._cachedReactIsConnected
+    const addressChanged = address !== this._cachedReactAddress
 
-    if (reactStateChanged) {
+    // Cache the new state for next comparison
+    this._cachedReactIsConnected = isConnected
+    this._cachedReactAddress = address
+
+    // Update only if the connection state changed (not just address updates)
+    if (isConnectedChanged) {
       if (isConnected) {
         this.connected = true
         // Emit local event only - wallet connection is client-side
@@ -91,13 +96,20 @@ export class EVM extends System {
   // Public method for apps to call - simplified wrapper
   async connect() {
     // Mark that we're performing an explicit operation
+    // (but only very briefly, React needs to update us!)
     this._explicitOperationTimestamp = Date.now()
 
-    // Check if already connected using either state
-    const isAlreadyConnected = this.connected || this._reactData?.isConnected
+    // If React has updated but isn't done connecting yet, don't block it
+    // Check both local state and React state - if they're different, we're in transition
+    if (this.connected && this._reactData?.isConnecting) {
+      console.log('[EVM] Already connected locally, but React is still processing')
+    }
+
+    // Check if already connected using both local state AND React state
+    const isAlreadyConnected = this.connected && this._reactData?.isConnected
 
     if (isAlreadyConnected) {
-      console.log('[EVM] Already connected, skipping...')
+      console.log('[EVM] Already connected (both states), skipping...')
       // Get address from React data if available
       const address = this._reactData?.address || this.address
       return { success: false, reason: 'already_connected', address }
