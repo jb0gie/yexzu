@@ -134,9 +134,18 @@ async function connectWallet() {
     await new Promise(resolve => setTimeout(resolve, 300))
 
     const result = await world.evm.connect()
-    console.log('✅ Result:', result)
+    console.log('✅ Result object:', JSON.stringify(result, null, 2))
 
-    if (result.success && result.address) {
+    // Check if the result has the expected structure
+    if (typeof result !== 'object' || result === null) {
+      console.error('❌ Invalid result from connect():', result)
+      statusText.value = '❌ Invalid response from wallet'
+      statusText.color = '#ff4444'
+      setTimeout(() => {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }, 3000)
+    } else if (result.success === true && result.address) {
       console.log('✅ CONNECTED! Address:', result.address)
       app.state.connected = true
       app.state.address = result.address
@@ -166,14 +175,31 @@ async function connectWallet() {
       }
       statusText.color = '#10b981'
       connectAction.label = 'Disconnect Wallet'
-    } else {
-      console.error('❌ Connection failed:', result.reason)
-      statusText.value = '❌ Failed: ' + (result.reason || 'Unknown error')
-      statusText.color = '#ff4444'
+    } else if (result.success === false) {
+      // Explicit failure from the EVM client
+      console.warn('⚠️ Connection failed from EVM:', result.reason || 'No reason provided')
+      statusText.value = '⚠️ Failed: ' + (result.reason || 'Unknown reason')
+      statusText.color = '#f59e0b'
       setTimeout(() => {
         statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
       }, 3000)
+    } else {
+      // Unexpected result structure - might be a timing issue
+      console.warn('⚠️ Unexpected result structure:', result)
+      // Check if we somehow got an address anyway
+      if (result.address || world.evm._reactData?.address) {
+        console.log('⚠️ But we have an address - treating as success')
+        app.state.connected = true
+        app.state.address = result.address || world.evm._reactData.address
+        const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
+        statusText.value = `✅ ${short}`
+        statusText.color = '#10b981'
+        connectAction.label = 'Disconnect Wallet'
+      } else {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
     }
   } catch (error) {
     // Check for user cancellation
