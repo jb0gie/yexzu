@@ -70,3 +70,37 @@ if (!isDesktop) {
 - Limit to ~10-20 webviews per scene
 - Complex pages reduce FPS
 - Mobile may throttle background iframes
+
+## Docker Build Caveats
+
+**Native Module Compilation Requirements**
+
+When building Docker images using Alpine Linux, native Node.js modules require build tools:
+
+**Required Packages:**
+- `python3` - Python interpreter for node-gyp
+- `make` - GNU Make build tool
+- `g++` - GNU C++ compiler
+- `sqlite-dev` - SQLite headers (for better-sqlite3)
+
+**Add to Dockerfile builder stage:**
+```dockerfile
+RUN apk add --no-cache python3 make g++ sqlite-dev
+```
+
+**Packages Requiring Native Compilation:**
+- `bufferutil` - WebSocket performance optimization (peer dependency of ws)
+- `utf-8-validate` - WebSocket UTF-8 validation (peer dependency of ws)
+- `better-sqlite3` - SQLite3 bindings (direct dependency)
+- Any other native addons in the dependency tree
+
+**Build Process:**
+1. Install build dependencies BEFORE `npm install`
+2. npm install will compile native modules automatically
+3. Alpine packages are lightweight but minimal - always check for native deps
+4. Verify build by checking for compiled .node files in node_modules
+
+**Common Errors:**
+- `gyp ERR! find Python` - Missing python3
+- `node-gyp rebuild` failures - Missing make or g++
+- SQLite compilation errors - Missing sqlite-dev
