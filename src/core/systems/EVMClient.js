@@ -38,24 +38,26 @@ export class EVM extends System {
     //   numConnectors: this.connection.connectors?.length
     // })
 
-    // Update connected state based on isConnected
-    if (isConnected && !this.connected) {
-      // console.log('[EVMClient.js] Connection state changed: disconnected -> connected')
-      this.connected = true
-      // Emit local event only - wallet connection is client-side
-      this.emit('evmConnect', address)
-    }
-    if (!isConnected && this.connected) {
-      // console.log('[EVMClient.js] Connection state changed: connected -> disconnected')
-      this.connected = false
-      // Emit local event only - wallet disconnection is client-side
-      this.emit('evmDisconnect')
-    }
-
-    // Also update _reactData if it exists
+    // Update _reactData always (this is just caching React state)
     if (this._reactData) {
       this._reactData.isConnected = isConnected
       this._reactData.address = address
+    }
+
+    // Only update this.connected if React has flipped the connection state
+    // This prevents bind() from overriding explicit connect()/disconnect() calls
+    const reactStateChanged = (isConnected && !this.connected) || (!isConnected && this.connected)
+
+    if (reactStateChanged) {
+      if (isConnected) {
+        this.connected = true
+        // Emit local event only - wallet connection is client-side
+        this.emit('evmConnect', address)
+      } else {
+        this.connected = false
+        // Emit local event only - wallet disconnection is client-side
+        this.emit('evmDisconnect')
+      }
     }
 
     // Periodic cache cleanup (run once on bind)
