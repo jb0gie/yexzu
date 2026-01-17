@@ -67,6 +67,30 @@ For containerized deployment, check [DOCKER.md](DOCKER.md) for detailed instruct
 - **[Sandbox](https://play.hyperfy.xyz/)** - Try Hyperfy in your browser
 - **[Twitter/X](https://x.com/hyperfy_io)** - Latest updates and announcements
 
+## 💡 Examples
+
+The `/examples` directory contains sample applications demonstrating Hyperfy patterns:
+
+### Web3 Wallet Connection Examples
+
+**EVM Wallet Connect** (`/examples/web3/evm/wallet-connect.js`)
+- Connect to MetaMask and EVM-compatible wallets
+- Minimal status UI with proximity trigger zone
+- Quick action hotkey (Q) for instant connect/disconnect
+- Uses `world.evm` API with `result.success/error` pattern
+
+**Cartridge Integration** (`/examples/web3/cartridge/cartridge.js`)
+- StarkNet wallet integration via Cartridge Controller
+- Same UI patterns as EVM wallet (status bar, trigger zone)
+- Uses `world.web3` API (throws on error)
+
+Both examples follow standardized patterns documented in `CLAUDE.md`:
+- Entity-based interaction with Action system
+- Minimal screen-space UI attached to world entities
+- Optional proximity trigger zones
+- Configurable quick action keys
+- Event emissions for cross-app communication
+
 ## 📏 Project Structure
 
 ```
