@@ -120,6 +120,12 @@ if (triggerBody && app.props.triggerZone === 'enabled') {
 
 // Connection functions
 async function connectWallet() {
+  // Check if already connected - this prevents the "already_connected" error
+  if (app.state.connected) {
+    console.log('[Wallet] Already connected (app.state), skipping connect attempt')
+    return
+  }
+
   try {
     statusText.value = '⏳ Connecting...'
     statusText.color = '#f59e0b'
@@ -145,6 +151,21 @@ async function connectWallet() {
         connected: true,
         address: result.address,
       })
+    } else if (result.reason === 'already_connected') {
+      // Handle already connected as SUCCESS, not error
+      console.log('[Wallet] Already connected according to EVM client')
+      app.state.connected = true
+
+      // Try to get the address from the EVM client
+      if (world.evm._reactData?.address) {
+        app.state.address = world.evm._reactData.address
+        const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
+        statusText.value = `✅ ${short}`
+      } else {
+        statusText.value = '✅ Connected (already)'
+      }
+      statusText.color = '#10b981'
+      connectAction.label = 'Disconnect Wallet'
     } else {
       console.error('❌ Connection failed:', result.reason)
       statusText.value = '❌ Failed: ' + (result.reason || 'Unknown error')
@@ -184,6 +205,12 @@ async function connectWallet() {
 }
 
 async function disconnectWallet() {
+  // Check if already disconnected - this prevents the "not_connected" error
+  if (!app.state.connected) {
+    console.log('[Wallet] Already disconnected (app.state), skipping disconnect attempt')
+    return
+  }
+
   try {
     const result = await world.evm.disconnect()
     console.log('✅ Result:', result)
@@ -200,8 +227,23 @@ async function disconnectWallet() {
       app.emit('walletDisconnected', {})
 
       console.log('[Wallet] Disconnected')
+    } else if (result.reason === 'not_connected') {
+      // Handle not connected as SUCCESS, not error
+      console.log('[Wallet] Already disconnected according to EVM client')
+      app.state.connected = false
+      app.state.address = null
+
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+      connectAction.label = 'Connect Wallet'
     } else {
       console.error('❌ Disconnect failed:', result.reason)
+      statusText.value = '❌ Disconnect failed'
+      statusText.color = '#ef4444'
+      setTimeout(() => {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }, 3000)
     }
   } catch (error) {
     console.error('❌ Error:', error.message)
