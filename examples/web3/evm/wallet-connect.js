@@ -145,20 +145,37 @@ async function connectWallet() {
         statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
       }, 3000)
-    } else if (result.success === true && result.address) {
-      console.log('✅ CONNECTED! Address:', result.address)
+    } else if (result.success === true) {
+      // Connection succeeded! But address might be null on first attempt due to timing
+      console.log('✅ Connection successful')
       app.state.connected = true
-      app.state.address = result.address
 
-      // Update UI for connected state
-      const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
-      statusText.value = `✅ ${short}`
+      // Check if we have an address
+      if (result.address) {
+        console.log('✅ Address received immediately:', result.address)
+        app.state.address = result.address
+        const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
+        statusText.value = `✅ ${short}`
+      } else if (world.evm._reactData?.address) {
+        // Address available from React data
+        console.log('✅ Address available from React:', world.evm._reactData.address)
+        app.state.address = world.evm._reactData.address
+        const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
+        statusText.value = `✅ ${short}`
+      } else {
+        // Connection succeeded but address not yet available
+        // This happens on first connect due to EVMClient's 2-second timeout waiting for React
+        console.log('✅ Connected (address pending...)')
+        statusText.value = '✅ Connected'
+        app.state.address = null // Clear any stale address
+      }
+
       statusText.color = '#10b981'
       connectAction.label = 'Disconnect Wallet'
 
       app.emit('walletConnected', {
         connected: true,
-        address: result.address,
+        address: app.state.address,
       })
     } else if (result.reason === 'already_connected') {
       // Handle already connected as SUCCESS, not error
@@ -175,6 +192,11 @@ async function connectWallet() {
       }
       statusText.color = '#10b981'
       connectAction.label = 'Disconnect Wallet'
+
+      app.emit('walletConnected', {
+        connected: true,
+        address: app.state.address,
+      })
     } else if (result.success === false) {
       // Explicit failure from the EVM client
       console.warn('⚠️ Connection failed from EVM:', result.reason || 'No reason provided')
@@ -185,21 +207,14 @@ async function connectWallet() {
         statusText.color = '#cccccc'
       }, 3000)
     } else {
-      // Unexpected result structure - might be a timing issue
-      console.warn('⚠️ Unexpected result structure:', result)
-      // Check if we somehow got an address anyway
-      if (result.address || world.evm._reactData?.address) {
-        console.log('⚠️ But we have an address - treating as success')
-        app.state.connected = true
-        app.state.address = result.address || world.evm._reactData.address
-        const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
-        statusText.value = `✅ ${short}`
-        statusText.color = '#10b981'
-        connectAction.label = 'Disconnect Wallet'
-      } else {
+      // Unexpected result structure
+      console.error('❌ Unexpected result structure:', result)
+      statusText.value = '❌ Unexpected response'
+      statusText.color = '#ff4444'
+      setTimeout(() => {
         statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
-      }
+      }, 3000)
     }
   } catch (error) {
     // Check for user cancellation
