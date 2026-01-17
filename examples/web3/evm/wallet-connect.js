@@ -45,7 +45,7 @@ app.state.connected = false
 app.state.address = null
 
 // Get entities
-const walletBody = app.get('WalletIcon')
+const walletBody = app.get('WalletConnectLogo')
 const triggerBody = app.get('AreaTrigger')
 
 // Create minimal status UI
@@ -249,4 +249,49 @@ function triggerZoneVisible() {
   return !app.props.triggerZone || app.props.triggerZone === 'disabled' || isPlayerNearby
 }
 
+// Example: Resolve ENS name for connected address
+async function showEnsName() {
+  if (!app.state.connected || !app.state.address) return
+
+  try {
+    const result = await world.evm.resolveName(app.state.address)
+    if (result.success && result.name) {
+      console.log('[Wallet] ENS name:', result.name)
+      statusText.value = `✅ ${result.name}`
+    }
+  } catch (error) {
+    console.log('[Wallet] ENS resolution failed:', error.message)
+  }
+}
+
+// Call when wallet connects
+try {
+  app.on('walletConnected', () => {
+    console.log('[Wallet] Connected event received')
+    // Uncomment to automatically resolve ENS
+    // showEnsName()
+  })
+} catch (error) {
+  console.log('[Wallet] Event listener setup failed')
+}
+
+// Example: Lookup address from ENS name
+async function lookupFromEns(ensName) {
+  try {
+    const result = await world.evm.lookupName(ensName)
+    if (result.success && result.address) {
+      console.log(`[Wallet] ${ensName} resolves to:`, result.address)
+      return result.address
+    }
+    return null
+  } catch (error) {
+    console.error('[Wallet] ENS lookup failed:', error.message)
+    return null
+  }
+}
+
 console.log('✅ Wallet connect app initialized')
+console.log('📧 ENS resolution methods available:')
+console.log('   - world.evm.resolveName(address)')
+console.log('   - world.evm.lookupName(ensName)')
+console.log('   - Automatic caching to prevent rate limits')

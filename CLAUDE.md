@@ -358,6 +358,58 @@ try {
 }
 ```
 
+### ENS Resolution
+
+**EVM wallets support ENS name resolution with built-in caching:**
+
+```javascript
+// Resolve ENS name from address (with 5-minute cache)
+const result = await world.evm.resolveName(address)
+if (result.success && result.name) {
+  console.log('ENS name:', result.name)
+} else if (result.success && !result.name) {
+  console.log('No ENS name found')
+} else {
+  console.error('Resolution failed:', result.reason)
+}
+
+// Lookup address from ENS name (with 5-minute cache)
+const result = await world.evm.lookupName('vitalik.eth')
+if (result.success && result.address) {
+  console.log('Address:', result.address)
+} else if (result.success && !result.address) {
+  console.log('No address found')
+} else {
+  console.error('Lookup failed:', result.reason)
+}
+```
+
+**ENS Resolution Features:**
+- **Caching**: Results cached for 5 minutes to prevent rate limiting
+- **Failure caching**: Failed lookups cached for 1 minute to avoid repeated attempts
+- **Automatic cleanup**: Cache cleared when EVM client binds/reconnects
+- **Error handling**: Graceful failure with detailed reasons
+- **Format validation**: `.eth` suffix required for name lookups
+
+**Implementation in EVMClient.js:**
+- `resolveName(address)` - Resolves address → ENS name
+- `lookupName(ensName)` - Resolves ENS name → address
+- `cleanupCache()` - Removes expired cache entries
+- `ensCacheTimeout = 5 * 60 * 1000` (5 minutes)
+
+**Rate Limit Prevention:**
+The ENS resolution includes multiple safeguards:
+1. 5-minute cache for successful resolutions
+2. 1-minute cache for failed resolutions
+3. Per-address/per-name caching to avoid repeated API calls
+4. Cache cleanup on bind to prevent stale entries
+
+**Common ENS Resolution Issues:**
+- **Rate limits**: Use built-in caching, don't resolve on every frame
+- **Not finding names**: ENS names only exist on mainnet, not testnets
+- **Performance**: Always check cache before making network requests
+- **Invalid names**: ENS names must end with `.eth`
+
 ## Docker Build Caveats
 
 **Native Module Compilation Requirements**

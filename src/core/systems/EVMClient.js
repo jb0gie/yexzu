@@ -28,6 +28,10 @@ export class EVM extends System {
     this.config = config
     this.address = address
 
+    // Initialize ENS cache to prevent rate limiting
+    this.ensCache = new Map()
+    this.ensCacheTimeout = 5 * 60 * 1000 // 5 minutes
+
     // console.log('[EVMClient.js] this.connection set to:', {
     //   hasConnect: !!this.connection.connect,
     //   hasDisconnect: !!this.connection.disconnect,
@@ -53,6 +57,9 @@ export class EVM extends System {
       this._reactData.isConnected = isConnected
       this._reactData.address = address
     }
+
+    // Periodic cache cleanup (run once on bind)
+    this.cleanupCache()
 
     // console.log('[EVMClient.js] bind() completed, ready for connections')
   }
@@ -214,5 +221,119 @@ export class EVM extends System {
     // const serializedSignedTx = Buffer.from(signedTx.serialize({ requireAllSignatures: false })).toString('base64')
     this.world.network.send('withdrawResponse', { withdrawId, serializedSignedTx })
     // console.log('withdrawResponse', { withdrawId, serializedSignedTx })
+  }
+
+  // ENS Resolution with caching to prevent rate limits
+  async resolveName(address) {
+    if (!address) {
+      return { success: false, reason: 'no_address' }
+    }
+
+    // Check cache first
+    const cacheKey = `name:${address.toLowerCase()}`
+    const cached = this.ensCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < this.ensCacheTimeout) {
+      console.log('[EVM] ENS name resolved from cache:', cached.value)
+      return { success: true, name: cached.value }
+    }
+
+    try {
+      // Use viem's getEnsName action through the bound actions
+      if (!this.actions?.getEnsName) {
+        console.error('[EVM] ENS resolution not available - getEnsName not bound')
+        return { success: false, reason: 'ens_not_available' }
+      }
+
+      console.log('[EVM] Resolving ENS name for address:', address)
+      const name = await this.actions.getEnsName(this.config, { address })
+
+      if (name) {
+        // Cache the result
+        this.ensCache.set(cacheKey, {
+          value: name,
+          timestamp: Date.now()
+        })
+        console.log('[EVM] ENS name resolved:', name)
+        return { success: true, name }
+      } else {
+        console.log('[EVM] No ENS name found for address:', address)
+        return { success: true, name: null }
+      }
+    } catch (error) {
+      console.error('[EVM] ENS name resolution failed:', error.message)
+      // Cache failures briefly to prevent repeated attempts
+      this.ensCache.set(cacheKey, {
+        value: null,
+        timestamp: Date.now() - (this.ensCacheTimeout - 60000) // Cache for 1 minute
+      })
+      return { success: false, reason: 'resolution_failed', error: error.message }
+    }
+  }
+
+  async lookupName(ensName) {
+    if (!ensName) {
+      return { success: false, reason: 'no_name' }
+    }
+
+    // Validate ENS name format
+    if (!ensName.endsWith('.eth')) {
+      console.log('[EVM] Not an ENS name:', ensName)
+      return { success: true, address: null }
+    }
+
+    // Check cache first
+    const cacheKey = `address:${ensName.toLowerCase()}`
+    const cached = this.ensCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < this.ensCacheTimeout) {
+      console.log('[EVM] ENS address resolved from cache:', cached.value)
+      return { success: true, address: cached.value }
+    }
+
+    try {
+      // Use viem's getEnsAddress action through the bound actions
+      if (!this.actions?.getEnsAddress) {
+        console.error('[EVM] ENS resolution not available - getEnsAddress not bound')
+        return { success: false, reason: 'ens_not_available' }
+      }
+
+      console.log('[EVM] Resolving ENS address for name:', ensName)
+      const address = await this.actions.getEnsAddress(this.config, { name: ensName })
+
+      if (address) {
+        // Cache the result
+        this.ensCache.set(cacheKey, {
+          value: address,
+          timestamp: Date.now()
+        })
+        console.log('[EVM] ENS address resolved:', address)
+        return { success: true, address }
+      } else {
+        console.log('[EVM] No address found for ENS name:', ensName)
+        return { success: true, address: null }
+      }
+    } catch (error) {
+      console.error('[EVM] ENS address resolution failed:', error.message)
+      // Cache failures briefly to prevent repeated attempts
+      this.ensCache.set(cacheKey, {
+        value: null,
+        timestamp: Date.now() - (this.ensCacheTimeout - 60000) // Cache for 1 minute
+      })
+      return { success: false, reason: 'resolution_failed', error: error.message }
+    }
+  }
+
+  // Clear expired cache entries
+  cleanupCache() {
+    const now = Date.now()
+    let cleaned = 0
+    for (const [key, entry] of this.ensCache.entries()) {
+      if (now - entry.timestamp > this.ensCacheTimeout) {
+        this.ensCache.delete(key)
+        cleaned++
+      }
+    }
+    if (cleaned > 0) {
+      console.log(`[EVM] Cleaned ${cleaned} expired ENS cache entries`)
+    }
   }
 }
