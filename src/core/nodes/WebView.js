@@ -13,6 +13,8 @@ const defaults = {
   doubleside: false,
   space: 'world',
   pointerEvents: false, // Enable to allow iframe interaction
+  geometry: null,
+  pivot: 'center',
 }
 
 const v1 = new THREE.Vector3()
@@ -30,6 +32,8 @@ export class WebView extends Node {
     this.doubleside = data.doubleside
     this.space = data.space
     this.pointerEvents = data.pointerEvents
+    this.geometry = data.geometry
+    this.pivot = data.pivot
   }
 
   copy(source, recursive) {
@@ -42,6 +46,8 @@ export class WebView extends Node {
     this._doubleside = source._doubleside
     this._space = source._space
     this._pointerEvents = source._pointerEvents
+    this._geometry = source._geometry
+    this._pivot = source._pivot
     return this
   }
 
@@ -64,10 +70,20 @@ export class WebView extends Node {
   buildWorld() {
     const hasContent = this._src || this._html
 
-    // Create the black mesh (cutout)
-    const geometry = new THREE.PlaneGeometry(this._width, this._height)
+    // Create geometry
+    let geometry
+    // custom geometry
+    if (this._geometry) {
+      geometry = this._geometry
+    }
+    // plane geometry
+    if (!this._geometry) {
+      geometry = new THREE.PlaneGeometry(this._width, this._height)
+      applyPivot(geometry, this._width, this._height, this._pivot)
+    }
     geometry.computeBoundingBox()
     geometry.computeBoundingSphere()
+
     const material = new THREE.MeshBasicMaterial({
       opacity: 0,
       color: new THREE.Color('black'),
@@ -394,6 +410,46 @@ export class WebView extends Node {
     return this._pointerEvents
   }
 
+  set width(value) {
+    if (this._width === value) return
+    this._width = isNumber(value) ? value : defaults.width
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get width() {
+    return this._width
+  }
+
+  set height(value) {
+    if (this._height === value) return
+    this._height = isNumber(value) ? value : defaults.height
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get height() {
+    return this._height
+  }
+
+  set geometry(value) {
+    if (this._geometry === value) return
+    this._geometry = value
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get geometry() {
+    return this._geometry
+  }
+
+  set pivot(value) {
+    if (this._pivot === value) return
+    this._pivot = value
+    this.needsRebuild = true
+    this.setDirty()
+  }
+  get pivot() {
+    return this._pivot
+  }
+
   getProxy() {
     if (!this.proxy) {
       const self = this
@@ -440,10 +496,53 @@ export class WebView extends Node {
         set space(value) {
           self.space = value
         },
+        get width() {
+          return self.width
+        },
+        set width(value) {
+          self.width = value
+        },
+        get height() {
+          return self.height
+        },
+        set height(value) {
+          self.height = value
+        },
+        get geometry() {
+          return self.geometry
+        },
+        set geometry(value) {
+          self.geometry = value
+        },
+        get pivot() {
+          return self.pivot
+        },
+        set pivot(value) {
+          self.pivot = value
+        },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy()))
       this.proxy = proxy
     }
     return this.proxy
+  }
+}
+
+function applyPivot(geometry, width, height, pivot) {
+  if (pivot === 'center') return
+  let offsetX = 0
+  let offsetY = 0
+  if (pivot.includes('left')) {
+    offsetX = width / 2
+  } else if (pivot.includes('right')) {
+    offsetX = -width / 2
+  }
+  if (pivot.includes('top')) {
+    offsetY = -height / 2
+  } else if (pivot.includes('bottom')) {
+    offsetY = height / 2
+  }
+  if (offsetX !== 0 || offsetY !== 0) {
+    geometry.translate(offsetX, offsetY, 0)
   }
 }

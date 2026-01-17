@@ -71,6 +71,88 @@ if (!isDesktop) {
 - Complex pages reduce FPS
 - Mobile may throttle background iframes
 
+## WebView Geometry Support
+
+**Feature**: WebView nodes now support custom geometry like Video nodes
+
+### New Properties
+
+**geometry** - Custom THREE.Geometry for the WebView mesh
+- Type: `THREE.Geometry` or `null`
+- Default: `null` (uses PlaneGeometry)
+- Use custom geometry to place WebViews on any mesh surface
+
+**width** - Width of the WebView when using default PlaneGeometry
+- Type: `Number`
+- Default: `1`
+
+**height** - Height of the WebView when using default PlaneGeometry
+- Type: `Number`
+- Default: `1`
+
+**pivot** - Pivot point for positioning geometry
+- Type: `String`
+- Default: `'center'`
+- Options: `'center'`, `'top-left'`, `'top-center'`, `'top-right'`, `'center-left'`, `'center-right'`, `'bottom-left'`, `'bottom-center'`, `'bottom-right'`
+
+### Usage Examples
+
+**Using custom geometry (like Video nodes):**
+```javascript
+const sphere = new THREE.SphereGeometry(2, 32, 16);
+const webview = world.createNode('webview', {
+  src: 'https://example.com',
+  geometry: sphere
+});
+```
+
+**Using default plane geometry with sizing:**
+```javascript
+const webview = world.createNode('webview', {
+  src: 'https://example.com',
+  width: 3,
+  height: 2,
+  pivot: 'top-left'
+});
+```
+
+**Dynamic updates:**
+```javascript
+webview.width = 4;  // Rebuilds with new width
+webview.pivot = 'bottom-center';  // Rebuilds with new pivot
+webview.geometry = customMesh;  // Rebuilds with custom geometry
+```
+
+### Implementation Details
+
+**buildWorld() method changes:**
+- Checks for `this._geometry` first, uses it if available
+- Falls back to `THREE.PlaneGeometry(this._width, this._height)`
+- Applies pivot transformation using `applyPivot()` function
+- Maintains full compatibility with existing WebView functionality
+
+**Similar to Video node:**
+- Uses same pattern as Video.js geometry handling
+- Custom shader materials can be applied via material property
+- UV coordinates work the same as Video nodes for texture mapping
+
+### Technical Notes
+
+**CSS3D Layer Positioning:**
+- The CSS3D iframe follows the mesh geometry's world transform
+- iframe dimensions are calculated from geometry bounding box
+- `factor` property scales pixel dimensions for CSS3D rendering
+
+**Performance Considerations:**
+- Custom geometry increases build time (regenerates CSS3D object)
+- Complex geometries work but may impact collision detection
+- Pivot calculations add minimal overhead during build
+
+**Raycasting Support:**
+- Custom geometry maintains full raycasting capabilities
+- Octree insertion uses custom geometry bounds
+- Mouse events work on custom shapes as expected
+
 ## Docker Build Caveats
 
 **Native Module Compilation Requirements**
