@@ -9,6 +9,8 @@ export class EVM extends System {
     super(world)
     this.auths = storage.get(key, []) // [...{ address, signature }]
     this.connected = false
+    this._explicitOperationTimestamp = 0 // Timestamp of last explicit connect/disconnect
+    this._explicitOperationCooldown = 100 // ms to ignore bind() updates after explicit ops
   }
 
   async bind({ connectors, connect, config, actions, abis, address, isConnected, isConnecting, disconnect }) {
@@ -22,10 +24,18 @@ export class EVM extends System {
     //   isConnecting
     // })
 
+    // Store the action bindings
     this.actions = actions
     this.abis = abis
     this.connection = { connect, disconnect, connectors }
     this.config = config
+
+    // Cache React-provided data (for checking if state actually changed)
+    this._cachedReactIsConnected = isConnected
+    this._cachedReactAddress = address
+
+    // Don't let bind() call this from React's stale state after explicit operations
+    // Skip state updates if we're in the middle of an explicit connect/disconnect operation
     this.address = address
 
     // Initialize ENS cache to prevent rate limiting
@@ -42,6 +52,18 @@ export class EVM extends System {
     if (this._reactData) {
       this._reactData.isConnected = isConnected
       this._reactData.address = address
+    }
+
+    // Check if we're in cooldown period after explicit connect/disconnect
+    const now = Date.now()
+    const inCooldown = now - this._explicitOperationTimestamp < this._explicitOperationCooldown
+
+    if (inCooldown) {
+      // Skip bind() updates during cooldown period to prevent race conditions
+      // React is probably still processing the explicit operation we just called
+      // console.log('[EVMClient.js] Skipping bind() update during cooldown period')
+      // console.log('[EVMClient.js] Time since explicit operation:', now - this._explicitOperationTimestamp, 'ms')
+      return
     }
 
     // Only update this.connected if React has flipped the connection state
@@ -68,6 +90,9 @@ export class EVM extends System {
 
   // Public method for apps to call - simplified wrapper
   async connect() {
+    // Mark that we're performing an explicit operation
+    this._explicitOperationTimestamp = Date.now()
+
     // Check if already connected using either state
     const isAlreadyConnected = this.connected || this._reactData?.isConnected
 
@@ -126,6 +151,9 @@ export class EVM extends System {
 
   // Public disconnect method for apps
   async disconnect() {
+    // Mark that we're performing an explicit operation
+    this._explicitOperationTimestamp = Date.now()
+
     // console.log('')
     // console.log('=====================================================')
     // console.log('🔥 [EVMClient.js] disconnect() CALLED 🔥')
