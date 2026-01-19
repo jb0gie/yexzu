@@ -470,17 +470,24 @@ The ENS resolution includes multiple safeguards:
 
 ## DojoSystem Architecture
 
-**Critical: DojoSystem is client-side only**
+**Status: Removed from Client World Initialization**
 
-DojoSystem requires browser environment and cannot be initialized on the server:
-- WASM modules (`.wasm` files) cannot be imported in Node.js environment
+DojoSystem has been removed from `createClientWorld.js` initialization. The project uses **Cartridge** for web3 integration instead of DojoEngine.
+
+**Reason for Removal:**
+- DojoSystem was causing initialization errors during Hyperfy startup
+- Project uses Cartridge (`examples/web3/cartridge`) for StarkNet integration
+- DojoSystem is no longer needed for current web3 implementation
+
+**If you need to re-enable DojoSystem:**
+1. Add import: `import { DojoSystem } from './systems/DojoSystem'`
+2. Register system: `world.register('dojo', DojoSystem)`
+3. Add initialization (if needed): `world.dojo.init()`
+
+**Note:** DojoSystem is client-side only and requires browser environment:
+- WASM modules cannot be imported in Node.js
 - DojoEngine dependencies use browser-only APIs
-- Attempting to import on server causes "Unknown file extension ".wasm"" errors
-
-**Implementation pattern:**
-- Register DojoSystem only in `createClientWorld.js`
-- Remove from `createServerWorld.js` to prevent server initialization
-- System will fail fast with clear error if environment requirements not met
+- Server initialization will cause "Unknown file extension ".wasm"" errors
 
 ## Docker Build Caveats
 
