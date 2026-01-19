@@ -410,26 +410,6 @@ export class WebView extends Node {
     return this._pointerEvents
   }
 
-  set width(value) {
-    if (this._width === value) return
-    this._width = isNumber(value) ? value : defaults.width
-    this.needsRebuild = true
-    this.setDirty()
-  }
-  get width() {
-    return this._width
-  }
-
-  set height(value) {
-    if (this._height === value) return
-    this._height = isNumber(value) ? value : defaults.height
-    this.needsRebuild = true
-    this.setDirty()
-  }
-  get height() {
-    return this._height
-  }
-
   set geometry(value) {
     if (this._geometry === value) return
     this._geometry = value
@@ -495,18 +475,6 @@ export class WebView extends Node {
         },
         set space(value) {
           self.space = value
-        },
-        get width() {
-          return self.width
-        },
-        set width(value) {
-          self.width = value
-        },
-        get height() {
-          return self.height
-        },
-        set height(value) {
-          self.height = value
         },
         get geometry() {
           return self.geometry

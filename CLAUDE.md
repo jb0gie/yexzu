@@ -468,6 +468,85 @@ The ENS resolution includes multiple safeguards:
 - **Performance**: Always check cache before making network requests
 - **Invalid names**: ENS names must end with `.eth`
 
+## JavaScript/ES6 Class Patterns
+
+### Duplicate Property Accessors in Classes
+
+**Issue:** Duplicate getters/setters in ES6 classes cause build warnings
+
+**Symptom:**
+```
+▲ [WARNING] Duplicate member "width" in class body [duplicate-class-member]
+    src/core/nodes/WebView.js:413:6:
+      413 │   set width(value) {
+```
+
+**Root cause:** Multiple getters or setters with the same name in class body
+
+**Example of problem:**
+```javascript
+class WebView {
+  set width(value) { /* first setter */ }
+  get width() { /* first getter */ }
+
+  set width(value) { /* ❌ DUPLICATE - causes warning */ }
+  get width() { /* ❌ DUPLICATE - causes warning */ }
+}
+```
+
+**Solution:** Ensure only one getter and one setter per property name
+
+**Verified in WebView.js:**
+- Exactly one `set width` / `get width` pair in class (lines 353, 359)
+- Exactly one `set height` / `get height` pair in class (lines 363, 369)
+- Exactly one of each in proxy object (lines 449-458)
+- No duplicate warnings in build output
+
+## System Architecture Principles
+
+### No Mocks/Fallbacks/Simulations
+
+**Core principle:** Systems must fail fast with clear errors, not silently fall back to mock implementations.
+
+**Rationale:**
+- Mock data hides real integration issues until production
+- Failures during development are better than hidden bugs in production
+- Clear error messages enable faster debugging
+
+**Implementation pattern:**
+```javascript
+// ❌ WRONG: Silent fallback to mock
+if (error) {
+  console.warn('Using mock API');
+  return createMockAPI();
+}
+
+// ✅ CORRECT: Fail with clear error
+if (error) {
+  throw new Error(`DojoEngine initialization failed: ${error.message}. ` +
+                  `Please ensure DojoEngine dependencies are installed and configured correctly.`);
+}
+```
+
+**Applied to DojoSystem:**
+- Removed `createMockAPI()` method (71 lines)
+- Removed `createFallbackAPI()` method (23 lines)
+- System now throws clear errors instead of falling back to mocks
+
+### DojoSystem Architecture
+
+**Critical: DojoSystem is client-side only**
+
+DojoSystem requires browser environment and cannot be initialized on the server:
+- WASM modules (`.wasm` files) cannot be imported in Node.js environment
+- DojoEngine dependencies use browser-only APIs
+- Attempting to import on server causes "Unknown file extension ".wasm"" errors
+
+**Implementation pattern:**
+- Register DojoSystem only in `createClientWorld.js`
+- Remove from `createServerWorld.js` to prevent server initialization
+- System will fail fast with clear error if environment requirements not met
+
 ## Docker Build Caveats
 
 **Native Module Compilation Requirements**

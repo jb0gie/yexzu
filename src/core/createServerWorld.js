@@ -7,7 +7,6 @@ import { ServerLoader } from './systems/ServerLoader'
 import { ServerEnvironment } from './systems/ServerEnvironment'
 import { ServerMonitor } from './systems/ServerMonitor'
 import { ServerAI } from './systems/ServerAI'
-import { DojoSystem } from './systems/DojoSystem'
 import { EVM } from './systems/EVMServer'
 
 export function createServerWorld() {
@@ -19,15 +18,7 @@ export function createServerWorld() {
   world.register('environment', ServerEnvironment)
   world.register('monitor', ServerMonitor)
   world.register('ai', ServerAI)
-  world.register('dojo', DojoSystem)
   world.register('evm', EVM)
-
-  // Initialize DojoSystem after registration
-  if (world.dojo?.init) {
-    world.dojo.init().catch(err => {
-      console.error('[createServerWorld] Failed to initialize DojoSystem:', err)
-    })
-  }
 
   return world
 }

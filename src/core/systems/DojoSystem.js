@@ -94,55 +94,47 @@ export class DojoSystem extends System {
 
       // Check if we're in browser environment (WASM only works in browser)
       if (typeof window === 'undefined') {
-        console.log('[DojoSystem] Running in Node.js - using mock mode for server')
-        this.createMockAPI()
-        return
+        throw new Error('DojoSystem requires browser environment - WASM modules cannot run in Node.js')
       }
 
       // Dynamically import Dojo libraries (browser only)
-      try {
-        const { ToriiClient } = await import('@dojoengine/torii-client')
-        const { RpcProvider, Account } = await import('starknet')
+      const { ToriiClient } = await import('@dojoengine/torii-client')
+      const { RpcProvider, Account } = await import('starknet')
 
-        console.log('[DojoSystem] ✅ Dojo libraries imported successfully')
+      console.log('[DojoSystem] ✅ Dojo libraries imported successfully')
 
-        // Initialize StarkNet provider
-        this.provider = new RpcProvider({ nodeUrl: this.config.rpcUrl })
-        console.log('[DojoSystem] ✅ StarkNet provider initialized')
+      // Initialize StarkNet provider
+      this.provider = new RpcProvider({ nodeUrl: this.config.rpcUrl })
+      console.log('[DojoSystem] ✅ StarkNet provider initialized')
 
-        // Initialize account for transactions
-        this.account = new Account(this.provider, this.config.masterAddress, this.config.masterPrivateKey)
-        console.log('[DojoSystem] ✅ Account initialized:', this.config.masterAddress)
+      // Initialize account for transactions
+      this.account = new Account(this.provider, this.config.masterAddress, this.config.masterPrivateKey)
+      console.log('[DojoSystem] ✅ Account initialized:', this.config.masterAddress)
 
-        // Test connection to Katana
-        await this.testConnection()
+      // Test connection to Katana
+      await this.testConnection()
 
-        // Initialize Torii client for indexing
-        this.toriiClient = new ToriiClient({
-          rpcUrl: this.config.rpcUrl,
-          toriiUrl: this.config.toriiUrl,
-          worldAddress: this.config.worldAddress,
-        })
-        console.log('[DojoSystem] ✅ Torii client initialized')
+      // Initialize Torii client for indexing
+      this.toriiClient = new ToriiClient({
+        rpcUrl: this.config.rpcUrl,
+        toriiUrl: this.config.toriiUrl,
+        worldAddress: this.config.worldAddress,
+      })
+      console.log('[DojoSystem] ✅ Torii client initialized')
 
-        // Set up entity synchronization
-        this.setupEntitySync()
+      // Set up entity synchronization
+      this.setupEntitySync()
 
-        // Mark as connected
-        this._isConnected = true
-        this._networkId = 'LOCAL_KATANA'
+      // Mark as connected
+      this._isConnected = true
+      this._networkId = 'LOCAL_KATANA'
 
-        console.log('[DojoSystem] ✅ REAL DojoEngine integration initialized successfully')
-        console.log('[DojoSystem] Network:', this._networkId)
-        console.log('[DojoSystem] Account:', this.config.masterAddress)
-      } catch (importError) {
-        console.warn('[DojoSystem] ⚠️ Could not import Dojo libraries:', importError.message)
-        console.warn('[DojoSystem] ⚠️ Falling back to mock mode')
-        this.createMockAPI()
-      }
+      console.log('[DojoSystem] ✅ DojoEngine integration initialized successfully')
+      console.log('[DojoSystem] Network:', this._networkId)
+      console.log('[DojoSystem] Account:', this.config.masterAddress)
     } catch (error) {
-      console.error('[DojoSystem] ❌ Failed to initialize REAL DojoEngine:', error)
-      this.createFallbackAPI(error)
+      console.error('[DojoSystem] ❌ Failed to initialize DojoEngine:', error)
+      throw new Error(`DojoEngine initialization failed: ${error.message}. Please ensure DojoEngine dependencies are installed and configured correctly.`)
     }
   }
 
@@ -387,101 +379,7 @@ export class DojoSystem extends System {
     }
   }
 
-  createMockAPI() {
-    console.log('[DojoSystem] 🟡 Creating MOCK API for development')
 
-    this._isConnected = true
-    this._networkId = 'MOCK'
-    this._worldAddress = '0x1234567890abcdef'
-
-    // Mock implementations that simulate blockchain behavior
-    this.world.dojo.isConnected = () => this._isConnected
-    this.world.dojo.getNetwork = () => this._networkId
-    this.world.dojo.getWorldAddress = () => this._worldAddress
-
-    this.world.dojo.syncEntity = async (hyperfyEntity, dojoEntityId = null) => {
-      if (!dojoEntityId) {
-        dojoEntityId = `mock_${hyperfyEntity.data.id}_${Date.now()}`
-      }
-      this.entitySync.set(hyperfyEntity.data.id, dojoEntityId)
-      this.dojoEntities.set(dojoEntityId, hyperfyEntity.data.id)
-      console.log('[DojoSystem] ✅ Mock synced entity:', hyperfyEntity.data.id, '<->', dojoEntityId)
-      return dojoEntityId
-    }
-
-    this.world.dojo.unsyncEntity = hyperfyEntityId => {
-      const dojoEntityId = this.entitySync.get(hyperfyEntityId)
-      if (dojoEntityId) {
-        this.entitySync.delete(hyperfyEntityId)
-        this.dojoEntities.delete(dojoEntityId)
-        console.log('[DojoSystem] 🗑️ Mock unsynced entity:', hyperfyEntityId)
-      }
-    }
-
-    this.world.dojo.execute = async calls => {
-      console.log('[DojoSystem] 💰 Mock transaction executed:', calls)
-      const txHash = '0xmock_' + Date.now()
-      this.pendingTransactions.set(txHash, {
-        calls,
-        timestamp: Date.now(),
-        status: 'pending',
-      })
-      return { transaction_hash: txHash }
-    }
-
-    this.world.dojo.getBalance = async address => {
-      return {
-        address,
-        balance: '1000000000000000000',
-        formatted: '1.0',
-      }
-    }
-
-    this.world.dojo.getComponent = async (dojoEntityId, componentType) => {
-      return null
-    }
-
-    this.world.dojo.setComponent = async (dojoEntityId, componentType, value) => {
-      console.log('[DojoSystem] 📝 Mock set component:', dojoEntityId, componentType, value)
-      return { transaction_hash: '0xmock_component_' + Date.now() }
-    }
-
-    this.world.dojo.getDebugInfo = () => ({
-      isConnected: this._isConnected,
-      networkId: this._networkId,
-      worldAddress: this._worldAddress,
-      syncedEntities: this.entitySync.size,
-      pendingTransactions: this.pendingTransactions.size,
-      mode: 'MOCK',
-    })
-
-    // Set up sync interval for mock updates
-    this.setupEntitySync()
-  }
-
-  createFallbackAPI(error) {
-    console.log('[DojoSystem] 🔴 Creating fallback API due to initialization error')
-
-    this.world.dojo.isConnected = () => false
-    this.world.dojo.getNetwork = () => 'ERROR'
-    this.world.dojo.getWorldAddress = () => null
-
-    this.world.dojo.syncEntity = async () => {
-      throw new Error(`DojoEngine not initialized: ${error.message}`)
-    }
-
-    this.world.dojo.execute = async () => {
-      throw new Error(`DojoEngine not initialized: ${error.message}`)
-    }
-
-    this.world.dojo.getDebugInfo = () => ({
-      error: error.message,
-      isConnected: false,
-      networkId: null,
-      worldAddress: null,
-      mode: 'ERROR',
-    })
-  }
 
   update(delta) {
     // Handle pending transaction confirmations

@@ -109,6 +109,16 @@ CHANGELOG.md       - Version history and changes
 
 ## 🛠️ Development
 
+### Architecture Principles
+
+This codebase follows strict architectural principles documented in `CLAUDE.md`:
+
+- **No Mocks/Fallbacks** - Systems fail fast with clear errors instead of silent fallbacks
+- **Client/Server Separation** - Some systems (like DojoSystem) are client-side only due to WASM requirements
+- **Duplicate Code Prevention** - ES6 class property accessors must be unique (see WebView.js patterns)
+
+Refer to `CLAUDE.md` for detailed technical caveats and implementation patterns.
+
 ### Key Commands
 
 ```bash
