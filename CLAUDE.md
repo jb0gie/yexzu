@@ -468,72 +468,7 @@ The ENS resolution includes multiple safeguards:
 - **Performance**: Always check cache before making network requests
 - **Invalid names**: ENS names must end with `.eth`
 
-## JavaScript/ES6 Class Patterns
-
-### Duplicate Property Accessors in Classes
-
-**Issue:** Duplicate getters/setters in ES6 classes cause build warnings
-
-**Symptom:**
-```
-▲ [WARNING] Duplicate member "width" in class body [duplicate-class-member]
-    src/core/nodes/WebView.js:413:6:
-      413 │   set width(value) {
-```
-
-**Root cause:** Multiple getters or setters with the same name in class body
-
-**Example of problem:**
-```javascript
-class WebView {
-  set width(value) { /* first setter */ }
-  get width() { /* first getter */ }
-
-  set width(value) { /* ❌ DUPLICATE - causes warning */ }
-  get width() { /* ❌ DUPLICATE - causes warning */ }
-}
-```
-
-**Solution:** Ensure only one getter and one setter per property name
-
-**Verified in WebView.js:**
-- Exactly one `set width` / `get width` pair in class (lines 353, 359)
-- Exactly one `set height` / `get height` pair in class (lines 363, 369)
-- Exactly one of each in proxy object (lines 449-458)
-- No duplicate warnings in build output
-
-## System Architecture Principles
-
-### No Mocks/Fallbacks/Simulations
-
-**Core principle:** Systems must fail fast with clear errors, not silently fall back to mock implementations.
-
-**Rationale:**
-- Mock data hides real integration issues until production
-- Failures during development are better than hidden bugs in production
-- Clear error messages enable faster debugging
-
-**Implementation pattern:**
-```javascript
-// ❌ WRONG: Silent fallback to mock
-if (error) {
-  console.warn('Using mock API');
-  return createMockAPI();
-}
-
-// ✅ CORRECT: Fail with clear error
-if (error) {
-  throw new Error(`DojoEngine initialization failed: ${error.message}. ` +
-                  `Please ensure DojoEngine dependencies are installed and configured correctly.`);
-}
-```
-
-**Applied to DojoSystem:**
-- Removed `createMockAPI()` method (71 lines)
-- Removed `createFallbackAPI()` method (23 lines)
-- System now throws clear errors instead of falling back to mocks
-
-### DojoSystem Architecture
+## DojoSystem Architecture
 
 **Critical: DojoSystem is client-side only**
 
@@ -580,3 +515,17 @@ RUN apk add --no-cache python3 make g++ sqlite-dev
 - `gyp ERR! find Python` - Missing python3
 - `node-gyp rebuild` failures - Missing make or g++
 - SQLite compilation errors - Missing sqlite-dev
+## Port Troubleshooting
+
+**Issue**: Hyperfy fails to start with EADDRINUSE error
+
+**Diagnosis**: Check if port is already in use
+- Run: ss -tuln | grep :3011 (or your configured PORT)
+- Check for running Hyperfy processes: ps aux | grep "build/index.js"
+
+**Resolution Options**:
+1. Kill existing process: kill <PID>
+2. Use different port: Edit .env.local and change PORT=3011 to PORT=3012
+3. Access existing instance: The server may already be running at http://localhost:3011
+
+**Common Cause**: Previous Hyperfy dev session didn't shutdown properly
