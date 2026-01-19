@@ -25,7 +25,6 @@ import { Snaps } from './systems/Snaps'
 import { Wind } from './systems/Wind'
 import { XR } from './systems/XR'
 import { ClientAI } from './systems/ClientAI'
-import { DojoSystem } from './systems/DojoSystem'
 import { EVM } from './systems/EVMClient'
 
 export function createClientWorld() {
@@ -55,15 +54,7 @@ export function createClientWorld() {
   world.register('wind', Wind)
   world.register('xr', XR)
   world.register('ai', ClientAI)
-  world.register('dojo', DojoSystem)
   world.register('evm', EVM)
-
-  // Initialize DojoSystem after registration
-  if (world.dojo?.init) {
-    world.dojo.init().catch(err => {
-      console.error('[createClientWorld] Failed to initialize DojoSystem:', err)
-    })
-  }
 
   return world
 }
