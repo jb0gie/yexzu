@@ -57,7 +57,7 @@ export class Apps extends System {
         return world.evm
       },
       dojo(entity) {
-        return world.dojo
+        return world.dojo || null
       },
     }
     this.worldSetters = {
