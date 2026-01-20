@@ -54,6 +54,35 @@ dojo?.rehydrate()  // Works safely
 - Test apps that might access the removed system
 - Use `entity.get('systemName')?.method()` pattern in apps
 
+## Cartridge Controller Bug
+
+**Issue**: @cartridge/controller v0.10.7 has internal rehydrate error
+
+**Error Message**: `TypeError: Cannot read properties of undefined (reading 'rehydrate')`
+
+**Source**: The error occurs in @cartridge/controller's internal store persistence layer during React component mount. The library attempts to call `store.persist.rehydrate()` but `store.persist` is undefined.
+
+**Stack Trace Pattern**:
+```
+at onMount (index-XXXXX.js:286656:47)
+at commitHookEffectListMount (react-dom code)
+at commitPassiveMountOnFiber (react-dom code)
+```
+
+**Impact**:
+- Error appears in browser console but does not break functionality
+- Cartridge wallet connection still works
+- ENS resolution and other features remain operational
+
+**Workaround**:
+- This is a known bug in @cartridge/controller v0.10.7
+- The error can be safely ignored as it doesn't affect functionality
+- Consider downgrading to v0.10.6 if the console error is problematic
+
+**Related Files**:
+- `src/client/web3/ControllerProvider.js` - Cartridge initialization
+- `src/core/systems/ClientWeb3.js` - Web3 system integration
+
 ## WebView Technical Caveats
 
 **Critical Discovery**: CSS3D iframes in Three.js do NOT follow normal CSS pointer-events rules.
