@@ -19,6 +19,41 @@ npm run lint
 npm run format
 ```
 
+## System Dependency Handling
+
+**Critical: Apps.js providers must handle undefined systems gracefully**
+
+When removing systems from client world initialization (e.g., DojoSystem), the Apps.js providers must return `null` instead of `undefined` to prevent "Cannot read properties of undefined" errors.
+
+### Problem Pattern
+```javascript
+// ❌ WRONG - Returns undefined when system doesn't exist
+dojo(entity) {
+  return world.dojo  // undefined when DojoSystem removed
+}
+// Apps calling entity.get('dojo').rehydrate() will crash
+```
+
+### Solution Pattern
+```javascript
+// ✅ CORRECT - Returns null when system doesn't exist
+dojo(entity) {
+  return world.dojo || null  // null when DojoSystem removed
+}
+// Apps get null and can handle gracefully
+dojo?.rehydrate()  // Works safely
+```
+
+### Implementation Steps
+1. **Client World**: Remove system import, registration, and initialization
+2. **Apps.js**: Update provider to return `world.systemName || null`
+3. **Apps**: Use optional chaining (`?.`) or null checks before calling methods
+
+### Verification
+- Restart Hyperfy and check for "Cannot read properties of" errors
+- Test apps that might access the removed system
+- Use `entity.get('systemName')?.method()` pattern in apps
+
 ## WebView Technical Caveats
 
 **Critical Discovery**: CSS3D iframes in Three.js do NOT follow normal CSS pointer-events rules.
