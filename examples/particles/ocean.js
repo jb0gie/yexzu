@@ -265,10 +265,27 @@ if (world.isClient) {
   let timeSinceLastTrail = 0
   let lastPlayerPos = null
   
+  // Track app position offset
+  let appOffset = app.position.clone()
+  let lastAppPos = app.position.clone()
+
+  // Monitor app position changes to move water with app
+  app.on('update', () => {
+    if (!lastAppPos.equals(app.position)) {
+      // App moved - update all segment positions
+      const delta = app.position.clone().sub(lastAppPos)
+      for (const segment of segments) {
+        segment.position.add(delta)
+      }
+      lastAppPos.copy(app.position)
+      appOffset.copy(app.position)
+    }
+  })
+
   // Additional prim effects - extra spray rings
   const extraSprayRings = []
   const RING_COUNT = 3
-  
+
   for (let i = 0; i < RING_COUNT; i++) {
     const ring = app.create('prim', 'torus')
     ring.scale.set(2, 2, 2)
