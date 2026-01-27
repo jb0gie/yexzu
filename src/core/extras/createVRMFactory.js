@@ -663,11 +663,11 @@ export function createVRMFactory(glb, setupMaterial) {
 
     // Load and setup additive animation
     function loadAdditiveAnimation(url, options = {}) {
-      console.log(`[VRM] loadAdditiveAnimation called with url: ${url}, options:`, options)
+      // console.log(`[VRM] loadAdditiveAnimation called with url: ${url}, options:`, options)
       const { fadeDuration = 0.15, weight = 1.0 } = options
 
       if (additiveAnimations[url]) {
-        console.log(`[VRM] Animation already loaded, updating weight`)
+        // console.log(`[VRM] Animation already loaded, updating weight`)
         // Already loaded, just update weight
         const anim = additiveAnimations[url]
         anim.targetWeight = weight
@@ -676,12 +676,12 @@ export function createVRMFactory(glb, setupMaterial) {
         return Promise.resolve(anim)
       }
 
-      console.log(`[VRM] Loading new additive animation from: ${url}`)
+      // console.log(`[VRM] Loading new additive animation from: ${url}`)
       // Load new additive animation
       return hooks.loader
         .load('emote', url)
         .then(emo => {
-          console.log(`[VRM] Animation loaded, creating clip`)
+          // console.log(`[VRM] Animation loaded, creating clip`)
           const originalClip = emo.toClip({
             rootToHips,
             version,
@@ -696,7 +696,7 @@ export function createVRMFactory(glb, setupMaterial) {
           // Convert to delta format for proper additive blending
           const deltaClip = convertToDeltaClip(filteredClip, skeleton)
 
-          console.log(`[VRM] Creating additive action with blend mode:`, THREE.AdditiveAnimationBlendMode)
+          // console.log(`[VRM] Creating additive action with blend mode:`, THREE.AdditiveAnimationBlendMode)
           // Create additive action following THREE.js additive blending patterns
           const action = mixer.clipAction(deltaClip)
           action.blendMode = THREE.AdditiveAnimationBlendMode
@@ -718,9 +718,9 @@ export function createVRMFactory(glb, setupMaterial) {
           additiveAnimations[url] = anim
           currentAdditiveAnims.set(url, anim)
 
-          console.log(`[VRM] Loaded additive animation: ${url}`)
-          console.log(`[VRM] Delta clip tracks: ${deltaClip.tracks.length}`)
-          console.log(`[VRM] Filtered bones (${filteredBones.size}):`, Array.from(filteredBones))
+          // console.log(`[VRM] Loaded additive animation: ${url}`)
+          // console.log(`[VRM] Delta clip tracks: ${deltaClip.tracks.length}`)
+          // console.log(`[VRM] Filtered bones (${filteredBones.size}):`, Array.from(filteredBones))
           return anim
         })
         .catch(error => {
@@ -734,7 +734,7 @@ export function createVRMFactory(glb, setupMaterial) {
       const anim = additiveAnimations[url]
       if (!anim) return
 
-      console.log(`[VRM] Stopping additive animation: ${url}`)
+      // console.log(`[VRM] Stopping additive animation: ${url}`)
       anim.targetWeight = 0
       anim.fadeSpeed = 1 / fadeDuration
 
@@ -1416,11 +1416,11 @@ export function createVRMFactory(glb, setupMaterial) {
             : configurableSmoothing
 
         // Debug logging for smoothing adjustments (1% chance per frame)
-        if (Math.random() < 0.01 && hasActiveAdditiveAnimations) {
-          console.log(
-            `[VRM] Adaptive smoothing: original=${smoothing.toFixed(2)}, configurable=${configurableSmoothing.toFixed(2)}, adaptive=${adaptiveSmoothingEnabled}, final=${adaptiveSmoothing.toFixed(2)}, additiveAnims=${currentAdditiveAnims.size}`
-          )
-        }
+        // if (Math.random() < 0.01 && hasActiveAdditiveAnimations) {
+        //   console.log(
+        //     `[VRM] Adaptive smoothing: original=${smoothing.toFixed(2)}, configurable=${configurableSmoothing.toFixed(2)}, adaptive=${adaptiveSmoothingEnabled}, final=${adaptiveSmoothing.toFixed(2)}, additiveAnims=${currentAdditiveAnims.size}`
+        //   )
+        // }
 
         smoothState.current.slerp(smoothState.target, adaptiveSmoothing)
         // apply smoothed rotation to bone
@@ -1771,10 +1771,10 @@ export function createVRMFactory(glb, setupMaterial) {
       headToHeight,
       setEmote,
       setAdditiveAnimation(url, options = {}) {
-        console.log(`[VRM] setAdditiveAnimation called with url: ${url}, options:`, options)
+        // console.log(`[VRM] setAdditiveAnimation called with url: ${url}, options:`, options)
         if (!url) {
           // Clear all additive animations immediately
-          console.log(`[VRM] Clearing all additive animations (${currentAdditiveAnims.size} active)`)
+          // console.log(`[VRM] Clearing all additive animations (${currentAdditiveAnims.size} active)`)
           for (const [animUrl, anim] of currentAdditiveAnims) {
             anim.targetWeight = 0
             anim.fadeSpeed = 1 / (options.fadeDuration || 0.1)
