@@ -1243,3 +1243,96 @@ When using THREE constructors, note that THREE may not be in scope. Use:
 - Direct material objects for prim.material
 - Avoid THREE.MeshStandardMaterial()
 
+## Console Logging Performance Caveats
+
+**Critical: Console.log in high-frequency code paths causes severe performance degradation**
+
+### Issue Discovery
+Typing `/dof` in chat caused CPU spike to 40%, GPU spike to 5%, and framerate drop from 60 to 24 FPS due to console.log statements firing on every command.
+
+### Root Cause
+Two console.log statements in `src/core/systems/ClientPrefs.js`:
+- Line 145: `[ClientPrefs] ${prefKey} set to:` logging for all preference changes
+- Line 156: `DOF ${enabled ? 'ENABLED ✓' : 'DISABLED ✗'}` status logging
+
+### Performance Impact by Code Location
+
+**Critical (Frame Loops)** - Remove immediately:
+- `update()`, `lateUpdate()`, `fixedUpdate()`, `onEarlyUpdate()` handlers
+- Console logs fire every frame (~60 times/second)
+- Causes immediate framerate drops and CPU/GPU spikes
+
+**High (Frequent Events)** - Use conditional logging:
+- `onTriggerEnter`, `onTriggerExit`, `onCollision`
+- Input handlers: `onKeyDown`, `onMouseMove`, `onClick`
+- Rapidly repeating user actions
+
+**Medium (State Changes)** - Acceptable for debugging:
+- Configuration/property changes
+- App initialization, mount/unmount
+- Network events
+
+**Low (Initialization)** - Safe to keep:
+- One-time setup code
+- Error handling for critical failures
+
+### Best Practice Pattern
+
+**Use conditional debug logging:**
+```javascript
+// In app configuration
+app.configure([
+  {
+    key: 'debugLogs',
+    type: 'switch',
+    label: 'Debug Logging',
+    options: [{ label: 'Enabled', value: 'enabled' },
+              { label: 'Disabled', value: 'disabled' }],
+    initial: 'disabled'
+  }
+])
+
+// Debug helper function
+function debugLog(...args) {
+  if (app.props.debugLogs === 'enabled') {
+    console.log('[app]', ...args)
+  }
+}
+
+// Usage in code
+debugLog('State changed:', newState)  // Only logs when enabled
+```
+
+**Benefits:**
+- Zero performance impact when disabled
+- Maintain debugging capability
+- User-controlled via configuration
+- Clean production console output
+
+### Discovered Issues
+
+**Fireball elemental item** (`world/assets/93eb35186806d40895d0843fcfb73fb4c7025736d6c0203243041deffab1e26f.js`):
+- Console.log in `lateUpdate()` handler (4 statements)
+- Executes every frame when item is held
+- Immediate performance degradation during gameplay
+
+**SimpleTriggerArea** (`world/assets/b11765f8dfee8571a140268114305efa3c7a4e8bf412e82f85359fbeb6a2cfad.js`):
+- Console.log in `onTriggerEnter` handler
+- Fires every time player enters trigger area
+- Unnecessary console spam
+
+### Recommendation
+
+**New Development:**
+1. Implement conditional debug logging pattern in all new systems
+2. Never use console.log directly in frame loops
+3. Add `debugLogs` configuration option to all interactive apps
+
+**Existing Code Audit:**
+- 3,232 console.log statements found across 443 JavaScript files
+- Priority: Frame loops → frequent events → state changes → initialization
+- Remove or conditionally wrap all logs in high-frequency paths
+
+**Linting Rule:**
+Prevent console.log in update/lateUpdate/fixedUpdate handlers to catch issues during development.
+
