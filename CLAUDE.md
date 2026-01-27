@@ -1168,3 +1168,12 @@ setTimeout(() => app.remove(burst), 3000)
 - **Cleaner Code**: ~60% less code, no manual array management
 - **Reliability**: System handles edge cases, cleanup, and lifecycle
 - **Consistent Pattern**: Follows Hyperfy's `app.create()` and `app.configure()` standards
+
+
+## THREE.js Object Availability
+
+When using THREE constructors, note that THREE may not be in scope. Use:
+- Direct Vector3 (global)
+- Direct material objects for prim.material
+- Avoid THREE.MeshStandardMaterial()
+
