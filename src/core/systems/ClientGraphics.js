@@ -205,16 +205,21 @@ export class ClientGraphics extends System {
 
     // Handle DOF enable/disable
     if (changes.dofEnabled !== undefined) {
-      if (changes.dofEnabled.value && !this.effects.dof) {
+      const shouldEnable = changes.dofEnabled.value && !this.effects.dof
+      const shouldDisable = !changes.dofEnabled.value && this.effects.dof
+
+      if (shouldEnable) {
         // Enable DOF
         this.effects.dof = this.effectRegistry.createEffect('dof', this.world.camera, this.world)
-      } else if (!changes.dofEnabled.value && this.effects.dof) {
+        // Recreate EffectPass to ensure clean WebGL state
+        this.recreateEffectPass()
+      } else if (shouldDisable) {
         // Disable and remove DOF
         this.effectRegistry.removeEffect('dof')
         this.effects.dof = null
+        // Recreate EffectPass to ensure clean WebGL state
+        this.recreateEffectPass()
       }
-      // Recreate EffectPass to ensure clean WebGL state
-      this.recreateEffectPass()
     }
   }
 

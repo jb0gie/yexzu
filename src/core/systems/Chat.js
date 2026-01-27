@@ -57,7 +57,9 @@ export class Chat extends System {
       .filter(str => !!str)
     const callback = this.commands[cmd]
     if (callback) {
-      return callback({ playerId, cmd, value, args })
+      callback({ playerId, cmd, value, args })
+      // Don't broadcast built-in commands - they're client-only
+      return
     }
     if (cmd !== 'admin') {
       this.world.events.emit('command', { playerId, cmd, value, args })
