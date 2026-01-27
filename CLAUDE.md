@@ -1170,6 +1170,72 @@ setTimeout(() => app.remove(burst), 3000)
 - **Consistent Pattern**: Follows Hyperfy's `app.create()` and `app.configure()` standards
 
 
+## Depth of Field (DOF) Technical Caveats
+
+**DOF raycast performance optimization with frame skipping**
+
+DOFController uses frame skipping to reduce raycast frequency for better performance:
+- `raycastInterval` (default: 16ms) - Minimum time between raycasts
+- `frameSkipInterval` (default: 1) - Raycast every N frames (2=every other frame, 3=every third frame)
+- Adjust via: `world.dofController.raycastInterval = 32` or `window.cam.dof.performance.setFrameSkip(3)`
+
+**Hysteresis prevents focus jumping**
+
+Focus changes only occur when distance delta exceeds `focusHysteresis` (default: 0.1):
+- Prevents rapid focus oscillation when looking at edges
+- Lower values (0.05) = more responsive but potentially jittery
+- Higher values (0.2) = smoother but less responsive
+
+**Fallback focus distance from zoom calculation**
+
+When raycast fails (no hits or sky/background), uses `fallbackFocusDistance`:
+- Default: 10 meters
+- Set via: `world.dofController.setFallbackFocusDistance(distance)`
+- Camera-based zoom calculation provides dynamic fallback
+
+**Shader uniform updates normalized to 0-1 range**
+
+Focus distance sent to shader is normalized: `focusDistance / camera.far`:
+- Shader receives 0-1 range for GPU efficiency
+- Actual distance available in `world.dofController.currentFocusDistance`
+- Updates every frame regardless of raycast frequency
+
+**Console debugging commands (admin-only)**
+
+```javascript
+// Enable/disable DOF
+window.cam.dof.enable() / disable()
+
+// Manual focus control
+window.cam.dof.setFocus(distance)      // Set focus distance (meters)
+window.cam.dof.setRange(range)         // Set focus range
+window.cam.dof.setBokeh(scale)         // Set blur amount
+window.cam.dof.setFStop(fstop)         // Set aperture
+
+// Performance monitoring
+window.cam.dof.performance.get()       // Get {lastRaycastTime, raycastInterval, frameSkipInterval}
+window.cam.dof.performance.setFrameSkip(interval)  // Adjust raycast frequency
+
+// Direct controller access
+world.dofController.setDebug(true)     // Enable debug logging
+world.dofController.getFocusDistance() // Get current focus
+world.dofController.setFocusSpeed(speed)  // 0.01-1 (default: 3.0)
+```
+
+**Common DOF issues and fixes**
+
+- **DOF not visible**: Check `world.prefs.dofEnabled`, increase `bokehScale` (window.cam.dof.setBokeh(10)), decrease f-stop (window.cam.dof.setFStop(1.4))
+- **Focus not changing**: Check raycast hits with `world.dofController._getRaycastFocusDistance()`, reduce hysteresis, increase focus speed
+- **Performance issues**: Increase frameSkipInterval, disable with `window.cam.dof.disable()`
+
+**DOF shader parameter mapping**
+
+EffectRegistry maps world preferences to shader uniforms:
+- `world.prefs.dofFocalLength` (mm) → `focalLength` (normalized)
+- `world.prefs.dofFocusRange` → `focusRange` (normalized)
+- `world.prefs.dofMaxBlur` → `bokehScale` (multiplied by 2)
+- `world.prefs.dofFStop` → `fStop` (direct)
+
 ## THREE.js Object Availability
 
 When using THREE constructors, note that THREE may not be in scope. Use:
