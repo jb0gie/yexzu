@@ -974,6 +974,101 @@ RUN apk add --no-cache python3 make g++ sqlite-dev
 
 **Implementing configurable particle effects in Hyperfy apps**
 
+### Modern Approach (Hyperfy v2+)
+
+**Use built-in particle systems and primitives instead of manual particle management:**
+
+```javascript
+// Create particle emitter with app.create('particles')
+const spray = app.create('particles', {
+  shape: ['sphere', 0.1],        // Built-in shapes: sphere, cone, point
+  direction: 0.3,                // Randomization in initial direction
+  rate: 10,                      // Particles per second
+  loop: true,                    // Continuous emission
+  life: '2~3',                   // Random lifetime range
+  speed: '1~2',                  // Random initial speed
+  size: '0.05~0.1',              // Random size range
+  color: '#a8d8ff',              // Particle color
+  alpha: '0.7~1.0',              // Random opacity
+  force: new Vector3(0, -2, 0),  // Physics forces
+  space: 'world',                // World or local space
+  blending: 'additive'           // Additive blending mode
+})
+app.add(spray)
+
+// Create particle bursts for explosions/splashes
+const splash = app.create('particles', {
+  shape: ['sphere', 0.1],
+  direction: 1,
+  rate: 0,                       // No continuous emission
+  max: 50,                       // Max particles in system
+  bursts: [{ time: 0, count: 50 }], // Emit 50 particles at time 0
+  life: '1~2',
+  speed: '2~4',
+  color: '#ffffff~#a8d8ff',
+  force: new Vector3(0, -9.8, 0),
+  space: 'world',
+  blending: 'additive'
+})
+app.add(splash)
+```
+
+### Legacy vs Modern Patterns
+
+**❌ OLD PATTERN (Manual Particle Management):**
+```javascript
+// Manual array management
+const particles = []
+
+// Manual creation
+const particle = someTemplate.clone(true)
+particle.velocity = { x: 0, y: 1, z: 0 }
+particles.push(particle)
+world.add(particle)
+
+// Manual update in game loop
+for (let i = particles.length - 1; i >= 0; i--) {
+  const p = particles[i]
+  p.position.y += p.velocity.y * delta
+  p.lifetime += delta
+  if (p.lifetime > maxLifetime) {
+    world.remove(p)
+    particles.splice(i, 1)
+  }
+}
+```
+
+**✅ NEW PATTERN (Built-in Particle System):**
+```javascript
+// Particle system handles everything
+const particles = app.create('particles', {
+  rate: 10,
+  speed: '1~2',
+  force: new Vector3(0, -9.8, 0)
+  // System handles: emission, movement, lifetime, cleanup
+})
+app.add(particles)
+```
+
+### Primitives for Basic Geometry
+
+**Use `app.create('prim', type)` instead of templates for basic shapes:**
+
+```javascript
+// Create a plane prim for water surface
+const water = app.create('prim', 'plane')
+water.scale.set(5, 1, 5)
+water.material = new THREE.MeshStandardMaterial({
+  color: 0x006994,
+  transparent: true,
+  opacity: 0.8
+})
+app.add(water)
+
+// Available primitive types:
+// 'sphere', 'box', 'plane', 'cylinder', 'cone', 'torus'
+```
+
 ### Configuration Structure
 
 When creating particle-based effects (like ocean water simulation), use `app.configure()` to expose all tunable parameters:
@@ -1004,42 +1099,72 @@ app.configure([
 
 **Follow this pattern when implementing configurable particle effects:**
 
-1. **Define CONFIG with app.props fallbacks:**
+1. **Use app.props with fallbacks for particle parameters:**
 ```javascript
-const CONFIG = {
-  GRID_SIZE: app.props.gridSize || 20,
-  EFFECT_ENABLED: app.props.particleEffectEnabled === 'enabled'
-  // Other configurable values use same pattern
-}
+const particles = app.create('particles', {
+  rate: app.props.sprayRate || 10,
+  speed: app.props.spraySpeed || '1~2',
+  life: String(app.props.sprayLifetime || 2.0)
+  // All parameters can be bound to app.props
+})
 ```
 
 2. **Use toggle switches for on/off effects:**
 ```javascript
 if (app.props.effectEnabled === 'enabled') {
-  // Generate particles and run simulation
+  // Create and add particle systems
+  const effect = app.create('particles', { ... })
+  app.add(effect)
 }
 ```
 
-3. **Reference app.props directly for conditional logic:**
+3. **Reference app.props directly for conditional emission:**
 ```javascript
 if (playerPos && app.props.playerTrailEnabled === 'enabled') {
-  // Generate player movement trails
+  // Trigger trail particle bursts
+  const trail = app.create('particles', {
+    rate: 0,
+    bursts: [{ time: 0, count: 5 }]
+  })
+  app.add(trail)
 }
+```
+
+4. **Auto-cleanup with setTimeout for burst effects:**
+```javascript
+const burst = app.create('particles', { ... })
+app.add(burst)
+// Remove after particles die
+setTimeout(() => app.remove(burst), 3000)
 ```
 
 ### Example Reference
 
 **Ocean Particles Demo** (`examples/particles/ocean.js`):
-- 21 configurable parameters covering all visual and behavioral aspects
-- 19 range sliders for numeric values (grid size, wave properties, particle counts)
+- Uses `app.create('prim', 'plane')` for water surface instead of clone templates
+- Uses `app.create('particles')` for all effects (spray, splash, trails)
+- 17 configurable parameters covering all visual and behavioral aspects
+- 15 range sliders for numeric values (grid size, wave properties, particle counts)
 - 2 toggle switches for enabling/disabling entire effect systems
+- No manual particle lifecycle management - system handles everything
 - All parameters accessible via `app.props.keyName`
 - Toggle switches use `'enabled'` / `'disabled'` string values for consistency
-- No mock values or fallbacks - configuration drives actual behavior
+
+### Key Differences (Modern vs Legacy)
+
+1. **No Templates Required**: Use `app.create('prim')` for basic geometry
+2. **Built-in Physics**: `force: new Vector3(x, y, z)` instead of manual velocity updates
+3. **Automatic Lifecycle**: Particle system handles emission, movement, and cleanup
+4. **Burst Emission**: Use `bursts: [{time: 0, count: n}]` instead of manual loops
+5. **Range Syntax**: `'1~2'` for random ranges instead of `Math.random()`
+6. **Declarative**: Configure properties rather than imperative updates
 
 ### Benefits
 
 - **Live Tuning**: Real-time parameter adjustment in Hyperfy editor
 - **No Code Changes**: All visual tweaking via configuration UI
 - **Toggle Control**: Enable/disable entire effect systems as needed
-- **Consistent Pattern**: Follows Hyperfy's `app.configure()` standards
+- **Performance**: Built-in optimizations and GPU acceleration
+- **Cleaner Code**: ~60% less code, no manual array management
+- **Reliability**: System handles edge cases, cleanup, and lifecycle
+- **Consistent Pattern**: Follows Hyperfy's `app.create()` and `app.configure()` standards
