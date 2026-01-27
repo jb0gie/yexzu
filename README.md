@@ -95,6 +95,23 @@ Both examples follow standardized patterns now documented in `CLAUDE.md`:
 - Event emissions for cross-app communication
 - Error handling with user cancellation detection
 
+### Particle & VFX Examples
+
+**Ocean Simulation** (`/examples/particles/ocean.js`)
+- Modern Hyperfy v2+ particle system patterns
+- Uses `app.create('prim')` for water surface (no templates)
+- Uses `app.create('particles')` with physics forces
+- 17 configurable parameters via `app.configure()`
+- Demonstrates burst emission, range syntax, and particle lifecycle
+- Reference implementation for modern particle effects
+
+**VFX Collection** (`/examples/vfx/`)
+- Meteor showers with raycast collision detection
+- Fire, smoke, rain, and weather effects
+- Healing and glow particle systems
+- Tornado and water fountain effects
+- All using modern `app.create('particles')` patterns
+
 
 ## 📏 Project Structure
 
