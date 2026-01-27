@@ -142,7 +142,6 @@ export class ClientPrefs extends System {
 
       this[setterName] = value => {
         this.modify(prefKey, value)
-        console.log(`[ClientPrefs] ${prefKey} set to:`, value)
       }
     })
   }
@@ -153,7 +152,6 @@ export class ClientPrefs extends System {
     })
     this.world.chat.bindCommand('dof', () => {
       this.setDOFEnabled(!this.dofEnabled)
-      console.log(`DOF ${this.dofEnabled ? 'ENABLED ✓' : 'DISABLED ✗'}`)
     })
   }
 
