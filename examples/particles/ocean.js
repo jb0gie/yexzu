@@ -1,7 +1,6 @@
-// Hybrid ocean simulation - templates for main surface + modern particles + prims for extras
-// Uses original mesh templates (WaterPlane, WaterSpray) for main water surface
-// Modern app.create('particles') for all particle effects
-// Additional prims for extra spray effects
+// Modern ocean simulation with prims only - fully movable in Hyperfy
+// Uses app.create('prim', 'plane') for water surface and app.create('particles') for effects
+// No templates - allows moving the app entity in Hyperfy editor
 
 app.configure([
   {
@@ -193,31 +192,18 @@ app.configure([
   }
 ])
 
-// Water surface grid using original templates
+// Water surface grid using prims - fully movable app
 if (world.isClient) {
-  // Initialize required template objects
-  const waterSegment = app.get('WaterPlane')
-  const sprayParticle = app.get('WaterSpray')
-  
-  if (!waterSegment || !sprayParticle) {
-    console.error('Required templates not found - please add WaterPlane and WaterSpray entities')
-    return
-  }
-  
-  // Hide original templates
-  waterSegment.visible = false
-  sprayParticle.visible = false
-  
-  // Create water surface grid
   const segments = []
   const GRID_SIZE = app.props.gridSize || 20
   const SEGMENT_SIZE = app.props.segmentSize || 5.0
   const SURFACE_HEIGHT = app.props.surfaceHeight || 1.0
   
+  // Create water surface grid with plane prims (no templates needed)
   for (let z = 0; z < GRID_SIZE; z++) {
     for (let x = 0; x < GRID_SIZE; x++) {
-      const segment = waterSegment.clone(true)
-      segment.visible = true
+      const segment = app.create('prim', 'plane')
+      segment.scale.set(SEGMENT_SIZE, 1, SEGMENT_SIZE)
       
       // Position in grid
       const posX = (x - GRID_SIZE / 2) * SEGMENT_SIZE
@@ -228,12 +214,21 @@ if (world.isClient) {
       const distFromCenter = Math.sqrt(posX * posX + posZ * posZ)
       segment.timeOffset = num(0, Math.PI * 2, 2) + distFromCenter * (app.props.waveFrequency || 0.8)
       
+      // Water material properties
+      segment.material = {
+        color: 0x006994,
+        transparent: true,
+        opacity: 0.8,
+        roughness: 0.1,
+        metalness: 0.2
+      }
+      
       segments.push(segment)
-      world.add(segment)
+      app.add(segment)
     }
   }
   
-  // Modern particle system for all effects
+  // Ambient spray particle system
   const sprayParticles = app.create('particles', {
     shape: ['sphere', 0.1],
     direction: 0.3,
@@ -250,29 +245,11 @@ if (world.isClient) {
   })
   app.add(sprayParticles)
   
-  // Additional prim effects - extra spray rings
-  const extraSprayRings = []
-  const RING_COUNT = 5
-  
-  for (let i = 0; i < RING_COUNT; i++) {
-    const ring = app.create('prim', 'torus')
-    ring.scale.set(2, 2, 2)
-    ring.material = {
-      color: 0x88ccff,
-      transparent: true,
-      opacity: 0.3,
-      emissive: 0x4488ff
-    }
-    ring.visible = false
-    extraSprayRings.push(ring)
-    app.add(ring)
-  }
-  
   // Player trail particle system
   const trailParticles = app.create('particles', {
     shape: ['sphere', 0.05],
     direction: 0.1,
-    rate: 0,
+    rate: 0, // Will be controlled manually
     loop: true,
     life: '0.8',
     speed: '0.5~1',
@@ -288,6 +265,24 @@ if (world.isClient) {
   let timeSinceLastTrail = 0
   let lastPlayerPos = null
   
+  // Additional prim effects - extra spray rings
+  const extraSprayRings = []
+  const RING_COUNT = 3
+  
+  for (let i = 0; i < RING_COUNT; i++) {
+    const ring = app.create('prim', 'torus')
+    ring.scale.set(2, 2, 2)
+    ring.material = {
+      color: 0x88ccff,
+      transparent: true,
+      opacity: 0.3,
+      emissive: 0x4488ff
+    }
+    ring.visible = false
+    extraSprayRings.push(ring)
+    app.add(ring)
+  }
+  
   // Fish splash timing
   let fishSplashTimer = 0
   let nextFishSplash = num(app.props.fishSplashMinInterval || 1, app.props.fishSplashMaxInterval || 1, 2)
@@ -298,7 +293,7 @@ if (world.isClient) {
     const WAVE_ROTATION = app.props.waveRotation || 0.1
     const WAVE_FREQUENCY = app.props.waveFrequency || 0.8
     
-    // Update water surface wave animation (original mesh approach)
+    // Update water surface wave animation
     const time = Date.now() / 1000
     for (const segment of segments) {
       const posX = segment.position.x
@@ -352,7 +347,7 @@ if (world.isClient) {
       }
     }
     
-    // Fish splash effects with modern particle bursts
+    // Fish splash effects
     if (app.props.fishSplashEnabled === 'enabled') {
       fishSplashTimer += delta
       if (fishSplashTimer >= nextFishSplash) {
@@ -387,7 +382,7 @@ if (world.isClient) {
       }
     }
     
-    // Player movement trail with modern particles
+    // Player movement trail
     if (app.props.playerTrailEnabled === 'enabled') {
       const player = world.getPlayer()
       const playerPos = player?.position
