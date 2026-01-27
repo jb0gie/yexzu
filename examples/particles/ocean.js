@@ -177,14 +177,14 @@ if (world.isClient) {
       const distFromCenter = Math.sqrt(posX * posX + posZ * posZ)
       segment.timeOffset = num(0, Math.PI * 2, 2) + distFromCenter * (app.props.waveFrequency || 0.8)
       
-      // Water material properties
-      segment.material = new THREE.MeshStandardMaterial({
+      // Water material properties (using direct material assignment)
+      segment.material = {
         color: 0x006994,
         transparent: true,
         opacity: 0.8,
         roughness: 0.1,
-        metalness: 0.2
-      })
+        metalness: 0.2,
+      }
       
       segments.push(segment)
       app.add(segment)
