@@ -15,14 +15,6 @@ export class EVM extends System {
     if (!chain) throw new Error('invalid chain string')
 
     if (world.network.isServer) {
-      const account = mnemonicToAccount(process.env.EVM_SEED_PHRASE)
-
-      const wallet = createWalletClient({
-        account,
-        chain,
-        transport: http(),
-      })
-
       const client = createPublicClient({
         chain,
         transport: http(),
@@ -30,11 +22,22 @@ export class EVM extends System {
 
       this.utils = utils
       this.actions = client
-      this.wallet = wallet
       this.getContract = getContract
       this.abis = {
         erc20: erc20Abi,
         erc721: null,
+      }
+
+      const seedPhrase = process.env.EVM_SEED_PHRASE
+      if (seedPhrase) {
+        const account = mnemonicToAccount(seedPhrase)
+        this.wallet = createWalletClient({
+          account,
+          chain,
+          transport: http(),
+        })
+      } else {
+        this.wallet = null
       }
     }
   }
