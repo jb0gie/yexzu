@@ -39,7 +39,6 @@ export function createClientWorld() {
   world.register('loader', ClientLoader)
   world.register('css', ClientCSS)
   world.register('graphics', ClientGraphics)
-  world.register('css', ClientCSS)
   world.register('environment', ClientEnvironment)
   world.register('audio', ClientAudio)
   world.register('stats', ClientStats)
