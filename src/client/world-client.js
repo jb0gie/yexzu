@@ -66,16 +66,12 @@ export function Client({ wsUrl, onSetup }) {
           position: absolute;
           inset: 0;
           z-index: 0;
-          // CHANGED: Must be 'auto' to allow iframe interactions
-          // CSS3D elements individually control their pointer-events
-          // Non-interactive CSS3D elements have pointer-events:none, so they
-          // don't block events from falling through to WebGL canvas
-          pointer-events: auto;
+          pointer-events: none;
         }
         .App__ui {
           position: absolute;
           inset: 0;
-          z-index: 2;
+          z-index: 1;
           pointer-events: none;
           user-select: none;
           display: ${ui.visible ? 'block' : 'none'};

@@ -6,15 +6,11 @@ import { Node } from './Node'
 
 const defaults = {
   src: null,
-  html: null,
   width: 1,
   height: 1,
   factor: 100,
   doubleside: false,
   space: 'world',
-  pointerEvents: false, // Enable to allow iframe interaction
-  geometry: null,
-  pivot: 'center',
 }
 
 const v1 = new THREE.Vector3()
@@ -25,34 +21,46 @@ export class WebView extends Node {
     this.name = 'webview'
 
     this.src = data.src
-    this.html = data.html
     this.width = data.width
     this.height = data.height
     this.factor = data.factor
     this.doubleside = data.doubleside
     this.space = data.space
-    this.pointerEvents = data.pointerEvents
-    this.geometry = data.geometry
-    this.pivot = data.pivot
   }
 
   copy(source, recursive) {
     super.copy(source, recursive)
     this._src = source._src
-    this._html = source._html
     this._width = source._width
     this._height = source._height
     this._factor = source._factor
     this._doubleside = source._doubleside
     this._space = source._space
-    this._pointerEvents = source._pointerEvents
-    this._geometry = source._geometry
-    this._pivot = source._pivot
     return this
   }
 
   mount() {
     this.build()
+  }
+
+  commit(didMove) {
+    if (this.needsRebuild) {
+      this.build()
+      return
+    }
+    if (didMove) {
+      if (this.mesh) {
+        this.matrixWorld.decompose(this.mesh.position, this.mesh.quaternion, this.mesh.scale)
+        this.matrixWorld.decompose(this.objectCSS.position, this.objectCSS.quaternion, this.objectCSS.scale)
+      }
+      if (this.sItem) {
+        this.ctx.world.stage.octree.move(this.sItem)
+      }
+    }
+  }
+
+  unmount() {
+    this.unbuild()
   }
 
   build() {
@@ -68,41 +76,23 @@ export class WebView extends Node {
   }
 
   buildWorld() {
-    const hasContent = this._src || this._html
+    const hasContent = this._src
 
-    // Create geometry
-    let geometry
-    // custom geometry
-    if (this._geometry) {
-      geometry = this._geometry
-    }
-    // plane geometry
-    if (!this._geometry) {
-      geometry = new THREE.PlaneGeometry(this._width, this._height)
-      applyPivot(geometry, this._width, this._height, this._pivot)
-    }
-    geometry.computeBoundingBox()
-    geometry.computeBoundingSphere()
-
+    // Create the black mesh (cutout)
+    const geometry = new THREE.PlaneGeometry(this._width, this._height)
     const material = new THREE.MeshBasicMaterial({
       opacity: 0,
       color: new THREE.Color('black'),
       blending: hasContent ? THREE.NoBlending : THREE.NormalBlending,
       side: this._doubleside ? THREE.DoubleSide : THREE.FrontSide,
-      visible: true, // Ensure visible for raycasting
     })
     this.mesh = new THREE.Mesh(geometry, material)
-    // Link mesh back to this WebView node for pointer events
-    this.mesh.node = this
-    // Copy world matrix to mesh for proper positioning
-    this.mesh.matrixWorld.copy(this.matrixWorld)
-    this.mesh.matrixAutoUpdate = false
-    this.mesh.matrixWorldAutoUpdate = false
+    this.matrixWorld.decompose(this.mesh.position, this.mesh.quaternion, this.mesh.scale)
     this.ctx.world.stage.scene.add(this.mesh)
 
     // Add to octree for raycasting
     this.sItem = {
-      matrix: this.matrixWorld.clone(),
+      matrix: this.matrixWorld,
       geometry,
       material,
       getEntity: () => this.ctx.entity,
@@ -129,61 +119,14 @@ export class WebView extends Node {
       // Iframe
       const iframe = document.createElement('iframe')
       iframe.frameBorder = '0'
-      iframe.scrolling = 'yes'
-      iframe.style.overflow = 'auto'
-      // AGENTIC-HYPERFY APPROACH: Keep parent as none, only toggle iframe
-      // This seems counter-intuitive but apparently works with CSS3D
-      container.style.pointerEvents = 'none'
-      inner.style.pointerEvents = 'none'
-      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+      iframe.allow =
+        'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
       iframe.allowFullscreen = true
       iframe.style.width = widthPx
       iframe.style.height = heightPx
       iframe.style.border = '0px'
-      if (this._html) {
-        iframe.srcdoc = this._html
-      } else {
-        iframe.src = this._src
-      }
-
-      // AGENTIC-HYPERFY: Set mobile to always interactive
-      const isDesktop = !this.ctx.world.network.isServer &&
-        this.ctx.world.controls &&
-        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
-
-      // TESTING AGENTIC-HYPERFY APPROACH
-      if (!isDesktop) {
-        iframe.style.pointerEvents = 'auto'
-      }
-
-      // For Desktop, toggle iframe pointer-events (not container/inner)
-      const mouseEnterHandler = () => {
-        if (isDesktop) {
-          this.objectCSS.interacting = true
-          // Toggle ONLY iframe, not parents (agentic-hyperfy way)
-          iframe.style.pointerEvents = 'auto'
-          // Also disable canvas to ensure clicks reach iframe
-          if (this.ctx.world.graphics) {
-            this.ctx.world.graphics.setCanvasPointerEvents(false)
-          }
-        }
-      }
-
-      const mouseLeaveHandler = () => {
-        if (isDesktop) {
-          this.objectCSS.interacting = false
-          // Disable iframe pointer-events when mouse leaves
-          iframe.style.pointerEvents = 'none'
-          // Restore canvas for WebGL interactions
-          if (this.ctx.world.graphics) {
-            this.ctx.world.graphics.setCanvasPointerEvents(true)
-          }
-        }
-      }
-
-      // Add event listeners
-      container.addEventListener('mouseenter', mouseEnterHandler)
-      container.addEventListener('mouseleave', mouseLeaveHandler)
+      iframe.style.pointerEvents = 'none'
+      iframe.src = this._src
 
       container.appendChild(inner)
       inner.appendChild(iframe)
@@ -191,12 +134,17 @@ export class WebView extends Node {
       // Create CSS3DObject
       this.objectCSS = new CSS3DObject(container)
       this.objectCSS.target = this.mesh // important: the mesh to follow
-      this.mesh.matrixWorld.decompose(this.objectCSS.position, this.objectCSS.quaternion, v1)
-      this.objectCSS.scale.setScalar(1 / this._factor)
+      this.matrixWorld.decompose(this.objectCSS.position, this.objectCSS.quaternion, this.objectCSS.scale)
+      this.objectCSS.scale.multiplyScalar(1 / this._factor)
 
       // Store references
       this.iframe = iframe
       this.inner = inner
+
+      // IFrame Pointer Events Handling
+      // Chrome has a bug where iframe receiving pointer-events breaks drag-and-drop.
+      // To fix: only enable pointer-events when mouse enters the iframe wrapper.
+      // For non-desktop, just enable pointer-events always.
 
       // Interaction Stabilization
       // When standing still, camera moves slightly with head idle animation.
@@ -204,230 +152,200 @@ export class WebView extends Node {
       // but browsers don't like this resulting in some click events not registering.
       // To solve: stop rendering CSS3D when interacting with any iframe.
 
-      // onPointerDown handler on WebView node itself
-      // This unlocks pointer when clicking on WebView
-      this.onPointerDown = (e) => {
-        // Don't unlock pointer in build mode
-        if (this.ctx.world.builder?.enabled) return
-        // Unlock pointer so user can interact with iframe
-        if (this.ctx.world.controls?.pointer?.locked) {
-          this.ctx.world.controls.unlockPointer()
-        }
-        // Prevent CSS3D updates while interacting (prevents slight iframe movement)
-        if (this.objectCSS && isDesktop) {
+      const isDesktop =
+        !this.ctx.world.network.isServer &&
+        this.ctx.world.controls &&
+        !/iPhone|iPad|iPod|Android/i.test(globalThis.navigator?.userAgent || '')
+
+      if (!isDesktop) {
+        iframe.style.pointerEvents = 'auto'
+      }
+
+      inner.addEventListener('mouseenter', () => {
+        if (isDesktop) {
           this.objectCSS.interacting = true
+          iframe.style.pointerEvents = 'auto'
         }
-        // Set canvas pointer-events to none to allow iframe interaction
-        // This is critical - canvas at z-index:1 blocks CSS3D layer otherwise
-        if (isDesktop && this.ctx.world.graphics) {
-          this.ctx.world.graphics.setCanvasPointerEvents(false)
+      })
+
+      inner.addEventListener('mouseleave', () => {
+        if (isDesktop) {
+          this.objectCSS.interacting = false
+          iframe.style.pointerEvents = 'none'
         }
-      }
+      })
 
-      // Store cleanup functions
-      this.cleanup = () => {
-        inner.removeEventListener('mouseenter', mouseEnterHandler)
-        inner.removeEventListener('mouseleave', mouseLeaveHandler)
-      }
-
-      this.ctx.world.css.add(this.objectCSS)
+      // Add to CSS system
+      this.ctx.world.css?.add(this.objectCSS)
     }
-
-    this.ctx.world.setHot(this, true)
   }
 
   buildScreen() {
-    const widthPx = `${this._width * this._factor}px`
-    const heightPx = `${this._height * this._factor}px`
+    const hasContent = this._src
+    if (!hasContent) return
 
+    // For screen space, width/height are in pixels
+    const widthPx = this._width
+    const heightPx = this._height
+
+    // Container
     const container = document.createElement('div')
     container.style.position = 'absolute'
-    container.style.width = widthPx
-    container.style.height = heightPx
+    container.style.width = `${widthPx}px`
+    container.style.height = `${heightPx}px`
+    container.style.pointerEvents = 'auto'
 
-    const inner = document.createElement('div')
-    inner.style.width = widthPx
-    inner.style.height = heightPx
+    // Position using percentage + transform offset
+    // position.x/y are percentages (0-1), position.z is z-index
+    // Use transform to offset by element size for proper corner positioning
+    container.style.left = `${this.position.x * 100}%`
+    container.style.top = `${this.position.y * 100}%`
+    container.style.transform = `translate(-${this.position.x * 100}%, -${this.position.y * 100}%)`
+    container.style.zIndex = String(Math.floor(this.position.z || 0))
 
+    // Iframe
     const iframe = document.createElement('iframe')
     iframe.frameBorder = '0'
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
     iframe.allowFullscreen = true
-    iframe.style.width = widthPx
-    iframe.style.height = heightPx
+    iframe.style.width = '100%'
+    iframe.style.height = '100%'
     iframe.style.border = '0px'
-    if (this._html) {
-      iframe.srcdoc = this._html
-    } else {
-      iframe.src = this._src
-    }
+    iframe.src = this._src
 
-    container.appendChild(inner)
-    inner.appendChild(iframe)
+    container.appendChild(iframe)
 
-    this.ctx.world.ui.appendChild(container)
+    // Store references
     this.container = container
     this.iframe = iframe
-  }
 
-  commit(didMove) {
-    if (this.needsRebuild) {
-      this.build()
-      return
+    // Add to UI container
+    if (this.ctx.world.pointer?.ui) {
+      this.ctx.world.pointer.ui.prepend(container)
     }
-    if (didMove) {
-      if (this.mesh) {
-        this.mesh.matrixWorld.copy(this.matrixWorld)
-      }
-      if (this.sItem) {
-        this.sItem.matrix.copy(this.matrixWorld)
-        this.ctx.world.stage.octree.move(this.sItem)
-      }
-    }
-  }
-
-  unmount() {
-    this.unbuild()
   }
 
   unbuild() {
-    // Clean up CSS3D object
-    if (this.objectCSS) {
-      this.ctx.world.css.remove(this.objectCSS)
-      this.objectCSS = null
-    }
-
-    // Clean up iframe
-    if (this.iframe) {
-      this.iframe.remove()
-      this.iframe = null
-    }
-
-    // Clean up container div
-    if (this.container) {
-      this.container.remove()
-      this.container = null
-    }
-
-    // Clean up screen-space elements
-    if (this.inner) {
-      this.inner.remove()
-      this.inner = null
-    }
-
-    // Clean up mesh
+    // World space cleanup
     if (this.mesh) {
       this.ctx.world.stage.scene.remove(this.mesh)
-      if (this.sItem) {
-        this.ctx.world.stage.octree.remove(this.sItem)
-        this.sItem = null
-      }
       this.mesh.geometry.dispose()
       this.mesh.material.dispose()
       this.mesh = null
     }
-
-    this.ctx.world.setHot(this, false)
+    if (this.sItem) {
+      this.ctx.world.stage.octree.remove(this.sItem)
+      this.sItem = null
+    }
+    if (this.objectCSS) {
+      this.ctx.world.css?.remove(this.objectCSS)
+      this.objectCSS = null
+    }
+    // Screen space cleanup
+    if (this.container) {
+      this.container.remove()
+      this.container = null
+    }
+    this.iframe = null
+    this.inner = null
   }
 
-  set src(value) {
-    if (this._src === value) return
-    this._src = isString(value) ? value : null
-    this.needsRebuild = true
-    this.setDirty()
+  // Pointer down handler - unlocks pointer so user can interact with iframe
+  onPointerDown(e) {
+    if (this._onPointerDown) {
+      this._onPointerDown(e)
+      if (e.defaultPrevented) return
+    }
+    // Don't unlock pointer in build mode - user needs to manipulate the node
+    if (this.ctx.world.builder?.enabled) return
+    // Unlock pointer so user can interact with the iframe
+    if (this.ctx.world.controls?.pointer?.locked) {
+      this.ctx.world.controls.unlockPointer()
+    }
   }
+
   get src() {
     return this._src
   }
 
-  set html(value) {
-    if (this._html === value) return
-    this._html = isString(value) ? value : null
+  set src(value = defaults.src) {
+    if (value !== null && !isString(value)) {
+      throw new Error('[webview] src not null or string')
+    }
+    if (this._src === value) return
+    this._src = value
     this.needsRebuild = true
     this.setDirty()
-  }
-  get html() {
-    return this._html
   }
 
-  set width(value) {
-    if (this._width === value) return
-    this._width = isNumber(value) ? value : defaults.width
-    this.needsRebuild = true
-    this.setDirty()
-  }
   get width() {
     return this._width
   }
 
-  set height(value) {
-    if (this._height === value) return
-    this._height = isNumber(value) ? value : defaults.height
+  set width(value = defaults.width) {
+    if (!isNumber(value)) {
+      throw new Error('[webview] width not a number')
+    }
+    if (this._width === value) return
+    this._width = value
     this.needsRebuild = true
     this.setDirty()
   }
+
   get height() {
     return this._height
   }
 
-  set factor(value) {
-    if (this._factor === value) return
-    this._factor = isNumber(value) ? value : defaults.factor
+  set height(value = defaults.height) {
+    if (!isNumber(value)) {
+      throw new Error('[webview] height not a number')
+    }
+    if (this._height === value) return
+    this._height = value
     this.needsRebuild = true
     this.setDirty()
   }
+
   get factor() {
     return this._factor
   }
 
-  set doubleside(value) {
-    if (this._doubleside === value) return
-    this._doubleside = isBoolean(value) ? value : defaults.doubleside
+  set factor(value = defaults.factor) {
+    if (!isNumber(value)) {
+      throw new Error('[webview] factor not a number')
+    }
+    if (this._factor === value) return
+    this._factor = value
     this.needsRebuild = true
     this.setDirty()
   }
+
   get doubleside() {
     return this._doubleside
   }
 
-  set space(value) {
-    if (this._space === value) return
-    this._space = value === 'screen' || value === 'world' ? value : defaults.space
+  set doubleside(value = defaults.doubleside) {
+    if (!isBoolean(value)) {
+      throw new Error('[webview] doubleside not a boolean')
+    }
+    if (this._doubleside === value) return
+    this._doubleside = value
     this.needsRebuild = true
     this.setDirty()
   }
+
   get space() {
     return this._space
   }
 
-  set pointerEvents(value) {
-    if (this._pointerEvents === value) return
-    this._pointerEvents = isBoolean(value) ? value : defaults.pointerEvents
+  set space(value = defaults.space) {
+    if (value !== 'world' && value !== 'screen') {
+      throw new Error('[webview] space must be "world" or "screen"')
+    }
+    if (this._space === value) return
+    this._space = value
     this.needsRebuild = true
     this.setDirty()
-  }
-  get pointerEvents() {
-    return this._pointerEvents
-  }
-
-  set geometry(value) {
-    if (this._geometry === value) return
-    this._geometry = value
-    this.needsRebuild = true
-    this.setDirty()
-  }
-  get geometry() {
-    return this._geometry
-  }
-
-  set pivot(value) {
-    if (this._pivot === value) return
-    this._pivot = value
-    this.needsRebuild = true
-    this.setDirty()
-  }
-  get pivot() {
-    return this._pivot
   }
 
   getProxy() {
@@ -439,12 +357,6 @@ export class WebView extends Node {
         },
         set src(value) {
           self.src = value
-        },
-        get html() {
-          return self.html
-        },
-        set html(value) {
-          self.html = value
         },
         get width() {
           return self.width
@@ -476,41 +388,10 @@ export class WebView extends Node {
         set space(value) {
           self.space = value
         },
-        get geometry() {
-          return self.geometry
-        },
-        set geometry(value) {
-          self.geometry = value
-        },
-        get pivot() {
-          return self.pivot
-        },
-        set pivot(value) {
-          self.pivot = value
-        },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy()))
       this.proxy = proxy
     }
     return this.proxy
-  }
-}
-
-function applyPivot(geometry, width, height, pivot) {
-  if (pivot === 'center') return
-  let offsetX = 0
-  let offsetY = 0
-  if (pivot.includes('left')) {
-    offsetX = width / 2
-  } else if (pivot.includes('right')) {
-    offsetX = -width / 2
-  }
-  if (pivot.includes('top')) {
-    offsetY = -height / 2
-  } else if (pivot.includes('bottom')) {
-    offsetY = height / 2
-  }
-  if (offsetX !== 0 || offsetY !== 0) {
-    geometry.translate(offsetX, offsetY, 0)
   }
 }

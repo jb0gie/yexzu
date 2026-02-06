@@ -8,6 +8,7 @@ import { ClientControls } from './systems/ClientControls'
 import { ClientCameraControls } from './systems/ClientCameraControls'
 import { ClientNetwork } from './systems/ClientNetwork'
 import { ClientLoader } from './systems/ClientLoader'
+import { ClientCSS } from './systems/ClientCSS'
 import { ClientGraphics } from './systems/ClientGraphics'
 import { ClientCSS } from './systems/ClientCSS'
 import { ClientEnvironment } from './systems/ClientEnvironment'
@@ -37,6 +38,7 @@ export function createClientWorld() {
   world.register('cameraControls', ClientCameraControls)
   world.register('network', ClientNetwork)
   world.register('loader', ClientLoader)
+  world.register('css', ClientCSS)
   world.register('graphics', ClientGraphics)
   world.register('css', ClientCSS)
   world.register('environment', ClientEnvironment)

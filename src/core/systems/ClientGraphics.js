@@ -1,12 +1,26 @@
 import * as THREE from '../extras/three'
+import { N8AOPostPass } from 'n8ao'
 import {
   EffectComposer,
   EffectPass,
   RenderPass,
+  SMAAPreset,
+  SMAAEffect,
+  ToneMappingEffect,
+  ToneMappingMode,
+  SelectiveBloomEffect,
+  BlendFunction,
+  Selection,
+  BloomEffect,
+  KernelSize,
+  DepthPass,
+  Pass,
+  DepthEffect,
 } from 'postprocessing'
 
 import { System } from './System'
-import { EffectRegistry } from './EffectRegistry'
+
+const v1 = new THREE.Vector3()
 
 let renderer
 function getRenderer() {
@@ -33,12 +47,9 @@ function getRenderer() {
 export class ClientGraphics extends System {
   constructor(world) {
     super(world)
-    this.helpers = new Set()
-    this.effectRegistry = new EffectRegistry(world)
   }
 
   async init({ viewport }) {
-    // console.log('[ClientGraphics] init() called with viewport:', !!viewport)
     this.viewport = viewport
     this.width = this.viewport.offsetWidth
     this.height = this.viewport.offsetHeight
@@ -56,66 +67,64 @@ export class ClientGraphics extends System {
     this.maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy()
     THREE.Texture.DEFAULT_ANISOTROPY = this.maxAnisotropy
     this.usePostprocessing = this.world.prefs.postprocessing
+    const context = this.renderer.getContext()
+    const maxMultisampling = context.getParameter(context.MAX_SAMPLES)
     this.composer = new EffectComposer(this.renderer, {
       frameBufferType: THREE.HalfFloatType,
       // multisampling: Math.min(8, maxMultisampling),
     })
     this.renderPass = new RenderPass(this.world.stage.scene, this.world.camera)
     this.composer.addPass(this.renderPass)
-
-    // Initialize effects using EffectRegistry
-    this.effects = {}
-
-    // AO effect (special case - needs world.stage.scene)
-    this.effects.ao = this.effectRegistry.createEffect('ao', this.world.camera, this.world)
-    if (this.effects.ao) {
-      // console.log('[ClientGraphics] AO effect created successfully')
-      this.composer.addPass(this.effects.ao)
-    }
-
-    // Create postprocessing effects
-    this.effects.bloom = this.effectRegistry.createEffect('bloom', this.world.camera, this.world)
-    if (this.effects.bloom) {
-      // console.log('[ClientGraphics] Bloom effect created successfully')
-    }
-
-    this.effects.smaa = this.effectRegistry.createEffect('smaa', this.world.camera, this.world)
-    if (this.effects.smaa) {
-      // console.log('[ClientGraphics] SMAA effect created successfully')
-    }
-
-    this.effects.tonemapping = this.effectRegistry.createEffect('tonemapping', this.world.camera, this.world)
-    if (this.effects.tonemapping) {
-      // console.log('[ClientGraphics] ToneMapping effect created successfully')
-    }
-
-    // Create DOF effect if enabled
-    if (this.world.prefs.dofEnabled) {
-      this.effects.dof = this.effectRegistry.createEffect('dof', this.world.camera, this.world)
-      if (this.effects.dof) {
-        // console.log('[ClientGraphics] DOF effect created successfully')
-      }
-    }
-
-    // Keep backwards compatibility assignments
-    this.smaa = this.effects.smaa
-    this.tonemapping = this.effects.tonemapping
-
-    // Create effect pass and add effects
+    this.aoPass = new N8AOPostPass(this.world.stage.scene, this.world.camera, this.width, this.height)
+    this.aoPass.enabled = this.world.settings.ao && this.world.prefs.ao
+    // we can't use this as it traverses the scene, but half our objects are in the octree
+    this.aoPass.autoDetectTransparency = false
+    // full res is pretty expensive
+    this.aoPass.configuration.halfRes = true
+    // look 1:
+    // this.aoPass.configuration.aoRadius = 0.2
+    // this.aoPass.configuration.distanceFalloff = 1
+    // this.aoPass.configuration.intensity = 2
+    // look 2:
+    // this.aoPass.configuration.aoRadius = 0.5
+    // this.aoPass.configuration.distanceFalloff = 1
+    // this.aoPass.configuration.intensity = 2
+    // look 3:
+    // this.aoPass.configuration.screenSpaceRadius = true
+    // this.aoPass.configuration.aoRadius = 32
+    // this.aoPass.configuration.distanceFalloff = 1
+    // this.aoPass.configuration.intensity = 2
+    // look 4:
+    this.aoPass.configuration.screenSpaceRadius = true
+    this.aoPass.configuration.aoRadius = 64
+    this.aoPass.configuration.distanceFalloff = 0.3
+    this.aoPass.configuration.intensity = 1
+    this.composer.addPass(this.aoPass)
+    this.bloom = new BloomEffect({
+      blendFunction: BlendFunction.ADD,
+      mipmapBlur: true,
+      luminanceThreshold: 1,
+      luminanceSmoothing: 0.3,
+      intensity: 0.5,
+      radius: 0.8,
+    })
+    this.bloomEnabled = this.world.prefs.bloom
+    this.smaa = new SMAAEffect({
+      preset: SMAAPreset.ULTRA,
+    })
+    this.tonemapping = new ToneMappingEffect({
+      mode: ToneMappingMode.ACES_FILMIC,
+    })
     this.effectPass = new EffectPass(this.world.camera)
     this.updatePostProcessingEffects()
     this.composer.addPass(this.effectPass)
-
     this.world.prefs.on('change', this.onPrefsChange)
     this.resizer = new ResizeObserver(() => {
       this.resize(this.viewport.offsetWidth, this.viewport.offsetHeight)
     })
     this.viewport.appendChild(this.renderer.domElement)
-    // Ensure canvas is above CSS3D layer for WebView occlusion
+    // Canvas renders on top via alpha compositing, but pointer events pass through to CSS layer
     this.renderer.domElement.style.position = 'relative'
-    this.renderer.domElement.style.zIndex = '1'
-    // CRITICAL: Start with pointer-events:none to allow CSS3D iframe clicks
-    // Will be toggled to 'auto' when not over WebViews
     this.renderer.domElement.style.pointerEvents = 'none'
     this.resizer.observe(this.viewport)
 
@@ -137,15 +146,11 @@ export class ClientGraphics extends System {
     this.world.camera.updateProjectionMatrix()
     this.renderer.setSize(this.width, this.height)
     this.composer.setSize(this.width, this.height)
-    // Note: css3dRenderer is managed by WebView nodes, not ClientGraphics
-
     this.emit('resize')
     this.render()
   }
 
   render() {
-    // Render CSS3D layer first (behind WebGL)
-    this.world.css?.render()
     // Then render WebGL
     if (this.renderer.xr.isPresenting || !this.usePostprocessing) {
       this.renderer.render(this.world.stage.scene, this.world.camera)
@@ -155,6 +160,7 @@ export class ClientGraphics extends System {
     if (this.xrDimensionsNeeded) {
       this.checkXRDimensions()
     }
+    this.emit('render')
   }
 
   commit() {
@@ -179,47 +185,14 @@ export class ClientGraphics extends System {
     if (changes.postprocessing) {
       this.usePostprocessing = changes.postprocessing.value
     }
-
-    // Update effects using EffectRegistry
-    const effectNames = this.effectRegistry.getSupportedEffects('postprocessing')
-
-    for (const effectName of effectNames) {
-      // Skip AO as it's handled specially
-      if (effectName === 'ao') {
-        if (changes.ao && this.effects.ao) {
-          this.effects.ao.enabled = changes.ao.value && this.world.settings.ao
-        }
-        continue
-      }
-
-      // Update effect if preferences changed
-      if (this.effectRegistry.updateEffectFromPrefs(effectName, changes)) {
-        // console.log(`[ClientGraphics] Updated ${effectName} from preferences`)
-      }
-    }
-
-    // Handle bloom enable/disable
-    if (changes.bloom !== undefined) {
+    // bloom
+    if (changes.bloom) {
+      this.bloomEnabled = changes.bloom.value
       this.updatePostProcessingEffects()
     }
-
-    // Handle DOF enable/disable
-    if (changes.dofEnabled !== undefined) {
-      const shouldEnable = changes.dofEnabled.value && !this.effects.dof
-      const shouldDisable = !changes.dofEnabled.value && this.effects.dof
-
-      if (shouldEnable) {
-        // Enable DOF
-        this.effects.dof = this.effectRegistry.createEffect('dof', this.world.camera, this.world)
-        // Recreate EffectPass to ensure clean WebGL state
-        this.recreateEffectPass()
-      } else if (shouldDisable) {
-        // Disable and remove DOF
-        this.effectRegistry.removeEffect('dof')
-        this.effects.dof = null
-        // Recreate EffectPass to ensure clean WebGL state
-        this.recreateEffectPass()
-      }
+    // ao
+    if (changes.ao) {
+      this.aoPass.enabled = changes.ao.value && this.world.settings.ao
     }
   }
 
@@ -247,9 +220,10 @@ export class ClientGraphics extends System {
       const views = frame.getViewerPose(referenceSpace)?.views
       if (views && views.length > 0) {
         // Use the first view's projection matrix
-        // _projectionMatrix = views[0].projectionMatrix
+        const projectionMatrix = views[0].projectionMatrix
         // Extract the relevant factors from the projection matrix
         // This is a simplified approach
+        const fovFactor = projectionMatrix[5] // Approximation of FOV scale
         // You might need to consider the XR display's physical properties
         // which can be accessed via session.renderState
         const renderState = this.xrSession.renderState
@@ -259,83 +233,31 @@ export class ClientGraphics extends System {
           this.xrWidth = baseLayer.framebufferWidth
           this.xrHeight = baseLayer.framebufferHeight
           this.xrDimensionsNeeded = false
-          // console.log({ xrWidth: this.xrWidth, xrHeight: this.xrHeight })
+          console.log({ xrWidth: this.xrWidth, xrHeight: this.xrHeight })
         }
       }
     }
   }
 
   onSettingsChange = changes => {
-    if (changes.ao && this.effects.ao) {
-      this.effects.ao.enabled = changes.ao.value && this.world.prefs.ao
-      // console.log(this.effects.ao.enabled)
+    if (changes.ao) {
+      this.aoPass.enabled = changes.ao.value && this.world.prefs.ao
+      console.log(this.aoPass.enabled)
     }
   }
 
   updatePostProcessingEffects() {
     const effects = []
-    const supportedEffects = this.effectRegistry.getSupportedEffects('postprocessing')
-
-    for (const effectName of supportedEffects) {
-      // Skip AO as it's handled separately with its own pass
-      if (effectName === 'ao') continue
-
-      const effect = this.effects[effectName]
-      if (!effect) continue
-
-      // Check if effect should be enabled
-      const config = this.effectRegistry.getEffectConfig(effectName)
-      let shouldInclude = true
-
-      // Check enabled preference
-      if (config.enabled && this.world.prefs[config.enabled] === false) {
-        shouldInclude = false
-      }
-
-      if (shouldInclude) {
-        effects.push(effect)
-        // console.log(`[ClientGraphics] Added ${effectName} to effect pass`)
-      }
+    if (this.bloomEnabled) {
+      effects.push(this.bloom)
     }
-
+    effects.push(this.smaa)
+    effects.push(this.tonemapping)
     this.effectPass.setEffects(effects)
     this.effectPass.recompile()
-    // console.log(`[ClientGraphics] Updated postprocessing effects: ${effects.length} effects active`)
-  }
-
-  recreateEffectPass() {
-    // Dispose old EffectPass and create new one for clean WebGL state
-    if (this.effectPass) {
-      this.composer.removePass(this.effectPass)
-      if (this.effectPass.dispose && typeof this.effectPass.dispose === 'function') {
-        this.effectPass.dispose()
-      }
-    }
-
-    this.effectPass = new EffectPass(this.world.camera)
-    this.updatePostProcessingEffects()
-    this.composer.addPass(this.effectPass)
-
-    // console.log('[ClientGraphics] EffectPass recreated for clean WebGL state')
-  }
-
-  // Control canvas pointer-events for WebView interaction
-  // When over WebViews: pointer-events:none allows iframe clicks
-  // When not over WebViews: pointer-events:auto allows WebGL interactions
-  setCanvasPointerEvents(enabled) {
-    if (this.renderer && this.renderer.domElement) {
-      this.renderer.domElement.style.pointerEvents = enabled ? 'auto' : 'none'
-      // DEBUG LOG
-      console.log('[ClientGraphics] Canvas pointer-events set to:', enabled ? 'auto' : 'none')
-    }
   }
 
   destroy() {
-    // Clean up effects through the registry
-    if (this.effectRegistry) {
-      this.effectRegistry.destroy()
-    }
-
     this.resizer.disconnect()
     this.viewport.removeChild(this.renderer.domElement)
   }
