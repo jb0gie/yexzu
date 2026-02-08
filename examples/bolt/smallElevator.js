@@ -25,7 +25,9 @@ app.configure(() => {
 
 SPEED = 2.0
 MIN_HEIGHT = 0
-
+isMoving = false
+isGoingUp = true
+currentHeight = 0
 
 elevator = app.get('SmallElevator')
 panel = app.get('Screen')
