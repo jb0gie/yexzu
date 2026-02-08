@@ -1,4 +1,7 @@
-let SPEED, MIN_HEIGHT, isMoving, isGoingUp, currentHeight, elevator, panel, action
+let SPEED, MIN_HEIGHT, isMoving, isGoingUp, currentHeight, targetHeight, elevator, panel, action
+
+// Smoothing config
+const LERP_FACTOR = 0.15  // Higher = snappier, Lower = smoother
 
 // Configure UI
 app.configure(() => {
@@ -28,6 +31,7 @@ MIN_HEIGHT = 0
 isMoving = false
 isGoingUp = true
 currentHeight = 0
+targetHeight = 0
 
 elevator = app.get('SmallElevator')
 panel = app.get('Screen')
@@ -122,15 +126,20 @@ if (world.isClient) {
 	app.on('sync', data => {
 		isMoving = data.isMoving
 		isGoingUp = data.isGoingUp
-		currentHeight = data.currentHeight
-		elevator.position.y = currentHeight
+		targetHeight = data.currentHeight
 		// action.label = isGoingUp ? 'Down' : 'Up'
 	})
 
-	// Handle position updates
+	// Handle position updates - set target, not direct position
 	app.on('pos', height => {
-		currentHeight = height
-		elevator.position.y = height
+		targetHeight = height
+	})
+
+	// Smooth interpolation on client
+	app.on('update', dt => {
+		// Smoothly interpolate current height toward target
+		currentHeight += (targetHeight - currentHeight) * LERP_FACTOR
+		elevator.position.y = currentHeight
 	})
 }
 
