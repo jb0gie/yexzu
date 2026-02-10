@@ -1,8 +1,15 @@
 import { System } from './System'
 import { storage } from '../storage'
+import { createPublicClient, http, mainnet } from 'viem'
 
 const key = 'hyp:solana:auths'
 const template = 'Connect to world:\n{address}'
+
+// Create a public client for Ethereum mainnet ENS resolution
+const mainnetClient = createPublicClient({
+  chain: mainnet,
+  transport: http('https://eth.llamarpc.com'),
+})
 
 export class EVM extends System {
   constructor(world) {
@@ -275,14 +282,9 @@ export class EVM extends System {
     }
 
     try {
-      // Use viem's getEnsName action through the bound actions
-      if (!this.actions?.getEnsName) {
-        console.error('[EVM] ENS resolution not available - getEnsName not bound')
-        return { success: false, reason: 'ens_not_available' }
-      }
-
-      console.log('[EVM] Resolving ENS name for address:', address)
-      const name = await this.actions.getEnsName(this.config, { address })
+      // Use viem's getEnsName with mainnet client (ENS only exists on Ethereum mainnet)
+      const { getEnsName } = await import('viem/actions')
+      const name = await getEnsName(mainnetClient, { address })
 
       if (name) {
         // Cache the result
@@ -327,14 +329,9 @@ export class EVM extends System {
     }
 
     try {
-      // Use viem's getEnsAddress action through the bound actions
-      if (!this.actions?.getEnsAddress) {
-        console.error('[EVM] ENS resolution not available - getEnsAddress not bound')
-        return { success: false, reason: 'ens_not_available' }
-      }
-
-      console.log('[EVM] Resolving ENS address for name:', ensName)
-      const address = await this.actions.getEnsAddress(this.config, { name: ensName })
+      // Use viem's getEnsAddress with mainnet client (ENS only exists on Ethereum mainnet)
+      const { getEnsAddress } = await import('viem/actions')
+      const address = await getEnsAddress(mainnetClient, { name: ensName })
 
       if (address) {
         // Cache the result
