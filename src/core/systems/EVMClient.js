@@ -14,23 +14,12 @@ export class EVM extends System {
     this._cachedReactAddress = null
   }
 
-  async bind({ connectors, connect, config, actions, abis, address, isConnected, isConnecting, disconnect }) {
-    // console.log('[EVMClient.js] bind() called with:', {
-    //   hasConnectors: !!connectors,
-    //   numConnectors: connectors?.length,
-    //   connectType: typeof connect,
-    //   disconnectType: typeof disconnect,
-    //   address,
-    //   isConnected,
-    //   isConnecting
-    // })
-
+  async bind({ connectors, connect, config, actions, abis, address, chainId, isConnected, isConnecting, disconnect }) {
     // Store the action bindings
     this.actions = actions
     this.abis = abis
     this.connection = { connect, disconnect, connectors }
     this.config = config
-    this.chainId = config?.chains?.[0]?.id || null
 
     // Cache React-provided data (for checking if state actually changed)
     this._cachedReactIsConnected = isConnected
@@ -39,21 +28,17 @@ export class EVM extends System {
     // Don't let bind() call this from React's stale state after explicit operations
     // Skip state updates if we're in the middle of an explicit connect/disconnect operation
     this.address = address
+    this.chainId = chainId
 
     // Initialize ENS cache to prevent rate limiting
     this.ensCache = new Map()
     this.ensCacheTimeout = 5 * 60 * 1000 // 5 minutes
 
-    // console.log('[EVMClient.js] this.connection set to:', {
-    //   hasConnect: !!this.connection.connect,
-    //   hasDisconnect: !!this.connection.disconnect,
-    //   numConnectors: this.connection.connectors?.length
-    // })
-
     // Update _reactData always (this is just caching React state)
     if (this._reactData) {
       this._reactData.isConnected = isConnected
       this._reactData.address = address
+      this._reactData.chainId = chainId
     }
 
     // Cache current React state for comparison next time
@@ -80,20 +65,24 @@ export class EVM extends System {
       if (isConnected) {
         this.connected = true
         this.address = address // Store the address too
+        this.chainId = chainId // Store the chainId
         // Emit local event only - wallet connection is client-side
         this.emit('evmConnect', address)
       } else {
         this.connected = false
         this.address = null // Clear address on disconnect
+        this.chainId = null // Clear chainId on disconnect
         // Emit local event only - wallet disconnection is client-side
         this.emit('evmDisconnect')
       }
+    } else if (addressChanged || (chainId !== undefined && chainId !== this.chainId)) {
+      // Handle updates when already connected (e.g. chain switch or address change)
+      this.address = address
+      this.chainId = chainId
     }
 
     // Periodic cache cleanup (run once on bind)
     this.cleanupCache()
-
-    // console.log('[EVMClient.js] bind() completed, ready for connections')
   }
 
   // Public method for apps to call - simplified wrapper
@@ -149,8 +138,8 @@ export class EVM extends System {
       while (Date.now() - startTime < maxWait) {
         const address = this._reactData?.address || this.address
         if (address) {
-          console.log('[EVM] Address received:', address)
           this.address = address
+          this.chainId = this._reactData?.chainId || this.chainId
           this.connected = true
           return { success: true, connector, address }
         }
@@ -221,30 +210,24 @@ export class EVM extends System {
       this._cachedReactIsConnected = false // Clear cached React state
       this._cachedReactAddress = null // Clear cached React address
       if (this._reactData) {
-        //console.log('[EVM] Resetting _reactData...')
         this._reactData.isConnected = false
         this._reactData.address = null
+        this._reactData.chainId = null
       }
 
-      //console.log('[EVM] ✨ Disconnect completed successfully!')
-
       // Emit disconnect event locally only
-      //console.log('[EVM] Emitting evmDisconnect event')
       this.emit('evmDisconnect')
 
       return { success: true }
 
     } catch (err) {
-      //console.error('[EVM] 🔥 DISCONNECT FAILED!')
-      //console.error('[EVM] Error:', err)
-      //console.error('[EVM] Error message:', err.message)
-      //console.error('[EVM] Error stack:', err.stack)
-
       // Even on error, reset our state to be safe
       this.connected = false
-      this._cachedReactIsConnected = false // Clear cached state even on error
+      this.chainId = null
+      this._cachedReactIsConnected = false
       if (this._reactData) {
         this._reactData.isConnected = false
+        this._reactData.chainId = null
       }
 
       return { success: false, error: err.message, reason: 'disconnect_failed' }

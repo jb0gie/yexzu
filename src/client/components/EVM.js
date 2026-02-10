@@ -5,43 +5,37 @@ import { defineChain } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 const queryClient = new QueryClient()
 
-// Custom chain definitions for networks not in wagmi/chains
-const customChains = {
-  monad: defineChain({
-    id: 143,
-    name: 'Monad',
-    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
-    rpcUrls: {
-      default: { http: ['https://testnet-rpc.monad.xyz'] },
-    },
-    blockExplorers: {
-      default: { name: 'Monad Testnet Explorer', url: 'https://testnet-explorer.monad.xyz' },
-    },
-    testnet: true,
-  }),
-}
+// Monad mainnet configuration (chainId 143)
+const monadMainnet = defineChain({
+  id: 143,
+  name: 'Monad',
+  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://rpc.monad.xyz'] },
+  },
+  blockExplorers: {
+    default: { name: 'Monad Explorer', url: 'https://monadexplorer.com' },
+  },
+})
 
-const chainStr = process.env.PUBLIC_EVM ?? 'mainnet'
-const chain = chains[chainStr] || customChains[chainStr]
-if (!chain) throw new Error(`invalid chain name: ${chainStr}. Available: ${Object.keys(chains).join(', ')}, ${Object.keys(customChains).join(', ')}`)
+// Support both Monad mainnet and Ethereum mainnet (for ENS resolution)
+const monad = monadMainnet
+const eth = chains.mainnet
 
-const transports = {
-  [chain.id]: http(),
-}
+const config = createConfig({
+  chains: [monad, eth],
+  transports: {
+    [monad.id]: http(),
+    [eth.id]: http(),
+  },
+  connectors: [injected()],
+  multiInjectedProviderDiscovery: false,
+  storage: null,
+  ssr: true,
+})
 
 export const Providers = ({ children }) => (
-  <WagmiProvider
-    config={createConfig({
-      chains: [chain],
-      transports,
-      connectors: [injected()],
-      multiInjectedProviderDiscovery: false,
-      // CRITICAL: Disable storage to prevent auto-reconnect
-      storage: null,
-      // Also explicitly disable persistance
-      ssr: true,
-    })}
-  >
+  <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   </WagmiProvider>
 )
@@ -64,7 +58,7 @@ export function EVM({ world }) {
 }
 
 import * as evmActions from 'wagmi/actions'
-import { useConfig, useAccount } from 'wagmi'
+import { useConfig, useAccount, useChainId } from 'wagmi'
 import * as utils from 'viem/utils'
 import { erc20Abi } from 'viem'
 
@@ -73,6 +67,7 @@ import { useState, useEffect } from 'react'
 
 function Logic({ world }) {
   const config = useConfig()
+  const chainId = useChainId()
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
   const [initialized, setInitialized] = useState(false)
   // useEffect(() => {
@@ -124,35 +119,29 @@ function Logic({ world }) {
       world.evm._reactData.address = address
       world.evm._reactData.isConnected = isConnected
       world.evm._reactData.isConnecting = isConnecting
+      world.evm._reactData.chainId = chainId
     }
 
     let actions = {}
 
-    // for (const [action, fn] of Object.entries(evmActions)) {
-    //   actions[action] = (...args) => fn(config, ...args)
-    // }
     const abis = {
       erc20: erc20Abi,
       erc721: null,
     }
-
-    // console.log('[EVM] Calling world.evm.bind()...')
 
     world.evm.bind({
       connectors,
       connect,
       disconnect,
       address,
+      chainId,
       actions: evmActions,
       abis,
       config,
       isConnected,
       isConnecting,
     })
-
-    // console.log('[EVM] world.evm.bind() called successfully')
-    // console.log('[EVM] world.evm.connection:', world.evm.connection)
-  }, [isConnected, isConnecting, address])
+  }, [isConnected, isConnecting, address, chainId])
 
   return null
 }
