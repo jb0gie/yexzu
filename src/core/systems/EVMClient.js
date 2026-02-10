@@ -1,6 +1,7 @@
 import { System } from './System'
 import { storage } from '../storage'
-import { createPublicClient, http, mainnet } from 'viem'
+import { createPublicClient, http } from 'viem'
+import { mainnet } from 'viem/chains'
 
 const key = 'hyp:solana:auths'
 const template = 'Connect to world:\n{address}'
