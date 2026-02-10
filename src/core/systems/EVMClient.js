@@ -30,6 +30,7 @@ export class EVM extends System {
     this.abis = abis
     this.connection = { connect, disconnect, connectors }
     this.config = config
+    this.chainId = config?.chains?.[0]?.id || null
 
     // Cache React-provided data (for checking if state actually changed)
     this._cachedReactIsConnected = isConnected
@@ -216,6 +217,7 @@ export class EVM extends System {
       //console.log('[EVM] Resetting EVMClient state...')
       this.connected = false
       this.address = null // Clear cached address
+      this.chainId = null // Clear chainId
       this._cachedReactIsConnected = false // Clear cached React state
       this._cachedReactAddress = null // Clear cached React address
       if (this._reactData) {

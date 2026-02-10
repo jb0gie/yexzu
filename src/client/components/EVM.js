@@ -1,12 +1,29 @@
 import { createConfig, http, injected, useDisconnect, WagmiProvider } from 'wagmi'
 import * as chains from 'wagmi/chains'
+import { defineChain } from 'viem'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 const queryClient = new QueryClient()
 
+// Custom chain definitions for networks not in wagmi/chains
+const customChains = {
+  monad: defineChain({
+    id: 143,
+    name: 'Monad',
+    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+    rpcUrls: {
+      default: { http: ['https://testnet-rpc.monad.xyz'] },
+    },
+    blockExplorers: {
+      default: { name: 'Monad Testnet Explorer', url: 'https://testnet-explorer.monad.xyz' },
+    },
+    testnet: true,
+  }),
+}
+
 const chainStr = process.env.PUBLIC_EVM ?? 'mainnet'
-const chain = chains[chainStr]
-if (!chain) throw new Error('invalid chain name')
+const chain = chains[chainStr] || customChains[chainStr]
+if (!chain) throw new Error(`invalid chain name: ${chainStr}. Available: ${Object.keys(chains).join(', ')}, ${Object.keys(customChains).join(', ')}`)
 
 const transports = {
   [chain.id]: http(),
@@ -107,7 +124,6 @@ function Logic({ world }) {
       world.evm._reactData.address = address
       world.evm._reactData.isConnected = isConnected
       world.evm._reactData.isConnecting = isConnecting
-      console.log('[EVM React Component] Stored address in _reactData:', address)
     }
 
     let actions = {}
