@@ -11,3 +11,4 @@ build/
 .code-search/
 .glootie-stop-verified
 .claude/
+examples/bolt/
