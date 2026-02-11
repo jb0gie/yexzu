@@ -45,7 +45,7 @@ app.state.connected = false
 app.state.address = null
 
 // Get entities
-const walletBody = app.get('WalletConnectLogo')
+const rig = app.get('WCRig')
 const triggerBody = app.get('AreaTrigger')
 
 // Create minimal status UI
@@ -70,13 +70,14 @@ const statusText = app.create('uitext', {
 })
 
 statusUI.add(statusText)
-walletBody.add(statusUI)
+rig.add(statusUI)
 
 // Create Action for wallet connection
 const connectAction = app.create('action', {
   label: app.state.connected ? 'Disconnect Wallet' : 'Connect Wallet',
   distance: 4,
   duration: 0.3,
+  position: [0, .67, .2],
   onTrigger: () => {
     if (app.state.connected) {
       disconnectWallet()
@@ -86,7 +87,7 @@ const connectAction = app.create('action', {
   }
 })
 
-walletBody.add(connectAction)
+rig.add(connectAction)
 
 // Initialize trigger zone
 let isPlayerNearby = false
@@ -154,7 +155,7 @@ async function connectWallet() {
       // Connection succeeded! But address might be null on first attempt due to timing
       console.log('✅ Connection successful')
       app.state.connected = true
-
+      rig.play({ name: 'ON', loop: true, fade: 0.3 })
       // Check if we have an address from player.evm (per hypkg docs)
       const player = world.getPlayer()
       const playerAddress = player?.evm
@@ -272,7 +273,7 @@ async function disconnectWallet() {
     if (result.success) {
       app.state.connected = false
       app.state.address = null
-
+      rig.play({ name: 'OFF', loop: true, fade: 0.3 })
       // Update UI for disconnected state
       statusText.value = '🌐 Disconnected'
       statusText.color = '#cccccc'
@@ -379,6 +380,8 @@ try {
     }
     statusText.color = '#10b981'
     connectAction.label = 'Disconnect Wallet'
+    // Play ON animation to show connected state
+    rig.play({ name: 'ON', loop: true, fade: 0.3 })
     // Uncomment to automatically resolve ENS
     // showEnsName()
   })
@@ -390,6 +393,8 @@ try {
     statusText.value = '🌐 Disconnected'
     statusText.color = '#cccccc'
     connectAction.label = 'Connect Wallet'
+    // Play OFF animation to show disconnected state
+    rig.play({ name: 'OFF', loop: true, fade: 0.3 })
   })
 } catch (error) {
   console.log('[Wallet] Event listener setup failed')
