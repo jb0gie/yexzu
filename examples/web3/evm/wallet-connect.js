@@ -357,12 +357,31 @@ async function showEnsName() {
   }
 }
 
-// Call when wallet connects
+// Listen for wallet events from other apps
 try {
-  app.on('walletConnected', () => {
-    console.log('[Wallet] Connected event received')
+  app.on('walletConnected', (e) => {
+    console.log('[Wallet] Connected event received from another app')
+    app.state.connected = true
+    app.state.address = e.address || world.evm?.address
+    if (app.state.address) {
+      const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
+      statusText.value = `✅ ${short}`
+    } else {
+      statusText.value = '✅ Connected'
+    }
+    statusText.color = '#10b981'
+    connectAction.label = 'Disconnect Wallet'
     // Uncomment to automatically resolve ENS
     // showEnsName()
+  })
+
+  app.on('walletDisconnected', () => {
+    console.log('[Wallet] Disconnected event received from another app')
+    app.state.connected = false
+    app.state.address = null
+    statusText.value = '🌐 Disconnected'
+    statusText.color = '#cccccc'
+    connectAction.label = 'Connect Wallet'
   })
 } catch (error) {
   console.log('[Wallet] Event listener setup failed')
