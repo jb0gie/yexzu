@@ -47,6 +47,7 @@ app.state.address = null
 // Get entities
 const rig = app.get('WCRig')
 const triggerBody = app.get('AreaTrigger')
+console.log('[Wallet] Rig entity:', rig ? 'found' : 'NOT FOUND')
 
 // Check if already connected on init (another app may have connected)
 if (world.isClient && world.evm?.connected) {
@@ -401,8 +402,15 @@ try {
     connectAction.label = 'Disconnect Wallet'
     // Play ON animation to show connected state
     if (rig) {
-      console.log('[Wallet] Playing ON animation')
-      rig.play({ name: 'ON', loop: true, fade: 0.3 })
+      console.log('[Wallet] Playing ON animation on rig:', rig.name || 'unnamed')
+      try {
+        rig.play({ name: 'ON', loop: true, fade: 0.3 })
+        console.log('[Wallet] ON animation play() called successfully')
+      } catch (err) {
+        console.error('[Wallet] Error playing ON animation:', err)
+      }
+    } else {
+      console.log('[Wallet] Cannot play animation - rig not found')
     }
     // Uncomment to automatically resolve ENS
     // showEnsName()
@@ -417,8 +425,15 @@ try {
     connectAction.label = 'Connect Wallet'
     // Play OFF animation to show disconnected state
     if (rig) {
-      console.log('[Wallet] Playing OFF animation')
-      rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+      console.log('[Wallet] Playing OFF animation on rig:', rig.name || 'unnamed')
+      try {
+        rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+        console.log('[Wallet] OFF animation play() called successfully')
+      } catch (err) {
+        console.error('[Wallet] Error playing OFF animation:', err)
+      }
+    } else {
+      console.log('[Wallet] Cannot play animation - rig not found')
     }
   })
   console.log('[Wallet] Event listeners registered successfully')
