@@ -48,6 +48,23 @@ app.state.address = null
 const rig = app.get('WCRig')
 const triggerBody = app.get('AreaTrigger')
 
+// Check if already connected on init (another app may have connected)
+if (world.isClient && world.evm?.connected) {
+  const player = world.getPlayer()
+  const playerAddress = player?.evm
+  if (playerAddress) {
+    console.log('[Wallet] Already connected on init, address:', playerAddress)
+    app.state.connected = true
+    app.state.address = playerAddress
+    // Update UI for connected state
+    const short = playerAddress.substring(0, 6) + '...' + playerAddress.substring(38)
+    statusText.value = `✅ ${short}`
+    statusText.color = '#10b981'
+    connectAction.label = 'Disconnect Wallet'
+    if (rig) rig.play({ name: 'ON', loop: true, fade: 0.3 })
+  }
+}
+
 // Create minimal status UI
 const statusUI = app.create('ui', {
   space: 'screen',
@@ -367,11 +384,12 @@ async function showEnsName() {
 // Listen for wallet events from other apps
 try {
   app.on('walletConnected', (e) => {
-    console.log('[Wallet] Connected event received from another app')
+    console.log('[Wallet] walletConnected event received:', e)
     app.state.connected = true
     // Use player.evm per hypkg docs, fallback to event address
     const player = world.getPlayer()
     app.state.address = player?.evm || e.address
+    console.log('[Wallet] Setting address to:', app.state.address)
     if (app.state.address) {
       const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
       statusText.value = `✅ ${short}`
@@ -381,23 +399,29 @@ try {
     statusText.color = '#10b981'
     connectAction.label = 'Disconnect Wallet'
     // Play ON animation to show connected state
-    rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    if (rig) {
+      console.log('[Wallet] Playing ON animation')
+      rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    }
     // Uncomment to automatically resolve ENS
     // showEnsName()
   })
 
   app.on('walletDisconnected', () => {
-    console.log('[Wallet] Disconnected event received from another app')
+    console.log('[Wallet] walletDisconnected event received')
     app.state.connected = false
     app.state.address = null
     statusText.value = '🌐 Disconnected'
     statusText.color = '#cccccc'
     connectAction.label = 'Connect Wallet'
     // Play OFF animation to show disconnected state
-    rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+    if (rig) {
+      console.log('[Wallet] Playing OFF animation')
+      rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+    }
   })
 } catch (error) {
-  console.log('[Wallet] Event listener setup failed')
+  console.log('[Wallet] Event listener setup failed:', error)
 }
 
 // Example: Lookup address from ENS name
