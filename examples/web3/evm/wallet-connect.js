@@ -155,21 +155,22 @@ async function connectWallet() {
       console.log('✅ Connection successful')
       app.state.connected = true
 
-      // Check if we have an address
+      // Check if we have an address from player.evm (per hypkg docs)
+      const player = world.getPlayer()
+      const playerAddress = player?.evm
       if (result.address) {
         console.log('✅ Address received immediately:', result.address)
         app.state.address = result.address
         const short = result.address.substring(0, 6) + '...' + result.address.substring(38)
         statusText.value = `✅ ${short}`
-      } else if (world.evm._reactData?.address) {
-        // Address available from React data
-        console.log('✅ Address available from React:', world.evm._reactData.address)
-        app.state.address = world.evm._reactData.address
+      } else if (playerAddress) {
+        // Address available from player.evm (per hypkg docs)
+        console.log('✅ Address available from player.evm:', playerAddress)
+        app.state.address = playerAddress
         const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
         statusText.value = `✅ ${short}`
       } else {
         // Connection succeeded but address not yet available
-        // This happens on first connect due to EVMClient's 2-second timeout waiting for React
         console.log('✅ Connected (address pending...)')
         statusText.value = '✅ Connected'
         app.state.address = null // Clear any stale address
@@ -187,9 +188,11 @@ async function connectWallet() {
       console.log('[Wallet] Already connected according to EVM client')
       app.state.connected = true
 
-      // Try to get the address from the EVM client
-      if (world.evm._reactData?.address) {
-        app.state.address = world.evm._reactData.address
+      // Try to get the address from player.evm (per hypkg docs)
+      const player = world.getPlayer()
+      const playerAddress = player?.evm
+      if (playerAddress) {
+        app.state.address = playerAddress
         const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
         statusText.value = `✅ ${short}`
       } else {
@@ -362,7 +365,9 @@ try {
   app.on('walletConnected', (e) => {
     console.log('[Wallet] Connected event received from another app')
     app.state.connected = true
-    app.state.address = e.address || world.evm?.address
+    // Use player.evm per hypkg docs, fallback to event address
+    const player = world.getPlayer()
+    app.state.address = player?.evm || e.address
     if (app.state.address) {
       const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
       statusText.value = `✅ ${short}`
