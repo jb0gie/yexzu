@@ -4,27 +4,25 @@ let SPEED, MIN_HEIGHT, isMoving, isGoingUp, currentHeight, targetHeight, elevato
 const LERP_FACTOR = 0.15  // Higher = snappier, Lower = smoother
 
 // Configure UI
-app.configure(() => {
-	return [
-		{
-			key: 'elevator',
-			type: 'section',
-			label: 'Elevator Settings',
-		},
-		{
-			key: 'maxHeight',
-			type: 'text',
-			label: 'Maximum Height',
-			defaultValue: '10',
-		},
-		{
-			key: 'speed',
-			type: 'text',
-			label: 'Speed',
-			defaultValue: '2',
-		}
-	]
-}) 
+app.configure([
+	{
+		key: 'elevator',
+		type: 'section',
+		label: 'Elevator Settings',
+	},
+	{
+		key: 'maxHeight',
+		type: 'text',
+		label: 'Maximum Height',
+		defaultValue: '10',
+	},
+	{
+		key: 'speed',
+		type: 'text',
+		label: 'Speed',
+		defaultValue: '2',
+	}
+])
 
 SPEED = 2.0
 MIN_HEIGHT = 0
