@@ -280,7 +280,7 @@ async function disconnectWallet() {
 
       app.emit('walletDisconnected', {})
 
-      console.log('[Wallet] Disconnected')
+      console.log('[Wallet] Disconnected, event emitted')
     } else if (result.reason === 'not_connected') {
       // Handle not connected as SUCCESS, not error
       console.log('[Wallet] Already disconnected according to EVM client')
@@ -290,6 +290,9 @@ async function disconnectWallet() {
       statusText.value = '🌐 Disconnected'
       statusText.color = '#cccccc'
       connectAction.label = 'Connect Wallet'
+
+      // Still emit event so other apps know we're disconnected
+      app.emit('walletDisconnected', {})
     } else {
       console.error('❌ Disconnect failed:', result.reason)
       statusText.value = '❌ Disconnect failed'
