@@ -382,6 +382,7 @@ async function showEnsName() {
 }
 
 // Listen for wallet events from other apps
+console.log('[Wallet] Setting up event listeners...')
 try {
   app.on('walletConnected', (e) => {
     console.log('[Wallet] walletConnected event received:', e)
@@ -420,6 +421,7 @@ try {
       rig.play({ name: 'OFF', loop: true, fade: 0.3 })
     }
   })
+  console.log('[Wallet] Event listeners registered successfully')
 } catch (error) {
   console.log('[Wallet] Event listener setup failed:', error)
 }
