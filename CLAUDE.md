@@ -219,13 +219,23 @@ webview.geometry = customMesh;  // Rebuilds with custom geometry
 
 ## Web3 Wallet Connection Patterns
 
-**Standardized patterns for wallet connection apps**
+**Standardized patterns for wallet connection apps per https://hypkg.sh/hypkg/evm/**
 
 ### API Usage
 
-**EVM Wallets (MetaMask, etc.) use `world.evm`:**
+**`player.evm` - Player's wallet address:**
+```javascript
+const player = world.getPlayer()
+const address = player.evm  // Returns wallet address string
+```
+
+**`world.evm` - EVM functionality:**
 - `world.evm.connect()` - Returns `{ success: boolean, address?: string, reason?: string }`
 - `world.evm.disconnect()` - Returns `{ success: boolean, reason?: string }`
+- `world.evm.connected` - Boolean connection state
+- `world.evm.chainId` - Current chain ID
+- `world.evm.actions` - wagmi actions (readContract, writeContract, getBalance)
+- `world.evm.abis` - Standard ABIs (erc20, erc721)
 - Check `result.success` before using `result.address`
 - Note: Cartridge/StarkNet wallets use different patterns (not covered here)
 
