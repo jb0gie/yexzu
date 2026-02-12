@@ -9,7 +9,7 @@ const template = 'Connect to world:\n{address}'
 // Create a public client for Ethereum mainnet ENS resolution
 const mainnetClient = createPublicClient({
   chain: mainnet,
-  transport: http('https://eth.llamarpc.com'),
+  transport: http('https://cloudflare-eth.com'),
 })
 
 export class EVM extends System {
