@@ -394,65 +394,67 @@ async function showEnsName() {
   }
 }
 
+// Event handlers for wallet state changes
+function handleWalletConnected(e) {
+  console.log('[Wallet] ===== walletConnected event received =====', e)
+  app.state.connected = true
+  // Use player.evm per hypkg docs, fallback to event address
+  const player = world.getPlayer()
+  app.state.address = player?.evm || e.address
+  console.log('[Wallet] Setting address to:', app.state.address)
+  if (app.state.address) {
+    const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
+    statusText.value = `✅ ${short}`
+  } else {
+    statusText.value = '✅ Connected'
+  }
+  statusText.color = '#10b981'
+  connectAction.label = 'Disconnect Wallet'
+  // Play ON animation to show connected state
+  if (rig) {
+    console.log('[Wallet] Playing ON animation on rig:', rig.name || 'unnamed')
+    setTimeout(() => {
+      try {
+        rig.play({ name: 'ON', loop: true, fade: 0.3 })
+        console.log('[Wallet] ON animation play() called successfully')
+      } catch (err) {
+        console.error('[Wallet] Error playing ON animation:', err)
+      }
+    }, 50)
+  } else {
+    console.log('[Wallet] Cannot play animation - rig not found')
+  }
+}
+
+function handleWalletDisconnected() {
+  console.log('[Wallet] walletDisconnected event received')
+  app.state.connected = false
+  app.state.address = null
+  statusText.value = '🌐 Disconnected'
+  statusText.color = '#cccccc'
+  connectAction.label = 'Connect Wallet'
+  // Play OFF animation to show disconnected state
+  if (rig) {
+    console.log('[Wallet] Playing OFF animation on rig:', rig.name || 'unnamed')
+    setTimeout(() => {
+      try {
+        rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+        console.log('[Wallet] OFF animation play() called successfully')
+      } catch (err) {
+        console.error('[Wallet] Error playing OFF animation:', err)
+      }
+    }, 50)
+  } else {
+    console.log('[Wallet] Cannot play animation - rig not found')
+  }
+}
+
 // Listen for wallet events from other apps
 console.log('[Wallet] Setting up event listeners...')
 try {
-  app.on('walletConnected', (e) => {
-    console.log('[Wallet] ===== walletConnected event received =====', e)
-    app.state.connected = true
-    // Use player.evm per hypkg docs, fallback to event address
-    const player = world.getPlayer()
-    app.state.address = player?.evm || e.address
-    console.log('[Wallet] Setting address to:', app.state.address)
-    if (app.state.address) {
-      const short = app.state.address.substring(0, 6) + '...' + app.state.address.substring(38)
-      statusText.value = `✅ ${short}`
-    } else {
-      statusText.value = '✅ Connected'
-    }
-    statusText.color = '#10b981'
-    connectAction.label = 'Disconnect Wallet'
-    // Play ON animation to show connected state
-    if (rig) {
-      console.log('[Wallet] Playing ON animation on rig:', rig.name || 'unnamed')
-      // Small delay to ensure rig is ready
-      setTimeout(() => {
-        try {
-          rig.play({ name: 'ON', loop: true, fade: 0.3 })
-          console.log('[Wallet] ON animation play() called successfully')
-        } catch (err) {
-          console.error('[Wallet] Error playing ON animation:', err)
-        }
-      }, 50)
-    } else {
-      console.log('[Wallet] Cannot play animation - rig not found')
-    }
-    // Uncomment to automatically resolve ENS
-    // showEnsName()
-  })
-
-  app.on('walletDisconnected', () => {
-    console.log('[Wallet] walletDisconnected event received')
-    app.state.connected = false
-    app.state.address = null
-    statusText.value = '🌐 Disconnected'
-    statusText.color = '#cccccc'
-    connectAction.label = 'Connect Wallet'
-    // Play OFF animation to show disconnected state
-    if (rig) {
-      console.log('[Wallet] Playing OFF animation on rig:', rig.name || 'unnamed')
-      setTimeout(() => {
-        try {
-          rig.play({ name: 'OFF', loop: true, fade: 0.3 })
-          console.log('[Wallet] OFF animation play() called successfully')
-        } catch (err) {
-          console.error('[Wallet] Error playing OFF animation:', err)
-        }
-      }, 50)
-    } else {
-      console.log('[Wallet] Cannot play animation - rig not found')
-    }
-  })
+  // Listen on both app and world for cross-app communication
+  app.on('walletConnected', handleWalletConnected)
+  app.on('walletDisconnected', handleWalletDisconnected)
   console.log('[Wallet] Event listeners registered successfully')
 } catch (error) {
   console.log('[Wallet] Event listener setup failed:', error)
