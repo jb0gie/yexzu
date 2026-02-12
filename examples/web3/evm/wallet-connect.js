@@ -393,7 +393,7 @@ async function showEnsName() {
 console.log('[Wallet] Setting up event listeners...')
 try {
   app.on('walletConnected', (e) => {
-    console.log('[Wallet] walletConnected event received:', e)
+    console.log('[Wallet] ===== walletConnected event received =====', e)
     app.state.connected = true
     // Use player.evm per hypkg docs, fallback to event address
     const player = world.getPlayer()
