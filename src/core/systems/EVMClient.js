@@ -300,6 +300,14 @@ export class EVM extends System {
         return { success: true, name: null }
       }
     } catch (error) {
+      // Contract reverts when no ENS name is set - treat as "no name found"
+      if (error.message?.includes('reverted') || error.message?.includes('Internal error')) {
+        this.ensCache.set(cacheKey, {
+          value: null,
+          timestamp: Date.now()
+        })
+        return { success: true, name: null }
+      }
       console.error('[EVM] ENS name resolution failed:', error.message)
       // Cache failures briefly to prevent repeated attempts
       this.ensCache.set(cacheKey, {
