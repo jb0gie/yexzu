@@ -86,21 +86,12 @@ function Logic({ world }) {
   //   world.evm = evm
   // }, [config])
 
-  // useEffect(() => {
-  //   const handlePlayer = player => {
-  //     // console.log({ player, address })
-  //     world.entities.player.modify({ evm: address })
-  //     world.off('player', handlePlayer)
-  //   }
-  //   world.on('player', handlePlayer)
-
-  //   if (!world.entities?.player) return
-  //   world.entities.player.modify({ evm: address })
-
-  //   return () => {
-  //     world.off(handlePlayer)
-  //   }
-  // }, [address, world.entities?.player])
+  // Set player.evm when wallet connects/disconnects
+  useEffect(() => {
+    if (world.entities?.player) {
+      world.entities.player.modify({ evm: address || null })
+    }
+  }, [address, world.entities?.player])
 
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
