@@ -62,7 +62,14 @@ if (world.isClient && world.evm?.connected) {
     statusText.value = `✅ ${short}`
     statusText.color = '#10b981'
     connectAction.label = 'Disconnect Wallet'
-    if (rig) rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    if (rig) {
+      console.log('[Wallet] Init: Playing ON animation on rig')
+      // Small delay to ensure rig is ready
+      setTimeout(() => {
+        rig.play({ name: 'ON', loop: true, fade: 0.3 })
+        console.log('[Wallet] Init: ON animation play() called')
+      }, 100)
+    }
   }
 }
 
@@ -403,12 +410,15 @@ try {
     // Play ON animation to show connected state
     if (rig) {
       console.log('[Wallet] Playing ON animation on rig:', rig.name || 'unnamed')
-      try {
-        rig.play({ name: 'ON', loop: true, fade: 0.3 })
-        console.log('[Wallet] ON animation play() called successfully')
-      } catch (err) {
-        console.error('[Wallet] Error playing ON animation:', err)
-      }
+      // Small delay to ensure rig is ready
+      setTimeout(() => {
+        try {
+          rig.play({ name: 'ON', loop: true, fade: 0.3 })
+          console.log('[Wallet] ON animation play() called successfully')
+        } catch (err) {
+          console.error('[Wallet] Error playing ON animation:', err)
+        }
+      }, 50)
     } else {
       console.log('[Wallet] Cannot play animation - rig not found')
     }
@@ -426,12 +436,14 @@ try {
     // Play OFF animation to show disconnected state
     if (rig) {
       console.log('[Wallet] Playing OFF animation on rig:', rig.name || 'unnamed')
-      try {
-        rig.play({ name: 'OFF', loop: true, fade: 0.3 })
-        console.log('[Wallet] OFF animation play() called successfully')
-      } catch (err) {
-        console.error('[Wallet] Error playing OFF animation:', err)
-      }
+      setTimeout(() => {
+        try {
+          rig.play({ name: 'OFF', loop: true, fade: 0.3 })
+          console.log('[Wallet] OFF animation play() called successfully')
+        } catch (err) {
+          console.error('[Wallet] Error playing OFF animation:', err)
+        }
+      }, 50)
     } else {
       console.log('[Wallet] Cannot play animation - rig not found')
     }
