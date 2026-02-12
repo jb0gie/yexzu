@@ -312,6 +312,11 @@ async function disconnectWallet() {
       console.log('[Wallet] Already disconnected according to EVM client')
       app.state.connected = false
       app.state.address = null
+      // Play OFF animation
+      if (rig) {
+        console.log('[Wallet] Playing OFF animation (not_connected)')
+        setTimeout(() => rig.play({ name: 'OFF', loop: true, fade: 0.3 }), 50)
+      }
 
       statusText.value = '🌐 Disconnected'
       statusText.color = '#cccccc'
