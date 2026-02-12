@@ -397,6 +397,11 @@ async function showEnsName() {
 // Event handlers for wallet state changes
 function handleWalletConnected(e) {
   console.log('[Wallet] ===== walletConnected event received =====', e)
+  // Don't play animation if already connected (prevent spam)
+  if (app.state.connected) {
+    console.log('[Wallet] Already connected, skipping animation')
+    return
+  }
   app.state.connected = true
   // Use player.evm per hypkg docs, fallback to event address
   const player = world.getPlayer()
@@ -428,6 +433,11 @@ function handleWalletConnected(e) {
 
 function handleWalletDisconnected() {
   console.log('[Wallet] walletDisconnected event received')
+  // Don't play animation if already disconnected (prevent spam)
+  if (!app.state.connected) {
+    console.log('[Wallet] Already disconnected, skipping animation')
+    return
+  }
   app.state.connected = false
   app.state.address = null
   statusText.value = '🌐 Disconnected'
