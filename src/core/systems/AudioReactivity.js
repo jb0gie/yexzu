@@ -6,6 +6,7 @@ export class AudioReactivity extends System {
     this.analysers = new Map()
     this.data = new Map()
     this.reactive = new Map()
+    this.pendingLinks = new Map() // Links to sources that don't exist yet
     this.smoothing = 0.6
   }
 
@@ -38,6 +39,9 @@ export class AudioReactivity extends System {
         raw: new Uint8Array(128),
         prevVolume: 0
       })
+
+      // Process any pending links for this source
+      this.processPendingLinks(nodeId)
     } catch (err) {
       console.error('[AudioReactivity] Failed to register audio node:', err)
     }
@@ -67,6 +71,9 @@ export class AudioReactivity extends System {
         raw: new Uint8Array(128),
         prevVolume: 0
       })
+
+      // Process any pending links for this source
+      this.processPendingLinks(nodeId)
     } catch (err) {
       console.error('[AudioReactivity] Failed to register media element:', err)
     }
@@ -76,12 +83,22 @@ export class AudioReactivity extends System {
     this.analysers.delete(nodeId)
     this.data.delete(nodeId)
 
+    // Clear active links
     const targets = this.reactive.get(nodeId)
     if (targets) {
       for (const target of targets) {
-        this.unlink(target.target)
+        delete target.target._audioReactivityLink
       }
       this.reactive.delete(nodeId)
+    }
+
+    // Clear pending links
+    const pending = this.pendingLinks.get(nodeId)
+    if (pending) {
+      for (const link of pending) {
+        delete link.target._audioReactivityLink
+      }
+      this.pendingLinks.delete(nodeId)
     }
   }
 
@@ -98,12 +115,23 @@ export class AudioReactivity extends System {
       targetType: options.targetType || 'light'
     }
 
-    let targets = this.reactive.get(sourceId)
-    if (!targets) {
-      targets = new Set()
-      this.reactive.set(sourceId, targets)
+    // If source doesn't exist yet, queue as pending
+    if (!this.data.has(sourceId)) {
+      let pending = this.pendingLinks.get(sourceId)
+      if (!pending) {
+        pending = []
+        this.pendingLinks.set(sourceId, pending)
+      }
+      pending.push(link)
+    } else {
+      // Source exists, add to active reactive map
+      let targets = this.reactive.get(sourceId)
+      if (!targets) {
+        targets = new Set()
+        this.reactive.set(sourceId, targets)
+      }
+      targets.add(link)
     }
-    targets.add(link)
 
     target._audioReactivityLink = link
   }
@@ -112,6 +140,8 @@ export class AudioReactivity extends System {
     if (!target || !target._audioReactivityLink) return
 
     const link = target._audioReactivityLink
+
+    // Remove from active reactive map
     const targets = this.reactive.get(link.sourceId)
     if (targets) {
       for (const t of targets) {
@@ -125,7 +155,37 @@ export class AudioReactivity extends System {
       }
     }
 
+    // Also remove from pending links if present
+    const pending = this.pendingLinks.get(link.sourceId)
+    if (pending) {
+      const idx = pending.indexOf(link)
+      if (idx !== -1) {
+        pending.splice(idx, 1)
+        if (pending.length === 0) {
+          this.pendingLinks.delete(link.sourceId)
+        }
+      }
+    }
+
     delete target._audioReactivityLink
+  }
+
+  processPendingLinks(sourceId) {
+    const pending = this.pendingLinks.get(sourceId)
+    if (!pending) return
+
+    // Move pending links to active reactive map
+    let targets = this.reactive.get(sourceId)
+    if (!targets) {
+      targets = new Set()
+      this.reactive.set(sourceId, targets)
+    }
+
+    for (const link of pending) {
+      targets.add(link)
+    }
+
+    this.pendingLinks.delete(sourceId)
   }
 
   update(delta) {
@@ -206,5 +266,6 @@ export class AudioReactivity extends System {
     this.analysers.clear()
     this.data.clear()
     this.reactive.clear()
+    this.pendingLinks.clear()
   }
 }
