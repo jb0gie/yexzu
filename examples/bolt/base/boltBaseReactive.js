@@ -85,40 +85,32 @@ function startAudio() {
     return
   }
 
-  console.log('[Audio Reactivity] Linking meshes...')
+  // Make its emissive material react to bass
+  mesh.linkAudioReactivity(audio.id, {
+    band: 'volume',
+    scale: 10,
+    property: 'emissiveIntensity'
+  })
 
-  // Try linking immediately, then retry after delay if needed
-  function tryLinkMeshes() {
-    console.log('[Audio Reactivity] world.audioReactivity available:', !!world.audioReactivity)
+  console.log('[Audio Reactivity] Linking mesh2...')
+  console.log('[Audio Reactivity] mesh2 exists:', !!mesh2)
+  console.log('[Audio Reactivity] world.audioReactivity:', !!world.audioReactivity)
 
-    if (!world.audioReactivity) {
-      console.log('[Audio Reactivity] System not ready, retrying in 500ms...')
-      setTimeout(tryLinkMeshes, 500)
-      return
-    }
-
-    // Make mesh emissive react to volume
-    if (mesh) {
-      mesh.linkAudioReactivity(audio.id, {
-        band: 'volume',
-        scale: 10,
-        property: 'emissiveIntensity'
-      })
-      console.log('[Audio Reactivity] Linked mesh (emissiveIntensity)')
-    }
-
-    // Make mesh2 color react to treble
-    if (mesh2) {
-      mesh2.linkAudioReactivity(audio.id, {
-        band: 'treble',
-        scale: 20,
-        property: 'color'
-      })
-      console.log('[Audio Reactivity] Linked mesh2 (color)')
-    }
+  // Make mesh2 color react to treble
+  if (mesh2) {
+    console.log('[Audio Reactivity] mesh2.name:', mesh2.name)
+    console.log('[Audio Reactivity] mesh2.id:', mesh2.id)
+    mesh2.linkAudioReactivity(audio.id, {
+      band: 'treble',
+      scale: 2,
+      property: 'color'
+    })
+    console.log('[Audio Reactivity] Called mesh2.linkAudioReactivity with scale: 2')
+  } else {
+    console.log('[Audio Reactivity] SKIPPED mesh2.linkAudioReactivity - mesh2 is null')
   }
 
-  tryLinkMeshes()
+  console.log('[Audio Reactivity] Linked mesh to audio reactivity')
 
   if (playAction) {
     playAction.label = 'Stop Audio'
