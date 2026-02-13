@@ -252,8 +252,9 @@ export class AudioReactivity extends System {
               target.handle.setEmissive(intensity, intensity, intensity)
             }
           } else if (link.property === 'emissiveColor' && target.handle) {
-            // Only change emissive color, keep base color unchanged
-            const color = this.getColorFromOptions(val, link)
+            // val is already scaled, normalize for color (0-1 range)
+            const normalizedVal = Math.min(1, val / link.scale)
+            const color = this.getColorFromOptions(normalizedVal, link)
             const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
 
             // Mesh nodes (from GLB) should use material proxy directly
@@ -267,7 +268,9 @@ export class AudioReactivity extends System {
               target.handle.setEmissiveIntensity(emissiveIntensity)
             }
           } else if (link.property === 'color' && target.handle) {
-            const color = this.getColorFromOptions(val, link)
+            // val is already scaled, normalize for color (0-1 range)
+            const normalizedVal = Math.min(1, val / link.scale)
+            const color = this.getColorFromOptions(normalizedVal, link)
             const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
 
             // Mesh nodes (from GLB) should use material proxy directly
