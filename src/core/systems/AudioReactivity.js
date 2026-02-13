@@ -226,23 +226,24 @@ export class AudioReactivity extends System {
           }
         } else if (link.targetType === 'material') {
           if (link.property === 'emissiveIntensity' && target.handle) {
-            // Prim nodes have setEmissiveIntensity method
-            if (target.handle.setEmissiveIntensity) {
-              target.handle.setEmissiveIntensity(val)
-            }
-            // Mesh nodes have material.proxy with emissiveIntensity property
-            else if (target.handle.material) {
+            // Mesh nodes (from GLB) should use material proxy directly
+            // because they don't have uberShader enabled
+            if (target.name === 'mesh' && target.handle.material) {
               target.handle.material.emissiveIntensity = val
+            }
+            // Prim nodes have setEmissiveIntensity method with uberShader
+            else if (target.handle.setEmissiveIntensity) {
+              target.handle.setEmissiveIntensity(val)
             }
           } else if (link.property === 'emissive' && target.handle) {
             const intensity = Math.min(1, val)
-            // Prim nodes have setEmissive method
-            if (target.handle.setEmissive) {
-              target.handle.setEmissive(intensity, intensity, intensity)
-            }
-            // Mesh nodes have material.proxy with emissive property
-            else if (target.handle.material) {
+            // Mesh nodes (from GLB) should use material proxy directly
+            if (target.name === 'mesh' && target.handle.material) {
               target.handle.material.emissive.setScalar(intensity)
+            }
+            // Prim nodes have setEmissive method with uberShader
+            else if (target.handle.setEmissive) {
+              target.handle.setEmissive(intensity, intensity, intensity)
             }
           }
         }
