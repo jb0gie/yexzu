@@ -253,8 +253,12 @@ export class AudioReactivity extends System {
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
-              target.handle.material.color.copy(heatColor)
-              target.handle.material.emissive.copy(heatColor)
+              if (target.handle.material.color) {
+                target.handle.material.color.copy(heatColor)
+              }
+              if (target.handle.material.emissive) {
+                target.handle.material.emissive.copy(heatColor)
+              }
               target.handle.material.emissiveIntensity = emissiveIntensity
             }
             // Prim nodes have setter methods with uberShader
