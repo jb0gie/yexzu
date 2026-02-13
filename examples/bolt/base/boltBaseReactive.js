@@ -66,10 +66,10 @@ app.configure([
   },
   {
     key: 'mesh1Color',
-    type: 'text',
-    label: 'Mesh 1 Color (hex or name)',
+    type: 'color',
+    label: 'Mesh 1 Color',
     initial: '',
-    description: 'Leave empty for heatmap, or use #ff0000, red, etc.',
+    description: 'Leave empty for heatmap gradient',
   },
   {
     key: 'mesh2',
@@ -121,10 +121,10 @@ app.configure([
   },
   {
     key: 'mesh2Color',
-    type: 'text',
-    label: 'Mesh 2 Color (hex or name)',
+    type: 'color',
+    label: 'Mesh 2 Color',
     initial: '',
-    description: 'Leave empty for heatmap, or use #ff0000, red, etc.',
+    description: 'Leave empty for heatmap gradient',
   },
 ])
 
