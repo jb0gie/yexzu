@@ -1088,6 +1088,12 @@ export class Prim extends Node {
         set doubleside(value) {
           self.doubleside = value
         },
+        linkAudioReactivity(sourceId, options) {
+          self.linkAudioReactivity(sourceId, options)
+        },
+        unlinkAudioReactivity() {
+          self.unlinkAudioReactivity()
+        },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
       this.proxy = proxy
