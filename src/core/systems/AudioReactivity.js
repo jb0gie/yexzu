@@ -114,7 +114,10 @@ export class AudioReactivity extends System {
       scale: options.scale ?? 1,
       offset: options.offset ?? 0,
       property: options.property || 'intensity',
-      targetType: options.targetType || 'light'
+      targetType: options.targetType || 'light',
+      color: options.color,
+      from: options.from,
+      to: options.to
     }
 
     // If source doesn't exist yet, queue as pending
@@ -248,35 +251,35 @@ export class AudioReactivity extends System {
               target.handle.setEmissive(intensity, intensity, intensity)
             }
           } else if (link.property === 'emissiveColor' && target.handle) {
-            // Only change emissive color (heatmap), keep base color unchanged
-            const heatColor = this.getHeatmapColor(val)
+            // Only change emissive color, keep base color unchanged
+            const color = this.getColorFromOptions(val, link)
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
-              target.handle.material.emissive = [heatColor.r, heatColor.g, heatColor.b]
+              target.handle.material.emissive = [color.r, color.g, color.b]
             }
             // Prim nodes have setter methods with uberShader
             else if (target.handle.setEmissive) {
-              target.handle.setEmissive(heatColor.r, heatColor.g, heatColor.b)
+              target.handle.setEmissive(color.r, color.g, color.b)
             }
           } else if (link.property === 'color' && target.handle) {
-            const heatColor = this.getHeatmapColor(val)
+            const color = this.getColorFromOptions(val, link)
             const emissiveIntensity = Math.max(0, Math.min(1, val))
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
-              // Change base color to heatmap color
+              // Change base color
               if (target.handle.material.color) {
-                target.handle.material.color.copy(heatColor)
+                target.handle.material.color.copy(color)
               }
               // Set emissive color via proxy (uses array format [r,g,b])
-              target.handle.material.emissive = [heatColor.r, heatColor.g, heatColor.b]
+              target.handle.material.emissive = [color.r, color.g, color.b]
               target.handle.material.emissiveIntensity = emissiveIntensity
             }
             // Prim nodes have setter methods with uberShader
             else if (target.handle.setColor) {
-              target.handle.setColor(heatColor.r, heatColor.g, heatColor.b)
-              target.handle.setEmissive(heatColor.r, heatColor.g, heatColor.b)
+              target.handle.setColor(color.r, color.g, color.b)
+              target.handle.setEmissive(color.r, color.g, color.b)
               target.handle.setEmissiveIntensity(emissiveIntensity)
             }
           }
@@ -316,6 +319,24 @@ export class AudioReactivity extends System {
     }
 
     return color
+  }
+
+  getColorFromOptions(val, options) {
+    // If from/to colors provided, interpolate between them
+    if (options.from && options.to) {
+      const fromColor = new THREE.Color(options.from)
+      const toColor = new THREE.Color(options.to)
+      const scaled = Math.max(0, Math.min(1, val))
+      return fromColor.clone().lerp(toColor, scaled)
+    }
+
+    // If single color provided, use it directly
+    if (options.color) {
+      return new THREE.Color(options.color)
+    }
+
+    // Default: heatmap gradient
+    return this.getHeatmapColor(val)
   }
 
   destroy() {
