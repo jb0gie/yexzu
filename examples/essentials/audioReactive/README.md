@@ -1,6 +1,6 @@
 # Audio Reactivity Example
 
-A complete example demonstrating audio reactivity with lights and materials reacting to music frequency data.
+A complete example demonstrating audio reactivity with lights and materials responding to music frequency data.
 
 ## What It Shows
 
@@ -24,6 +24,44 @@ Plus three emissive primitives that pulse with the music.
 
 ## Key Concepts
 
+### Creating Reactive Lights
+
+```javascript
+const light = app.create('light', {
+  type: 'point',
+  color: '#ff0000',
+  intensity: 0.5,
+  distance: 100,
+})
+app.add(light)
+
+// Link to audio source
+light.linkAudioReactivity(audio.id, {
+  band: 'bass',
+  scale: 2,
+  offset: 0.5,
+})
+```
+
+### Creating Reactive Prims
+
+```javascript
+const prim = app.create('prim', {
+  type: 'box',
+  color: '#222222',
+  emissive: '#00ffff',
+  emissiveIntensity: 0.1,
+})
+app.add(prim)
+
+// React to volume
+prim.linkAudioReactivity(audio.id, {
+  band: 'volume',
+  scale: 1.5,
+  property: 'emissiveIntensity',
+})
+```
+
 ### Frequency Bands
 
 | Band | Frequency Range | Sounds |
@@ -40,6 +78,7 @@ node.linkAudioReactivity(sourceId, {
   band: 'bass', // 'volume' | 'bass' | 'mid' | 'treble'
   scale: 2, // Multiplier for the audio value
   offset: 0.5, // Base value added to result
+  property: 'emissiveIntensity', // For prims: 'emissiveIntensity' | 'emissive'
 })
 ```
 
@@ -49,7 +88,15 @@ Always unlink before removing reactive nodes:
 
 ```javascript
 node.unlinkAudioReactivity()
-world.remove(node)
+app.remove(node)
+```
+
+Or use the destroy event:
+
+```javascript
+app.on('destroy', () => {
+  light.unlinkAudioReactivity()
+})
 ```
 
 ## Files
@@ -62,10 +109,11 @@ world.remove(node)
 Replace the audio source with your own music:
 
 ```javascript
-const audio = world.createNode('audio', {
+const audio = app.create('audio', {
   src: 'asset://your-music.mp3',
   loop: true,
 })
+app.add(audio)
 ```
 
 Try different scales and offsets:
@@ -76,4 +124,36 @@ light.linkAudioReactivity(audio.id, { band: 'volume', scale: 0.5, offset: 0.5 })
 
 // Dramatic pulse
 light.linkAudioReactivity(audio.id, { band: 'bass', scale: 5, offset: 0.2 })
+```
+
+## Light Types
+
+The Light node supports three types:
+
+```javascript
+// Directional light (like sun)
+const sun = app.create('light', {
+  type: 'directional',
+  color: '#ffffff',
+  intensity: 1,
+})
+
+// Point light (omnidirectional)
+const lamp = app.create('light', {
+  type: 'point',
+  color: '#ffaa00',
+  intensity: 1,
+  distance: 50,
+  decay: 2,
+})
+
+// Spot light (cone)
+const spotlight = app.create('light', {
+  type: 'spot',
+  color: '#ffffff',
+  intensity: 2,
+  distance: 100,
+  angle: Math.PI / 6,
+  penumbra: 0.2,
+})
 ```
