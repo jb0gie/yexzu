@@ -329,7 +329,11 @@ export class Mesh extends Node {
       property: options.property || 'emissiveIntensity',
       band: options.band || 'volume',
       scale: options.scale ?? 1,
-      offset: options.offset ?? 0
+      offset: options.offset ?? 0,
+      intensity: options.intensity ?? 1,
+      color: options.color,
+      from: options.from,
+      to: options.to
     })
   }
 
@@ -422,11 +426,6 @@ export class Mesh extends Node {
         },
         unlinkAudioReactivity() {
           self.unlinkAudioReactivity()
-        },
-        setEmissive(r, g, b) {
-          if (self.handle?.material) {
-            self.handle.material.emissive = [r, g, b]
-          }
         },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
