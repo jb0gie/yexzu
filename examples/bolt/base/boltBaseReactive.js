@@ -85,38 +85,24 @@ function startAudio() {
     return
   }
 
-  // Link both meshes with retry until audioReactivity system is ready
-  function tryLinkMeshes() {
-    if (!world.audioReactivity) {
-      console.log('[Audio Reactivity] System not ready, retrying in 100ms...')
-      setTimeout(tryLinkMeshes, 100)
-      return
-    }
+  // Make mesh1 emissive react to volume
+  mesh.linkAudioReactivity(audio.id, {
+    band: 'volume',
+    scale: 10,
+    property: 'emissiveIntensity'
+  })
 
-    console.log('[Audio Reactivity] System ready, linking meshes...')
-
-    // Make mesh1 emissive react to volume
-    if (mesh) {
-      mesh.linkAudioReactivity(audio.id, {
-        band: 'volume',
-        scale: 10,
-        property: 'emissiveIntensity'
-      })
-      console.log('[Audio Reactivity] Linked mesh (emissiveIntensity)')
-    }
-
-    // Make mesh2 color react to bass
-    if (mesh2) {
-      mesh2.linkAudioReactivity(audio.id, {
-        band: 'bass',
-        scale: 2,
-        property: 'color'
-      })
-      console.log('[Audio Reactivity] Linked mesh2 (color)')
-    }
+  // Make mesh2 color react to bass
+  if (mesh2) {
+    mesh2.linkAudioReactivity(audio.id, {
+      band: 'bass',
+      scale: 2,
+      property: 'color'
+    })
+    console.log('[Audio Reactivity] Linked mesh2 with color property')
   }
 
-  tryLinkMeshes()
+  console.log('[Audio Reactivity] Linked meshes to audio reactivity')
 
   if (playAction) {
     playAction.label = 'Stop Audio'
@@ -131,6 +117,9 @@ function stopAudio() {
 
   if (mesh) {
     mesh.unlinkAudioReactivity()
+  }
+  if (mesh2) {
+    mesh2.unlinkAudioReactivity()
   }
 
   if (playAction) {
