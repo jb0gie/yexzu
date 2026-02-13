@@ -260,6 +260,7 @@ export class AudioReactivity extends System {
           } else if (link.property === 'emissiveColor' && target.handle) {
             // Only change emissive color, NOT intensity (use emissiveIntensity for that)
             const color = this.getColorFromOptions(1, link)
+            console.log('[AudioReactivity] applying emissiveColor:', { r: color.r.toFixed(2), g: color.g.toFixed(2), b: color.b.toFixed(2) })
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
@@ -341,7 +342,9 @@ export class AudioReactivity extends System {
 
     // Use the configured color (pulses with intensity)
     if (options.color) {
-      return new THREE.Color(options.color)
+      const color = new THREE.Color(options.color)
+      console.log('[AudioReactivity] getColorFromOptions:', { input: options.color, output: { r: color.r.toFixed(2), g: color.g.toFixed(2), b: color.b.toFixed(2) } })
+      return color
     }
 
     // Fallback: white
