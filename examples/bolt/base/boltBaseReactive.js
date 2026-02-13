@@ -16,12 +16,119 @@ app.configure([
     ],
     initial: 'disabled',
   },
+  {
+    key: 'mesh1',
+    type: 'text',
+    label: 'Mesh 1 Name',
+    initial: 'MeshLOD0_2',
+    description: 'Name of first mesh in GLB to apply audio reactivity',
+  },
+  {
+    key: 'mesh1Property',
+    type: 'switch',
+    label: 'Mesh 1 Property',
+    options: [
+      { label: 'Emissive Intensity', value: 'emissiveIntensity' },
+      { label: 'Color', value: 'color' },
+      { label: 'Emissive Color', value: 'emissiveColor' },
+    ],
+    initial: 'emissiveIntensity',
+  },
+  {
+    key: 'mesh1Band',
+    type: 'switch',
+    label: 'Mesh 1 Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' },
+    ],
+    initial: 'volume',
+  },
+  {
+    key: 'mesh1Scale',
+    type: 'range',
+    label: 'Mesh 1 Scale',
+    initial: 10,
+    min: 0.1,
+    max: 50,
+    step: 0.1,
+  },
+  {
+    key: 'mesh1Intensity',
+    type: 'range',
+    label: 'Mesh 1 Intensity',
+    initial: 1,
+    min: 0.1,
+    max: 10,
+    step: 0.1,
+  },
+  {
+    key: 'mesh1Color',
+    type: 'text',
+    label: 'Mesh 1 Color (hex or name)',
+    initial: '',
+    description: 'Leave empty for heatmap, or use #ff0000, red, etc.',
+  },
+  {
+    key: 'mesh2',
+    type: 'text',
+    label: 'Mesh 2 Name',
+    initial: 'Coolant',
+    description: 'Name of second mesh in GLB (leave empty to disable)',
+  },
+  {
+    key: 'mesh2Property',
+    type: 'switch',
+    label: 'Mesh 2 Property',
+    options: [
+      { label: 'Emissive Intensity', value: 'emissiveIntensity' },
+      { label: 'Color', value: 'color' },
+      { label: 'Emissive Color', value: 'emissiveColor' },
+    ],
+    initial: 'color',
+  },
+  {
+    key: 'mesh2Band',
+    type: 'switch',
+    label: 'Mesh 2 Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' },
+    ],
+    initial: 'bass',
+  },
+  {
+    key: 'mesh2Scale',
+    type: 'range',
+    label: 'Mesh 2 Scale',
+    initial: 2,
+    min: 0.1,
+    max: 50,
+    step: 0.1,
+  },
+  {
+    key: 'mesh2Intensity',
+    type: 'range',
+    label: 'Mesh 2 Intensity',
+    initial: 1,
+    min: 0.1,
+    max: 10,
+    step: 0.1,
+  },
+  {
+    key: 'mesh2Color',
+    type: 'text',
+    label: 'Mesh 2 Color (hex or name)',
+    initial: '',
+    description: 'Leave empty for heatmap, or use #ff0000, red, etc.',
+  },
 ])
 
 if (!world.isClient) return
-
-console.log('[Audio Reactivity] Initializing...')
-console.log('[Audio Reactivity] AudioReactivity system:', world.audioReactivity ? 'available' : 'NOT available')
 
 const audio = app.create('audio', {
   src: props.audioFile?.url || null,
@@ -29,36 +136,27 @@ const audio = app.create('audio', {
 })
 app.add(audio)
 
-// Get a mesh from your GLB model
-const mesh = app.get('MeshLOD0_2')
-const meshMaterial = mesh?.material
-const mesh2 = app.get('Coolant')
-const meshMaterial2 = mesh2?.material
-
-if (!mesh) {
-  console.error('[Audio Reactivity] Could not find mesh named "MeshLOD0_2" in GLB model')
-  console.log('[Audio Reactivity] Make sure your GLB has a mesh named "MeshLOD0_2"')
-} else {
-  console.log('[Audio Reactivity] Found mesh:', mesh.id)
-  console.log('[Audio Reactivity] Mesh type:', mesh.name)
-  console.log('[Audio Reactivity] Has material:', !!meshMaterial)
-  console.log('[Audio Reactivity] Has linkAudioReactivity:', typeof mesh.linkAudioReactivity)
-  if (meshMaterial) {
-    console.log('[Audio Reactivity] Material emissiveIntensity:', meshMaterial.emissiveIntensity)
-  }
-}
-
-// Debug mesh2
-if (!mesh2) {
-  console.error('[Audio Reactivity] Could not find mesh2 named "Coolant" in GLB model')
-} else {
-  console.log('[Audio Reactivity] Found mesh2:', mesh2.id)
-  console.log('[Audio Reactivity] Mesh2 type:', mesh2.name)
-  console.log('[Audio Reactivity] Mesh2 has material:', !!meshMaterial2)
-  console.log('[Audio Reactivity] Mesh2 has linkAudioReactivity:', typeof mesh2.linkAudioReactivity)
-}
+// Get meshes from props
+const mesh1 = props.mesh1 ? app.get(props.mesh1) : null
+const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
 
 let isPlaying = false
+
+function buildLinkOptions(meshProps) {
+  const options = {
+    band: meshProps.band,
+    scale: meshProps.scale,
+    intensity: meshProps.intensity,
+    property: meshProps.property,
+  }
+
+  // Add color if specified
+  if (meshProps.color && meshProps.color.trim()) {
+    options.color = meshProps.color.trim()
+  }
+
+  return options
+}
 
 function startAudio() {
   if (isPlaying) return
@@ -66,43 +164,40 @@ function startAudio() {
     console.log('[Audio Reactivity] No audio file configured')
     return
   }
-  if (!mesh) {
-    console.log('[Audio Reactivity] No mesh available for audio reactivity')
-    return
-  }
-
-  console.log('[Audio Reactivity] Starting audio...')
-  console.log('[Audio Reactivity] Mesh:', mesh?.id)
-  console.log('[Audio Reactivity] Mesh material:', mesh?.material ? 'found' : 'not found')
-  console.log('[Audio Reactivity] Audio ID:', audio?.id)
 
   try {
     audio.play()
     isPlaying = true
-    console.log('[Audio Reactivity] Audio playing, linking reactivity...')
   } catch (err) {
     console.error('[Audio Reactivity] Failed to play audio:', err.message)
     return
   }
 
-  // Make mesh1 emissive react to volume
-  mesh.linkAudioReactivity(audio.id, {
-    band: 'volume',
-    scale: 10,
-    property: 'emissiveIntensity'
-  })
-
-  // Make mesh2 color react to bass
-  if (mesh2) {
-    mesh2.linkAudioReactivity(audio.id, {
-      band: 'bass',
-      scale: 0.5,
-      property: 'color'
+  // Link mesh 1
+  if (mesh1) {
+    const options = buildLinkOptions({
+      band: props.mesh1Band,
+      scale: props.mesh1Scale,
+      intensity: props.mesh1Intensity,
+      property: props.mesh1Property,
+      color: props.mesh1Color,
     })
-    console.log('[Audio Reactivity] Linked mesh2 with color property')
+    mesh1.linkAudioReactivity(audio.id, options)
+    console.log('[Audio Reactivity] Linked mesh1:', props.mesh1, options)
   }
 
-  console.log('[Audio Reactivity] Linked meshes to audio reactivity')
+  // Link mesh 2
+  if (mesh2) {
+    const options = buildLinkOptions({
+      band: props.mesh2Band,
+      scale: props.mesh2Scale,
+      intensity: props.mesh2Intensity,
+      property: props.mesh2Property,
+      color: props.mesh2Color,
+    })
+    mesh2.linkAudioReactivity(audio.id, options)
+    console.log('[Audio Reactivity] Linked mesh2:', props.mesh2, options)
+  }
 
   if (playAction) {
     playAction.label = 'Stop Audio'
@@ -115,12 +210,8 @@ function stopAudio() {
   audio.stop()
   isPlaying = false
 
-  if (mesh) {
-    mesh.unlinkAudioReactivity()
-  }
-  if (mesh2) {
-    mesh2.unlinkAudioReactivity()
-  }
+  if (mesh1) mesh1.unlinkAudioReactivity()
+  if (mesh2) mesh2.unlinkAudioReactivity()
 
   if (playAction) {
     playAction.label = 'Start Audio'
@@ -142,7 +233,6 @@ const playAction = app.create('action', {
 app.add(playAction)
 
 if (props.autoPlay === 'enabled') {
-  // Wait for audio node to be fully mounted before playing
   setTimeout(() => startAudio(), 100)
 }
 
