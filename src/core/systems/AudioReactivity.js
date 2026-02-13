@@ -232,8 +232,8 @@ export class AudioReactivity extends System {
           }
         } else if (link.targetType === 'material') {
           if (link.property === 'emissiveIntensity' && target.handle) {
-            // Use scaled value directly (clamped to 0-1)
-            const intensity = Math.max(0, Math.min(1, val))
+            // Use scaled value directly (no clamping for intense glows)
+            const intensity = Math.max(0, val)
 
             // Mesh nodes (from GLB) should use material proxy directly
             // because they don't have uberShader enabled
@@ -269,7 +269,7 @@ export class AudioReactivity extends System {
           } else if (link.property === 'color' && target.handle) {
             // Use scaled value for intensity, configured color for color
             const color = this.getColorFromOptions(1, link)
-            const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
+            const emissiveIntensity = Math.max(0, val * link.intensity)
             console.log('[AudioReactivity] color:', { val: val.toFixed(3), color: link.color, emissiveIntensity: emissiveIntensity.toFixed(3) })
 
             // Mesh nodes (from GLB) should use material proxy directly
