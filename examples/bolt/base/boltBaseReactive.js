@@ -68,8 +68,8 @@ app.configure([
     key: 'mesh1Color',
     type: 'color',
     label: 'Mesh 1 Color',
-    initial: '',
-    description: 'Leave empty for heatmap gradient',
+    initial: '#ff0000',
+    description: 'Color for audio reactivity',
   },
   {
     key: 'mesh2',
@@ -123,8 +123,8 @@ app.configure([
     key: 'mesh2Color',
     type: 'color',
     label: 'Mesh 2 Color',
-    initial: '',
-    description: 'Leave empty for heatmap gradient',
+    initial: '#0000ff',
+    description: 'Color for audio reactivity',
   },
 ])
 
@@ -148,14 +148,7 @@ function buildLinkOptions(meshProps) {
     scale: meshProps.scale,
     intensity: meshProps.intensity,
     property: meshProps.property,
-  }
-
-  // Add color if specified (color picker returns hex string)
-  if (meshProps.color && typeof meshProps.color === 'string' && meshProps.color.startsWith('#')) {
-    options.color = meshProps.color
-    console.log('[Audio Reactivity] Using custom color:', meshProps.color)
-  } else {
-    console.log('[Audio Reactivity] Using heatmap (no custom color set)')
+    color: meshProps.color || '#ffffff',
   }
 
   return options
