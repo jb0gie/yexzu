@@ -150,9 +150,12 @@ function buildLinkOptions(meshProps) {
     property: meshProps.property,
   }
 
-  // Add color if specified
-  if (meshProps.color && meshProps.color.trim()) {
-    options.color = meshProps.color.trim()
+  // Add color if specified (color picker returns hex string)
+  if (meshProps.color && typeof meshProps.color === 'string' && meshProps.color.startsWith('#')) {
+    options.color = meshProps.color
+    console.log('[Audio Reactivity] Using custom color:', meshProps.color)
+  } else {
+    console.log('[Audio Reactivity] Using heatmap (no custom color set)')
   }
 
   return options
