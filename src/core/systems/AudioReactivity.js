@@ -13,9 +13,11 @@ export class AudioReactivity extends System {
   }
 
   async init() {
+    console.log('[AudioReactivity] System initialized')
   }
 
   start() {
+    console.log('[AudioReactivity] System started')
   }
 
   registerAudioNode(nodeId, audioNode) {
