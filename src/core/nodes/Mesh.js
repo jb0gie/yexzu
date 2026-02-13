@@ -319,6 +319,22 @@ export class Mesh extends Node {
     this.setDirty()
   }
 
+  linkAudioReactivity(sourceId, options = {}) {
+    if (!this.ctx.world.audioReactivity) return
+    this.ctx.world.audioReactivity.link(this, sourceId, {
+      targetType: 'material',
+      property: options.property || 'emissiveIntensity',
+      band: options.band || 'volume',
+      scale: options.scale ?? 1,
+      offset: options.offset ?? 0
+    })
+  }
+
+  unlinkAudioReactivity() {
+    if (!this.ctx.world.audioReactivity) return
+    this.ctx.world.audioReactivity.unlink(this)
+  }
+
   getProxy() {
     if (!this.proxy) {
       const self = this
@@ -397,6 +413,12 @@ export class Mesh extends Node {
         },
         set visible(value) {
           self.visible = value
+        },
+        linkAudioReactivity(sourceId, options) {
+          self.linkAudioReactivity(sourceId, options)
+        },
+        unlinkAudioReactivity() {
+          self.unlinkAudioReactivity()
         },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
