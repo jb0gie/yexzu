@@ -358,6 +358,10 @@ export class Audio extends Node {
       if (!this._loop) {
         this.source.onended = () => this.stop()
       }
+
+      if (this.ctx.world.audioReactivity) {
+        this.ctx.world.audioReactivity.registerAudioNode(this.id, this.gainNode)
+      }
     })
   }
 
@@ -390,6 +394,9 @@ export class Audio extends Node {
       this.gainNode = null
       this.pannerNode?.disconnect()
       this.pannerNode = null
+    }
+    if (this.ctx.world.audioReactivity) {
+      this.ctx.world.audioReactivity.unregister(this.id)
     }
   }
 
