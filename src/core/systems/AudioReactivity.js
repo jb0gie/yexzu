@@ -113,6 +113,7 @@ export class AudioReactivity extends System {
       band: options.band || 'volume',
       scale: options.scale ?? 1,
       offset: options.offset ?? 0,
+      intensity: options.intensity ?? 1,
       property: options.property || 'intensity',
       targetType: options.targetType || 'light',
       color: options.color,
@@ -253,18 +254,21 @@ export class AudioReactivity extends System {
           } else if (link.property === 'emissiveColor' && target.handle) {
             // Only change emissive color, keep base color unchanged
             const color = this.getColorFromOptions(val, link)
+            const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
               target.handle.material.emissive = [color.r, color.g, color.b]
+              target.handle.material.emissiveIntensity = emissiveIntensity
             }
             // Prim nodes have setter methods with uberShader
             else if (target.handle.setEmissive) {
               target.handle.setEmissive(color.r, color.g, color.b)
+              target.handle.setEmissiveIntensity(emissiveIntensity)
             }
           } else if (link.property === 'color' && target.handle) {
             const color = this.getColorFromOptions(val, link)
-            const emissiveIntensity = Math.max(0, Math.min(1, val))
+            const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
