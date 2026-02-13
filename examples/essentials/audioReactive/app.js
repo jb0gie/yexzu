@@ -53,15 +53,6 @@ const trebleLight = app.create('light', {
 })
 trebleLight.position.set(3, 2, 0)
 
-const floor = app.create('prim', {
-  type: 'plane',
-  size: [15, 15],
-  color: '#111111',
-  emissive: '#440044',
-  emissiveIntensity: 0.1,
-})
-floor.position.set(0, 0, 0)
-
 const bassCube = app.create('prim', {
   type: 'box',
   size: [1, 1, 1],
@@ -93,7 +84,6 @@ app.add(audio)
 app.add(bassLight)
 app.add(midLight)
 app.add(trebleLight)
-app.add(floor)
 app.add(bassCube)
 app.add(midSphere)
 app.add(trebleCone)
@@ -126,13 +116,6 @@ function startAudio() {
     band: 'treble',
     scale: 4,
     offset: 0.2,
-  })
-
-  floor.linkAudioReactivity(audio.id, {
-    band: 'volume',
-    scale: 0.8,
-    offset: 0.1,
-    property: 'emissiveIntensity',
   })
 
   bassCube.linkAudioReactivity(audio.id, {
@@ -170,7 +153,6 @@ function stopAudio() {
   bassLight.unlinkAudioReactivity()
   midLight.unlinkAudioReactivity()
   trebleLight.unlinkAudioReactivity()
-  floor.unlinkAudioReactivity()
   bassCube.unlinkAudioReactivity()
   midSphere.unlinkAudioReactivity()
   trebleCone.unlinkAudioReactivity()
@@ -178,7 +160,6 @@ function stopAudio() {
   bassLight.intensity = 0.2
   midLight.intensity = 0.2
   trebleLight.intensity = 0.2
-  floor.emissiveIntensity = 0.1
   bassCube.emissiveIntensity = 0.1
   midSphere.emissiveIntensity = 0.1
   trebleCone.emissiveIntensity = 0.1

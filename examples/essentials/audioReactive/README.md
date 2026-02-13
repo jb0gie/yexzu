@@ -9,7 +9,7 @@ This example creates a 3-light setup where each light responds to different freq
 - **Green Light** - Responds to mid frequencies (snare, vocals)
 - **Blue Light** - Responds to treble frequencies (hi-hats, cymbals)
 
-Plus three emissive primitives that pulse with the music.
+Plus three emissive primitives (cube, sphere, cone) that pulse with the music.
 
 ## Usage
 
