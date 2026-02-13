@@ -96,7 +96,7 @@ function startAudio() {
   if (mesh2) {
     mesh2.linkAudioReactivity(audio.id, {
       band: 'bass',
-      scale: 2,
+      scale: 0.5,
       property: 'color'
     })
     console.log('[Audio Reactivity] Linked mesh2 with color property')
