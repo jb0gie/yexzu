@@ -1,3 +1,5 @@
+import * as THREE from '../extras/three'
+
 import { System } from './System'
 
 export class AudioReactivity extends System {
@@ -280,7 +282,7 @@ export class AudioReactivity extends System {
   }
 
   getHeatmapColor(value) {
-    const color = new this.world.THREE.Color()
+    const color = new THREE.Color()
     const scaled = Math.max(0, Math.min(1, value))
 
     if (scaled < 0.25) {
