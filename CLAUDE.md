@@ -1253,6 +1253,93 @@ When using THREE constructors, note that THREE may not be in scope. Use:
 - Direct material objects for prim.material
 - Avoid THREE.MeshStandardMaterial()
 
+## Audio Reactivity System
+
+**Feature**: Make lights and materials respond to audio frequency data from Audio/Video nodes
+
+### Quick Start
+
+```javascript
+// Create audio source
+const audio = world.createNode('audio', { src: 'music.mp3' })
+audio.play()
+
+// Create reactive light
+const light = world.createNode('light', {
+  type: 'point',
+  color: '#ff00ff',
+  intensity: 0.5
+})
+light.linkAudioReactivity(audio.id, { band: 'bass', scale: 2 })
+
+// Or reactive prim emissive
+const prim = world.createNode('prim', {
+  type: 'box',
+  emissive: '#00ffff'
+})
+prim.linkAudioReactivity(audio.id, { band: 'volume', scale: 1.5 })
+```
+
+### Light Node
+
+**Types**: `directional` | `point` | `spot`
+
+```javascript
+const light = world.createNode('light', {
+  type: 'point',          // Light type
+  color: '#ffffff',       // Light color
+  intensity: 1,           // Base intensity
+  distance: 100,          // Max distance (point/spot)
+  decay: 2,               // Falloff (point/spot)
+  angle: Math.PI / 3,     // Cone angle (spot only)
+  penumbra: 0,            // Edge softness (spot only)
+  castShadow: false       // Shadow casting
+})
+```
+
+### Audio Reactivity Options
+
+```javascript
+node.linkAudioReactivity(sourceId, {
+  band: 'bass',           // 'volume' | 'bass' | 'mid' | 'treble'
+  scale: 1,               // Value multiplier
+  offset: 0,              // Base value added
+  property: 'intensity'   // 'intensity' (light) | 'emissiveIntensity' | 'emissive' (prim)
+})
+```
+
+**Frequency Bands**:
+- `volume` - Overall loudness (all frequencies)
+- `bass` - Low frequencies (0-10 FFT bins, ~0-172 Hz)
+- `mid` - Mid frequencies (10-40 FFT bins, ~172-689 Hz)
+- `treble` - High frequencies (40+ FFT bins, ~689+ Hz)
+
+### Cleanup
+
+```javascript
+// Remove reactivity before deleting node
+light.unlinkAudioReactivity()
+world.remove(light)
+
+// Audio unregisters automatically when stopped
+audio.stop()
+```
+
+### Technical Details
+
+- **FFT Size**: 256 bins
+- **Smoothing**: 0.6 (configurable in AudioReactivity system)
+- **Update Rate**: Every frame
+- **System Location**: `src/core/systems/AudioReactivity.js`
+- **Node Location**: `src/core/nodes/Light.js`
+
+### Integration Points
+
+Audio and Video nodes auto-register with AudioReactivity:
+- `Audio.js`: Registers `gainNode` when playing
+- `Video.js`: Registers `instance.audio` on mount
+- Both unregister automatically on stop/unmount
+
 ## Console Logging Performance Caveats
 
 **Critical: Console.log in high-frequency code paths causes severe performance degradation**
