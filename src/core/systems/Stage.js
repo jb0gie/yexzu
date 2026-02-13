@@ -199,6 +199,19 @@ export class Stage extends System {
         raw.emissiveIntensity = value
         raw.needsUpdate = true
       },
+      get emissive() {
+        return raw.emissive
+      },
+      set emissive(val) {
+        if (!raw.emissive) {
+          raw.emissive = new THREE.Color(val)
+        } else if (typeof val === 'string') {
+          raw.emissive.set(val)
+        } else if (Array.isArray(val) && val.length === 3) {
+          raw.emissive.setRGB(val[0], val[1], val[2])
+        }
+        raw.needsUpdate = true
+      },
       get fog() {
         return raw.fog
       },
