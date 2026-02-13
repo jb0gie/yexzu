@@ -107,6 +107,8 @@ export class AudioReactivity extends System {
   link(target, sourceId, options = {}) {
     if (!target) return
 
+    console.log('[AudioReactivity] link options:', options)
+
     const link = {
       target,
       sourceId,
@@ -232,9 +234,9 @@ export class AudioReactivity extends System {
           }
         } else if (link.targetType === 'material') {
           if (link.property === 'emissiveIntensity' && target.handle) {
-            // Use raw audio value * intensity slider (scale controls sensitivity, not output)
-            const rawVal = srcData[link.band] ?? srcData.volume
-            const intensity = Math.max(0, Math.min(1, rawVal * link.intensity))
+            // Use scaled value * intensity
+            const intensity = Math.max(0, Math.min(1, val * link.intensity))
+            console.log('[AudioReactivity] emissiveIntensity:', { val: val.toFixed(3), intensity: intensity.toFixed(3), linkIntensity: link.intensity })
 
             // Mesh nodes (from GLB) should use material proxy directly
             // because they don't have uberShader enabled
@@ -268,10 +270,10 @@ export class AudioReactivity extends System {
               target.handle.setEmissive(color.r, color.g, color.b)
             }
           } else if (link.property === 'color' && target.handle) {
-            // Use raw audio value for intensity, configured color for color
-            const rawVal = srcData[link.band] ?? srcData.volume
+            // Use scaled value for intensity, configured color for color
             const color = this.getColorFromOptions(1, link)
-            const emissiveIntensity = Math.max(0, Math.min(1, rawVal * link.intensity))
+            const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
+            console.log('[AudioReactivity] color:', { val: val.toFixed(3), color: link.color, emissiveIntensity: emissiveIntensity.toFixed(3) })
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
