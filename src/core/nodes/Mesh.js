@@ -320,7 +320,10 @@ export class Mesh extends Node {
   }
 
   linkAudioReactivity(sourceId, options = {}) {
-    if (!this.ctx.world.audioReactivity) return
+    if (!this.ctx.world.audioReactivity) {
+      console.warn('[Mesh] linkAudioReactivity called but AudioReactivity system not ready. Try again after world is initialized.')
+      return
+    }
     this.ctx.world.audioReactivity.link(this, sourceId, {
       targetType: 'material',
       property: options.property || 'emissiveIntensity',
