@@ -12,3 +12,4 @@ build/
 .glootie-stop-verified
 .claude/
 examples/bolt/
+tmp/
