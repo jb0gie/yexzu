@@ -117,6 +117,15 @@ export class AudioReactivity extends System {
       targetType: options.targetType || 'light'
     }
 
+    console.log('[AudioReactivity] LINK CREATED:', {
+      sourceId,
+      property: link.property,
+      targetType: link.targetType,
+      targetName: target.name,
+      hasHandle: !!target.handle,
+      sourceExists: this.data.has(sourceId)
+    })
+
     // If source doesn't exist yet, queue as pending
     if (!this.data.has(sourceId)) {
       let pending = this.pendingLinks.get(sourceId)
@@ -251,8 +260,20 @@ export class AudioReactivity extends System {
             const heatColor = this.getHeatmapColor(val)
             const emissiveIntensity = Math.max(0, Math.min(1, val))
 
+            console.log('[AudioReactivity] COLOR:', {
+              targetName: target.name,
+              hasMaterial: !!target.handle.material,
+              hasSetColor: !!target.handle.setColor,
+              val: val.toFixed(3),
+              heatColor: { r: heatColor.r.toFixed(2), g: heatColor.g.toFixed(2), b: heatColor.b.toFixed(2) }
+            })
+
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
+              console.log('[AudioReactivity] Applying to mesh material:', {
+                hasColor: !!target.handle.material.color,
+                hasEmissive: !!target.handle.material.emissive
+              })
               if (target.handle.material.color) {
                 target.handle.material.color.copy(heatColor)
               }
@@ -263,9 +284,12 @@ export class AudioReactivity extends System {
             }
             // Prim nodes have setter methods with uberShader
             else if (target.handle.setColor) {
+              console.log('[AudioReactivity] Applying to prim via setColor')
               target.handle.setColor(heatColor.r, heatColor.g, heatColor.b)
               target.handle.setEmissive(heatColor.r, heatColor.g, heatColor.b)
               target.handle.setEmissiveIntensity(emissiveIntensity)
+            } else {
+              console.log('[AudioReactivity] NO MATCH - neither mesh+material nor setColor')
             }
           }
         }
