@@ -20,6 +20,7 @@ Plus three emissive primitives that pulse with the music.
 
 ## Configuration
 
+- **Audio File** - Upload an audio file to play (required)
 - **Auto Play on Load** - Start playing automatically when the world loads
 
 ## Key Concepts
@@ -104,13 +105,29 @@ app.on('destroy', () => {
 - `app.js` - Main application with the full demo
 - `README.md` - This documentation
 
+## Setup
+
+1. Install the app in your Hyperfy world
+2. Open the app settings and upload an audio file
+3. Enable "Auto Play on Load" if desired
+4. The app will create reactive lights and prims
+
 ## Customization
 
-Replace the audio source with your own music:
+To use your own music, upload an audio file in the app settings or modify the code:
 
 ```javascript
+app.configure([
+  {
+    key: 'audioFile',
+    type: 'file',
+    kind: 'audio',
+    label: 'Audio File',
+  },
+])
+
 const audio = app.create('audio', {
-  src: 'asset://your-music.mp3',
+  src: props.audioFile?.url,
   loop: true,
 })
 app.add(audio)

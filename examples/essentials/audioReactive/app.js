@@ -1,5 +1,12 @@
 app.configure([
   {
+    key: 'audioFile',
+    type: 'file',
+    kind: 'audio',
+    label: 'Audio File',
+    description: 'Upload an audio file to play',
+  },
+  {
     key: 'autoPlay',
     type: 'switch',
     label: 'Auto Play on Load',
@@ -7,14 +14,18 @@ app.configure([
       { label: 'Yes', value: 'enabled' },
       { label: 'No', value: 'disabled' },
     ],
-    initial: 'enabled',
+    initial: 'disabled',
   },
 ])
 
 if (!world.isClient) return
 
+if (!props.audioFile?.url) {
+  console.log('[Audio Reactivity] No audio file configured. Please add an audio file in app settings.')
+}
+
 const audio = app.create('audio', {
-  src: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  src: props.audioFile?.url || null,
   loop: true,
 })
 
@@ -91,6 +102,10 @@ let isPlaying = false
 
 function startAudio() {
   if (isPlaying) return
+  if (!props.audioFile?.url) {
+    console.log('[Audio Reactivity] No audio file configured')
+    return
+  }
 
   audio.play()
   isPlaying = true
