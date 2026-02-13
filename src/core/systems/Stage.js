@@ -204,7 +204,11 @@ export class Stage extends System {
       },
       set emissive(val) {
         if (!raw.emissive) {
-          raw.emissive = new THREE.Color(val)
+          if (Array.isArray(val) && val.length === 3) {
+            raw.emissive = new THREE.Color(val[0], val[1], val[2])
+          } else {
+            raw.emissive = new THREE.Color(val)
+          }
         } else if (typeof val === 'string') {
           raw.emissive.set(val)
         } else if (Array.isArray(val) && val.length === 3) {
