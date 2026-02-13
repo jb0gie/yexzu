@@ -270,7 +270,6 @@ export class AudioReactivity extends System {
           } else if (link.property === 'color' && target.handle) {
             // val is already scaled, normalize for color (0-1 range)
             const normalizedVal = Math.min(1, val / link.scale)
-            console.log('[AudioReactivity] color options:', { from: link.from, to: link.to, color: link.color, normalizedVal: normalizedVal.toFixed(2) })
             const color = this.getColorFromOptions(normalizedVal, link)
             const emissiveIntensity = Math.max(0, Math.min(1, val * link.intensity))
 
@@ -335,13 +334,11 @@ export class AudioReactivity extends System {
       const fromColor = new THREE.Color(options.from)
       const toColor = new THREE.Color(options.to)
       const scaled = Math.max(0, Math.min(1, val))
-      console.log('[AudioReactivity] gradient:', { from: options.from, to: options.to, val: val.toFixed(2), scaled: scaled.toFixed(2) })
       return fromColor.clone().lerp(toColor, scaled)
     }
 
     // If single color provided, use it directly
     if (options.color) {
-      console.log('[AudioReactivity] single color:', options.color)
       return new THREE.Color(options.color)
     }
 
