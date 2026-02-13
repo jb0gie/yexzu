@@ -237,6 +237,7 @@ export class AudioReactivity extends System {
           }
         } else if (link.targetType === 'material') {
           if (link.property === 'emissiveIntensity' && target.handle) {
+            console.log('[AudioReactivity] EMISSIVE_INTENSITY:', { targetName: target.name, val: val.toFixed(3) })
             // Mesh nodes (from GLB) should use material proxy directly
             // because they don't have uberShader enabled
             if (target.name === 'mesh' && target.handle.material) {
