@@ -247,6 +247,18 @@ export class AudioReactivity extends System {
             else if (target.handle.setEmissive) {
               target.handle.setEmissive(intensity, intensity, intensity)
             }
+          } else if (link.property === 'emissiveColor' && target.handle) {
+            // Only change emissive color (heatmap), keep base color unchanged
+            const heatColor = this.getHeatmapColor(val)
+
+            // Mesh nodes (from GLB) should use material proxy directly
+            if (target.name === 'mesh' && target.handle.material) {
+              target.handle.material.emissive = [heatColor.r, heatColor.g, heatColor.b]
+            }
+            // Prim nodes have setter methods with uberShader
+            else if (target.handle.setEmissive) {
+              target.handle.setEmissive(heatColor.r, heatColor.g, heatColor.b)
+            }
           } else if (link.property === 'color' && target.handle) {
             const heatColor = this.getHeatmapColor(val)
             const emissiveIntensity = Math.max(0, Math.min(1, val))
