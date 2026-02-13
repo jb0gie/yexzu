@@ -260,6 +260,11 @@ export class AudioReactivity extends System {
               // Set emissive color via proxy (uses array format [r,g,b])
               target.handle.material.emissive = [heatColor.r, heatColor.g, heatColor.b]
               target.handle.material.emissiveIntensity = emissiveIntensity
+              console.log('[AudioReactivity] color update:', {
+                val: val.toFixed(3),
+                emissiveIntensity: emissiveIntensity.toFixed(3),
+                heatColor: { r: heatColor.r.toFixed(2), g: heatColor.g.toFixed(2), b: heatColor.b.toFixed(2) }
+              })
             }
             // Prim nodes have setter methods with uberShader
             else if (target.handle.setColor) {
