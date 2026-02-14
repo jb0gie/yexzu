@@ -17,6 +17,17 @@ app.configure([
     initial: 'disabled',
   },
   {
+    key: 'debugMode',
+    type: 'switch',
+    label: 'Debug Logging',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' },
+    ],
+    initial: 'disabled',
+    description: 'Enable console logs for debugging',
+  },
+  {
     key: 'mesh1',
     type: 'text',
     label: 'Mesh 1 Name',
@@ -126,9 +137,82 @@ app.configure([
     initial: '#0000ff',
     description: 'Color for audio reactivity',
   },
+  {
+    key: 'screen',
+    type: 'section',
+    label: 'Screen Settings',
+  },
+  {
+    key: 'video',
+    type: 'file',
+    kind: 'video',
+    label: 'Upload Video',
+  },
+  {
+    key: 'videoLink',
+    type: 'text',
+    label: 'Video Link (paste URL here)',
+  },
+  {
+    key: 'defaultVolume',
+    type: 'switch',
+    label: 'Default Volume',
+    options: [
+      { label: 'Low', value: 1 },
+      { label: 'Medium', value: 5 },
+      { label: 'High', value: 10 }
+    ],
+    initial: 0,
+  },
+	{
+		key: 'isSpatial',
+		type: 'switch',
+		label: 'Audio Type',
+		options: [
+			{ label: 'Spatial (3D)', value: true },
+			{ label: 'Global', value: false }
+		],
+		initial: true
+	},
+	{
+		key: 'minDistance',
+		type: 'number',
+		label: 'Min Distance',
+		initial: 5,
+		min: 1,
+		max: 50,
+		description: 'Distance where audio starts to fade (in meters)'
+	},
+	{
+		key: 'maxDistance',
+		type: 'number',
+		label: 'Max Distance',
+		initial: 20,
+		min: 1,
+		max: 100,
+		description: 'Distance where audio becomes inaudible (in meters)'
+	},
+	{
+		key: 'rolloffFactor',
+		type: 'switch',
+		label: 'Falloff Rate',
+		options: [
+			{ label: 'Gradual', value: 1 },
+			{ label: 'Medium', value: 2 },
+			{ label: 'Steep', value: 4 }
+		],
+		initial: 2
+	}
 ])
 
 if (!world.isClient) return
+
+// Debug logger
+function debugLog(...args) {
+  if (props.debugMode === 'enabled') {
+    console.log('[Audio Reactivity]', ...args)
+  }
+}
 
 const audio = app.create('audio', {
   src: props.audioFile?.url || null,
@@ -140,7 +224,45 @@ app.add(audio)
 const mesh1 = props.mesh1 ? app.get(props.mesh1) : null
 const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
 
+const src = props.video?.url || props.videoLink;
+
 let isPlaying = false
+
+// Set up video player state
+const player = {
+  isPlaying: true,
+  volume: props.defaultVolume || 10,
+  elapsedTime: 0,
+  duration: 0
+}
+
+if (!src) {
+  console.error("No video source provided. Please upload a video or paste a video link.");
+} else if (world.isClient) {
+  const mesh = app.get('Screens');
+  const video = app.create('video', {
+    src,
+    linked: true,
+    loop: true,
+    aspect: 16 / 9, // geometry is 16:9
+    geometry: mesh.geometry,
+    cover: true,
+    volume: player.volume / 15, // Convert to 0-1 range for the video element
+    spatial: props.isSpatial !== false, // Spatial audio by default
+    minDistance: props.minDistance || 5,
+    maxDistance: props.maxDistance || 20,
+    rolloffFactor: props.rolloffFactor || 2
+  });
+  // Move video to the same place as mesh and adjust its position slightly
+  video.position.copy(mesh.position);
+  video.quaternion.copy(mesh.quaternion);
+  video.scale.copy(mesh.scale);
+  video.position.z += 0.001;
+  mesh.active = false
+  // Add the video to the scene and play it
+  app.add(video);
+  video.play();
+}
 
 function buildLinkOptions(meshProps) {
   const options = {
@@ -165,7 +287,7 @@ function startAudio() {
     audio.play()
     isPlaying = true
   } catch (err) {
-    console.error('[Audio Reactivity] Failed to play audio:', err.message)
+    debugLog('Failed to play audio:', err.message)
     return
   }
 
@@ -179,7 +301,7 @@ function startAudio() {
       color: props.mesh1Color,
     })
     mesh1.linkAudioReactivity(audio.id, options)
-    console.log('[Audio Reactivity] Linked mesh1:', props.mesh1, options)
+    debugLog('Linked mesh1:', props.mesh1, options)
   }
 
   // Link mesh 2
@@ -192,7 +314,7 @@ function startAudio() {
       color: props.mesh2Color,
     })
     mesh2.linkAudioReactivity(audio.id, options)
-    console.log('[Audio Reactivity] Linked mesh2:', props.mesh2, options)
+    debugLog('Linked mesh2:', props.mesh2, options)
   }
 
   if (playAction) {
