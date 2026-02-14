@@ -270,7 +270,6 @@ export class AudioReactivity extends System {
             // Use scaled value for intensity, configured color for color
             const color = this.getColorFromOptions(1, link)
             const emissiveIntensity = Math.max(0, val * link.intensity)
-            console.log('[AudioReactivity] color:', { val: val.toFixed(3), color: link.color, emissiveIntensity: emissiveIntensity.toFixed(3) })
 
             // Mesh nodes (from GLB) should use material proxy directly
             if (target.name === 'mesh' && target.handle.material) {
