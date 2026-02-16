@@ -442,6 +442,22 @@ app.on('update', (dt) => {
   }
 })
 
+// Engine animations (from boltEngine.js)
+app.on('update', delta => {
+  if (thruster) {
+    thruster.rotation.y += -0.1 * delta
+    if (thruster.material) {
+      thruster.material.textureY += 5 * delta
+    }
+  }
+  if (engineInner) {
+    engineInner.rotation.y += -0.1 * delta
+  }
+  if (engineOuter) {
+    engineOuter.rotation.y += -0.1 * delta
+  }
+})
+
 app.on('destroy', () => {
   stopAudio()
 })
