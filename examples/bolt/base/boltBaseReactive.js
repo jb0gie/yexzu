@@ -235,6 +235,11 @@ const audio = app.create('audio', {
 })
 app.add(audio)
 
+// Log the asset URL so you can copy it to boltFans.js
+if (props.audioFile?.url) {
+  console.log('[BoltBase] Audio asset URL:', props.audioFile.url)
+}
+
 // Get meshes from props
 const mesh1 = props.mesh1 ? app.get(props.mesh1) : null
 const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
