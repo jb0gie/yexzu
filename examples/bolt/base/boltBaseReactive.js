@@ -217,6 +217,217 @@ app.configure([
     min: -5,
     max: 5,
     step: 0.1
+  },
+  {
+    key: 'engineSection',
+    type: 'section',
+    label: 'Engine Settings',
+  },
+  {
+    key: 'thrusterColor',
+    type: 'color',
+    label: 'Thruster Color',
+    initial: '#ff4400',
+  },
+  {
+    key: 'thrusterBand',
+    type: 'switch',
+    label: 'Thruster Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'bass'
+  },
+  {
+    key: 'thrusterScale',
+    type: 'range',
+    label: 'Thruster Scale',
+    initial: 8,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'thrusterIntensity',
+    type: 'range',
+    label: 'Thruster Intensity',
+    initial: 2,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
+    key: 'engineInnerColor',
+    type: 'color',
+    label: 'Engine Inner Color',
+    initial: '#00aaff',
+  },
+  {
+    key: 'engineInnerBand',
+    type: 'switch',
+    label: 'Engine Inner Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'mid'
+  },
+  {
+    key: 'engineInnerScale',
+    type: 'range',
+    label: 'Engine Inner Scale',
+    initial: 5,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'engineInnerIntensity',
+    type: 'range',
+    label: 'Engine Inner Intensity',
+    initial: 1.5,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
+    key: 'engineOuterColor',
+    type: 'color',
+    label: 'Engine Outer Color',
+    initial: '#ffffff',
+  },
+  {
+    key: 'engineOuterBand',
+    type: 'switch',
+    label: 'Engine Outer Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'volume'
+  },
+  {
+    key: 'engineOuterScale',
+    type: 'range',
+    label: 'Engine Outer Scale',
+    initial: 3,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'engineOuterIntensity',
+    type: 'range',
+    label: 'Engine Outer Intensity',
+    initial: 1,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
+    key: 'tunnelSection',
+    type: 'section',
+    label: 'Tunnel Settings',
+  },
+  {
+    key: 'tunnelColor',
+    type: 'color',
+    label: 'Tunnel Color',
+    initial: '#aa00ff',
+  },
+  {
+    key: 'tunnelBand',
+    type: 'switch',
+    label: 'Tunnel Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'bass'
+  },
+  {
+    key: 'tunnelScale',
+    type: 'range',
+    label: 'Tunnel Scale',
+    initial: 6,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'tunnelIntensity',
+    type: 'range',
+    label: 'Tunnel Intensity',
+    initial: 1.5,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
+    key: 'fanSection',
+    type: 'section',
+    label: 'Fan Settings',
+  },
+  {
+    key: 'fanMesh',
+    type: 'text',
+    label: 'Fan Mesh Name',
+    initial: 'Cylinder007',
+    description: 'Name of mesh for audio reactivity'
+  },
+  {
+    key: 'fanColor',
+    type: 'color',
+    label: 'Fan Color',
+    initial: '#00ff00',
+  },
+  {
+    key: 'fanBand',
+    type: 'switch',
+    label: 'Fan Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'treble'
+  },
+  {
+    key: 'fanScale',
+    type: 'range',
+    label: 'Fan Scale',
+    initial: 5,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'fanIntensity',
+    type: 'range',
+    label: 'Fan Intensity',
+    initial: 1,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
+    key: 'fanSpinSpeed',
+    type: 'range',
+    label: 'Fan Spin Speed',
+    initial: 2,
+    min: 0,
+    max: 10,
+    step: 0.1
   }
 ])
 
@@ -255,13 +466,7 @@ const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
 const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
 
 // Get fan meshes
-const fanMesh = app.get('Cylinder007')
-const fanGroups = []
-for (let i = 0; i <= 5; i++) {
-  const name = i === 0 ? 'CoolingFan' : `CoolingFan_${i}`
-  const fan = app.get(name)
-  if (fan) fanGroups.push(fan)
-}
+const fanMesh = app.get(props.fanMesh || 'FanMeshLOD0_7')
 
 // Debug: log what we found
 debugLog('Found nodes:', {
@@ -273,8 +478,7 @@ debugLog('Found nodes:', {
   engineInnerLOD: !!engineInnerLOD,
   engineOuterLOD: !!engineOuterLOD,
   tunnelPiece: !!tunnelPiece,
-  fanMesh: !!fanMesh,
-  fanCount: fanGroups.length
+  fanMesh: !!fanMesh
 })
 
 const src = props.video?.url || props.videoLink;
@@ -371,11 +575,11 @@ function startAudio() {
   // Link thruster
   if (thruster) {
     const options = {
-      band: 'bass',
-      scale: 8,
-      intensity: 2,
+      band: props.thrusterBand,
+      scale: props.thrusterScale,
+      intensity: props.thrusterIntensity,
       property: 'color',
-      color: '#ff4400',
+      color: props.thrusterColor,
     }
     thruster.linkAudioReactivity(audio.id, options)
     debugLog('Linked thruster:', options)
@@ -384,11 +588,11 @@ function startAudio() {
   // Link engine LOD meshes
   if (engineInnerLOD) {
     const options = {
-      band: 'mid',
-      scale: 5,
-      intensity: 1.5,
+      band: props.engineInnerBand,
+      scale: props.engineInnerScale,
+      intensity: props.engineInnerIntensity,
       property: 'color',
-      color: '#00aaff',
+      color: props.engineInnerColor,
     }
     engineInnerLOD.linkAudioReactivity(audio.id, options)
     debugLog('Linked engineInnerLOD:', options)
@@ -396,11 +600,11 @@ function startAudio() {
 
   if (engineOuterLOD) {
     const options = {
-      band: 'volume',
-      scale: 3,
-      intensity: 1,
+      band: props.engineOuterBand,
+      scale: props.engineOuterScale,
+      intensity: props.engineOuterIntensity,
       property: 'color',
-      color: '#ffffff',
+      color: props.engineOuterColor,
     }
     engineOuterLOD.linkAudioReactivity(audio.id, options)
     debugLog('Linked engineOuterLOD:', options)
@@ -409,11 +613,11 @@ function startAudio() {
   // Link tunnel piece
   if (tunnelPiece) {
     const options = {
-      band: 'bass',
-      scale: 6,
-      intensity: 1.5,
+      band: props.tunnelBand,
+      scale: props.tunnelScale,
+      intensity: props.tunnelIntensity,
       property: 'color',
-      color: '#aa00ff',
+      color: props.tunnelColor,
     }
     tunnelPiece.linkAudioReactivity(audio.id, options)
     debugLog('Linked tunnelPiece:', options)
@@ -422,11 +626,11 @@ function startAudio() {
   // Link fan mesh
   if (fanMesh) {
     const options = {
-      band: 'treble',
-      scale: 5,
-      intensity: 1,
+      band: props.fanBand,
+      scale: props.fanScale,
+      intensity: props.fanIntensity,
       property: 'color',
-      color: '#00ff00',
+      color: props.fanColor,
     }
     fanMesh.linkAudioReactivity(audio.id, options)
     debugLog('Linked fanMesh:', options)
@@ -494,12 +698,10 @@ app.on('update', delta => {
   }
 })
 
-// Fan spinning
+// Fan spinning - uses the configurable spin speed
 app.on('update', delta => {
-  for (const fan of fanGroups) {
-    if (fan) {
-      fan.rotation.x += -2 * delta
-    }
+  if (fanMesh) {
+    fanMesh.rotation.x += -props.fanSpinSpeed * delta
   }
 })
 
