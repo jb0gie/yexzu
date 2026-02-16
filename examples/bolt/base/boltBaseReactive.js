@@ -688,13 +688,19 @@ app.on('update', (dt) => {
   }
 })
 
-// Thruster rotation and texture animation
+// Thruster and engine rotation animation
 app.on('update', delta => {
   if (thruster) {
     thruster.rotation.y += -0.1 * delta
     if (thruster.material) {
       thruster.material.textureY += 5 * delta
     }
+  }
+  if (engineInnerLOD) {
+    engineInnerLOD.rotation.y += -0.1 * delta
+  }
+  if (engineOuterLOD) {
+    engineOuterLOD.rotation.y += -0.1 * delta
   }
 })
 
