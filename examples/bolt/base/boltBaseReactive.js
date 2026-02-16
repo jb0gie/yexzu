@@ -250,13 +250,28 @@ const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 
 // Get engine and fan meshes for audio reactivity
 const thruster = app.get('Thrusters')
-const engineInner = app.get('engineInner')
-const engineOuter = app.get('engineOuter')
 const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
 const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
 const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
 const fanMesh = app.get('Cylinder007')
-const fanGroup = app.get('CoolingFan')
+
+// Get all fan groups (CoolingFan to CoolingFan_5)
+const fanGroups = []
+for (let i = 0; i <= 5; i++) {
+  const name = i === 0 ? 'CoolingFan' : `CoolingFan_${i}`
+  const fan = app.get(name)
+  if (fan) fanGroups.push(fan)
+}
+
+// Debug: log what we found
+debugLog('Found nodes:', {
+  thruster: !!thruster,
+  engineInnerLOD: !!engineInnerLOD,
+  engineOuterLOD: !!engineOuterLOD,
+  tunnelPiece: !!tunnelPiece,
+  fanMesh: !!fanMesh,
+  fanCount: fanGroups.length
+})
 
 const src = props.video?.url || props.videoLink;
 
@@ -361,28 +376,6 @@ function startAudio() {
     debugLog('Linked thruster:', options)
   }
 
-  if (engineInner) {
-    const options = buildLinkOptions({
-      band: 'mid',
-      scale: 5,
-      intensity: 1.5,
-      color: '#00aaff',
-    })
-    engineInner.linkAudioReactivity(audio.id, options)
-    debugLog('Linked engineInner:', options)
-  }
-
-  if (engineOuter) {
-    const options = buildLinkOptions({
-      band: 'volume',
-      scale: 3,
-      intensity: 1,
-      color: '#ffffff',
-    })
-    engineOuter.linkAudioReactivity(audio.id, options)
-    debugLog('Linked engineOuter:', options)
-  }
-
   // Link LOD engine meshes
   if (engineInnerLOD) {
     const options = buildLinkOptions({
@@ -444,8 +437,6 @@ function stopAudio() {
   if (mesh1) mesh1.unlinkAudioReactivity()
   if (mesh2) mesh2.unlinkAudioReactivity()
   if (thruster) thruster.unlinkAudioReactivity()
-  if (engineInner) engineInner.unlinkAudioReactivity()
-  if (engineOuter) engineOuter.unlinkAudioReactivity()
   if (engineInnerLOD) engineInnerLOD.unlinkAudioReactivity()
   if (engineOuterLOD) engineOuterLOD.unlinkAudioReactivity()
   if (tunnelPiece) tunnelPiece.unlinkAudioReactivity()
@@ -492,18 +483,14 @@ app.on('update', delta => {
       thruster.material.textureY += 5 * delta
     }
   }
-  if (engineInner) {
-    engineInner.rotation.y += -0.1 * delta
-  }
-  if (engineOuter) {
-    engineOuter.rotation.y += -0.1 * delta
-  }
 })
 
-// Fan spinning animation (from boltFans.js)
+// Fan spinning animation (from boltFans.js) - spin all CoolingFan groups
 app.on('update', delta => {
-  if (fanGroup) {
-    fanGroup.rotation.x += -2 * delta
+  for (const fan of fanGroups) {
+    if (fan) {
+      fan.rotation.x += -2 * delta
+    }
   }
 })
 
