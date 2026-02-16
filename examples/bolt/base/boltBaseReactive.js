@@ -475,7 +475,10 @@ const fanGroups = []
 for (let i = 0; i <= 5; i++) {
   const name = i === 0 ? 'CoolingFan' : `CoolingFan_${i}`
   const fan = app.get(name)
-  if (fan) fanGroups.push(fan)
+  if (fan) {
+    fanGroups.push(fan)
+    console.log(`[BoltBase] Found fan: ${name}`)
+  }
 }
 
 // Debug: log what we found
@@ -719,7 +722,13 @@ app.on('update', delta => {
 })
 
 // Fan spinning - spin all fan groups
+let fanSpinLogged = false
 app.on('update', delta => {
+  if (fanGroups.length === 0 && !fanSpinLogged) {
+    console.log('[BoltBase] No fan groups found to spin')
+    fanSpinLogged = true
+    return
+  }
   for (const fan of fanGroups) {
     if (fan) {
       fan.rotation.x += -props.fanSpinSpeed * delta
