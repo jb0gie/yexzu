@@ -252,7 +252,11 @@ const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 const thruster = app.get('Thrusters')
 const engineInner = app.get('engineInner')
 const engineOuter = app.get('engineOuter')
+const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
+const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
+const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
 const fanMesh = app.get('Cylinder007')
+const fanGroup = app.get('CoolingFan')
 
 const src = props.video?.url || props.videoLink;
 
@@ -379,6 +383,41 @@ function startAudio() {
     debugLog('Linked engineOuter:', options)
   }
 
+  // Link LOD engine meshes
+  if (engineInnerLOD) {
+    const options = buildLinkOptions({
+      band: 'mid',
+      scale: 5,
+      intensity: 1.5,
+      color: '#00aaff',
+    })
+    engineInnerLOD.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineInnerMeshLOD0_2:', options)
+  }
+
+  if (engineOuterLOD) {
+    const options = buildLinkOptions({
+      band: 'volume',
+      scale: 3,
+      intensity: 1,
+      color: '#ffffff',
+    })
+    engineOuterLOD.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineOuterMeshLOD0_2:', options)
+  }
+
+  // Link tunnel piece
+  if (tunnelPiece) {
+    const options = buildLinkOptions({
+      band: 'bass',
+      scale: 6,
+      intensity: 1.5,
+      color: '#aa00ff',
+    })
+    tunnelPiece.linkAudioReactivity(audio.id, options)
+    debugLog('Linked tunnelPieceMeshLOD0_2:', options)
+  }
+
   // Link fan mesh
   if (fanMesh) {
     const options = buildLinkOptions({
@@ -407,6 +446,9 @@ function stopAudio() {
   if (thruster) thruster.unlinkAudioReactivity()
   if (engineInner) engineInner.unlinkAudioReactivity()
   if (engineOuter) engineOuter.unlinkAudioReactivity()
+  if (engineInnerLOD) engineInnerLOD.unlinkAudioReactivity()
+  if (engineOuterLOD) engineOuterLOD.unlinkAudioReactivity()
+  if (tunnelPiece) tunnelPiece.unlinkAudioReactivity()
   if (fanMesh) fanMesh.unlinkAudioReactivity()
 
   if (playAction) {
@@ -455,6 +497,13 @@ app.on('update', delta => {
   }
   if (engineOuter) {
     engineOuter.rotation.y += -0.1 * delta
+  }
+})
+
+// Fan spinning animation (from boltFans.js)
+app.on('update', delta => {
+  if (fanGroup) {
+    fanGroup.rotation.x += -2 * delta
   }
 })
 
