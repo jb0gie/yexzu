@@ -373,6 +373,63 @@ app.configure([
     step: 0.1
   },
   {
+    key: 'tunnelSpinSpeed',
+    type: 'range',
+    label: 'Tunnel Spin Speed',
+    initial: 0.2,
+    min: -5,
+    max: 5,
+    step: 0.1
+  },
+  {
+    key: 'tableSection',
+    type: 'section',
+    label: 'Table Settings',
+  },
+  {
+    key: 'tableMesh',
+    type: 'text',
+    label: 'Table Mesh Name',
+    initial: 'TableMeshLOD0_8',
+    description: 'Name of mesh for audio reactivity'
+  },
+  {
+    key: 'tableColor',
+    type: 'color',
+    label: 'Table Color',
+    initial: '#ff00ff',
+  },
+  {
+    key: 'tableBand',
+    type: 'switch',
+    label: 'Table Audio Band',
+    options: [
+      { label: 'Volume', value: 'volume' },
+      { label: 'Bass', value: 'bass' },
+      { label: 'Mid', value: 'mid' },
+      { label: 'Treble', value: 'treble' }
+    ],
+    initial: 'mid'
+  },
+  {
+    key: 'tableScale',
+    type: 'range',
+    label: 'Table Scale',
+    initial: 4,
+    min: 0.1,
+    max: 50,
+    step: 0.1
+  },
+  {
+    key: 'tableIntensity',
+    type: 'range',
+    label: 'Table Intensity',
+    initial: 1.2,
+    min: 0.1,
+    max: 10,
+    step: 0.1
+  },
+  {
     key: 'fanSection',
     type: 'section',
     label: 'Fan Settings',
@@ -463,10 +520,11 @@ const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 const thruster = app.get('Thrusters')
 const engineInner = app.get('engineInner')
 const engineOuter = app.get('engineOuter')
-const engineInnerLOD = app.get('engineInnerMeshLOD0_1')
+const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
 const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
+const tunnel = app.get('tunnel')
 const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
-const tableMesh = app.get('TableMeshLOD0_8')
+const tableMesh = app.get(props.tableMesh || 'TableMeshLOD0_8')
 
 // Get fan meshes
 const fanMesh = app.get(props.fanMesh || 'FanMeshLOD0_7')
@@ -493,6 +551,7 @@ debugLog('Found nodes:', {
   engineOuter: !!engineOuter,
   engineInnerLOD: !!engineInnerLOD,
   engineOuterLOD: !!engineOuterLOD,
+  tunnel: !!tunnel,
   tunnelPiece: !!tunnelPiece,
   tableMesh: !!tableMesh,
   fanMesh: !!fanMesh,
@@ -644,11 +703,11 @@ function startAudio() {
   // Link table mesh
   if (tableMesh) {
     const options = {
-      band: 'mid',
-      scale: 4,
-      intensity: 1.2,
+      band: props.tableBand,
+      scale: props.tableScale,
+      intensity: props.tableIntensity,
       property: 'color',
-      color: '#ff00ff',
+      color: props.tableColor,
     }
     tableMesh.linkAudioReactivity(audio.id, options)
     debugLog('Linked tableMesh:', options)
@@ -734,6 +793,13 @@ app.on('update', delta => {
   }
   if (engineOuter) {
     engineOuter.rotation.y += -0.1 * delta
+  }
+})
+
+// Tunnel spinning
+app.on('update', delta => {
+  if (tunnel && props.tunnelSpinSpeed !== 0) {
+    tunnel.rotation.x += props.tunnelSpinSpeed * delta
   }
 })
 
