@@ -248,12 +248,33 @@ const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
 const lowerTruss = props.lowerTruss ? app.get(props.lowerTruss) : null
 const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 
+// Get engine meshes (combined into boltbase GLB)
+const thruster = app.get('Thrusters')
+const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
+const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
+const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
+
+// Get fan meshes
+const fanMesh = app.get('Cylinder007')
+const fanGroups = []
+for (let i = 0; i <= 5; i++) {
+  const name = i === 0 ? 'CoolingFan' : `CoolingFan_${i}`
+  const fan = app.get(name)
+  if (fan) fanGroups.push(fan)
+}
+
 // Debug: log what we found
 debugLog('Found nodes:', {
   mesh1: !!mesh1,
   mesh2: !!mesh2,
   lowerTruss: !!lowerTruss,
-  upperTruss: !!upperTruss
+  upperTruss: !!upperTruss,
+  thruster: !!thruster,
+  engineInnerLOD: !!engineInnerLOD,
+  engineOuterLOD: !!engineOuterLOD,
+  tunnelPiece: !!tunnelPiece,
+  fanMesh: !!fanMesh,
+  fanCount: fanGroups.length
 })
 
 const src = props.video?.url || props.videoLink;
@@ -347,6 +368,70 @@ function startAudio() {
     debugLog('Linked mesh2:', props.mesh2, options)
   }
 
+  // Link thruster
+  if (thruster) {
+    const options = {
+      band: 'bass',
+      scale: 8,
+      intensity: 2,
+      property: 'color',
+      color: '#ff4400',
+    }
+    thruster.linkAudioReactivity(audio.id, options)
+    debugLog('Linked thruster:', options)
+  }
+
+  // Link engine LOD meshes
+  if (engineInnerLOD) {
+    const options = {
+      band: 'mid',
+      scale: 5,
+      intensity: 1.5,
+      property: 'color',
+      color: '#00aaff',
+    }
+    engineInnerLOD.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineInnerLOD:', options)
+  }
+
+  if (engineOuterLOD) {
+    const options = {
+      band: 'volume',
+      scale: 3,
+      intensity: 1,
+      property: 'color',
+      color: '#ffffff',
+    }
+    engineOuterLOD.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineOuterLOD:', options)
+  }
+
+  // Link tunnel piece
+  if (tunnelPiece) {
+    const options = {
+      band: 'bass',
+      scale: 6,
+      intensity: 1.5,
+      property: 'color',
+      color: '#aa00ff',
+    }
+    tunnelPiece.linkAudioReactivity(audio.id, options)
+    debugLog('Linked tunnelPiece:', options)
+  }
+
+  // Link fan mesh
+  if (fanMesh) {
+    const options = {
+      band: 'treble',
+      scale: 5,
+      intensity: 1,
+      property: 'color',
+      color: '#00ff00',
+    }
+    fanMesh.linkAudioReactivity(audio.id, options)
+    debugLog('Linked fanMesh:', options)
+  }
+
   if (playAction) {
     playAction.label = 'Stop Audio'
   }
@@ -360,6 +445,11 @@ function stopAudio() {
 
   if (mesh1) mesh1.unlinkAudioReactivity()
   if (mesh2) mesh2.unlinkAudioReactivity()
+  if (thruster) thruster.unlinkAudioReactivity()
+  if (engineInnerLOD) engineInnerLOD.unlinkAudioReactivity()
+  if (engineOuterLOD) engineOuterLOD.unlinkAudioReactivity()
+  if (tunnelPiece) tunnelPiece.unlinkAudioReactivity()
+  if (fanMesh) fanMesh.unlinkAudioReactivity()
 
   if (playAction) {
     playAction.label = 'Start Audio'
@@ -391,6 +481,25 @@ app.on('update', (dt) => {
   }
   if (upperTruss && props.upperTrussSpeed !== 0) {
     upperTruss.rotation.y += props.upperTrussSpeed * dt
+  }
+})
+
+// Thruster rotation and texture animation
+app.on('update', delta => {
+  if (thruster) {
+    thruster.rotation.y += -0.1 * delta
+    if (thruster.material) {
+      thruster.material.textureY += 5 * delta
+    }
+  }
+})
+
+// Fan spinning
+app.on('update', delta => {
+  for (const fan of fanGroups) {
+    if (fan) {
+      fan.rotation.x += -2 * delta
+    }
   }
 })
 
