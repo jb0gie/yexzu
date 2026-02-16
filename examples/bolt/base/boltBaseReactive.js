@@ -461,7 +461,9 @@ const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 
 // Get engine meshes (combined into boltbase GLB)
 const thruster = app.get('Thrusters')
-const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
+const engineInner = app.get('engineInner')
+const engineOuter = app.get('engineOuter')
+const engineInnerLOD = app.get('engineInnerMeshLOD0_1')
 const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
 const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
 
@@ -696,11 +698,12 @@ app.on('update', delta => {
       thruster.material.textureY += 5 * delta
     }
   }
-  if (engineInnerLOD) {
-    engineInnerLOD.rotation.y += -0.1 * delta
+  // Spin the engine groups (not LOD meshes)
+  if (engineInner) {
+    engineInner.rotation.y += -0.1 * delta
   }
-  if (engineOuterLOD) {
-    engineOuterLOD.rotation.y += -0.1 * delta
+  if (engineOuter) {
+    engineOuter.rotation.y += -0.1 * delta
   }
 })
 
