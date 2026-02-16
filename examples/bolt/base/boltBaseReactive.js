@@ -142,82 +142,82 @@ app.configure([
     ],
     initial: 0,
   },
-	{
-		key: 'isSpatial',
-		type: 'switch',
-		label: 'Audio Type',
-		options: [
-			{ label: 'Spatial (3D)', value: true },
-			{ label: 'Global', value: false }
-		],
-		initial: true
-	},
-	{
-		key: 'minDistance',
-		type: 'number',
-		label: 'Min Distance',
-		initial: 5,
-		min: 1,
-		max: 50,
-		description: 'Distance where audio starts to fade (in meters)'
-	},
-	{
-		key: 'maxDistance',
-		type: 'number',
-		label: 'Max Distance',
-		initial: 20,
-		min: 1,
-		max: 100,
-		description: 'Distance where audio becomes inaudible (in meters)'
-	},
-	{
-		key: 'rolloffFactor',
-		type: 'switch',
-		label: 'Falloff Rate',
-		options: [
-			{ label: 'Gradual', value: 1 },
-			{ label: 'Medium', value: 2 },
-			{ label: 'Steep', value: 4 }
-		],
-		initial: 2
-	},
-	{
-		key: 'truss',
-		type: 'section',
-		label: 'Spinning Truss Settings',
-	},
-	{
-		key: 'lowerTruss',
-		type: 'text',
-		label: 'Lower Truss Group',
-		initial: 'LowerTruss',
-		description: 'Name of group to spin (leave empty to disable)'
-	},
-	{
-		key: 'lowerTrussSpeed',
-		type: 'range',
-		label: 'Lower Truss Speed',
-		initial: 0.5,
-		min: -5,
-		max: 5,
-		step: 0.1
-	},
-	{
-		key: 'upperTruss',
-		type: 'text',
-		label: 'Upper Truss Group',
-		initial: 'UpperTruss',
-		description: 'Name of group to spin (leave empty to disable)'
-	},
-	{
-		key: 'upperTrussSpeed',
-		type: 'range',
-		label: 'Upper Truss Speed',
-		initial: -0.3,
-		min: -5,
-		max: 5,
-		step: 0.1
-	}
+  {
+    key: 'isSpatial',
+    type: 'switch',
+    label: 'Audio Type',
+    options: [
+      { label: 'Spatial (3D)', value: true },
+      { label: 'Global', value: false }
+    ],
+    initial: true
+  },
+  {
+    key: 'minDistance',
+    type: 'number',
+    label: 'Min Distance',
+    initial: 5,
+    min: 1,
+    max: 50,
+    description: 'Distance where audio starts to fade (in meters)'
+  },
+  {
+    key: 'maxDistance',
+    type: 'number',
+    label: 'Max Distance',
+    initial: 20,
+    min: 1,
+    max: 100,
+    description: 'Distance where audio becomes inaudible (in meters)'
+  },
+  {
+    key: 'rolloffFactor',
+    type: 'switch',
+    label: 'Falloff Rate',
+    options: [
+      { label: 'Gradual', value: 1 },
+      { label: 'Medium', value: 2 },
+      { label: 'Steep', value: 4 }
+    ],
+    initial: 2
+  },
+  {
+    key: 'truss',
+    type: 'section',
+    label: 'Spinning Truss Settings',
+  },
+  {
+    key: 'lowerTruss',
+    type: 'text',
+    label: 'Lower Truss Group',
+    initial: 'LowerTruss',
+    description: 'Name of group to spin (leave empty to disable)'
+  },
+  {
+    key: 'lowerTrussSpeed',
+    type: 'range',
+    label: 'Lower Truss Speed',
+    initial: 0.5,
+    min: -5,
+    max: 5,
+    step: 0.1
+  },
+  {
+    key: 'upperTruss',
+    type: 'text',
+    label: 'Upper Truss Group',
+    initial: 'UpperTruss',
+    description: 'Name of group to spin (leave empty to disable)'
+  },
+  {
+    key: 'upperTrussSpeed',
+    type: 'range',
+    label: 'Upper Truss Speed',
+    initial: -0.3,
+    min: -5,
+    max: 5,
+    step: 0.1
+  }
 ])
 
 if (!world.isClient) return
@@ -247,6 +247,12 @@ const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
 // Get truss groups for spinning
 const lowerTruss = props.lowerTruss ? app.get(props.lowerTruss) : null
 const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
+
+// Get engine and fan meshes for audio reactivity
+const thruster = app.get('Thrusters')
+const engineInner = app.get('engineInner')
+const engineOuter = app.get('engineOuter')
+const fanMesh = app.get('Cylinder007')
 
 const src = props.video?.url || props.videoLink;
 
@@ -339,6 +345,52 @@ function startAudio() {
     debugLog('Linked mesh2:', props.mesh2, options)
   }
 
+  // Link engine meshes
+  if (thruster) {
+    const options = buildLinkOptions({
+      band: 'bass',
+      scale: 8,
+      intensity: 2,
+      color: '#ff4400',
+    })
+    thruster.linkAudioReactivity(audio.id, options)
+    debugLog('Linked thruster:', options)
+  }
+
+  if (engineInner) {
+    const options = buildLinkOptions({
+      band: 'mid',
+      scale: 5,
+      intensity: 1.5,
+      color: '#00aaff',
+    })
+    engineInner.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineInner:', options)
+  }
+
+  if (engineOuter) {
+    const options = buildLinkOptions({
+      band: 'volume',
+      scale: 3,
+      intensity: 1,
+      color: '#ffffff',
+    })
+    engineOuter.linkAudioReactivity(audio.id, options)
+    debugLog('Linked engineOuter:', options)
+  }
+
+  // Link fan mesh
+  if (fanMesh) {
+    const options = buildLinkOptions({
+      band: 'treble',
+      scale: 5,
+      intensity: 1,
+      color: '#00ff00',
+    })
+    fanMesh.linkAudioReactivity(audio.id, options)
+    debugLog('Linked fanMesh (Cylinder007):', options)
+  }
+
   if (playAction) {
     playAction.label = 'Stop Audio'
   }
@@ -352,6 +404,10 @@ function stopAudio() {
 
   if (mesh1) mesh1.unlinkAudioReactivity()
   if (mesh2) mesh2.unlinkAudioReactivity()
+  if (thruster) thruster.unlinkAudioReactivity()
+  if (engineInner) engineInner.unlinkAudioReactivity()
+  if (engineOuter) engineOuter.unlinkAudioReactivity()
+  if (fanMesh) fanMesh.unlinkAudioReactivity()
 
   if (playAction) {
     playAction.label = 'Start Audio'
