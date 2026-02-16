@@ -180,6 +180,43 @@ app.configure([
 			{ label: 'Steep', value: 4 }
 		],
 		initial: 2
+	},
+	{
+		key: 'truss',
+		type: 'section',
+		label: 'Spinning Truss Settings',
+	},
+	{
+		key: 'lowerTruss',
+		type: 'text',
+		label: 'Lower Truss Group',
+		initial: 'LowerTruss',
+		description: 'Name of group to spin (leave empty to disable)'
+	},
+	{
+		key: 'lowerTrussSpeed',
+		type: 'range',
+		label: 'Lower Truss Speed',
+		initial: 0.5,
+		min: -5,
+		max: 5,
+		step: 0.1
+	},
+	{
+		key: 'upperTruss',
+		type: 'text',
+		label: 'Upper Truss Group',
+		initial: 'UpperTruss',
+		description: 'Name of group to spin (leave empty to disable)'
+	},
+	{
+		key: 'upperTrussSpeed',
+		type: 'range',
+		label: 'Upper Truss Speed',
+		initial: -0.3,
+		min: -5,
+		max: 5,
+		step: 0.1
 	}
 ])
 
@@ -201,6 +238,10 @@ app.add(audio)
 // Get meshes from props
 const mesh1 = props.mesh1 ? app.get(props.mesh1) : null
 const mesh2 = props.mesh2 ? app.get(props.mesh2) : null
+
+// Get truss groups for spinning
+const lowerTruss = props.lowerTruss ? app.get(props.lowerTruss) : null
+const upperTruss = props.upperTruss ? app.get(props.upperTruss) : null
 
 const src = props.video?.url || props.videoLink;
 
@@ -329,6 +370,16 @@ app.add(playAction)
 if (props.autoPlay === 'enabled') {
   setTimeout(() => startAudio(), 100)
 }
+
+// Spin truss groups
+app.on('update', (dt) => {
+  if (lowerTruss && props.lowerTrussSpeed !== 0) {
+    lowerTruss.rotation.y += props.lowerTrussSpeed * dt
+  }
+  if (upperTruss && props.upperTrussSpeed !== 0) {
+    upperTruss.rotation.y += props.upperTrussSpeed * dt
+  }
+})
 
 app.on('destroy', () => {
   stopAudio()
