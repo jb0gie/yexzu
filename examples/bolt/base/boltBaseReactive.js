@@ -35,17 +35,6 @@ app.configure([
     description: 'Name of first mesh in GLB to apply audio reactivity',
   },
   {
-    key: 'mesh1Property',
-    type: 'switch',
-    label: 'Mesh 1 Property',
-    options: [
-      { label: 'Emissive Intensity', value: 'emissiveIntensity' },
-      { label: 'Color', value: 'color' },
-      { label: 'Emissive Color', value: 'emissiveColor' },
-    ],
-    initial: 'emissiveIntensity',
-  },
-  {
     key: 'mesh1Band',
     type: 'switch',
     label: 'Mesh 1 Audio Band',
@@ -88,17 +77,6 @@ app.configure([
     label: 'Mesh 2 Name',
     initial: 'Coolant',
     description: 'Name of second mesh in GLB (leave empty to disable)',
-  },
-  {
-    key: 'mesh2Property',
-    type: 'switch',
-    label: 'Mesh 2 Property',
-    options: [
-      { label: 'Emissive Intensity', value: 'emissiveIntensity' },
-      { label: 'Color', value: 'color' },
-      { label: 'Emissive Color', value: 'emissiveColor' },
-    ],
-    initial: 'color',
   },
   {
     key: 'mesh2Band',
@@ -269,7 +247,7 @@ function buildLinkOptions(meshProps) {
     band: meshProps.band,
     scale: meshProps.scale,
     intensity: meshProps.intensity,
-    property: meshProps.property,
+    property: 'color',
     color: meshProps.color || '#ffffff',
   }
 
@@ -297,7 +275,6 @@ function startAudio() {
       band: props.mesh1Band,
       scale: props.mesh1Scale,
       intensity: props.mesh1Intensity,
-      property: props.mesh1Property,
       color: props.mesh1Color,
     })
     mesh1.linkAudioReactivity(audio.id, options)
@@ -310,7 +287,6 @@ function startAudio() {
       band: props.mesh2Band,
       scale: props.mesh2Scale,
       intensity: props.mesh2Intensity,
-      property: props.mesh2Property,
       color: props.mesh2Color,
     })
     mesh2.linkAudioReactivity(audio.id, options)
