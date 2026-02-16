@@ -466,6 +466,7 @@ const engineOuter = app.get('engineOuter')
 const engineInnerLOD = app.get('engineInnerMeshLOD0_1')
 const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
 const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
+const tableMesh = app.get('TableMeshLOD0_8')
 
 // Get fan meshes
 const fanMesh = app.get(props.fanMesh || 'FanMeshLOD0_7')
@@ -493,6 +494,7 @@ debugLog('Found nodes:', {
   engineInnerLOD: !!engineInnerLOD,
   engineOuterLOD: !!engineOuterLOD,
   tunnelPiece: !!tunnelPiece,
+  tableMesh: !!tableMesh,
   fanMesh: !!fanMesh,
   fanCount: fanGroups.length
 })
@@ -639,6 +641,19 @@ function startAudio() {
     debugLog('Linked tunnelPiece:', options)
   }
 
+  // Link table mesh
+  if (tableMesh) {
+    const options = {
+      band: 'mid',
+      scale: 4,
+      intensity: 1.2,
+      property: 'color',
+      color: '#ff00ff',
+    }
+    tableMesh.linkAudioReactivity(audio.id, options)
+    debugLog('Linked tableMesh:', options)
+  }
+
   // Link fan mesh
   if (fanMesh) {
     const options = {
@@ -669,6 +684,7 @@ function stopAudio() {
   if (engineInnerLOD) engineInnerLOD.unlinkAudioReactivity()
   if (engineOuterLOD) engineOuterLOD.unlinkAudioReactivity()
   if (tunnelPiece) tunnelPiece.unlinkAudioReactivity()
+  if (tableMesh) tableMesh.unlinkAudioReactivity()
   if (fanMesh) fanMesh.unlinkAudioReactivity()
 
   if (playAction) {
