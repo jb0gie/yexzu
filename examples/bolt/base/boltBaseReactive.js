@@ -310,9 +310,6 @@ function startAudio() {
     return
   }
 
-  // Emit event so other apps can link to this audio source
-  app.emit('boltAudioStarted', { audioId: audio.id })
-
   // Link mesh 1
   if (mesh1) {
     const options = buildLinkOptions({
@@ -347,9 +344,6 @@ function stopAudio() {
 
   audio.stop()
   isPlaying = false
-
-  // Emit event so other apps can unlink
-  app.emit('boltAudioStopped', {})
 
   if (mesh1) mesh1.unlinkAudioReactivity()
   if (mesh2) mesh2.unlinkAudioReactivity()
