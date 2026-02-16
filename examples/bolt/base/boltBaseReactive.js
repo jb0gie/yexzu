@@ -470,6 +470,14 @@ const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
 // Get fan meshes
 const fanMesh = app.get(props.fanMesh || 'FanMeshLOD0_7')
 
+// Get all fan groups for spinning (CoolingFan to CoolingFan_5)
+const fanGroups = []
+for (let i = 0; i <= 5; i++) {
+  const name = i === 0 ? 'CoolingFan' : `CoolingFan_${i}`
+  const fan = app.get(name)
+  if (fan) fanGroups.push(fan)
+}
+
 // Debug: log what we found
 debugLog('Found nodes:', {
   mesh1: !!mesh1,
@@ -477,10 +485,13 @@ debugLog('Found nodes:', {
   lowerTruss: !!lowerTruss,
   upperTruss: !!upperTruss,
   thruster: !!thruster,
+  engineInner: !!engineInner,
+  engineOuter: !!engineOuter,
   engineInnerLOD: !!engineInnerLOD,
   engineOuterLOD: !!engineOuterLOD,
   tunnelPiece: !!tunnelPiece,
-  fanMesh: !!fanMesh
+  fanMesh: !!fanMesh,
+  fanCount: fanGroups.length
 })
 
 const src = props.video?.url || props.videoLink;
@@ -707,10 +718,12 @@ app.on('update', delta => {
   }
 })
 
-// Fan spinning - uses the configurable spin speed
+// Fan spinning - spin all fan groups
 app.on('update', delta => {
-  if (fanMesh) {
-    fanMesh.rotation.x += -props.fanSpinSpeed * delta
+  for (const fan of fanGroups) {
+    if (fan) {
+      fan.rotation.x += -props.fanSpinSpeed * delta
+    }
   }
 })
 
