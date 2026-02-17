@@ -40,15 +40,14 @@ COPY --from=builder /app/scripts ./scripts
 # Set build argument and environment variable
 ARG COMMIT_HASH=local
 ENV COMMIT_HASH=${COMMIT_HASH:-local} \
-    NODE_ENV=production             
+    NODE_ENV=production
+
 # Expose the port
 EXPOSE 3000 5050 8080
 
-# Healthcheck: Use a path your server actually responds to (adjust if /status isn't real)
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
-  CMD curl -f http://localhost:${PORT}/status || exit 1
-  # Alternative if /status doesn't exist: CMD curl -f http://localhost:${PORT}/ || exit 1
+# Healthcheck
+HEALTHCHECK --interval=2s --timeout=10s --start-period=5s --retries=5 \
+  CMD curl -f http://localhost:3000/status || exit 1
 
-USER nodeuser   # ← Run as non-root (good practice)
-
+# Start the application
 CMD ["npm", "run", "start"]
