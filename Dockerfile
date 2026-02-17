@@ -40,8 +40,7 @@ COPY --from=builder /app/scripts ./scripts
 # Set build argument and environment variable
 ARG COMMIT_HASH=local
 ENV COMMIT_HASH=${COMMIT_HASH:-local} \
-    NODE_ENV=production
-    PORT=3000              
+    NODE_ENV=production             
 # Expose the port
 EXPOSE 3000 5050 8080
 
