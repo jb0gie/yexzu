@@ -32,7 +32,12 @@ export class Events extends System {
       try {
         callback(a1, a2)
       } catch (err) {
-        console.error(err)
+        console.error(`[Events] Error in '${name}' event handler:`, err)
+        // Try to identify the callback source
+        if (callback.toString) {
+          const fnStr = callback.toString().slice(0, 100)
+          console.error(`[Events] Handler source: ${fnStr}...`)
+        }
       }
     }
   }
