@@ -231,45 +231,8 @@ export class AudioReactivity extends System {
             target.light.intensity = val
           }
         } else if (link.targetType === 'material') {
-          if (link.property === 'emissiveIntensity' && target.handle) {
-            // Use raw audio value * intensity slider (scale controls sensitivity, not output)
-            const rawVal = srcData[link.band] ?? srcData.volume
-            const intensity = Math.max(0, Math.min(1, rawVal * link.intensity))
-
-            // Mesh nodes (from GLB) should use material proxy directly
-            // because they don't have uberShader enabled
-            if (target.name === 'mesh' && target.handle.material) {
-              target.handle.material.emissiveIntensity = intensity
-            }
-            // Prim nodes have setEmissiveIntensity method with uberShader
-            else if (target.handle.setEmissiveIntensity) {
-              target.handle.setEmissiveIntensity(intensity)
-            }
-          } else if (link.property === 'emissive' && target.handle) {
-            const intensity = Math.min(1, val)
-            // Mesh nodes (from GLB) should use material proxy directly
-            if (target.name === 'mesh' && target.handle.material) {
-              target.handle.material.emissive.setScalar(intensity)
-            }
-            // Prim nodes have setEmissive method with uberShader
-            else if (target.handle.setEmissive) {
-              target.handle.setEmissive(intensity, intensity, intensity)
-            }
-          } else if (link.property === 'emissiveColor' && target.handle) {
-            // Only change emissive color, NOT intensity (use emissiveIntensity for that)
-            const color = this.getColorFromOptions(1, link)
-
-            // Mesh nodes (from GLB) should use material proxy directly
-            if (target.name === 'mesh' && target.handle.material) {
-              target.handle.material.emissive = [color.r, color.g, color.b]
-            }
-            // Prim nodes have setter methods with uberShader
-            else if (target.handle.setEmissive) {
-              target.handle.setEmissive(color.r, color.g, color.b)
-            }
-          } else if (link.property === 'color' && target.handle) {
-            // Use raw audio value for intensity, configured color for color
-            const rawVal = srcData[link.band] ?? srcData.volume
+          if (link.property === 'color' && target.handle) {
+            // Use scaled value for intensity, configured color for color
             const color = this.getColorFromOptions(1, link)
             const emissiveIntensity = Math.max(0, Math.min(1, rawVal * link.intensity))
 
@@ -305,27 +268,6 @@ export class AudioReactivity extends System {
       nodes.push({ id, ...data })
     }
     return nodes
-  }
-
-  getHeatmapColor(value) {
-    const color = new THREE.Color()
-    const scaled = Math.max(0, Math.min(1, value))
-
-    if (scaled < 0.25) {
-      const t = scaled / 0.25
-      color.setRGB(0, t, 1)
-    } else if (scaled < 0.5) {
-      const t = (scaled - 0.25) / 0.25
-      color.setRGB(0, 1, 1 - t)
-    } else if (scaled < 0.75) {
-      const t = (scaled - 0.5) / 0.25
-      color.setRGB(t, 1, 0)
-    } else {
-      const t = (scaled - 0.75) / 0.25
-      color.setRGB(1, 1 - t, 0)
-    }
-
-    return color
   }
 
   getColorFromOptions(val, options) {
