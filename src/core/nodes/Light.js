@@ -308,6 +308,12 @@ export class Light extends Node {
         set castShadow(value) {
           self.castShadow = value
         },
+        linkAudioReactivity(sourceId, options) {
+          self.linkAudioReactivity(sourceId, options)
+        },
+        unlinkAudioReactivity() {
+          self.unlinkAudioReactivity()
+        },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy()))
       this.proxy = proxy
