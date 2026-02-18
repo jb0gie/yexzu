@@ -370,6 +370,10 @@ export class Video extends Node {
         this.shouldPlay = false
       }
     }
+
+    if (this.ctx.world.audioReactivity && this.instance?.audio) {
+      this.ctx.world.audioReactivity.registerAudioNode(this.id, this.instance.audio)
+    }
   }
 
   commit(didMove) {
@@ -414,6 +418,9 @@ export class Video extends Node {
     if (this.sItem) {
       this.ctx.world.stage.octree.remove(this.sItem)
       this.sItem = null
+    }
+    if (this.ctx.world.audioReactivity) {
+      this.ctx.world.audioReactivity.unregister(this.id)
     }
     this.ctx.world.livekit.unregisterScreenNode(this)
   }
