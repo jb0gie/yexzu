@@ -257,12 +257,8 @@ export class AudioReactivity extends System {
               if (target.handle.material.color) {
                 target.handle.material.color.copy(heatColor)
               }
-              // Set emissive color to heatmap color (create if doesn't exist)
-              if (!target.handle.material.emissive) {
-                target.handle.material.emissive = new THREE.Color(heatColor.r, heatColor.g, heatColor.b)
-              } else {
-                target.handle.material.emissive.copy(heatColor)
-              }
+              // Set emissive color via proxy (uses array format [r,g,b])
+              target.handle.material.emissive = [heatColor.r, heatColor.g, heatColor.b]
               target.handle.material.emissiveIntensity = emissiveIntensity
             }
             // Prim nodes have setter methods with uberShader

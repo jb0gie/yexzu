@@ -420,6 +420,11 @@ export class Mesh extends Node {
         unlinkAudioReactivity() {
           self.unlinkAudioReactivity()
         },
+        setEmissive(r, g, b) {
+          if (self.handle?.material) {
+            self.handle.material.emissive = [r, g, b]
+          }
+        },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties
       this.proxy = proxy
