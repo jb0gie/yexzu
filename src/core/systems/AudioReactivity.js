@@ -1,3 +1,5 @@
+import * as THREE from '../extras/three'
+
 import { System } from './System'
 
 export class AudioReactivity extends System {
@@ -245,6 +247,25 @@ export class AudioReactivity extends System {
             else if (target.handle.setEmissive) {
               target.handle.setEmissive(intensity, intensity, intensity)
             }
+          } else if (link.property === 'color' && target.handle) {
+            const heatColor = this.getHeatmapColor(val)
+            const emissiveIntensity = Math.max(0, Math.min(1, val))
+
+            // Mesh nodes (from GLB) should use material proxy directly
+            if (target.name === 'mesh' && target.handle.material) {
+              // Change base color to heatmap color
+              if (target.handle.material.color) {
+                target.handle.material.color.copy(heatColor)
+              }
+              // Note: emissive color property not accessible on material proxy
+              // Only emissiveIntensity can be modified
+              target.handle.material.emissiveIntensity = emissiveIntensity
+            }
+            // Prim nodes have setter methods with uberShader
+            else if (target.handle.setColor) {
+              target.handle.setColor(heatColor.r, heatColor.g, heatColor.b)
+              target.handle.setEmissiveIntensity(emissiveIntensity)
+            }
           }
         }
       }
@@ -261,6 +282,27 @@ export class AudioReactivity extends System {
       nodes.push({ id, ...data })
     }
     return nodes
+  }
+
+  getHeatmapColor(value) {
+    const color = new THREE.Color()
+    const scaled = Math.max(0, Math.min(1, value))
+
+    if (scaled < 0.25) {
+      const t = scaled / 0.25
+      color.setRGB(0, t, 1)
+    } else if (scaled < 0.5) {
+      const t = (scaled - 0.25) / 0.25
+      color.setRGB(0, 1, 1 - t)
+    } else if (scaled < 0.75) {
+      const t = (scaled - 0.5) / 0.25
+      color.setRGB(t, 1, 0)
+    } else {
+      const t = (scaled - 0.75) / 0.25
+      color.setRGB(1, 1 - t, 0)
+    }
+
+    return color
   }
 
   destroy() {
