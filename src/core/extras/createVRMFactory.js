@@ -67,7 +67,8 @@ export function createVRMFactory(glb, setupMaterial) {
   // we'll update matrix ourselves
   glb.scene.matrixAutoUpdate = false
   glb.scene.matrixWorldAutoUpdate = false
-  // NOTE: Preserve VRMExpression nodes so facial expressions (blink/viseme) can work
+  // get expression manager before removing expressions from scene
+  const expressionManager = glb.userData.vrmExpressionManager
   // remove VRMHumanoidRig
   const vrmHumanoidRigs = glb.scene.children.filter(n => n.name === 'VRMHumanoidRig') // prettier-ignore
   for (const node of vrmHumanoidRigs) node.removeFromParent()
@@ -148,7 +149,7 @@ export function createVRMFactory(glb, setupMaterial) {
   }
 
   return {
-    create,
+    create: (matrix, hooks, node) => create(matrix, hooks, node, expressionManager),
     applyStats(stats) {
       glb.scene.traverse(obj => {
         if (obj.geometry && !stats.geometries.has(obj.geometry.uuid)) {
@@ -163,9 +164,11 @@ export function createVRMFactory(glb, setupMaterial) {
     },
   }
 
-  function create(matrix, hooks, node) {
+  function create(matrix, hooks, node, expressionManager) {
     const vrm = cloneGLB(glb)
     const tvrm = vrm.userData.vrm
+    // use expression manager from cloned vrm if available, otherwise use factory one
+    const exprManager = vrm.userData.vrmExpressionManager || expressionManager
     const skinnedMeshes = getSkinnedMeshes(vrm.scene)
     const skeleton = skinnedMeshes[0].skeleton // primary skeleton
     const cloneSkeletons = Array.from(new Set(skinnedMeshes.map(m => m.skeleton)))

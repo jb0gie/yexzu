@@ -145,6 +145,10 @@ export class Avatar extends Node {
     this.instance?.setLocomotion(mode, axis, gazeDir)
   }
 
+  setSpeaking(active) {
+    this.instance?.setSpeaking(active)
+  }
+
   setEmote(url) {
     // DEPRECATED: use .emote
     this.emote = url
@@ -206,6 +210,9 @@ export class Avatar extends Node {
         },
         setLocomotion(mode, axis, gazeDir) {
           self.setLocomotion(mode, axis, gazeDir)
+        },
+        setSpeaking(active) {
+          self.setSpeaking(active)
         },
         setEmote(url) {
           // DEPRECATED: use .emote

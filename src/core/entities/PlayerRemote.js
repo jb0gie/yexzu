@@ -180,6 +180,7 @@ export class PlayerRemote extends Entity {
     this.speaking = speaking
     const name = this.data.name
     this.nametag.label = speaking ? `» ${name} «` : name
+    this.avatar?.setSpeaking(speaking)
   }
 
   modify(data) {
