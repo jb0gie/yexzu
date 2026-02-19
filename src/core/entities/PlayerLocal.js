@@ -1197,6 +1197,7 @@ export class PlayerLocal extends Entity {
     if (this.speaking === speaking) return
     if (speaking && this.isMuted()) return
     this.speaking = speaking
+    this.avatar?.setSpeaking(speaking)
   }
 
   push(force) {

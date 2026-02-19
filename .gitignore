@@ -7,3 +7,6 @@ localstorage.json
 node_modules/
 build/
 /world*
+.glootie-stop-verified
+
+.code-search/

@@ -55,9 +55,8 @@ export function createVRMFactory(glb, setupMaterial) {
   // we'll update matrix ourselves
   glb.scene.matrixAutoUpdate = false
   glb.scene.matrixWorldAutoUpdate = false
-  // remove expressions from scene
-  const expressions = glb.scene.children.filter(n => n.type === 'VRMExpression') // prettier-ignore
-  for (const node of expressions) node.removeFromParent()
+  // get expression manager before removing expressions from scene
+  const expressionManager = glb.userData.vrmExpressionManager
   // remove VRMHumanoidRig
   const vrmHumanoidRigs = glb.scene.children.filter(n => n.name === 'VRMHumanoidRig') // prettier-ignore
   for (const node of vrmHumanoidRigs) node.removeFromParent()
@@ -137,7 +136,7 @@ export function createVRMFactory(glb, setupMaterial) {
   }
 
   return {
-    create,
+    create: (matrix, hooks, node) => create(matrix, hooks, node, expressionManager),
     applyStats(stats) {
       glb.scene.traverse(obj => {
         if (obj.geometry && !stats.geometries.has(obj.geometry.uuid)) {
@@ -152,9 +151,11 @@ export function createVRMFactory(glb, setupMaterial) {
     },
   }
 
-  function create(matrix, hooks, node) {
+  function create(matrix, hooks, node, expressionManager) {
     const vrm = cloneGLB(glb)
     const tvrm = vrm.userData.vrm
+    // use expression manager from cloned vrm if available, otherwise use factory one
+    const exprManager = vrm.userData.vrmExpressionManager || expressionManager
     const skinnedMeshes = getSkinnedMeshes(vrm.scene)
     const skeleton = skinnedMeshes[0].skeleton // should be same across all skinnedMeshes
     const rootBone = skeleton.bones[0] // should always be 0
@@ -221,6 +222,14 @@ export function createVRMFactory(glb, setupMaterial) {
       loco.mode = mode
       loco.axis = axis
       loco.gazeDir = gazeDir
+    }
+
+    // speaking mouth animation
+    let speakingActive = false
+    let speakingTime = 0
+    let speakingPhase = 0
+    const setSpeaking = active => {
+      speakingActive = active
     }
 
     // world.updater.add(update)
@@ -331,6 +340,22 @@ export function createVRMFactory(glb, setupMaterial) {
           })
         }
         // tvrm.humanoid.update(elapsed)
+        // animate mouth when speaking
+        if (exprManager && speakingActive) {
+          speakingTime += elapsed
+          // simple mouth animation: cycle through open/close based on time
+          const cycle = Math.sin(speakingTime * 15) * 0.5 + 0.5 // 0 to 1, ~15Hz
+          const mouthOpen = cycle * 0.7 // max 0.7 weight
+          exprManager.setValue('aa', mouthOpen)
+        } else if (exprManager) {
+          // close mouth when not speaking
+          const currentWeight = exprManager.getValue('aa') || 0
+          if (currentWeight > 0.01) {
+            exprManager.setValue('aa', currentWeight * 0.8) // decay to 0
+          } else {
+            exprManager.setValue('aa', 0)
+          }
+        }
         elapsed = 0
       } else {
         skeleton.update = noop
@@ -621,6 +646,7 @@ export function createVRMFactory(glb, setupMaterial) {
       headToHeight,
       setEmote,
       setFirstPerson,
+      setSpeaking,
       update,
       updateRate,
       getBoneTransform,
