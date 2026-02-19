@@ -226,7 +226,6 @@ export function createVRMFactory(glb, setupMaterial) {
       const sm = origVRM?.springBoneManager
       // console.log('[vrmFactory] spring manager:', !!sm, 'joints:', sm?.joints?.size ?? 0)
     } catch (_) {}
-    const expressionManager = origVRM?.expressionManager || null
     // expressions from the cloned scene (fallback path if no manager)
     // expressions live on the top-level scene of the GLB, not the skinned subtree
     // when we cloned, `vrm.scene` is the cloned top-level scene, so look directly there
@@ -255,12 +254,12 @@ export function createVRMFactory(glb, setupMaterial) {
       oh: 0,
       ou: 0,
     }
-    const expressionsEnabled = !!expressionManager || expressionsByName.size > 0
+    const expressionsEnabled = !!exprManager || expressionsByName.size > 0
     // map canonical names -> actual names present in this VRM
     const resolveName = (...candidates) => {
       // prefer manager lookup
       for (const c of candidates) {
-        const v = expressionManager?.getValue?.(c)
+        const v = exprManager?.getValue?.(c)
         if (v !== null && v !== undefined) return c
       }
       // fallback to cloned expression nodes
@@ -303,7 +302,7 @@ export function createVRMFactory(glb, setupMaterial) {
       const clamped = THREE.MathUtils.clamp(weight, 0, 1)
       expressionWeights[name] = clamped
       const actual = nameMap[name] || name
-      expressionManager?.setValue?.(actual, clamped)
+      exprManager?.setValue?.(actual, clamped)
     }
 
     function clearMouth() {
@@ -1155,13 +1154,13 @@ export function createVRMFactory(glb, setupMaterial) {
         if (expressionsEnabled) {
           updateBlink(elapsed)
           updateMouth(elapsed, talking)
-          if (expressionManager) {
+          if (exprManager) {
             // push values to manager and update
             for (const [canon, weight] of Object.entries(expressionWeights)) {
               const actual = nameMap[canon] || canon
-              expressionManager.setValue(actual, weight)
+              exprManager.setValue(actual, weight)
             }
-            expressionManager.update()
+            exprManager.update()
             // mirror morph target influences from original to clone
             if (!morphMirrorInit) initMorphMirror()
             for (const [s, d] of morphPairs) {
