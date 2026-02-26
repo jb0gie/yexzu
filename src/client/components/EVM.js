@@ -37,8 +37,8 @@ if (projectId && projectId.length >= 32) {
     metadata: {
       name: 'Hyperfy',
       description: 'Hyperfy Virtual World',
-      url: 'https://hyperfy.xyz',
-      icons: ['https://hyperfy.xyz/favicon.ico'],
+      url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
+      icons: [],
     },
     themeMode: 'dark',
     features: {
