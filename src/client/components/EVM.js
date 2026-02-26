@@ -14,8 +14,8 @@ const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
     ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
     : ''
 
-// Network configuration - Major chains first for wallet compatibility
-const networks = [mainnet, arbitrum, base, polygon, monad]
+// Network configuration - Start with just Ethereum for maximum compatibility
+const networks = [mainnet]
 
 // Create Wagmi adapter with AppKit
 const wagmiAdapter = new WagmiAdapter({
@@ -38,7 +38,7 @@ if (projectId && projectId.length >= 32) {
       name: 'Hyperfy',
       description: 'Hyperfy Virtual World',
       url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
-      icons: [],
+      icons: ['https://raw.githubusercontent.com/hyperfy-xyz/hyperfy/main/docs/static/img/favicon.ico'],
     },
     themeMode: 'dark',
     features: {
