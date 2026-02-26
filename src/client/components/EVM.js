@@ -2,7 +2,7 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createAppKit, useAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { monad } from '@reown/appkit/networks'
+import { monad, mainnet } from '@reown/appkit/networks'
 
 const queryClient = new QueryClient()
 
@@ -14,8 +14,8 @@ const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
     ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
     : ''
 
-// Network configuration - Monad mainnet
-const networks = [monad]
+// Network configuration - Ethereum first for wallet compatibility, then Monad
+const networks = [mainnet, monad]
 
 // Create Wagmi adapter with AppKit
 const wagmiAdapter = new WagmiAdapter({
@@ -24,13 +24,9 @@ const wagmiAdapter = new WagmiAdapter({
   ssr: true,
 })
 
-// Featured wallet IDs - these appear on the main modal view
-// Find wallet IDs at: https://walletguide.walletconnect.network/
-const featuredWalletIds = [
-  'ecc4036f814562b41a5268adc86270fba1365471402006302e70169465b7ac18', // Zerion
-]
-
 // Initialize AppKit if project ID is available
+// Note: Add featuredWalletIds to prioritize specific wallets on the main view
+// Find wallet IDs at: https://walletguide.walletconnect.network/
 if (projectId) {
   createAppKit({
     adapters: [wagmiAdapter],
@@ -49,7 +45,6 @@ if (projectId) {
       onramp: false,
       email: false,
     },
-    featuredWalletIds,
   })
 }
 
