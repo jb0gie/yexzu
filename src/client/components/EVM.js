@@ -1,6 +1,6 @@
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createAppKit } from '@reown/appkit/react'
+import { createAppKit, useAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { monad } from '@reown/appkit/networks'
 
@@ -36,6 +36,13 @@ if (projectId) {
       url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
       icons: [],
     },
+    themeMode: 'dark',
+    features: {
+      analytics: false,
+      swaps: false,
+      onramp: false,
+      email: false,
+    },
   })
 }
 
@@ -62,12 +69,13 @@ import * as evmActions from 'wagmi/actions'
 import { useConfig, useAccount, useChainId, useConnect, useConnectors, useDisconnect } from 'wagmi'
 import { erc20Abi } from 'viem'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 function Logic({ world }) {
   const config = useConfig()
   const chainId = useChainId()
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
+  const { open } = useAppKit()
   const [initialized, setInitialized] = useState(false)
 
   // Set player.evm when wallet connects/disconnects
@@ -79,6 +87,32 @@ function Logic({ world }) {
 
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
+
+  // Wrap connect to open AppKit modal
+  const appKitConnect = useCallback(async (options = {}) => {
+    console.log('[EVM] Opening AppKit modal...')
+    try {
+      // Open AppKit modal - this handles wallet selection
+      open({ view: 'Connect' })
+      // Return success immediately - AppKit handles the connection flow
+      return { success: true }
+    } catch (error) {
+      console.error('[EVM] Failed to open AppKit:', error)
+      return { success: false, error: error.message }
+    }
+  }, [open])
+
+  // Wrap disconnect to use AppKit
+  const appKitDisconnect = useCallback(async () => {
+    console.log('[EVM] Disconnecting via AppKit...')
+    try {
+      await disconnect()
+      return { success: true }
+    } catch (error) {
+      console.error('[EVM] Disconnect failed:', error)
+      return { success: false, error: error.message }
+    }
+  }, [disconnect])
 
   useEffect(() => {
     // Store latest data for EVMClient to access
@@ -98,8 +132,10 @@ function Logic({ world }) {
 
     world.evm.bind({
       connectors,
-      connect,
-      disconnect,
+      connect: appKitConnect,
+      disconnect: appKitDisconnect,
+      wagmiConnect: connect,
+      wagmiDisconnect: disconnect,
       address,
       chainId,
       actions: evmActions,
@@ -107,8 +143,9 @@ function Logic({ world }) {
       config,
       isConnected,
       isConnecting,
+      appKit: { open },
     })
-  }, [isConnected, isConnecting, address, chainId])
+  }, [isConnected, isConnecting, address, chainId, appKitConnect, appKitDisconnect, open])
 
   return null
 }
