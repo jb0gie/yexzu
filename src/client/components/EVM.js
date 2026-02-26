@@ -27,16 +27,18 @@ const wagmiAdapter = new WagmiAdapter({
 // Initialize AppKit if project ID is available
 // Note: Add featuredWalletIds to prioritize specific wallets on the main view
 // Find wallet IDs at: https://walletguide.walletconnect.network/
-if (projectId) {
-  createAppKit({
+if (projectId && projectId.length >= 32) {
+  console.log('[EVM] Initializing AppKit with projectId:', projectId.substring(0, 8) + '...')
+  try {
+    createAppKit({
     adapters: [wagmiAdapter],
     networks,
     projectId,
     metadata: {
       name: 'Hyperfy',
       description: 'Hyperfy Virtual World',
-      url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
-      icons: [],
+      url: 'https://hyperfy.xyz',
+      icons: ['https://hyperfy.xyz/favicon.ico'],
     },
     themeMode: 'dark',
     features: {
@@ -45,7 +47,13 @@ if (projectId) {
       onramp: false,
       email: false,
     },
-  })
+    })
+    console.log('[EVM] AppKit initialized successfully')
+  } catch (err) {
+    console.error('[EVM] Failed to initialize AppKit:', err)
+  }
+} else {
+  console.warn('[EVM] No valid projectId found, AppKit disabled')
 }
 
 export const Providers = ({ children }) => (
