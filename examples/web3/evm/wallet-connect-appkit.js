@@ -19,7 +19,7 @@ app.configure([
 // State
 app.state.connected = false
 app.state.address = null
-app.state.connecting = false
+app.state.modalOpen = false
 
 // Get entities
 const rig = app.get('WCRig')
@@ -39,7 +39,7 @@ const statusUI = app.create('ui', {
 })
 
 const statusText = app.create('uitext', {
-  value: '🌐 Click to Connect',
+  value: '🌐 Disconnected',
   color: '#cccccc',
   fontSize: 14,
   textAlign: 'center',
@@ -67,41 +67,48 @@ if (rig) rig.add(connectAction)
 
 // Check connection state periodically
 let checkInterval = null
+let previousAddress = null
 
 function startConnectionCheck() {
   if (checkInterval) clearInterval(checkInterval)
+
   checkInterval = setInterval(() => {
     const player = world.getPlayer()
     const address = player?.evm || world.evm?.address
     const isConnected = world.evm?.connected
 
-    if (isConnected && address && !app.state.connected) {
-      // Connection detected
-      app.state.connected = true
-      app.state.address = address
-      app.state.connecting = false
+    // Only update if address actually changed
+    if (address !== previousAddress) {
+      previousAddress = address
 
-      const short = address.substring(0, 6) + '...' + address.substring(38)
-      statusText.value = `✅ ${short}`
-      statusText.color = '#10b981'
-      connectAction.label = 'Disconnect Wallet'
+      if (isConnected && address) {
+        // Connection established
+        app.state.connected = true
+        app.state.address = address
+        app.state.modalOpen = false
 
-      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+        const short = address.substring(0, 6) + '...' + address.substring(38)
+        statusText.value = `✅ ${short}`
+        statusText.color = '#10b981'
+        connectAction.label = 'Disconnect Wallet'
 
-      console.log('[Wallet] Connected:', address)
-    } else if (!isConnected && app.state.connected) {
-      // Disconnection detected
-      app.state.connected = false
-      app.state.address = null
-      app.state.connecting = false
+        // Only play animation on new connection
+        rig?.play({ name: 'ON', loop: true, fade: 0.3 })
 
-      statusText.value = '🌐 Disconnected'
-      statusText.color = '#cccccc'
-      connectAction.label = 'Connect Wallet'
+        console.log('[Wallet] Connected:', address)
+      } else if (!isConnected && app.state.connected) {
+        // Disconnected
+        app.state.connected = false
+        app.state.address = null
 
-      rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+        connectAction.label = 'Connect Wallet'
 
-      console.log('[Wallet] Disconnected')
+        rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
+
+        console.log('[Wallet] Disconnected')
+      }
     }
   }, 500)
 }
@@ -113,37 +120,37 @@ if (world.isClient) {
 
 // Connection function
 async function connectWallet() {
-  if (app.state.connected || app.state.connecting) {
-    console.log('[Wallet] Already connected or connecting')
+  if (app.state.connected) {
+    console.log('[Wallet] Already connected')
     return
   }
 
   console.log('[Wallet] Opening AppKit modal...')
-  app.state.connecting = true
-  statusText.value = '⏳ Open wallet modal...'
+  app.state.modalOpen = true
+  statusText.value = '⏳ Select wallet...'
   statusText.color = '#f59e0b'
 
   try {
-    // This opens the AppKit modal
+    // Open AppKit modal - this returns immediately, doesn't wait for connection
     const result = await world.evm.connect()
-    console.log('[Wallet] Connect result:', result)
+    console.log('[Wallet] Modal opened:', result)
 
-    if (result.success) {
-      // Wait for connection to complete via polling
-      statusText.value = '⏳ Confirm in wallet...'
-    } else {
-      app.state.connecting = false
-      statusText.value = '🌐 Click to Connect'
+    // Note: Modal is open, but user hasn't connected yet
+    // The polling will detect when they actually connect
+    if (!result.success) {
+      app.state.modalOpen = false
+      statusText.value = '🌐 Disconnected'
       statusText.color = '#cccccc'
     }
+    // If success, we wait for polling to detect actual connection
   } catch (error) {
     console.error('[Wallet] Connect error:', error)
-    app.state.connecting = false
-    statusText.value = '❌ Error - Try Again'
+    app.state.modalOpen = false
+    statusText.value = '❌ Error'
     statusText.color = '#ef4444'
     setTimeout(() => {
       if (!app.state.connected) {
-        statusText.value = '🌐 Click to Connect'
+        statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
       }
     }, 3000)
@@ -172,3 +179,4 @@ app.on('destroy', () => {
 
 console.log('✅ AppKit Wallet Test initialized')
 console.log('📱 Click "Connect Wallet" to open AppKit modal')
+console.log('⏳ Wait for actual connection before celebrating!')
