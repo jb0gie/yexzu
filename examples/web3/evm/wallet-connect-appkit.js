@@ -78,7 +78,7 @@ const doInitialCheck = (dt) => {
   const address = player?.evm || world.evm?.address
   const isConnected = world.evm?.connected
 
-  console.log('[Wallet] Initial state:', { address, isConnected })
+  console.log('[Wallet] Initial state:', { address, isConnected, rigFound: !!rig })
 
   if (isConnected && address) {
     app.state.connected = true
@@ -90,7 +90,13 @@ const doInitialCheck = (dt) => {
     statusText.color = '#10b981'
     connectAction.label = 'Disconnect Wallet'
 
-    rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+    // Play animation if rig exists
+    if (rig) {
+      console.log('[Wallet] Playing ON animation for existing connection')
+      rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    } else {
+      console.log('[Wallet] No rig found, cannot play animation')
+    }
 
     console.log('[Wallet] Already connected on init:', address)
   }
