@@ -65,12 +65,48 @@ const connectAction = app.create('action', {
 
 if (rig) rig.add(connectAction)
 
+// Check initial connection state - use update loop to avoid SES restrictions
+let initCheckTimer = 0
+let initChecked = false
+
+const doInitialCheck = (dt) => {
+  if (initChecked) return
+  initCheckTimer += dt
+  if (initCheckTimer < 0.5) return // Wait 0.5 seconds
+
+  const player = world.getPlayer()
+  const address = player?.evm || world.evm?.address
+  const isConnected = world.evm?.connected
+
+  console.log('[Wallet] Initial state:', { address, isConnected })
+
+  if (isConnected && address) {
+    app.state.connected = true
+    app.state.address = address
+    previousAddress = address
+
+    const short = address.substring(0, 6) + '...' + address.substring(38)
+    statusText.value = `✅ ${short}`
+    statusText.color = '#10b981'
+    connectAction.label = 'Disconnect Wallet'
+
+    rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+
+    console.log('[Wallet] Already connected on init:', address)
+  }
+
+  initChecked = true
+}
+
 // Use app update loop instead of setInterval (SES restriction)
 let checkTimer = 0
 let previousAddress = null
 let debugCounter = 0
 
 app.on('update', (dt) => {
+  // Do initial check first
+  doInitialCheck(dt)
+
   // Check every 0.5 seconds (500ms)
   checkTimer += dt
   if (checkTimer < 0.5) return
