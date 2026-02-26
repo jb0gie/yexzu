@@ -80,7 +80,8 @@ const doInitialCheck = (dt) => {
 
   console.log('[Wallet] Initial state:', { address, isConnected, rigFound: !!rig })
 
-  if (isConnected && address) {
+  if (address) {
+    // Have address - treat as connected (isConnected flag may lag)
     app.state.connected = true
     app.state.address = address
     previousAddress = address
@@ -139,8 +140,8 @@ app.on('update', (dt) => {
   if (address !== previousAddress || (app.state.modalOpen && !isConnected && !address)) {
     previousAddress = address
 
-    if (isConnected && address) {
-      // Connection established
+    if (address) {
+      // Connection established (check address since isConnected may lag)
       app.state.connected = true
       app.state.address = address
       app.state.modalOpen = false
@@ -154,7 +155,7 @@ app.on('update', (dt) => {
       rig?.play({ name: 'ON', loop: true, fade: 0.3 })
 
       console.log('[Wallet] Connected:', address)
-    } else if (!isConnected && app.state.connected) {
+    } else if (!address && app.state.connected) {
       // Disconnected
       app.state.connected = false
       app.state.address = null
