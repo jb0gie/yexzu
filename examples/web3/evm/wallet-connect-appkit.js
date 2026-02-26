@@ -68,6 +68,7 @@ if (rig) rig.add(connectAction)
 // Use app update loop instead of setInterval (SES restriction)
 let checkTimer = 0
 let previousAddress = null
+let debugCounter = 0
 
 app.on('update', (dt) => {
   // Check every 0.5 seconds (500ms)
@@ -79,8 +80,21 @@ app.on('update', (dt) => {
   const address = player?.evm || world.evm?.address
   const isConnected = world.evm?.connected
 
-  // Only update if address actually changed
-  if (address !== previousAddress) {
+  // Debug logging every 5 seconds
+  debugCounter++
+  if (debugCounter >= 10) {
+    debugCounter = 0
+    console.log('[Wallet Debug]', {
+      playerEvm: player?.evm,
+      worldEvmAddress: world.evm?.address,
+      worldEvmConnected: world.evm?.connected,
+      appState: app.state,
+      previousAddress
+    })
+  }
+
+  // Update if address changed OR if we need to reset after modal closed
+  if (address !== previousAddress || (app.state.modalOpen && !isConnected && !address)) {
     previousAddress = address
 
     if (isConnected && address) {
@@ -102,6 +116,7 @@ app.on('update', (dt) => {
       // Disconnected
       app.state.connected = false
       app.state.address = null
+      app.state.modalOpen = false
 
       statusText.value = '🌐 Disconnected'
       statusText.color = '#cccccc'
