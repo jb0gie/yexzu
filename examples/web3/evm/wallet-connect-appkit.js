@@ -65,58 +65,54 @@ const connectAction = app.create('action', {
 
 if (rig) rig.add(connectAction)
 
-// Check connection state periodically
-let checkInterval = null
+// Use app update loop instead of setInterval (SES restriction)
+let checkTimer = 0
 let previousAddress = null
 
-function startConnectionCheck() {
-  if (checkInterval) clearInterval(checkInterval)
+app.on('update', (dt) => {
+  // Check every 0.5 seconds (500ms)
+  checkTimer += dt
+  if (checkTimer < 0.5) return
+  checkTimer = 0
 
-  checkInterval = setInterval(() => {
-    const player = world.getPlayer()
-    const address = player?.evm || world.evm?.address
-    const isConnected = world.evm?.connected
+  const player = world.getPlayer()
+  const address = player?.evm || world.evm?.address
+  const isConnected = world.evm?.connected
 
-    // Only update if address actually changed
-    if (address !== previousAddress) {
-      previousAddress = address
+  // Only update if address actually changed
+  if (address !== previousAddress) {
+    previousAddress = address
 
-      if (isConnected && address) {
-        // Connection established
-        app.state.connected = true
-        app.state.address = address
-        app.state.modalOpen = false
+    if (isConnected && address) {
+      // Connection established
+      app.state.connected = true
+      app.state.address = address
+      app.state.modalOpen = false
 
-        const short = address.substring(0, 6) + '...' + address.substring(38)
-        statusText.value = `✅ ${short}`
-        statusText.color = '#10b981'
-        connectAction.label = 'Disconnect Wallet'
+      const short = address.substring(0, 6) + '...' + address.substring(38)
+      statusText.value = `✅ ${short}`
+      statusText.color = '#10b981'
+      connectAction.label = 'Disconnect Wallet'
 
-        // Only play animation on new connection
-        rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+      // Only play animation on new connection
+      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
 
-        console.log('[Wallet] Connected:', address)
-      } else if (!isConnected && app.state.connected) {
-        // Disconnected
-        app.state.connected = false
-        app.state.address = null
+      console.log('[Wallet] Connected:', address)
+    } else if (!isConnected && app.state.connected) {
+      // Disconnected
+      app.state.connected = false
+      app.state.address = null
 
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
-        connectAction.label = 'Connect Wallet'
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+      connectAction.label = 'Connect Wallet'
 
-        rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
+      rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
 
-        console.log('[Wallet] Disconnected')
-      }
+      console.log('[Wallet] Disconnected')
     }
-  }, 500)
-}
-
-// Start checking
-if (world.isClient) {
-  startConnectionCheck()
-}
+  }
+})
 
 // Connection function
 async function connectWallet() {
@@ -136,7 +132,7 @@ async function connectWallet() {
     console.log('[Wallet] Modal opened:', result)
 
     // Note: Modal is open, but user hasn't connected yet
-    // The polling will detect when they actually connect
+    // The update loop will detect when they actually connect
     if (!result.success) {
       app.state.modalOpen = false
       statusText.value = '🌐 Disconnected'
@@ -148,12 +144,18 @@ async function connectWallet() {
     app.state.modalOpen = false
     statusText.value = '❌ Error'
     statusText.color = '#ef4444'
-    setTimeout(() => {
-      if (!app.state.connected) {
+
+    // Reset after delay using world time
+    let errorTimer = 0
+    const resetOnUpdate = (dt) => {
+      errorTimer += dt
+      if (errorTimer >= 3 && !app.state.connected) {
         statusText.value = '🌐 Disconnected'
         statusText.color = '#cccccc'
+        app.off('update', resetOnUpdate)
       }
-    }, 3000)
+    }
+    app.on('update', resetOnUpdate)
   }
 }
 
@@ -171,11 +173,6 @@ async function disconnectWallet() {
     console.error('[Wallet] Disconnect error:', error)
   }
 }
-
-// Cleanup on destroy
-app.on('destroy', () => {
-  if (checkInterval) clearInterval(checkInterval)
-})
 
 console.log('✅ AppKit Wallet Test initialized')
 console.log('📱 Click "Connect Wallet" to open AppKit modal')
