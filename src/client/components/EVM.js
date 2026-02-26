@@ -21,7 +21,7 @@ const networks = [mainnet]
 const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
-  ssr: true,
+  ssr: false,
 })
 
 // Initialize AppKit if project ID is available
@@ -38,7 +38,7 @@ if (projectId && projectId.length >= 32) {
       name: 'Hyperfy',
       description: 'Hyperfy Virtual World',
       url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
-      icons: ['https://raw.githubusercontent.com/hyperfy-xyz/hyperfy/main/docs/static/img/favicon.ico'],
+      icons: ['https://avatars.githubusercontent.com/u/12345678'],
     },
     themeMode: 'dark',
     features: {
