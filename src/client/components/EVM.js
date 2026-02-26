@@ -2,7 +2,7 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createAppKit, useAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { monad, mainnet } from '@reown/appkit/networks'
+import { monad, mainnet, arbitrum, base, polygon } from '@reown/appkit/networks'
 
 const queryClient = new QueryClient()
 
@@ -14,8 +14,8 @@ const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
     ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
     : ''
 
-// Network configuration - Ethereum first for wallet compatibility, then Monad
-const networks = [mainnet, monad]
+// Network configuration - Major chains first for wallet compatibility
+const networks = [mainnet, arbitrum, base, polygon, monad]
 
 // Create Wagmi adapter with AppKit
 const wagmiAdapter = new WagmiAdapter({
@@ -95,6 +95,7 @@ function Logic({ world }) {
     console.log('[EVM] Opening AppKit modal...')
     try {
       // Open AppKit modal - this handles wallet selection
+      // Using open() is the recommended way for AppKit
       open({ view: 'Connect' })
       // Return success immediately - AppKit handles the connection flow
       return { success: true }
