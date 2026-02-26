@@ -24,6 +24,15 @@ const wagmiAdapter = new WagmiAdapter({
   ssr: true,
 })
 
+// Featured wallet IDs - these appear on the main modal view
+// Find wallet IDs at: https://walletguide.walletconnect.network/
+const featuredWalletIds = [
+  'c57ca95b47569778a828d19178114f556dbdbd3a8c7b7f5f5f5f5f5f5f5f5f5f', // MetaMask
+  '1ae92b26df02f0abca6304df07debccd18262fdf5f5f5f5f5f5f5f5f5f5f5f', // Rainbow
+  '22592b3e0bfa38224a7f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f', // Trust Wallet
+  'ecc4036f814562b41a52608adafb299c4d7c5c3b07d8e9e3c8d4f9c8c4c4c4c', // Zerion
+]
+
 // Initialize AppKit if project ID is available
 if (projectId) {
   createAppKit({
@@ -43,6 +52,7 @@ if (projectId) {
       onramp: false,
       email: false,
     },
+    featuredWalletIds,
   })
 }
 
