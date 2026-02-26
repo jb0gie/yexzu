@@ -14,6 +14,16 @@ app.configure([
     label: 'Button Color',
     initial: '#6366f1',
   },
+  {
+    key: 'debug',
+    type: 'switch',
+    label: 'Debug Logging',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' },
+    ],
+    initial: 'disabled',
+  },
 ])
 
 // State
@@ -78,7 +88,9 @@ const doInitialCheck = (dt) => {
   const address = player?.evm || world.evm?.address
   const isConnected = world.evm?.connected
 
-  console.log('[Wallet] Initial state:', { address, isConnected, rigFound: !!rig })
+  if (app.props.debug === 'enabled') {
+    console.log('[Wallet] Initial state:', { address, isConnected, rigFound: !!rig })
+  }
 
   if (address) {
     // Have address - treat as connected (isConnected flag may lag)
@@ -93,13 +105,13 @@ const doInitialCheck = (dt) => {
 
     // Play animation if rig exists
     if (rig) {
-      console.log('[Wallet] Playing ON animation for existing connection')
+      if (app.props.debug === 'enabled') console.log('[Wallet] Playing ON animation for existing connection')
       rig.play({ name: 'ON', loop: true, fade: 0.3 })
-    } else {
+    } else if (app.props.debug === 'enabled') {
       console.log('[Wallet] No rig found, cannot play animation')
     }
 
-    console.log('[Wallet] Already connected on init:', address)
+    if (app.props.debug === 'enabled') console.log('[Wallet] Already connected on init:', address)
   }
 
   initChecked = true
@@ -123,17 +135,19 @@ app.on('update', (dt) => {
   const address = player?.evm || world.evm?.address
   const isConnected = world.evm?.connected
 
-  // Debug logging every 5 seconds
-  debugCounter++
-  if (debugCounter >= 10) {
-    debugCounter = 0
-    console.log('[Wallet Debug]', {
-      playerEvm: player?.evm,
-      worldEvmAddress: world.evm?.address,
-      worldEvmConnected: world.evm?.connected,
-      appState: app.state,
-      previousAddress
-    })
+  // Debug logging every 5 seconds (if enabled)
+  if (app.props.debug === 'enabled') {
+    debugCounter++
+    if (debugCounter >= 10) {
+      debugCounter = 0
+      console.log('[Wallet Debug]', {
+        playerEvm: player?.evm,
+        worldEvmAddress: world.evm?.address,
+        worldEvmConnected: world.evm?.connected,
+        appState: app.state,
+        previousAddress
+      })
+    }
   }
 
   // Update if address changed OR if we need to reset after modal closed
@@ -154,7 +168,7 @@ app.on('update', (dt) => {
       // Only play animation on new connection
       rig?.play({ name: 'ON', loop: true, fade: 0.3 })
 
-      console.log('[Wallet] Connected:', address)
+      if (app.props.debug === 'enabled') console.log('[Wallet] Connected:', address)
     } else if (!address && app.state.connected) {
       // Disconnected
       app.state.connected = false
@@ -167,7 +181,7 @@ app.on('update', (dt) => {
 
       rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
 
-      console.log('[Wallet] Disconnected')
+      if (app.props.debug === 'enabled') console.log('[Wallet] Disconnected')
     }
   }
 })
@@ -175,11 +189,11 @@ app.on('update', (dt) => {
 // Connection function
 async function connectWallet() {
   if (app.state.connected) {
-    console.log('[Wallet] Already connected')
+    if (app.props.debug === 'enabled') console.log('[Wallet] Already connected')
     return
   }
 
-  console.log('[Wallet] Opening AppKit modal...')
+  if (app.props.debug === 'enabled') console.log('[Wallet] Opening AppKit modal...')
   app.state.modalOpen = true
   statusText.value = '⏳ Select wallet...'
   statusText.color = '#f59e0b'
@@ -187,7 +201,7 @@ async function connectWallet() {
   try {
     // Open AppKit modal - this returns immediately, doesn't wait for connection
     const result = await world.evm.connect()
-    console.log('[Wallet] Modal opened:', result)
+    if (app.props.debug === 'enabled') console.log('[Wallet] Modal opened:', result)
 
     // Note: Modal is open, but user hasn't connected yet
     // The update loop will detect when they actually connect
@@ -220,18 +234,20 @@ async function connectWallet() {
 // Disconnect function
 async function disconnectWallet() {
   if (!app.state.connected) {
-    console.log('[Wallet] Not connected')
+    if (app.props.debug === 'enabled') console.log('[Wallet] Not connected')
     return
   }
 
   try {
     await world.evm.disconnect()
-    console.log('[Wallet] Disconnected')
+    if (app.props.debug === 'enabled') console.log('[Wallet] Disconnected')
   } catch (error) {
     console.error('[Wallet] Disconnect error:', error)
   }
 }
 
-console.log('✅ AppKit Wallet Test initialized')
-console.log('📱 Click "Connect Wallet" to open AppKit modal')
-console.log('⏳ Wait for actual connection before celebrating!')
+if (app.props.debug === 'enabled') {
+  console.log('✅ AppKit Wallet Test initialized')
+  console.log('📱 Click "Connect Wallet" to open AppKit modal')
+  console.log('⏳ Wait for actual connection before celebrating!')
+}
