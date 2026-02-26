@@ -48,6 +48,8 @@
     "@firebolt-dev/css": "^0.4.3",
     "@firebolt-dev/jsx": "^0.4.3",
     "@pixiv/three-vrm": "^3.3.3",
+    "@reown/appkit": "^1.8.18",
+    "@reown/appkit-adapter-wagmi": "^1.8.18",
     "@tanstack/react-query": "^5.65.1",
     "better-sqlite3": "^11.7.2",
     "d3": "^7.9.0",

@@ -1,50 +1,51 @@
-import { createConfig, http, injected, useDisconnect, WagmiProvider } from 'wagmi'
-import * as chains from 'wagmi/chains'
-import { defineChain } from 'viem'
-
+import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createAppKit } from '@reown/appkit/react'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import { monad } from '@reown/appkit/networks'
+
 const queryClient = new QueryClient()
 
-// Monad mainnet configuration (chainId 143)
-const monadMainnet = defineChain({
-  id: 143,
-  name: 'Monad',
-  nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://rpc.monad.xyz'] },
-  },
-  blockExplorers: {
-    default: { name: 'Monad Explorer', url: 'https://monadexplorer.com' },
-  },
-})
+// Reown AppKit Project ID - required for mobile wallet connections
+// Get one free at: https://cloud.reown.com (formerly cloud.walletconnect.com)
+const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
+  ? env.PUBLIC_REOWN_PROJECT_ID
+  : typeof env !== 'undefined' && env.PUBLIC_WALLETCONNECT_PROJECT_ID
+    ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
+    : ''
 
-// Support both Monad mainnet and Ethereum mainnet (for ENS resolution)
-const monad = monadMainnet
-const eth = chains.mainnet
+// Network configuration - Monad mainnet
+const networks = [monad]
 
-const config = createConfig({
-  chains: [monad, eth],
-  transports: {
-    [monad.id]: http(),
-    [eth.id]: http(),
-  },
-  connectors: [injected()],
-  multiInjectedProviderDiscovery: false,
-  storage: null,
+// Create Wagmi adapter with AppKit
+const wagmiAdapter = new WagmiAdapter({
+  networks,
+  projectId,
   ssr: true,
 })
 
+// Initialize AppKit if project ID is available
+if (projectId) {
+  createAppKit({
+    adapters: [wagmiAdapter],
+    networks,
+    projectId,
+    metadata: {
+      name: 'Hyperfy',
+      description: 'Hyperfy Virtual World',
+      url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
+      icons: [],
+    },
+  })
+}
+
 export const Providers = ({ children }) => (
-  <WagmiProvider config={config}>
+  <WagmiProvider config={wagmiAdapter.wagmiConfig}>
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   </WagmiProvider>
 )
 
 export function EVM({ world }) {
-  // console.log('[EVM] component rendering!')
-  // console.log('[EVM] world parameter:', world)
-  // console.log('[EVM] world.evm exists:', !!world?.evm)
-
   // Store the latest connection data for EVMClient to access
   if (world.evm && !world.evm._reactData) {
     world.evm._reactData = {}
@@ -59,7 +60,6 @@ export function EVM({ world }) {
 
 import * as evmActions from 'wagmi/actions'
 import { useConfig, useAccount, useChainId } from 'wagmi'
-import * as utils from 'viem/utils'
 import { erc20Abi } from 'viem'
 
 import { useConnect, useConnectors } from 'wagmi'
@@ -70,21 +70,6 @@ function Logic({ world }) {
   const chainId = useChainId()
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
   const [initialized, setInitialized] = useState(false)
-  // useEffect(() => {
-  //   if (initialized) return
-  //   setInitialized(true)
-
-  //   let evm = { actions: {}, utils }
-  //   for (const [action, fn] of Object.entries(evmActions)) {
-  //     evm.actions[action] = (...args) => fn(config, ...args)
-  //   }
-  //   evm.abis = {
-  //     erc20: erc20Abi,
-  //     erc721: null,
-  //   }
-
-  //   world.evm = evm
-  // }, [config])
 
   // Set player.evm when wallet connects/disconnects
   useEffect(() => {
@@ -97,14 +82,6 @@ function Logic({ world }) {
   const { disconnect } = useDisconnect()
 
   useEffect(() => {
-    //console.log('[EVM] useEffect running, wagmi state:')
-    //console.log('[EVM] - isConnected:', isConnected)
-    //console.log('[EVM] - isConnecting:', isConnecting)
-    //console.log('[EVM] - address:', address)
-    //console.log('[EVM] - connectors:', connectors)
-    //console.log('[EVM] - connect function type:', typeof connect)
-    //console.log('[EVM] - disconnect function type:', typeof disconnect)
-
     // Store latest data for EVMClient to access
     if (world.evm._reactData) {
       world.evm._reactData.address = address
@@ -113,7 +90,7 @@ function Logic({ world }) {
       world.evm._reactData.chainId = chainId
     }
 
-    let actions = {}
+    const actions = {}
 
     const abis = {
       erc20: erc20Abi,
