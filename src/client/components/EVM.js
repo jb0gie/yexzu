@@ -59,10 +59,9 @@ export function EVM({ world }) {
 }
 
 import * as evmActions from 'wagmi/actions'
-import { useConfig, useAccount, useChainId } from 'wagmi'
+import { useConfig, useAccount, useChainId, useConnect, useConnectors, useDisconnect } from 'wagmi'
 import { erc20Abi } from 'viem'
 
-import { useConnect, useConnectors } from 'wagmi'
 import { useState, useEffect } from 'react'
 
 function Logic({ world }) {
