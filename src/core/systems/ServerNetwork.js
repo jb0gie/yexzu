@@ -9,7 +9,7 @@ import * as THREE from '../extras/three'
 import { Ranks } from '../extras/ranks'
 
 const SAVE_INTERVAL = parseInt(process.env.SAVE_INTERVAL || '60') // seconds
-const PING_RATE = parseInt(process.env.PING_RATE || '10') // seconds (higher = more tolerant of mobile app switching)
+const PING_RATE = 10 // seconds
 const defaultSpawn = '{ "position": [0, 0, 0], "quaternion": [0, 0, 0, 1] }'
 
 const HEALTH_MAX = 100
@@ -58,7 +58,7 @@ export class ServerNetwork extends System {
       this.world.entities.add(data, true)
     }
     // hydrate settings
-    const settingsRow = await this.db('config').where('key', 'settings').first()
+    let settingsRow = await this.db('config').where('key', 'settings').first()
     try {
       const settings = JSON.parse(settingsRow?.value || '{}')
       this.world.settings.deserialize(settings)
@@ -220,8 +220,8 @@ export class ServerNetwork extends System {
 
       // check connection params
       let authToken = params.authToken
-      const name = params.name
-      const avatar = params.avatar
+      let name = params.name
+      let avatar = params.avatar
 
       // get or create user
       let user
