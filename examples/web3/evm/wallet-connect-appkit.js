@@ -75,6 +75,40 @@ const connectAction = app.create('action', {
 
 if (rig) rig.add(connectAction)
 
+// Track if we're attempting reconnect
+let isReconnecting = false
+let reconnectAttempts = 0
+const MAX_RECONNECT_ATTEMPTS = 3
+
+// Function to check and restore wallet connection after app resume
+async function checkAndRestoreConnection() {
+  if (isReconnecting) return
+  if (app.state.connected) return // Already showing as connected
+
+  const player = world.getPlayer()
+  const address = player?.evm || world.evm?.address
+
+  // If wallet has address but app doesn't show connected, restore it
+  if (address && !app.state.connected) {
+    if (app.props.debug === 'enabled') {
+      console.log('[Wallet] Detected wallet connection on resume:', address)
+    }
+
+    app.state.connected = true
+    app.state.address = address
+    previousAddress = address
+
+    const short = address.substring(0, 6) + '...' + address.substring(38)
+    statusText.value = `✅ ${short}`
+    statusText.color = '#10b981'
+    connectAction.label = 'Disconnect Wallet'
+
+    if (rig) {
+      rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    }
+  }
+}
+
 // Check initial connection state - use update loop to avoid SES restrictions
 let initCheckTimer = 0
 let initChecked = false
@@ -121,8 +155,23 @@ const doInitialCheck = (dt) => {
 let checkTimer = 0
 let previousAddress = null
 let debugCounter = 0
+let awayTimer = 0
+let lastUpdateTime = 0
 
 app.on('update', (dt) => {
+  // Detect if we've been "away" (app backgrounded) - dt will be large
+  const now = Date.now()
+  const timeSinceLastUpdate = now - lastUpdateTime
+  lastUpdateTime = now
+
+  // If more than 2 seconds since last update, app was likely backgrounded
+  if (timeSinceLastUpdate > 2000 && lastUpdateTime > 0) {
+    if (app.props.debug === 'enabled') {
+      console.log('[Wallet] App resumed after', timeSinceLastUpdate, 'ms - checking connection')
+    }
+    // Check if wallet is still connected
+    checkAndRestoreConnection()
+  }
   // Do initial check first
   doInitialCheck(dt)
 
