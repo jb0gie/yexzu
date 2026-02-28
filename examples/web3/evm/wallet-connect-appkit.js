@@ -120,7 +120,6 @@ const doInitialCheck = (dt) => {
 // Use app update loop instead of setInterval (SES restriction)
 let checkTimer = 0
 let previousAddress = null
-let debugCounter = 0
 
 app.on('update', (dt) => {
   // Do initial check first
@@ -134,21 +133,6 @@ app.on('update', (dt) => {
   const player = world.getPlayer()
   const address = player?.evm || world.evm?.address
   const isConnected = world.evm?.connected
-
-  // Debug logging every 5 seconds (if enabled)
-  if (app.props.debug === 'enabled') {
-    debugCounter++
-    if (debugCounter >= 10) {
-      debugCounter = 0
-      console.log('[Wallet Debug]', {
-        playerEvm: player?.evm,
-        worldEvmAddress: world.evm?.address,
-        worldEvmConnected: world.evm?.connected,
-        appState: app.state,
-        previousAddress
-      })
-    }
-  }
 
   // Update if address changed OR if we need to reset after modal closed
   if (address !== previousAddress || (app.state.modalOpen && !isConnected && !address)) {
