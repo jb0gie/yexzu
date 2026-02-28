@@ -33,6 +33,35 @@ app.state.modalOpen = false
 
 // Get entities
 const rig = app.get('WCRig')
+const triggerBody = app.get('AreaTrigger')
+
+// Initialize trigger zone
+let isPlayerNearby = false
+const localPlayer = world.getPlayer()
+
+if (triggerBody) {
+  triggerBody.onTriggerEnter = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = true
+      }
+    }
+  }
+
+  triggerBody.onTriggerLeave = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = false
+      }
+    }
+  }
+} else {
+  isPlayerNearby = true
+}
 
 // Create minimal status UI
 const statusUI = app.create('ui', {
@@ -117,11 +146,20 @@ const doInitialCheck = (dt) => {
   initChecked = true
 }
 
+function triggerZoneVisible() {
+  return !triggerBody || isPlayerNearby
+}
+
 // Use app update loop instead of setInterval (SES restriction)
 let checkTimer = 0
 let previousAddress = null
 
 app.on('update', (dt) => {
+  // Update UI and action visibility based on trigger zone
+  const visible = triggerZoneVisible()
+  statusUI.active = visible
+  connectAction.active = visible
+
   // Do initial check first
   doInitialCheck(dt)
 

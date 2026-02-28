@@ -14,8 +14,8 @@ const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
     ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
     : ''
 
-// Network configuration - Start with just Ethereum for maximum compatibility
-const networks = [mainnet]
+// Network configuration - Monad first, then Ethereum
+const networks = [monad, mainnet]
 
 // Create Wagmi adapter with AppKit
 const wagmiAdapter = new WagmiAdapter({
