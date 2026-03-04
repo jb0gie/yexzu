@@ -999,7 +999,7 @@ function startGameEmote() {
         speed: 1.0,
         gaze: false,
         loop: true,
-        cancellable: true,  // Must be true to allow stopping
+        cancellable: false,  // Non-cancellable during gameplay
       },
     })
     debugLog('animlib:play emit succeeded')
