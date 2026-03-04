@@ -1010,10 +1010,14 @@ function startGameEmote() {
 // Stop the dance emote
 function stopGameEmote() {
   debugLog('stopGameEmote called')
-  if (!shouldUseAnimlib()) return
-
-  debugLog('Stopping dance emote')
-  app.emit('animlib:stop', { target: 'player' })
+  // Always try to stop - don't check shouldUseAnimlib() because
+  // the emote might have been started when it was enabled
+  try {
+    app.emit('animlib:stop', { target: 'player' })
+    debugLog('animlib:stop emit succeeded')
+  } catch (err) {
+    debugLog('animlib:stop emit failed:', err.message)
+  }
 }
 
 // Scene objects
