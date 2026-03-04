@@ -994,11 +994,12 @@ function startGameEmote() {
     app.emit('animlib:play', {
       anim: randomAnim,
       target: 'player',
+      playerId: 'local',
       options: {
         speed: 1.0,
         gaze: false,
         loop: true,
-        cancellable: false,
+        cancellable: true,  // Must be true to allow stopping
       },
     })
     debugLog('animlib:play emit succeeded')
@@ -1013,10 +1014,21 @@ function stopGameEmote() {
   // Always try to stop - don't check shouldUseAnimlib() because
   // the emote might have been started when it was enabled
   try {
-    app.emit('animlib:stop', { target: 'player' })
+    app.emit('animlib:stop', { target: 'player', playerId: 'local' })
     debugLog('animlib:stop emit succeeded')
   } catch (err) {
     debugLog('animlib:stop emit failed:', err.message)
+  }
+
+  // Also try to clear any active effect on player
+  const player = world.getPlayer()
+  if (player && player.applyEffect) {
+    try {
+      player.applyEffect(null)
+      debugLog('player.applyEffect(null) succeeded')
+    } catch (err) {
+      debugLog('player.applyEffect(null) failed:', err.message)
+    }
   }
 }
 
