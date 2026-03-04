@@ -972,34 +972,25 @@ function shouldUseAnimlib() {
   return enabled && isClient
 }
 
-// Available dance animations
-const DANCE_ANIMS = [
-  'vrmdancecharleston56',
-  'vrmdancebodyroll156',
-  'vrmdancereachhip61',
-]
-
-// Start continuous dance emote while playing
-function startGameEmote() {
-  debugLog('startGameEmote called')
+// Start game over emote
+function playGameOverEmote() {
+  debugLog('playGameOverEmote called')
   if (!shouldUseAnimlib()) {
     debugLog('Animlib not enabled, skipping emote')
     return
   }
 
-  // Pick random animation
-  const randomAnim = DANCE_ANIMS[Math.floor(Math.random() * DANCE_ANIMS.length)]
-  debugLog('Starting random dance emote:', randomAnim)
+  debugLog('Playing game over emote: vrmaction48')
   try {
     app.emit('animlib:play', {
-      anim: randomAnim,
+      anim: 'vrmaction48',
       target: 'player',
       playerId: 'local',
       options: {
         speed: 1.0,
         gaze: false,
-        loop: true,
-        cancellable: false,  // Non-cancellable during gameplay
+        loop: false,
+        cancellable: true,  // Cancellable for game over
       },
     })
     debugLog('animlib:play emit succeeded')
@@ -1397,8 +1388,6 @@ function exitGame() {
   // Reset beat detection
   lastBeatTimes = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 }
   energyHistory = []
-  // Stop dance emote
-  stopGameEmote()
   // Teleport player back to start
   teleportToStart()
 }
@@ -1411,6 +1400,8 @@ function gameOver() {
   updateZoneDisplay()
   ratingText.value = 'GAME OVER'
   ratingText.color = COLORS('MISS')
+  // Play game over emote
+  playGameOverEmote()
   // Stop audio
   if (audio.playing) {
     audio.stop()
@@ -1885,8 +1876,6 @@ app.on('update', () => {
     if (audio.playing || app.state.isPlaying) {
       if (!app.state.isPlaying && audio.playing) {
         debugLog('Audio started playing! isPlaying was:', app.state.isPlaying, 'audio.playing:', audio.playing)
-        // Start dance emote when game begins
-        startGameEmote()
       }
       app.state.isPlaying = true
       // Use audio time when playing, otherwise use world time for test mode
@@ -1960,8 +1949,6 @@ app.on('update', () => {
     } else {
       if (app.state.isPlaying) {
         handleSongEnd()
-        // Stop dance emote when game ends
-        stopGameEmote()
       }
       app.state.isPlaying = false
     }
@@ -1971,5 +1958,4 @@ app.on('update', () => {
 // Cleanup on destroy
 app.on('destroy', () => {
   unlinkAudioReactivity()
-  stopGameEmote()
 })
