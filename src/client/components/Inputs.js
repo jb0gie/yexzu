@@ -1,7 +1,7 @@
 import { css } from '@firebolt-dev/css'
 import { useEffect, useRef, useState } from 'react'
 import { useUpdate } from './useUpdate'
-import { ChevronDownIcon, FileIcon, LoaderIcon, XIcon, CopyIcon } from 'lucide-react'
+import { ChevronDownIcon, FileIcon, LoaderIcon, XIcon } from 'lucide-react'
 import { cls } from './cls'
 import { hashFile } from '../../core/utils-client'
 
@@ -432,13 +432,6 @@ export function InputFile({ world, kind: kindName, value, onChange }) {
     e.stopPropagation()
     onChange(null)
   }
-  const copyUrl = e => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (value?.url) {
-      navigator.clipboard.writeText(value.url)
-    }
-  }
   const n = nRef.current
   const label = loading?.name || value?.name
   return (
@@ -484,18 +477,6 @@ export function InputFile({ world, kind: kindName, value, onChange }) {
           justify-content: center;
           cursor: pointer;
         }
-        .inputfile-copy {
-          width: 30px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          opacity: 0.7;
-          &:hover {
-            opacity: 1;
-          }
-        }
         .inputfile-loading {
           width: 30px;
           height: 34px;
@@ -520,14 +501,9 @@ export function InputFile({ world, kind: kindName, value, onChange }) {
       {!value && !loading && <div className='inputfile-placeholder'>{kind.placeholder}</div>}
       {label && <div className='inputfile-name'>{label}</div>}
       {value && !loading && (
-        <>
-          <div className='inputfile-copy' title='Copy asset URL'>
-            <CopyIcon size={14} onClick={copyUrl} />
-          </div>
-          <div className='inputfile-x'>
-            <XIcon size={14} onClick={remove} />
-          </div>
-        </>
+        <div className='inputfile-x'>
+          <XIcon size={14} onClick={remove} />
+        </div>
       )}
       {loading && (
         <div className='inputfile-loading'>
