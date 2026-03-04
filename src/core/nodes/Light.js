@@ -240,22 +240,6 @@ export class Light extends Node {
     this.setDirty()
   }
 
-  linkAudioReactivity(sourceId, options = {}) {
-    if (!this.ctx.world.audioReactivity) return
-    this.ctx.world.audioReactivity.link(this, sourceId, {
-      targetType: 'light',
-      property: options.property || 'intensity',
-      band: options.band || 'volume',
-      scale: options.scale ?? 1,
-      offset: options.offset ?? 0
-    })
-  }
-
-  unlinkAudioReactivity() {
-    if (!this.ctx.world.audioReactivity) return
-    this.ctx.world.audioReactivity.unlink(this)
-  }
-
   getProxy() {
     if (!this.proxy) {
       const self = this
@@ -307,12 +291,6 @@ export class Light extends Node {
         },
         set castShadow(value) {
           self.castShadow = value
-        },
-        linkAudioReactivity(sourceId, options) {
-          self.linkAudioReactivity(sourceId, options)
-        },
-        unlinkAudioReactivity() {
-          self.unlinkAudioReactivity()
         },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy()))
