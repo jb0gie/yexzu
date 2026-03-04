@@ -1886,7 +1886,9 @@ app.on('update', () => {
       if (!app.state.isPlaying && audio.playing) {
         debugLog('Audio started playing! isPlaying was:', app.state.isPlaying, 'audio.playing:', audio.playing)
         // Start dance emote when game begins
+        debugLog('About to call startGameEmote...')
         startGameEmote()
+        debugLog('Finished calling startGameEmote')
       }
       app.state.isPlaying = true
       // Use audio time when playing, otherwise use world time for test mode
