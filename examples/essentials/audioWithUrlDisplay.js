@@ -6,14 +6,6 @@ app.configure([
     label: 'Audio File',
   },
   {
-    key: 'showUrl',
-    type: 'toggle',
-    label: 'Show Asset URL',
-    trueLabel: 'Show',
-    falseLabel: 'Hide',
-    initial: false,
-  },
-  {
     key: 'autoPlay',
     type: 'toggle',
     label: 'Auto Play',
@@ -30,58 +22,9 @@ const audio = app.create('audio', {
 
 app.add(audio)
 
-let statusUI = null
-let urlUI = null
-
-function updateUI() {
-  if (statusUI) {
-    app.remove(statusUI)
-    statusUI = null
-  }
-  if (urlUI) {
-    app.remove(urlUI)
-    urlUI = null
-  }
-
-  statusUI = app.create('ui', {
-    space: 'screen',
-    position: [0.5, 0.05, 0],
-    width: 0.4,
-    height: 0.08,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  })
-
-  const statusText = app.create('uitext', {
-    value: props.audioFile?.url
-      ? audio.isPlaying
-        ? 'Playing'
-        : 'Ready'
-      : 'No audio file',
-    fontSize: 16,
-    color: audio.isPlaying ? '#10b981' : '#cccccc',
-  })
-
-  statusUI.add(statusText)
-  app.add(statusUI)
-
-  if (props.showUrl && props.audioFile?.url) {
-    urlUI = app.create('ui', {
-      space: 'screen',
-      position: [0.5, 0.15, 0],
-      width: 0.9,
-      height: 0.12,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-    })
-
-    const urlText = app.create('uitext', {
-      value: props.audioFile.url,
-      fontSize: 12,
-      color: '#fbbf24',
-    })
-
-    urlUI.add(urlText)
-    app.add(urlUI)
-  }
+// Log the asset URL so you can copy it to other apps
+if (props.audioFile?.url) {
+  console.log('[AudioWithUrlDisplay] Asset URL:', props.audioFile.url)
 }
 
 const playAction = app.create('action', {
@@ -95,7 +38,6 @@ const playAction = app.create('action', {
     } else {
       audio.play()
     }
-    updateUI()
   },
 })
 
@@ -104,18 +46,16 @@ app.add(playAction)
 app.on('props', () => {
   if (props.audioFile?.url) {
     audio.src = props.audioFile.url
+    console.log('[AudioWithUrlDisplay] Asset URL:', props.audioFile.url)
     if (props.autoPlay && !audio.isPlaying) {
       audio.play()
     }
   }
-  updateUI()
 })
 
 if (props.audioFile?.url && props.autoPlay) {
   audio.play()
 }
-
-updateUI()
 
 app.on('destroy', () => {
   audio.stop()
