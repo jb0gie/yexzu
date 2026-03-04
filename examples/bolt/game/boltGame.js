@@ -1397,29 +1397,27 @@ function exitGame() {
   // Reset beat detection
   lastBeatTimes = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 }
   energyHistory = []
-  // Switch to different dance emote
-  switchGameEmote()
+  // Play game over emote
+  playGameOverEmote()
   // Teleport player back to start
   teleportToStart()
 }
 
-// Switch to a different dance emote
-function switchGameEmote() {
-  debugLog('switchGameEmote called')
+// Play game over emote
+function playGameOverEmote() {
+  debugLog('playGameOverEmote called')
   if (!shouldUseAnimlib()) return
 
-  // Pick random animation (different from current if possible)
-  const randomAnim = DANCE_ANIMS[Math.floor(Math.random() * DANCE_ANIMS.length)]
-  debugLog('Switching to dance emote:', randomAnim)
+  debugLog('Playing game over emote: vrmaction48')
   try {
     app.emit('animlib:play', {
-      anim: randomAnim,
+      anim: 'vrmaction48',
       target: 'player',
       playerId: 'local',
       options: {
         speed: 1.0,
         gaze: false,
-        loop: true,
+        loop: false,
         cancellable: true,
       },
     })
@@ -1437,8 +1435,8 @@ function gameOver() {
   updateZoneDisplay()
   ratingText.value = 'GAME OVER'
   ratingText.color = COLORS('MISS')
-  // Switch to different dance emote
-  switchGameEmote()
+  // Play game over emote
+  playGameOverEmote()
   // Stop audio
   if (audio.playing) {
     audio.stop()
