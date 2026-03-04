@@ -972,6 +972,13 @@ function shouldUseAnimlib() {
   return enabled && isClient
 }
 
+// Available dance animations
+const DANCE_ANIMS = [
+  'vrmdancecharleston56',
+  'vrmdancebodyroll156',
+  'vrmdancereachhip61',
+]
+
 // Start continuous dance emote while playing
 function startGameEmote() {
   debugLog('startGameEmote called')
@@ -980,10 +987,12 @@ function startGameEmote() {
     return
   }
 
-  debugLog('Starting dance emote: VRM|DanceBodyRoll@156')
+  // Pick random animation
+  const randomAnim = DANCE_ANIMS[Math.floor(Math.random() * DANCE_ANIMS.length)]
+  debugLog('Starting random dance emote:', randomAnim)
   try {
     app.emit('animlib:play', {
-      anim: 'VRM|DanceBodyRoll@156',
+      anim: randomAnim,
       target: 'player',
       options: {
         speed: 1.0,
