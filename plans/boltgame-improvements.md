@@ -12,18 +12,46 @@
 ### Phase 1: Gameplay Enhancements
 
 #### 1.1 Difficulty System
-- **Easy**: Slower arrows, wider hit windows, more forgiving timing
-- **Normal**: Current settings
-- **Hard**: Faster arrows, tighter windows, combo breaks on miss
-- **Expert**: Very fast, strict timing, no health recovery
+**Status**: Ready to implement
 
+- **Easy**: Wider hit windows, slower spawn rate
+- **Normal**: Current settings (default)
+- **Hard**: Tighter windows, faster spawn rate
+
+**Implementation**:
 ```javascript
-const DIFFICULTIES = {
-  EASY: { speed: 1.5, windows: { PERFECT: 0.15, GREAT: 0.3, GOOD: 0.5, OKAY: 0.7 } },
-  NORMAL: { speed: 2.0, windows: { PERFECT: 0.1, GREAT: 0.2, GOOD: 0.35, OKAY: 0.5 } },
-  HARD: { speed: 2.5, windows: { PERFECT: 0.08, GREAT: 0.15, GOOD: 0.25, OKAY: 0.4 } },
-  EXPERT: { speed: 3.0, windows: { PERFECT: 0.05, GREAT: 0.1, GOOD: 0.2, OKAY: 0.3 } },
+// Add to app.configure
+{
+  key: 'difficulty',
+  type: 'switch',
+  label: 'Game Difficulty',
+  options: [
+    { label: 'Easy', value: 'easy' },
+    { label: 'Normal', value: 'normal' },
+    { label: 'Hard', value: 'hard' },
+  ],
+  initial: 'normal',
 }
+
+// Dynamic WINDOWS object
+const WINDOWS = {
+  get PERFECT() {
+    return { easy: 0.15, normal: 0.1, hard: 0.08 }[app.props.difficulty || 'normal']
+  },
+  get GREAT() {
+    return { easy: 0.3, normal: 0.2, hard: 0.15 }[app.props.difficulty || 'normal']
+  },
+  get GOOD() {
+    return { easy: 0.45, normal: 0.35, hard: 0.25 }[app.props.difficulty || 'normal']
+  },
+  get OKAY() {
+    return { easy: 0.6, normal: 0.5, hard: 0.35 }[app.props.difficulty || 'normal']
+  },
+}
+
+// Spawn rate multiplier in beat detection
+const difficultyMultiplier = { easy: 0.8, normal: 1.0, hard: 1.3 }[app.props.difficulty || 'normal']
+const threshold = avgEnergy * (1.5 / (app.props.sensitivity || 1)) / difficultyMultiplier
 ```
 
 #### 1.2 Health/Lives System
@@ -37,6 +65,66 @@ const DIFFICULTIES = {
 - Sequential spawning based on audio analysis
 - Pattern editor for custom songs
 - Support for holds (long arrows) and mines (avoid)
+
+#### 1.4 Animlib Dance Emotes (Optional)
+**Status**: Ready to implement
+
+Play dance animations on successful hits using animlib event system.
+
+**Config**:
+```javascript
+{
+  key: 'useAnimlib',
+  type: 'switch',
+  label: 'Use Animlib Emotes',
+  options: [
+    { label: 'Enabled', value: 'enabled' },
+    { label: 'Disabled', value: 'disabled' },
+  ],
+  initial: 'disabled',
+  description: 'Play dance emotes on hits (requires animlib in world)',
+}
+```
+
+**Emote Mappings**:
+- PERFECT!! → 'vrmdancehappy124' (celebration)
+- GREAT! → 'vrmdance124' (standard dance)
+- GOOD → 'vrmcheer124' (small cheer)
+
+**Implementation**:
+```javascript
+function shouldUseAnimlib() {
+  return app.props.useAnimlib === 'enabled' && world.isClient
+}
+
+function playHitEmote(rating) {
+  if (!shouldUseAnimlib()) return
+
+  const emotes = {
+    'PERFECT!!': 'vrmdancehappy124',
+    'GREAT!': 'vrmdance124',
+    'GOOD': 'vrmcheer124',
+  }
+  const anim = emotes[rating]
+  if (!anim) return
+
+  app.emit('animlib:play', {
+    anim,
+    target: 'player',
+    playerId: 'local',
+    options: {
+      speed: 1.0,
+      gaze: false,
+      loop: false,
+      cancellable: true,
+    },
+  })
+}
+```
+
+**Reference**: See `examples/GaStation/GaStationFridge.js` for working animlib pattern.
+
+---
 
 ### Phase 2: Audio & Visual Improvements
 
@@ -144,9 +232,10 @@ arrowColors: color[]
 
 ### High Priority (Immediate)
 1. Difficulty system
-2. Health/lives system
-3. Better arrow patterns
-4. Sound effects
+2. Animlib integration (optional toggle)
+3. Health/lives system
+4. Better arrow patterns
+5. Sound effects
 
 ### Medium Priority (Next)
 5. Enhanced visual feedback
