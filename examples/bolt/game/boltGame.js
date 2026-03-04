@@ -1397,10 +1397,36 @@ function exitGame() {
   // Reset beat detection
   lastBeatTimes = { UP: 0, DOWN: 0, LEFT: 0, RIGHT: 0 }
   energyHistory = []
-  // Stop dance emote
-  stopGameEmote()
+  // Switch to different dance emote
+  switchGameEmote()
   // Teleport player back to start
   teleportToStart()
+}
+
+// Switch to a different dance emote
+function switchGameEmote() {
+  debugLog('switchGameEmote called')
+  if (!shouldUseAnimlib()) return
+
+  // Pick random animation (different from current if possible)
+  const randomAnim = DANCE_ANIMS[Math.floor(Math.random() * DANCE_ANIMS.length)]
+  debugLog('Switching to dance emote:', randomAnim)
+  try {
+    app.emit('animlib:play', {
+      anim: randomAnim,
+      target: 'player',
+      playerId: 'local',
+      options: {
+        speed: 1.0,
+        gaze: false,
+        loop: true,
+        cancellable: true,
+      },
+    })
+    debugLog('animlib:play emit succeeded')
+  } catch (err) {
+    debugLog('animlib:play emit failed:', err.message)
+  }
 }
 
 // Game over function
@@ -1411,6 +1437,8 @@ function gameOver() {
   updateZoneDisplay()
   ratingText.value = 'GAME OVER'
   ratingText.color = COLORS('MISS')
+  // Switch to different dance emote
+  switchGameEmote()
   // Stop audio
   if (audio.playing) {
     audio.stop()
@@ -1427,8 +1455,6 @@ function gameOver() {
   keyStates.right = false
   keyStates.up = false
   keyStates.down = false
-  // Stop dance emote
-  stopGameEmote()
   // Teleport player back to start
   teleportToStart()
 }
@@ -1962,8 +1988,6 @@ app.on('update', () => {
     } else {
       if (app.state.isPlaying) {
         handleSongEnd()
-        // Stop dance emote when game ends
-        stopGameEmote()
       }
       app.state.isPlaying = false
     }
@@ -1973,5 +1997,4 @@ app.on('update', () => {
 // Cleanup on destroy
 app.on('destroy', () => {
   unlinkAudioReactivity()
-  stopGameEmote()
 })
