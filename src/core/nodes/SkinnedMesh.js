@@ -31,6 +31,7 @@ export class SkinnedMesh extends Node {
     this.bones = null
     this.animNames = []
     this.boneHandles = {}
+    this._audioReactiveMeshes = null
   }
 
   mount() {
@@ -237,8 +238,55 @@ export class SkinnedMesh extends Node {
     return handle
   }
 
+  linkAudioReactivity(sourceId, options = {}) {
+    if (!this.ctx.world.audioReactivity) {
+      console.warn('[SkinnedMesh] linkAudioReactivity called but AudioReactivity system not ready.')
+      return
+    }
+    this.unlinkAudioReactivity()
+
+    const meshes = []
+    if (this.obj) {
+      this.obj.traverse(node => {
+        if (node.isMesh && node.material) {
+          this.ctx.world.audioReactivity.link({
+            name: 'skinnedmesh',
+            handle: { material: node.material }
+          }, sourceId, {
+            targetType: 'material',
+            property: options.property || 'emissiveIntensity',
+            band: options.band || 'volume',
+            scale: options.scale ?? 1,
+            offset: options.offset ?? 0,
+            intensity: options.intensity ?? 1,
+            color: options.color,
+            from: options.from,
+            to: options.to
+          })
+          meshes.push(node)
+        }
+      })
+    }
+
+    this._audioReactiveMeshes = meshes
+  }
+
+  unlinkAudioReactivity() {
+    if (!this.ctx.world.audioReactivity) return
+
+    if (this._audioReactiveMeshes) {
+      for (const mesh of this._audioReactiveMeshes) {
+        this.ctx.world.audioReactivity.unlink({
+          name: 'skinnedmesh',
+          handle: { material: mesh.material }
+        })
+      }
+      this._audioReactiveMeshes = null
+    }
+  }
+
   getProxy() {
-    var self = this
+    const self = this
     if (!this.proxy) {
       let proxy = {
         get anims() {
@@ -264,6 +312,12 @@ export class SkinnedMesh extends Node {
         },
         getBoneTransform(name) {
           return self.getBoneTransform(name)
+        },
+        linkAudioReactivity(sourceId, options) {
+          self.linkAudioReactivity(sourceId, options)
+        },
+        unlinkAudioReactivity() {
+          self.unlinkAudioReactivity()
         },
       }
       proxy = Object.defineProperties(proxy, Object.getOwnPropertyDescriptors(super.getProxy())) // inherit Node properties

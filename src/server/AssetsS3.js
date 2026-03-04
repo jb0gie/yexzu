@@ -84,7 +84,7 @@ export class AssetsS3 {
       const host = parts[0]
       const pathParts = parts.slice(1)
 
-      let config = {
+      const config = {
         accessKeyId,
         secretAccessKey,
         forcePathStyle: false,

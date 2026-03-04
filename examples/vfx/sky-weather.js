@@ -1,10 +1,10 @@
-let lastConfig = null
+const lastConfig = null
 let sky = null
 const SPEED = 1.6 // Slower speed for more gradual movement
 let daysPassed = 0
 let previousHour = 0
 let cycleStartTime = Date.now()
-let fogParticleSystem = null
+const fogParticleSystem = null
 app.keepActive = true
 // Weather system variables
 const WEATHER_TYPES = {
@@ -27,8 +27,8 @@ const WEATHER_TYPES = {
 // Particle systems for different weather types
 let activeWeatherSystems = {}
 let currentWeather = WEATHER_TYPES.CLEAR
-let weatherTransitioning = false
-let weatherTransitionTime = 0
+const weatherTransitioning = false
+const weatherTransitionTime = 0
 let weatherTimer = 0
 let weatherDuration = 0
 let randomWeatherEnabled = false
@@ -262,11 +262,11 @@ function updateFogBasedOnEnvironment(camera, sky) {
 function updateSunPosition(delta) {
 	if (!sky) return
 
-	let hour24 = app.config.timeOfDay || 0
+	const hour24 = app.config.timeOfDay || 0
 
 	if (app.config.autoRotate) {
 		// Increment time smoothly and wrap using modulo
-		let newTime = (hour24 + SPEED * delta) % 24
+		const newTime = (hour24 + SPEED * delta) % 24
 		previousHour = newTime
 
 		// Update time of day with 1 decimal place
@@ -1444,7 +1444,7 @@ function randomizeWeather(config) {
 		const isNight = timeOfDay < 6 || timeOfDay > 18
 
 		// Adjust probabilities based on time
-		let weights = {
+		const weights = {
 			[WEATHER_TYPES.CLEAR]: 40,
 			[WEATHER_TYPES.CLOUDY]: 25,
 			[WEATHER_TYPES.RAIN]: 15,

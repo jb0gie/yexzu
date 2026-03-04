@@ -34,7 +34,7 @@ const testDojoInSES = () => {
       let foundDojo = false
       if (typeof world === 'object') {
         try {
-          for (let key in world) {
+          for (const key in world) {
             console.log(`   ${key}: ${typeof world[key]}`)
             if (key === 'dojo') foundDojo = true
           }

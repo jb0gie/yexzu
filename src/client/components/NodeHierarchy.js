@@ -170,7 +170,7 @@ export function NodeHierarchy({ app }) {
 }
 
 function HierarchyDetail({ label, value, copy }) {
-  let handleCopy = copy ? () => navigator.clipboard.writeText(value) : null
+  const handleCopy = copy ? () => navigator.clipboard.writeText(value) : null
   return (
     <div className='nodehierarchy-detail'>
       <div className='nodehierarchy-detail-label'>{label}</div>

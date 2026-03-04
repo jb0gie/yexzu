@@ -966,6 +966,8 @@ function ActionIcon({ icon: Icon }) {
 function Reticle({ world }) {
   const [pointerLocked, setPointerLocked] = useState(world.controls.pointer.locked)
   const [buildMode, setBuildMode] = useState(world.builder.enabled)
+  const [overWorldUI, setOverWorldUI] = useState(false)
+
   useEffect(() => {
     world.on('pointer-lock', setPointerLocked)
     world.on('build-mode', setBuildMode)
@@ -974,8 +976,22 @@ function Reticle({ world }) {
       world.off('build-mode', setBuildMode)
     }
   }, [])
+
+  // Track world UI hit on mobile for reticle feedback
+  useEffect(() => {
+    if (!isTouch) return
+    let rafId
+    const checkWorldUI = () => {
+      setOverWorldUI(!!world.pointer?.mobileReticleHit?.node?.isUI)
+      rafId = requestAnimationFrame(checkWorldUI)
+    }
+    rafId = requestAnimationFrame(checkWorldUI)
+    return () => cancelAnimationFrame(rafId)
+  }, [])
+
   const visible = isTouch ? true : pointerLocked
   if (!visible) return null
+
   return (
     <div
       className='reticle'
@@ -987,13 +1003,13 @@ function Reticle({ world }) {
         justify-content: center;
         font-size: 1rem;
         .reticle-item {
-          width: 0.25rem;
-          height: 0.25rem;
+          width: ${overWorldUI ? '0.5rem' : '0.25rem'};
+          height: ${overWorldUI ? '0.5rem' : '0.25rem'};
           border-radius: 0.625rem;
-          /* border: 0.125rem solid ${buildMode ? '#ff4d4d' : 'white'}; */
-          background: ${buildMode ? '#ff4d4d' : 'white'};
+          background: ${buildMode ? '#ff4d4d' : overWorldUI ? '#836ef1' : 'white'};
           border: 0.5px solid rgba(0, 0, 0, 0.3);
-          /* mix-blend-mode: ${buildMode ? 'normal' : 'difference'}; */
+          box-shadow: ${overWorldUI ? '0 0 8px #836ef1' : 'none'};
+          transition: width 0.1s, height 0.1s, box-shadow 0.1s;
         }
       `}
     >

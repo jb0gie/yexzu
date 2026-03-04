@@ -139,7 +139,7 @@ export class AvatarPreview {
     // box.max.x = 0.1
     // box.min.y += box.getSize(v1).y / 2
 
-    var size = new THREE.Vector3()
+    const size = new THREE.Vector3()
     box.getSize(size)
 
     // size.min.x = 0.1
@@ -185,9 +185,9 @@ export class AvatarPreview {
 
     const fov = camera.fov * (Math.PI / 180)
     const fovh = 2 * Math.atan(Math.tan(fov / 2) * camera.aspect)
-    let dx = size.z / 2 + Math.abs(size.x / 2 / Math.tan(fovh / 2))
-    let dy = size.z / 2 + Math.abs(size.y / 2 / Math.tan(fov / 2))
-    let cameraZ = Math.max(dx, dy)
+    const dx = size.z / 2 + Math.abs(size.x / 2 / Math.tan(fovh / 2))
+    const dy = size.z / 2 + Math.abs(size.y / 2 / Math.tan(fov / 2))
+    const cameraZ = Math.max(dx, dy)
 
     camera.position.z = -cameraZ
     camera.rotation.y += 180 * DEG2RAD

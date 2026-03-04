@@ -263,7 +263,7 @@ function createEmitter(world, system, node) {
   mesh.matrixWorldAutoUpdate = false
   world.stage.scene.add(mesh)
 
-  let matrixWorld = node.matrixWorld
+  const matrixWorld = node.matrixWorld
 
   let pending = false
   let skippedDelta = 0

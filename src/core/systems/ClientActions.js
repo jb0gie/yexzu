@@ -27,6 +27,7 @@ export class ClientActions extends System {
       distance: Infinity,
     }
     this.action = null
+    this._wasOverWorldUI = false
   }
 
   start() {
@@ -58,6 +59,33 @@ export class ClientActions extends System {
       this.control.touchB.down ||
       this.control.xrLeftTrigger.down ||
       this.control.xrRightTrigger.down
+
+    // On mobile, check if looking at world UI
+    const hasWorldUIHit = isTouch && this.world.pointer?.mobileReticleHit?.node?.isUI
+
+    // If looking at world UI, still show action button but don't process actions
+    if (hasWorldUIHit) {
+      if (this.current.node) {
+        this.current.node = null
+        this.current.distance = Infinity
+        this.emit('change', false)
+        this.action.stop()
+      }
+      // Clear btnDown to prevent any lingering action triggers
+      this.btnDown = false
+      // Emit change true to show action button for world UI interaction
+      if (!this._wasOverWorldUI) {
+        this.emit('change', true)
+        this._wasOverWorldUI = true
+      }
+      return
+    }
+
+    // Left world UI, emit change false to hide button
+    if (this._wasOverWorldUI) {
+      this._wasOverWorldUI = false
+      this.emit('change', false)
+    }
 
     // clear current action if its no longer in distance
     if (this.current.node) {
@@ -94,7 +122,11 @@ export class ClientActions extends System {
       this.action.start(this.current.node)
       this.emit('change', true)
     }
-    this.action.update(delta)
+    // Only update action if not over world UI (safety check)
+    const stillOverWorldUI = isTouch && this.world.pointer?.mobileReticleHit?.node?.isUI
+    if (!stillOverWorldUI) {
+      this.action.update(delta)
+    }
   }
 
   destroy() {

@@ -731,9 +731,9 @@ export function FieldVec3({
   onChange,
 }) {
   const { setHint } = useContext(HintContext)
-  let valueX = value?.[0] || 0
-  let valueY = value?.[1] || 0
-  let valueZ = value?.[2] || 0
+  const valueX = value?.[0] || 0
+  const valueY = value?.[1] || 0
+  const valueZ = value?.[2] || 0
   const [localX, setLocalX] = useState(valueX.toFixed(dp))
   const [localY, setLocalY] = useState(valueY.toFixed(dp))
   const [localZ, setLocalZ] = useState(valueZ.toFixed(dp))

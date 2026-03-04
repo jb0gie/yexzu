@@ -400,7 +400,7 @@ export function createVRMFactory(glb, setupMaterial) {
       //   fadeSpeed: Number - how fast to fade in/out
       // }
     }
-    let currentAdditiveAnims = new Map() // Currently playing additive animations
+    const currentAdditiveAnims = new Map() // Currently playing additive animations
 
     // Detect which bones an animation clip affects
     function getAffectedBones(clip) {
@@ -979,7 +979,7 @@ export function createVRMFactory(glb, setupMaterial) {
         spring.joints.forEach(joint => {
           const src = joint.bone
           if (!src || !src.name) return
-          let dst = skeleton.getBoneByName(src.name)
+          const dst = skeleton.getBoneByName(src.name)
           if (dst) springPairs.push([src, dst])
         })
         // build drive pairs (clone skeleton -> original bones) for joint ancestors
@@ -1900,7 +1900,7 @@ function cloneGLB(glb) {
 }
 
 function getSkinnedMeshes(scene) {
-  let meshes = []
+  const meshes = []
   scene.traverse(o => {
     if (o.isSkinnedMesh) {
       meshes.push(o)
@@ -1916,7 +1916,7 @@ function createCapsule(radius, height) {
   return geometry
 }
 
-let queryParams = {}
+const queryParams = {}
 function getQueryParams(url) {
   if (!queryParams[url]) {
     url = new URL(url)

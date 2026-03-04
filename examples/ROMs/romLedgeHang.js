@@ -105,8 +105,8 @@ if (world.isClient) {
   let hangCooldown = 0
   let currentEffect = null
   let hangAnchor = null
-  let lastPosition = new Vector3()
-  let wallNormal = new Vector3()
+  const lastPosition = new Vector3()
+  const wallNormal = new Vector3()
   let lastSpace = false
   let lastS = false
   let targetRotationY = 0
@@ -249,7 +249,7 @@ if (world.isClient) {
         const consumeRequestId = Math.random().toString(36).substr(2, 9)
 
         // Calculate consume amount with safety checks
-        let rawAmount = STAMINA_DRAIN_RATE * dt
+        const rawAmount = STAMINA_DRAIN_RATE * dt
         let consumeAmount = Math.min(rawAmount, 0.5) // Cap max consume per frame
 
         // Extra safety: if dt is weirdly large, don't consume anything

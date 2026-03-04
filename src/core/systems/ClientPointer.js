@@ -2,6 +2,7 @@ import * as THREE from '../extras/three'
 import { ControlPriorities } from '../extras/ControlPriorities'
 
 import { System } from './System'
+import { isTouch } from '../../client/utils'
 
 const v1 = new THREE.Vector3()
 
@@ -17,6 +18,8 @@ export class ClientPointer extends System {
   constructor(world) {
     super(world)
     this.pointerState = new PointerState()
+    this.isTouch = isTouch
+    this.mobileReticleHit = null
   }
 
   init({ ui }) {
@@ -40,14 +43,37 @@ export class ClientPointer extends System {
       const trigger = this.control.xrLeftTrigger.value ? this.control.xrLeftTrigger : this.control.xrRightTrigger
       pressed = trigger.pressed
       released = trigger.released
+      this.mobileReticleHit = null
     } else if (this.control.pointer.locked) {
       hit = this.world.stage.raycastReticle()[0]
       pressed = this.control.mouseLeft.pressed
       released = this.control.mouseLeft.released
+      this.mobileReticleHit = null
+    } else if (this.isTouch) {
+      // MOBILE: Screen UI takes priority over world UI
+      if (this.screenHit) {
+        // Use screen hit (from DOM touch events on screen UI)
+        hit = this.screenHit
+        pressed = this.control.mouseLeft.pressed
+        released = this.control.mouseLeft.released
+        this.mobileReticleHit = null
+      } else {
+        // No screen UI hit, use reticle raycast for world UI
+        const reticleHits = this.world.stage.raycastReticle()
+        const uiHit = reticleHits.find(h => h.node?.isUI)
+
+        hit = uiHit || null
+        this.mobileReticleHit = uiHit || null
+
+        // Use touchB (action button) for pointer events on mobile
+        pressed = this.control.touchB.pressed
+        released = this.control.touchB.released
+      }
     } else {
       hit = this.screenHit
       pressed = this.control.mouseLeft.pressed
       released = this.control.mouseLeft.released
+      this.mobileReticleHit = null
     }
     this.pointerState.update(hit, pressed, released)
   }

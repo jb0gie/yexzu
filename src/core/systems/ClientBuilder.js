@@ -16,7 +16,7 @@ const FORWARD = new THREE.Vector3(0, 0, -1)
 const SNAP_DISTANCE = 1
 const SNAP_DEGREES = 5
 const PROJECT_SPEED = 10
-const PROJECT_MIN = 3
+const PROJECT_MIN = 1.5
 const PROJECT_MIN_XR = 0.1
 const PROJECT_MAX = 50
 

@@ -35,7 +35,7 @@ export function simpleCamLerp(world, camera, target, delta) {
   const hit = world.physics.sweep(sweepGeometry, origin, direction, 200, layerMask)
 
   // lerp to target zoom distance
-  let distance = target.zoom
+  const distance = target.zoom
   // but if we hit something snap it in so we don't end up in the wall
   if (hit && hit.distance < distance) {
     camera.zoom = hit.distance

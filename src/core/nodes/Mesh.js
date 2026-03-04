@@ -24,7 +24,7 @@ const defaults = {
 
 const types = ['box', 'sphere', 'geometry']
 
-let boxes = {}
+const boxes = {}
 const getBox = (width, height, depth) => {
   const key = `${width},${height},${depth}`
   if (!boxes[key]) {
@@ -33,7 +33,7 @@ const getBox = (width, height, depth) => {
   return boxes[key]
 }
 
-let spheres = {}
+const spheres = {}
 const getSphere = radius => {
   const key = radius
   if (!spheres[key]) {

@@ -433,7 +433,7 @@ export class App extends Entity {
     // to get a clean hierarchy
     if (!this.blueprint) return
     const type = this.blueprint.model.endsWith('vrm') ? 'avatar' : 'model'
-    let glb = this.world.loader.get(type, this.blueprint.model)
+    const glb = this.world.loader.get(type, this.blueprint.model)
     if (!glb) return
     return glb.toNodes()
   }

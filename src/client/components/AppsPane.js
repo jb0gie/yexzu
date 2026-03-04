@@ -108,14 +108,14 @@ function AppsPaneContent({ world, query, refresh, setRefresh }) {
   const [target, setTarget] = useState(null)
   let items = useMemo(() => {
     const itemMap = new Map() // id -> { blueprint, count }
-    let items = []
+    const items = []
     for (const [_, entity] of world.entities.items) {
       if (!entity.isApp) continue
       const blueprint = entity.blueprint
       if (!blueprint) continue // still loading?
       let item = itemMap.get(blueprint.id)
       if (!item) {
-        let count = 0
+        const count = 0
         const type = blueprint.model.endsWith('.vrm') ? 'avatar' : 'model'
         const model = world.loader.get(type, blueprint.model)
         if (!model) continue

@@ -13,3 +13,4 @@ build/
 .claude/
 examples/bolt/
 tmp/
+.gm-stop-verified

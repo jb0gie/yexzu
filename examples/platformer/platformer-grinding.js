@@ -57,7 +57,7 @@ if (world.isClient) {
   let grindDirection = 1
   let jumpOffCooldown = 0
   let isExiting = false
-  let lastPosition = new Vector3()
+  const lastPosition = new Vector3()
 
   const railStartZ = -RAIL_LENGTH / 2
   const railEndZ = RAIL_LENGTH / 2

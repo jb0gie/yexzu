@@ -61,7 +61,7 @@ export class ClientLoader extends System {
 
   execPreload() {
     let loadedItems = 0
-    let totalItems = this.preloadItems.length
+    const totalItems = this.preloadItems.length
     let progress = 0
     const promises = this.preloadItems.map(item => {
       return this.load(item.type, item.url).then(() => {

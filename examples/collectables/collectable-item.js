@@ -18,7 +18,7 @@ app.on('init', () => {
   }
 
   const mesh = app.root
-  let originalScale = mesh.scale.x
+  const originalScale = mesh.scale.x
   let canCollect = false
 
   function checkCollection() {

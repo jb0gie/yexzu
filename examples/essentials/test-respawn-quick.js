@@ -4,7 +4,7 @@
 console.log('[Respawn Test] Starting quick test...')
 
 // Keep track of collections
-let collections = []
+const collections = []
 const testStart = Date.now()
 
 world.on('potion:collected', (data) => {

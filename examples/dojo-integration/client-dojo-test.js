@@ -60,7 +60,7 @@ const testClientDojo = () => {
     console.log('\n🔍 Available client world properties:')
     let propCount = 0
     try {
-      for (let key in world) {
+      for (const key in world) {
         if (propCount < 10) { // Limit to first 10 properties
           console.log(`   ${key}: ${typeof world[key]}`)
           propCount++

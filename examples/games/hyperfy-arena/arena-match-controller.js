@@ -28,8 +28,8 @@ let matchState = 'waiting'  // waiting, countdown, active, ended, respawning
 let matchTimer = 0
 let matchEndTime = 0
 let spawnPoints = []
-let playerStats = new Map()  // playerId -> stats
-let playerTimers = new Map() // playerId -> respawn timers
+const playerStats = new Map()  // playerId -> stats
+const playerTimers = new Map() // playerId -> respawn timers
 
 // Initialize match controller
 app.on('init', () => {

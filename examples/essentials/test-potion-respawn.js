@@ -4,7 +4,7 @@
 console.log('[Potion Respawn Test] Test script loaded')
 
 let collectionCount = 0
-let testStartTime = Date.now()
+const testStartTime = Date.now()
 
 // Listen for potion collection events
 world.on('potion:collected', ({ playerId, duration, position }) => {

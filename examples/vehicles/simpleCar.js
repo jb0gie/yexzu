@@ -600,7 +600,7 @@ let zoom = 7
 // Vehicle state
 let health = maxHealth
 let isSeated = false
-let isDriving = false
+const isDriving = false
 let isDamaged = false
 let lastSend = 0
 

@@ -208,7 +208,7 @@ const migrations = [
   },
   // rename config key to settings
   async db => {
-    let config = await db('config').where('key', 'config').first()
+    const config = await db('config').where('key', 'config').first()
     if (config) {
       const settings = config.value
       await db('config').insert({ key: 'settings', value: settings })

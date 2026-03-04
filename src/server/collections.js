@@ -17,7 +17,7 @@ class Collections {
     // copy over built-in collections
     await fs.copy(path.join(rootDir, 'src/world/collections'), this.dir)
     // ensure all collections apps are installed
-    let folderNames = fs.readdirSync(this.dir)
+    const folderNames = fs.readdirSync(this.dir)
     folderNames.sort((a, b) => {
       // keep "default" first then sort alphabetically
       if (a === 'default') return -1

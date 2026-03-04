@@ -14,7 +14,7 @@ const RANGE = 100 // Longer range for a pistol
 const FIRE_RATE = 0.1 // Cooldown in seconds between shots (reduced for testing)
 
 // Global variables
-let pickupAction = null // Pickup action for the pistol
+const pickupAction = null // Pickup action for the pistol
 
 // Vector objects for calculations
 const v1 = new Vector3()

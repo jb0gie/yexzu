@@ -24,8 +24,8 @@ const ARENA_CONFIG = {
 }
 
 let arenaSystemState = 'initializing'
-let loadedSystems = new Set()
-let systemHealth = {}
+const loadedSystems = new Set()
+const systemHealth = {}
 
 // Initialize the complete arena system
 app.on('init', () => {

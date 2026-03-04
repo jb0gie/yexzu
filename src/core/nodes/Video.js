@@ -134,7 +134,7 @@ export class Video extends Node {
     if (this._visible) {
       // material
       let material
-      let vidAspect = this.instance?.width / this.instance?.height || this._aspect
+      const vidAspect = this.instance?.width / this.instance?.height || this._aspect
       const uniforms = {
         uMap: { value: null },
         uHasMap: { value: 0 },
@@ -255,7 +255,7 @@ export class Video extends Node {
       if (!this._geometry) {
         let width = this._width
         let height = this._height
-        let preAspect = this._aspect
+        const preAspect = this._aspect
         if (width === null && height === null) {
           height = 0
           width = 0
@@ -921,7 +921,7 @@ export class Video extends Node {
   }
 
   getProxy() {
-    var self = this
+    const self = this
     if (!this.proxy) {
       let proxy = {
         get screenId() {

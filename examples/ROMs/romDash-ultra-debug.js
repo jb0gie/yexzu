@@ -69,7 +69,7 @@ const q1 = new Quaternion()
 const e1 = new Euler(0, 0, 0, 'YXZ')
 
 // Debug state tracking
-let debugFrameCount = 0
+const debugFrameCount = 0
 
 // ULTRA debug logging
 function debugLog(...args) {

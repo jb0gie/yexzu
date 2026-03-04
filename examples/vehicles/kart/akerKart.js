@@ -530,8 +530,8 @@ app.configure([
   // Minimap UI
   let minimapUI = null
   let minimapDot = null
-  let minimapTrail = [] // Array to store trail dots (old positions)
-  let minimapGrid = [] // Array to store grid lines
+  const minimapTrail = [] // Array to store trail dots (old positions)
+  const minimapGrid = [] // Array to store grid lines
   let lastDotPosition = null // Last position of the main dot
   const TRAIL_DISTANCE_THRESHOLD = 5 // Minimum distance (pixels) before creating new trail dot
   const WORLD_SIZE = 2000 // 2km = 2000m

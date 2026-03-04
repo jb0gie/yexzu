@@ -10,6 +10,7 @@ on:
       - 'solana-v2'
       - 'ai'
       - 'dojo'
+      - 'dojo-appkit'
     tags:
       - 'v*.*.*'
 

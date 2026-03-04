@@ -57,7 +57,7 @@ const defaultSizes = {
 }
 
 // Geometry cache
-let geometryCache = new Map()
+const geometryCache = new Map()
 
 const getGeometry = (type, size) => {
   // All primitives of the same type share one unit-sized geometry

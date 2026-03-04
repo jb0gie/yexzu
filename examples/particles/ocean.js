@@ -266,8 +266,8 @@ if (world.isClient) {
   let lastPlayerPos = null
   
   // Track app position offset
-  let appOffset = app.position.clone()
-  let lastAppPos = app.position.clone()
+  const appOffset = app.position.clone()
+  const lastAppPos = app.position.clone()
 
   // Monitor app position changes to move water with app
   app.on('update', () => {

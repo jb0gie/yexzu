@@ -36,11 +36,11 @@ app.configure([
 const rig = app.get('MainEntranceRig')
 const col = app.get('hitboxCollider')
 const anims = rig.anims
-var isAnimating = false
-var hasOpened = false
-var animState = 'Closed'
-var openTimerId = null
-var shouldAutoClose = true
+let isAnimating = false
+let hasOpened = false
+let animState = 'Closed'
+let openTimerId = null
+let shouldAutoClose = true
 const debug = props.debug
 const logDebug = msg => { if (debug) console.log(`[BIGDOOR DEBUG] ${msg}`) }
 

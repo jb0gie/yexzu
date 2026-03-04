@@ -80,7 +80,7 @@ const e1 = new Euler(0, 0, 0, 'YXZ')
 
 if (world.isClient) {
 	const player = world.getPlayer()
-	let control = app.control()
+	const control = app.control()
 	let canDash = true;
 
 	function getDirection(vec3) {

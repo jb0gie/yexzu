@@ -47,8 +47,8 @@ if (world.isClient) {
   let hangCooldown = 0
   let currentEffect = null
   let hangAnchor = null
-  let lastPosition = new Vector3()
-  let wallNormal = new Vector3()
+  const lastPosition = new Vector3()
+  const wallNormal = new Vector3()
   let lastSpace = false
   let lastS = false
   let targetRotationY = 0

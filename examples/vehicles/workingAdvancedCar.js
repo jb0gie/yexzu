@@ -735,7 +735,7 @@ let zoom = 7
 // Vehicle state
 let health = maxHealth
 let isSeated = false
-let isDriving = false
+const isDriving = false
 let isDamaged = false
 let lastSend = 0
 
@@ -1861,7 +1861,7 @@ function updateTurretShooting(delta) {
   const frozenDir = dir.clone()
 
   // Get muzzle position for visual effects (muzzle flash should appear at muzzle bone)
-  let muzzlePos = origin.clone() // Default to camera position
+  const muzzlePos = origin.clone() // Default to camera position
   if (turretMuzzleBone) {
     try {
       const muzzleMatrixWorld = turretMuzzleBone.matrixWorld
@@ -2336,7 +2336,7 @@ if (world.isClient) {
     // Handle turret fire visual effects from server
     app.on('turret:fire-visual', data => {
       // Get muzzle position directly from turret muzzle bone (ensures perfect sync with turret rotation)
-      let muzzlePos = new Vector3().fromArray(data.muzzlePos || data.origin) // Fallback to network position
+      const muzzlePos = new Vector3().fromArray(data.muzzlePos || data.origin) // Fallback to network position
       if (turretMuzzleBone) {
         try {
           const muzzleMatrixWorld = turretMuzzleBone.matrixWorld
