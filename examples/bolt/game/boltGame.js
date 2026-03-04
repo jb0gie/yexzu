@@ -981,16 +981,21 @@ function startGameEmote() {
   }
 
   debugLog('Starting dance emote: vrmdance124')
-  app.emit('animlib:play', {
-    anim: 'vrmdance124',
-    target: 'player',
-    options: {
-      speed: 1.0,
-      gaze: false,
-      loop: true,
-      cancellable: false,
-    },
-  })
+  try {
+    app.emit('animlib:play', {
+      anim: 'vrmdance124',
+      target: 'player',
+      options: {
+        speed: 1.0,
+        gaze: false,
+        loop: true,
+        cancellable: false,
+      },
+    })
+    debugLog('animlib:play emit succeeded')
+  } catch (err) {
+    debugLog('animlib:play emit failed:', err.message)
+  }
 }
 
 // Stop the dance emote
@@ -1854,7 +1859,7 @@ app.on('update', () => {
   try {
     if (audio.playing || app.state.isPlaying) {
       if (!app.state.isPlaying && audio.playing) {
-        debugLog('Audio started playing!')
+        debugLog('Audio started playing! isPlaying was:', app.state.isPlaying, 'audio.playing:', audio.playing)
         // Start dance emote when game begins
         startGameEmote()
       }
