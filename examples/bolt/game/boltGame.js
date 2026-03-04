@@ -980,10 +980,10 @@ function startGameEmote() {
     return
   }
 
-  debugLog('Starting dance emote: vrmdance124')
+  debugLog('Starting dance emote: VRM|DanceBodyRoll@156')
   try {
     app.emit('animlib:play', {
-      anim: 'vrmdance124',
+      anim: 'VRM|DanceBodyRoll@156',
       target: 'player',
       options: {
         speed: 1.0,
