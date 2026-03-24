@@ -168,12 +168,15 @@ export function createVRMFactory(glb, setupMaterial) {
     const vrm = cloneGLB(glb)
     const tvrm = vrm.userData.vrm
 
+    // use expression manager from cloned vrm if available, otherwise use factory one
+    const exprManager = vrm.userData.vrmExpressionManager || expressionManager
+    const skinnedMeshes = getSkinnedMeshes(vrm.scene)
+    const skeleton = skinnedMeshes[0].skeleton // primary skeleton
+
     // Rewire spring bone joints to use cloned skeleton
-    const springManager = tvrm?.springBoneManager
-    if (springManager?.joints) {
-      const skinnedMeshes = getSkinnedMeshes(vrm.scene)
-      const skeleton = skinnedMeshes[0]?.skeleton
-      if (skeleton) {
+    try {
+      const springManager = tvrm?.springBoneManager
+      if (springManager?.joints && skeleton) {
         springManager.joints.forEach(joint => {
           if (joint.bone?.name) {
             const clonedBone = skeleton.getBoneByName(joint.bone.name)
@@ -194,12 +197,9 @@ export function createVRMFactory(glb, setupMaterial) {
           }
         })
       }
+    } catch (e) {
+      console.warn('[VRM] Spring bone rewiring failed:', e)
     }
-
-    // use expression manager from cloned vrm if available, otherwise use factory one
-    const exprManager = vrm.userData.vrmExpressionManager || expressionManager
-    const skinnedMeshes = getSkinnedMeshes(vrm.scene)
-    const skeleton = skinnedMeshes[0].skeleton // primary skeleton
     const cloneSkeletons = Array.from(new Set(skinnedMeshes.map(m => m.skeleton)))
     const rootBone = skeleton.bones[0] // should always be 0
     rootBone.parent.remove(rootBone)
