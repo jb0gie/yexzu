@@ -167,6 +167,35 @@ export function createVRMFactory(glb, setupMaterial) {
   function create(matrix, hooks, node, expressionManager) {
     const vrm = cloneGLB(glb)
     const tvrm = vrm.userData.vrm
+
+    // Rewire spring bone joints to use cloned skeleton
+    const springManager = tvrm?.springBoneManager
+    if (springManager?.joints) {
+      const skinnedMeshes = getSkinnedMeshes(vrm.scene)
+      const skeleton = skinnedMeshes[0]?.skeleton
+      if (skeleton) {
+        springManager.joints.forEach(joint => {
+          if (joint.bone?.name) {
+            const clonedBone = skeleton.getBoneByName(joint.bone.name)
+            if (clonedBone) {
+              joint.bone = clonedBone
+            }
+          }
+          // Also rewire collider groups to use cloned bones
+          if (joint.colliderGroups) {
+            joint.colliderGroups.forEach(group => {
+              if (group.bone?.name) {
+                const clonedGroupBone = skeleton.getBoneByName(group.bone.name)
+                if (clonedGroupBone) {
+                  group.bone = clonedGroupBone
+                }
+              }
+            })
+          }
+        })
+      }
+    }
+
     // use expression manager from cloned vrm if available, otherwise use factory one
     const exprManager = vrm.userData.vrmExpressionManager || expressionManager
     const skinnedMeshes = getSkinnedMeshes(vrm.scene)
@@ -909,144 +938,65 @@ export function createVRMFactory(glb, setupMaterial) {
       morphMirrorInit = true
     }
 
-    // spring bone mirroring (original -> clone) and drive original with clone pose
-    let springMirrorInit = false
+    // spring bones - using cloned VRM directly (no mirroring needed)
+    let springInit = false
     let hasSprings = false
-    const springPairs = []
-    const drivePairs = []
-    function initSpringMirror() {
-      if (springMirrorInit) return
-      const spring = origVRM?.springBoneManager
+    function initSpringBones() {
+      if (springInit) return
+      const spring = tvrm?.springBoneManager
       if (!spring) {
-        springMirrorInit = true
+        springInit = true
         return
       }
       try {
         hasSprings = spring.joints && spring.joints.size > 0
-        // Gentle spring bone physics tuning to prevent spazzing
+        if (!hasSprings) {
+          springInit = true
+          return
+        }
+
+        // Apply tuning to cloned spring bones
         const tuning = hooks.springTuning || {
-          stiffness: 1.2, // Slightly increased responsiveness, but not too high
-          dragForce: 1.0, // Keep at 1.0 for stable movement
-          gravityPower: 1.0, // Keep at 1.0 for natural gravity
-          hitRadius: 1.0, // Default collision radius
+          stiffness: 1.2,
+          dragForce: 1.0,
+          gravityPower: 1.0,
+          hitRadius: 1.0,
         }
-        try {
-          spring.joints.forEach(joint => {
-            const s = joint.settings
-            if (!s) return
-            if (tuning.stiffness != null) s.stiffness *= tuning.stiffness
-            if (tuning.dragForce != null) s.dragForce *= tuning.dragForce
-            if (tuning.gravityPower != null) s.gravityPower *= tuning.gravityPower
-            if (tuning.hitRadius != null) s.hitRadius *= tuning.hitRadius
-            // Only disable colliders if explicitly requested
-            if (hooks.disableSpringColliders === true) {
-              joint.colliderGroups = []
-            }
-          })
-        } catch (_) {}
-        // Enhanced spring initialization with stability checks
-        try {
-          // Set initial state before applying tuning
-          spring.setInitState()
 
-          // Apply per-joint optimization for different body parts
-          spring.joints.forEach(joint => {
-            const s = joint.settings
-            if (!s) return
-
-            // Subtle enhancements for different bone types to prevent instability
-            const boneName = joint.bone?.name?.toLowerCase() || ''
-            if (boneName.includes('hair') || boneName.includes('tail')) {
-              // Only very slight increase for hair/tail to prevent spazzing
-              s.stiffness *= 1.05 // Minimal increase (5%)
-            }
-
-            // Keep chest/spine bones at default stability
-            // No modifications to prevent instability
-
-            // Ensure minimum threshold values to prevent dead springs
-            s.stiffness = Math.max(s.stiffness, 0.5)
-            s.dragForce = Math.max(s.dragForce, 0.1)
-            s.gravityPower = Math.max(s.gravityPower, 0.1)
-          })
-
-          // Re-initialize with optimized settings
-          spring.setInitState()
-        } catch (e) {
-          console.warn('[VRM] Spring bone initialization failed:', e)
-        }
-        // build spring joint pairs (orig -> clone) using clone skeleton lookup by name
         spring.joints.forEach(joint => {
-          const src = joint.bone
-          if (!src || !src.name) return
-          const dst = skeleton.getBoneByName(src.name)
-          if (dst) springPairs.push([src, dst])
-        })
-        // build drive pairs (clone skeleton -> original bones) for joint ancestors
-        const origMeshes = []
-        glb.scene.traverse(o => {
-          if (o.isSkinnedMesh && o.skeleton) origMeshes.push(o)
-        })
-        const origSkeleton = origMeshes[0]?.skeleton
-        const addDrivePair = origObj => {
-          if (!origObj || !origObj.name) return
-          const cloneBone = skeleton.getBoneByName(origObj.name)
-          if (cloneBone) drivePairs.push([cloneBone, origObj])
-        }
-        spring.joints.forEach(joint => {
-          let p = joint.bone
-          while (p && p !== glb.scene) {
-            addDrivePair(p)
-            p = p.parent
+          const s = joint.settings
+          if (!s) return
+          if (tuning.stiffness != null) s.stiffness *= tuning.stiffness
+          if (tuning.dragForce != null) s.dragForce *= tuning.dragForce
+          if (tuning.gravityPower != null) s.gravityPower *= tuning.gravityPower
+          if (tuning.hitRadius != null) s.hitRadius *= tuning.hitRadius
+
+          // Disable colliders if requested
+          if (hooks.disableSpringColliders === true) {
+            joint.colliderGroups = []
           }
-        })
-        // targeted alias mapping to help common hair/tail chains and path-based fallback
-        const alias = new Map([
-          ['Hair1', ['hair1', 'hair_1', 'Hair_1']],
-          ['Hair2', ['hair2', 'hair_2', 'Hair_2']],
-          ['Tail', ['tail', 'Tail_1', 'tail_1']],
-        ])
-        // rebuild springPairs using alias + path fallback for better coverage
-        springPairs.length = 0
-        spring.joints.forEach(joint => {
-          const src = joint.bone
-          if (!src || !src.name) return
-          let dst = skeleton.getBoneByName(src.name)
-          if (!dst) {
-            for (const [key, alts] of alias.entries()) {
-              if (src.name.toLowerCase().startsWith(key.toLowerCase())) {
-                for (const a of alts) {
-                  dst = skeleton.getBoneByName(a)
-                  if (dst) break
-                }
-                if (dst) break
-              }
-            }
+
+          // Per-joint tuning based on bone name
+          const boneName = joint.bone?.name?.toLowerCase() || ''
+          if (boneName.includes('hair') || boneName.includes('tail')) {
+            s.stiffness *= 1.05
           }
-          if (!dst) {
-            // path fallback
-            const path = []
-            let n = src
-            while (n && n !== glb.scene) {
-              const p = n.parent
-              if (!p) break
-              const i = p.children.indexOf(n)
-              if (i < 0) break
-              path.push(i)
-              n = p
-            }
-            if (n === glb.scene) {
-              path.reverse()
-              let m = vrm.scene
-              for (const i of path) {
-                m = m.children?.[i]
-                if (!m) break
-              }
-              if (m && m.isBone) dst = m
-            }
-          }
-          if (dst) springPairs.push([src, dst])
+
+          // Ensure minimum values
+          s.stiffness = Math.max(s.stiffness, 0.5)
+          s.dragForce = Math.max(s.dragForce, 0.1)
+          s.gravityPower = Math.max(s.gravityPower, 0.1)
         })
+
+        // Re-initialize with tuned settings
+        spring.setInitState()
+
+        // console.log('[VRM] Spring bones initialized:', spring.joints.size, 'joints')
+      } catch (e) {
+        console.warn('[VRM] Spring bone init failed:', e)
+      }
+      springInit = true
+    }
         // re-initialize springs after mapping (safe if already initialized)
         try {
           spring.setInitState()
@@ -1211,58 +1161,17 @@ export function createVRMFactory(glb, setupMaterial) {
         skeleton.update = noop
       }
 
-      // Optimized spring bone updates (every frame for fluidity, but optimized)
-      if (!springMirrorInit) initSpringMirror()
-      if (origVRM && (springPairs.length || drivePairs.length)) {
-        // Use pre-allocated objects instead of creating new ones each frame
-        vrm.scene.matrix.decompose(_springPos, _springQuat, _springScl)
-        origVRM.scene.position.copy(_springPos)
-        origVRM.scene.quaternion.copy(_springQuat)
-        origVRM.scene.scale.copy(_springScl)
-        origVRM.scene.updateMatrixWorld(true)
-
-        // Batch copy clone bone rotations to minimize matrix updates
-        const bonesNeedingUpdate = []
-        for (const [cloneBone, origBone] of drivePairs) {
-          if (origBone && cloneBone) {
-            // many VRM spring bones have matrixAutoUpdate=false; force local matrix rebuild
-            origBone.quaternion.copy(cloneBone.quaternion)
-            origBone.updateMatrix()
-            bonesNeedingUpdate.push(origBone)
-          }
-        }
-
-        // Batch update matrix world operations
-        for (const bone of bonesNeedingUpdate) {
-          bone.updateMatrixWorld(true)
-        }
-
-        // Simple, stable spring bone physics update
-        const physicsDelta = Math.min(delta, 0.02) // Clamp to 50fps to prevent instability
-        origVRM.update(physicsDelta)
-
-        // Batch mirror spring joints back to clone only
-        const clonesNeedingUpdate = []
-        for (const [src, dst] of springPairs) {
-          if (dst) {
-            dst.quaternion.copy(src.quaternion)
-            dst.updateMatrix()
-            clonesNeedingUpdate.push(dst)
-          }
-        }
-
-        // Batch update clone matrix world operations
-        for (const clone of clonesNeedingUpdate) {
-          clone.updateMatrixWorld(true)
-        }
-
-        // Update skinned mesh bone matrices only once after all spring updates
+      // Spring bone updates using three-vrm directly on cloned VRM
+      if (!springInit) initSpringBones()
+      if (hasSprings && tvrm?.springBoneManager) {
+        // Update skeleton bone matrices before spring physics
         for (const m of skinnedMeshes) {
-          THREE.Skeleton.prototype.update.call(m.skeleton)
+          m.skeleton.update()
         }
 
-        // Update bone helpers for debugging visualization
-        updateBoneHelpers()
+        // Simple, stable spring bone physics update using the cloned VRM
+        const physicsDelta = Math.min(delta, 0.02) // Clamp to 50fps to prevent instability
+        tvrm.update(physicsDelta)
       }
     }
 
