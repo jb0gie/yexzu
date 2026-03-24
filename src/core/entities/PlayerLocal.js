@@ -217,7 +217,15 @@ export class PlayerLocal extends Entity {
       .load('avatar', avatarUrl)
       .then(src => {
         if (this.avatar) this.avatar.deactivate()
-        this.avatar = src.toNodes().get('avatar')
+        // Pass custom hooks with velocity getter for spring bone physics
+        const customHooks = {
+          ...src.hooks,
+          getVerticalVelocity: () => {
+            const velocity = this.capsule?.getLinearVelocity()
+            return velocity?.y || 0
+          },
+        }
+        this.avatar = src.toNodes(customHooks).get('avatar')
         this.avatar.disableRateCheck() // max fps for local player
         this.base.add(this.avatar)
         this.nametag.position.y = this.avatar.getHeadToHeight() + 0.2

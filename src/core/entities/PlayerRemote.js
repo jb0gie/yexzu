@@ -89,6 +89,10 @@ export class PlayerRemote extends Entity {
     this.axis = new THREE.Vector3()
     this.gaze = new THREE.Vector3()
 
+    // For velocity-based spring bones on remote players
+    this.lastPositionY = this.base.position.y
+    this.verticalVelocity = 0
+
     this.world.setHot(this, true)
   }
 
@@ -97,7 +101,13 @@ export class PlayerRemote extends Entity {
     if (this.avatarUrl === avatarUrl) return
     this.world.loader.load('avatar', avatarUrl).then(src => {
       if (this.avatar) this.avatar.deactivate()
-      this.avatar = src.toNodes().get('avatar')
+      // Pass custom hooks with velocity getter for spring bone physics
+      // Remote players calculate velocity from position changes
+      const customHooks = {
+        ...src.hooks,
+        getVerticalVelocity: () => this.verticalVelocity || 0,
+      }
+      this.avatar = src.toNodes(customHooks).get('avatar')
       this.base.add(this.avatar)
       this.nametag.position.y = this.avatar.getHeadToHeight() + 0.2
       this.bubble.position.y = this.avatar.getHeadToHeight() + 0.2
@@ -140,6 +150,12 @@ export class PlayerRemote extends Entity {
       this.position.update(delta)
       this.quaternion.update(delta)
     }
+
+    // Calculate vertical velocity for spring bone physics
+    const currentY = this.base.position.y
+    this.verticalVelocity = (currentY - this.lastPositionY) / delta
+    this.lastPositionY = currentY
+
     this.avatar?.setEmote(this.data.emote)
     // pass speaking state to animation system for blending
     this.avatar?.instance?.setSpeaking(this.speaking)

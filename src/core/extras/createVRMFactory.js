@@ -941,6 +941,7 @@ export function createVRMFactory(glb, setupMaterial) {
     // spring bones - using cloned VRM directly (no mirroring needed)
     let springInit = false
     let hasSprings = false
+    const springBoneOrigins = new Map() // Store original gravity settings per joint
     function initSpringBones() {
       if (springInit) return
       const spring = tvrm?.springBoneManager
@@ -986,6 +987,12 @@ export function createVRMFactory(glb, setupMaterial) {
           s.stiffness = Math.max(s.stiffness, 0.5)
           s.dragForce = Math.max(s.dragForce, 0.1)
           s.gravityPower = Math.max(s.gravityPower, 0.1)
+
+          // Store original gravity settings for velocity-based adjustments
+          springBoneOrigins.set(joint, {
+            gravityDir: s.gravityDir.clone(),
+            gravityPower: s.gravityPower,
+          })
         })
 
         // Re-initialize with tuned settings
@@ -1123,6 +1130,27 @@ export function createVRMFactory(glb, setupMaterial) {
         for (const m of skinnedMeshes) {
           m.skeleton.update()
         }
+
+        // Adjust spring bone gravity based on player vertical velocity
+        // This makes hair/clothes react to jumping and falling
+        const verticalVelocity = hooks.getVerticalVelocity ? hooks.getVerticalVelocity() : 0
+        const velocityFactor = Math.max(-1, Math.min(1, verticalVelocity / 10)) // Normalize to -1..1 range (10 m/s max)
+
+        tvrm.springBoneManager.joints.forEach(joint => {
+          if (joint.settings) {
+            const origins = springBoneOrigins.get(joint)
+            if (origins) {
+              // Base gravity is downward (0, -1, 0). Adjust based on velocity:
+              // Jumping up (positive velocity) -> increase downward gravity (hair pushes down)
+              // Falling down (negative velocity) -> reduce gravity or make it upward (hair floats up)
+              const baseGravityY = origins.gravityDir.y
+              const adjustedGravityY = baseGravityY - velocityFactor // -1 - (+ve) = more down when jumping, -1 - (-ve) = up when falling
+              joint.settings.gravityDir.set(0, adjustedGravityY, 0).normalize()
+              // Also scale gravity power slightly for more dramatic effect
+              joint.settings.gravityPower = origins.gravityPower * (1 + Math.abs(velocityFactor) * 0.5)
+            }
+          }
+        })
 
         // Simple, stable spring bone physics update using the cloned VRM
         const physicsDelta = Math.min(delta, 0.02) // Clamp to 50fps to prevent instability
