@@ -1017,31 +1017,8 @@ export function createVRMFactory(glb, setupMaterial) {
         //   })
         // )
 
-        // Log spring bone configuration for debugging
-        let activeSprings = 0
-        spring.joints.forEach(joint => {
-          if (joint.settings && joint.bone) {
-            activeSprings++
-            if (activeSprings <= 5) {
-              // Log first 5 for debugging
-              // console.log(`[VRM] Spring ${joint.bone.name}:`, {
-              //   stiffness: joint.settings.stiffness?.toFixed(3),
-              //   dragForce: joint.settings.dragForce?.toFixed(3),
-              //   gravityPower: joint.settings.gravityPower?.toFixed(3)
-              // })
-            }
-          }
-        })
-      } catch (_) {
-        // ignore
-      }
-      springMirrorInit = true
+      springInit = true
     }
-
-    // Reusable objects for spring bone updates (allocated once)
-    const _springPos = new THREE.Vector3()
-    const _springQuat = new THREE.Quaternion()
-    const _springScl = new THREE.Vector3()
 
     const update = delta => {
       elapsed += delta
