@@ -1732,6 +1732,8 @@ export function createVRMFactory(glb, setupMaterial) {
       },
       move(_matrix) {
         matrix.copy(_matrix)
+        vrm.scene.matrix.copy(_matrix)
+        vrm.scene.matrixWorld.copy(_matrix)
         hooks.octree?.move(sItem)
       },
       disableRateCheck() {
