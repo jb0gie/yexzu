@@ -997,28 +997,6 @@ export function createVRMFactory(glb, setupMaterial) {
       }
       springInit = true
     }
-        // re-initialize springs after mapping (safe if already initialized)
-        try {
-          spring.setInitState()
-        } catch (_) {}
-        // console.log(
-        //   '[vrmFactory] Enhanced spring bone system initialized',
-        //   'springs:',
-        //   spring.joints.size,
-        //   'pairs:',
-        //   springPairs.length,
-        //   'drive:',
-        //   drivePairs.length,
-        //   'tuning:',
-        //   JSON.stringify({
-        //     stiffness: tuning.stiffness?.toFixed(2),
-        //     dragForce: tuning.dragForce?.toFixed(2),
-        //     gravityPower: tuning.gravityPower?.toFixed(2)
-        //   })
-        // )
-
-      springInit = true
-    }
 
     const update = delta => {
       elapsed += delta
