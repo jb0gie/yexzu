@@ -38,7 +38,6 @@ import {
   linea,
   lineaSepolia,
   mantle,
-  mantleSepolia,
   celo,
   celoAlfajores,
   aurora,
@@ -49,7 +48,7 @@ import {
   fuse,
   meter,
   theta,
-  oasis,
+  oasys,
   hedera,
   hederaTestnet,
 } from '@reown/appkit/networks'
@@ -101,7 +100,6 @@ const networks = [
   linea,
   lineaSepolia,
   mantle,
-  mantleSepolia,
   celo,
   celoAlfajores,
   aurora,
@@ -112,7 +110,7 @@ const networks = [
   fuse,
   meter,
   theta,
-  oasis,
+  oasys,
   hedera,
   hederaTestnet,
 ]
