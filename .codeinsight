@@ -1,0 +1,103 @@
+## 🎯 hyperfy v0.16.0
+
+## 🚀 Quick Start
+
+`node scripts/build.mjs --dev` | `node scripts/build.mjs`
+
+# 406f 127.5kL 4281fn 159cls cx2.0
+*Legend: f=files L=lines fn=functions cls=classes cx=avg-complexity | file:line:name(NL)=location Np=params | ↑N=imports-from ↓N=imported-by (N)=occurrences (+N)=more | 🔄circular 🏝️isolated 🔥complex 📋duplicated 📁large*
+
+**Langs:** JS:99% Py:0% JSON:0%
+
+## 🛠️ Tech Stack
+
+**Stack:** React, PostgreSQL, AWS
+**Patterns:** app.create(881), app.on(457), debugLog(405), app.send(248), app.add(243), Math.random(215)
+**Top IDs:** value(3974), app(3900), world(3077), console(2908), log(2289), position(2175)
+
+## ⚡ Code Patterns
+
+**Async:** async(598), await(445), Promise(83)
+**Errors:** try/catch(393), throw(428)
+**Internal calls:** app.create(881), app.on(457), debugLog(405), app.send(248), app.add(243), Math.random(215), world.on(211), safeExecute(205)
+
+## 🔗 I/O & Integration
+
+**Env vars:** ADMIN_CODE, AI_API_KEY, AI_EFFORT, AI_MODEL, AI_PROVIDER, ASSETS, ASSETS_BASE_URL, ASSETS_S3_URI, CLEAN, CLIENT, COMMIT_HASH, CORS_ORIGIN, DB_SCHEMA, DB_URI, EVM_SEED_PHRASE, JWT_SECRET, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, NODE_ENV, OPENAI_BASE_URL, PORT, PUBLIC_API_URL, PUBLIC_EVM, PUBLIC_MAX_UPLOAD_SIZE, PUBLIC_WS_URL, SAVE_INTERVAL, SERVER, WORLD
+**HTTP:** fetch(21), routes: /, /api/backup, /api/restore, /api/upload (+5)
+**Storage:** SQL(35), files(356), JSON(91)
+**Events:** emit(277), listen(828)
+**Models:** PlayerRemote, DojoComponent, App, PlayerLocal, Entity
+
+## 📊 Code Organization
+
+**Large files:** gltfloader/GLTFLoader.js:4763L, vehicles/workingAdvancedCar.js:2769L, vehicles/AdvancedCars.js:2764L, elementals/elemental-item-pistol.js:2650L, vfx/sky-weather.js:2153L, components/Sidebar.js:2004L (+168)
+**Long funcs:** extras/createVRMFactory.js:66:createVRMFactory(1723L), extras/createVRMFactory.js:167:create(1621L), systems/ClientCameraControls.js:540:setupConsoleCommands(523L), client/particles.js:54:createEmitter(473L), xr/advanced-vr-flip-gestures.js:5:configure(443L), elementals/elemental-item-pistol.js:833:init(432L) (+386)
+**Many params:** nodes/Video.js:923:getProxy(68p), nodes/Particles.js:660:getProxy(67p), nodes/Prim.js:924:getProxy(57p), nodes/UI.js:810:getProxy(49p), nodes/UIView.js:541:getProxy(47p), extras/createVRMFactory.js:66:createVRMFactory(45p) (+69)
+**Classes:** nodes/Image.js:0:Image, systems/Wind.js:0:Wind, nodes/Controller.js:0:Controller, SYSTEM_MODULARIZATION_TEMPLATE.js:0:ConfigurableSystemX, nodes/Collider.js:0:Collider, nodes/LOD.js:0:LOD, extras/SnapOctree.js:0:SnapOctree, extras/SnapOctree.js:0:SnapOctreeNode (+143)
+
+## 🔄 Architecture
+
+**L0 [pure exports]:** System(60↓), Node(25↓), three(13↓), usePane(11↓), cls(8↓), Icons(8↓), useUpdate(8↓), Portal(7↓) (+25)
+**L1 [low imports]:** CurvePane(1↑7↓), Settings(1↑5↓), Chat(1↑5↓), Apps(1↑5↓), Events(1↑5↓), Collections(1↑5↓), assets(2↑4↓), Blueprints(1↑5↓)
+**L2 [mid flow]:** CoreUI(21↑2↓), World(15↑4↓), Sidebar(14↑3↓), Fields(7↑4↓), Menu(6↑2↓)
+**L3 [pure imports]:** createClientWorld(46↑), createServerWorld(24↑), createViewerWorld(23↑), createNodeClientWorld(21↑), index(19↑), MenuMain(8↑), index(8↑), MenuApp(7↑) (+45)
+**Hubs:** System(0↑60↓), createClientWorld(46↑0↓), Node(0↑25↓), createServerWorld(24↑0↓), CoreUI(21↑2↓)
+**External:** lodash-es, three, react, fs-extra, @firebolt-dev/css, lucide-react
+
+## 🔌 API Surface
+
+**Classes:** Image, Wind, Controller, ConfigurableSystemX, Collider, LOD (+145)
+**Entry files:** Layers, getTrianglesFromGeometry, useFullscreen, Hint, three (+28)
+
+## 🚨 Issues
+
+- 🔥 Complex funcs: createVRMFactory.js:66:createVRMFactory(1723L), createVRMFactory.js:167:create(1621L), ClientCameraControls.js:540:setupConsoleCommands(523L), particles.js:54:createEmitter(473L) (+147)
+- 📁 Large files: nodes/Image.js:530L, cameras/camera-control-system.js:757L, cameras/comprehensive-camera-test.js:716L (+72)
+- 📋 235 duplicated groups
+- 🔐 hardcoded secrets in ServerAI.js:376, wallet-connect.js:538, wallet-connect.js:613
+
+## 🧹 Dead Code & Tests
+
+**Orphaned:** neon.js, schizo-pc.js, appTools.js, LerpQuaternion.js, platformer-air-dive.js, elemental-item-sword.js (+236)
+**Unused exports:** EnhancedCameraSystem.js: CAMERA_TYPES, TRANSITION_TYPES | createViewerWorld.js: System | GLTFLoader.js: GLTFLoader | storage.js: storage
+**Tests:** 0/406 (0%)
+**Notes:** TODO AvatarPreview.js:5 | TODO Sidebar.js:1045 "disable code editor, model change, metadata editing, flag editing etc" | TODO MenuApp.js:67 "disable code editor, model change, metadata editing, flag editing etc" | TODO glbToNodes.js:75 "glbToNodes collider for box/sphere in blender?')" | TODO createVRMFactory.js:43 "de-dup PlayerLocal.js has a copy" | TODO createEmoteFactory.js:123 "use vrm.bones[name] not getBoneNode" | TODO Vector3Enhanced.js:534 "lengthSquared?" | TODO lockdown.js:2 "in production we may want to flip these" | TODO PlayerLocal.js:47 "de-dup createVRMFactory.js has a copy" | TODO Collider.js:287 "we could just update the PxFilterData tbh" | TODO Controller.js:191 "we could just update the PxFilterData tbh" | TODO Prim.js:346 "think we can remove this? why would this happen?" | TODO index.js:196 "Color GPU Analytic in another color than yellow to know webgpu or webgl context" | TODO index.js:90 "Remove this code when https://crbug.com/1256340 is solved)" | TODO GLTFLoader.js:1745 "Can we support InstancedMesh + SkinnedMesh?" | TODO createNodeClientWorld.js:17 "ClientLoader should be named BrowserLoader and ServerLoader should be called Nod" | TODO Apps.js:328 "only allow on user interaction" | TODO Apps.js:329 "show UI with a button to release()" | TODO Stage.js:226 "not yet" | TODO Physics.js:496 "this.raycastResult.destroy() on this.destroy()" | TODO Physics.js:528 "this.sweepResult.destroy() on this.destroy()" | TODO Physics.js:541 "this.overlapResult.destroy() on this.destroy()" | TODO blender-addon.py:1 | TODO agent.mjs:7 | TODO animation-library.js:68 "Support other players" | TODO npc.js:101 "actions should have chance multipliers" | TODO CarExample.js:702 "roadPower is the power based on regular momentum but if i power is more than" | HACK AssetsS3.js:249 "we only want to include uploaded assets (not core/assets/*) so we do a check" | HACK AssetsLocal.js:46 "we only want to include uploaded assets (not core/assets/*) so we do a check"
+
+## 📦 Modules
+
+- src: 194f, 728cx, 364↑364↓
+- scripts: 10f, 0cx, 0↑0↓
+- apps: 1f, 0cx, 0↑0↓
+- examples: 185f, 0cx, 0↑0↓
+- docs: 1f, 0cx, 0↑0↓
+
+## 📄 File Index
+
+**SYSTEM_MODULARIZATION_TEMPLATE.js** 199L fn: constructor, applyConfiguration, init, update (+5)
+**agent.mjs** 69L fn: start, next, press, release (+1)
+**apps/bone-debug.js** 55L fn: init, update
+**cleanup-temp-docs.py** 46L
+**cleanup_files.js** 50L
+**cleanup_files.py** 50L
+**cleanup_webview_docs.py** 51L
+**docs/extras/blender-addon.py** 877L
+**examples/GaStation/GaStationFridge.js** 411L fn: debugLog, getVisibleItemCount, takeItem, restockFridge (+1)
+**examples/GaStation/GaStationMainEntrance.js** 135L fn: openDoor, closeDoor
+**examples/ROMs/oldromDash.js** 246L fn: debugLog, getStamina, getDirection, charge
+**examples/ROMs/romDash-ULTIMATE-FIX.js** 322L fn: debugLog, getStamina, staminaChangedHandler, staminaChangedHandler (+2)
+**examples/ROMs/romDash-fixed.js** 344L fn: debugLog, initStamina, getDirection, performDash (+1)
+**examples/ROMs/romDash-ultra-debug.js** 430L fn: debugLog, getDirection, performDash, charge
+**examples/ROMs/romDash.js** 288L fn: debugLog, getStamina, getDirection, charge
+**examples/ROMs/romLedgeHang.js** 436L fn: debugLog, getPlayerHeight, getPlayerHalfHeight, getHangHeight (+5)
+**examples/ROMs/romServer.js** 33L
+**examples/ROMs/romSprint.js** 254L fn: debugLog, getStamina, getForwardDirection, isGrounded (+2)
+**examples/ROMs/wallhang.js** 202L fn: getPlayerHeight, getPlayerHalfHeight, getHangHeight, getForwardDirection (+2)
+**examples/animLib/animation-library.js** 164L fn: debugLog, getPlayer, buildAnimationUrl
+*+386 more files*
+
+Git: branch: dojo
+Hot: boltBaseReactive.js(27), AudioReactivity.js(19), boltGame.js(12), EVM.js(12), wallet-connect-appkit.js(11), createVRMFactory.js(9)
+Tooling: ESLint, Prettier, GitHub Actions (docker.yml), Docker
+Conv[JS]: 4-space, single quotes, no semicolons, named exports, relative imports, kebab-case files
+Conv[Py]: 4-space, double quotes, kebab-case files

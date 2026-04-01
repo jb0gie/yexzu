@@ -2,7 +2,57 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createAppKit, useAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { monad, mainnet, arbitrum, base, polygon } from '@reown/appkit/networks'
+import {
+  // Ethereum L1
+  mainnet,
+  sepolia,
+  holesky,
+  // L2s
+  arbitrum,
+  arbitrumSepolia,
+  arbitrumNova,
+  base,
+  baseSepolia,
+  optimism,
+  optimismSepolia,
+  // Alt L1s
+  polygon,
+  polygonMumbai,
+  avalanche,
+  avalancheFuji,
+  bsc,
+  bscTestnet,
+  fantom,
+  fantomTestnet,
+  gnosis,
+  cronos,
+  klaytn,
+  // Monad
+  monad,
+  // Others
+  scroll,
+  scrollSepolia,
+  blast,
+  blastSepolia,
+  zkSync,
+  linea,
+  lineaSepolia,
+  mantle,
+  mantleSepolia,
+  celo,
+  celoAlfajores,
+  aurora,
+  harmonyOne,
+  moonbeam,
+  moonriver,
+  telos,
+  fuse,
+  meter,
+  theta,
+  oasis,
+  hedera,
+  hederaTestnet,
+} from '@reown/appkit/networks'
 
 const queryClient = new QueryClient()
 
@@ -14,8 +64,58 @@ const projectId = typeof env !== 'undefined' && env.PUBLIC_REOWN_PROJECT_ID
     ? env.PUBLIC_WALLETCONNECT_PROJECT_ID
     : ''
 
-// Network configuration - Monad first, then Ethereum
-const networks = [monad, mainnet]
+// Network configuration - supports all major EVM networks
+const networks = [
+  // Ethereum L1
+  mainnet,
+  sepolia,
+  holesky,
+  // L2s
+  arbitrum,
+  arbitrumSepolia,
+  arbitrumNova,
+  base,
+  baseSepolia,
+  optimism,
+  optimismSepolia,
+  // Alt L1s
+  polygon,
+  polygonMumbai,
+  avalanche,
+  avalancheFuji,
+  bsc,
+  bscTestnet,
+  fantom,
+  fantomTestnet,
+  gnosis,
+  cronos,
+  klaytn,
+  // Monad
+  monad,
+  // Others
+  scroll,
+  scrollSepolia,
+  blast,
+  blastSepolia,
+  zkSync,
+  linea,
+  lineaSepolia,
+  mantle,
+  mantleSepolia,
+  celo,
+  celoAlfajores,
+  aurora,
+  harmonyOne,
+  moonbeam,
+  moonriver,
+  telos,
+  fuse,
+  meter,
+  theta,
+  oasis,
+  hedera,
+  hederaTestnet,
+]
 
 // Create Wagmi adapter with AppKit
 const wagmiAdapter = new WagmiAdapter({
