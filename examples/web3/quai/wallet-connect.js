@@ -27,7 +27,7 @@ app.state.address = null
 app.state.shard = null
 
 // Get entities
-const rig = app.get('QuaiRig')
+const rig = app.get('WCRig')
 const triggerBody = app.get('AreaTrigger')
 
 // Initialize trigger zone
