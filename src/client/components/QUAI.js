@@ -62,19 +62,26 @@ export function QUAI({ world }) {
       window.pelagus.on('chainChanged', handleChainChanged)
     }
 
-    // Check existing connection
-    window.pelagus.request({ method: 'quai_accounts' })
-      .then(accounts => {
-        if (accounts && accounts.length > 0) {
-          setAddress(accounts[0])
-          setIsConnected(true)
-          updateShard(accounts[0])
-          if (world.entities?.player) {
-            world.entities.player.modify({ quai: accounts[0] })
+    // Check existing connection (safely)
+    try {
+      window.pelagus.request({ method: 'quai_accounts' })
+        .then(accounts => {
+          if (accounts && accounts.length > 0) {
+            setAddress(accounts[0])
+            setIsConnected(true)
+            updateShard(accounts[0])
+            if (world?.entities?.player) {
+              world.entities.player.modify({ quai: accounts[0] })
+            }
           }
-        }
-      })
-      .catch(console.error)
+        })
+        .catch(err => {
+          // Silently ignore - Pelagus may not be ready
+          console.log('[QUAI] No existing connection')
+        })
+    } catch (err) {
+      // Silently ignore
+    }
 
     return () => {
       if (window.pelagus.removeListener) {
