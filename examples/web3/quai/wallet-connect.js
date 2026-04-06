@@ -64,57 +64,63 @@ if (triggerBody) {
   isPlayerNearby = true
 }
 
-// Create status UI - add to app root to ensure proper context
-const statusUI = app.create('ui', {
-  space: 'screen',
-  position: [0.89, 0.1, 0],
-  width: 220,
-  height: 60,
-  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  borderRadius: 6,
-  padding: 8,
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-})
+// Create status UI (only if rig exists to ensure proper context)
+let statusUI = null
+let statusText = null
+let shardText = null
 
-const statusText = app.create('uitext', {
-  value: '🌐 Disconnected',
-  color: '#cccccc',
-  fontSize: 14,
-  textAlign: 'center',
-})
+if (rig) {
+  statusUI = app.create('ui', {
+    space: 'screen',
+    position: [0.89, 0.1, 0],
+    width: 220,
+    height: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 6,
+    padding: 8,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  })
 
-const shardText = app.create('uitext', {
-  value: '',
-  color: '#888888',
-  fontSize: 12,
-  textAlign: 'center',
-})
+  statusText = app.create('uitext', {
+    value: '🌐 Disconnected',
+    color: '#cccccc',
+    fontSize: 14,
+    textAlign: 'center',
+  })
 
-statusUI.add(statusText)
-statusUI.add(shardText)
+  shardText = app.create('uitext', {
+    value: '',
+    color: '#888888',
+    fontSize: 12,
+    textAlign: 'center',
+  })
 
-// Add UI to app root (not rig) to ensure proper mounting context
-app.add(statusUI)
+  statusUI.add(statusText)
+  statusUI.add(shardText)
+  rig.add(statusUI)
+}
 
-// Create Action for wallet connection - add to app root
-const connectAction = app.create('action', {
-  label: 'Connect Pelagus',
-  distance: 4,
-  duration: 0.3,
-  position: [0, .67, .2],
-  onTrigger: () => {
-    if (app.state.connected) {
-      disconnectWallet()
-    } else {
-      connectWallet()
+// Create Action for wallet connection (declared in outer scope)
+let connectAction = null
+
+if (rig) {
+  connectAction = app.create('action', {
+    label: 'Connect Pelagus',
+    distance: 4,
+    duration: 0.3,
+    position: [0, .67, .2],
+    onTrigger: () => {
+      if (app.state.connected) {
+        disconnectWallet()
+      } else {
+        connectWallet()
+      }
     }
-  }
-})
-
-// Add action to app root
-app.add(connectAction)
+  })
+  rig.add(connectAction)
+}
 
 // Check if QUAI system is available
 function isQuaiAvailable() {
@@ -173,15 +179,18 @@ const doInitialCheck = (dt) => {
 }
 
 function updateStatusUI(address, shard) {
+  if (!statusText) return
   const short = address.substring(0, 6) + '...' + address.substring(address.length - 4)
   statusText.value = `✅ ${short}`
   statusText.color = '#10b981'
-  connectAction.label = 'Disconnect'
+  if (connectAction) connectAction.label = 'Disconnect'
 
-  if (shard?.name) {
-    shardText.value = `📍 ${shard.name}`
-  } else {
-    shardText.value = ''
+  if (shardText) {
+    if (shard?.name) {
+      shardText.value = `📍 ${shard.name}`
+    } else {
+      shardText.value = ''
+    }
   }
 }
 
@@ -195,8 +204,8 @@ let checkTimer = 0
 app.on('update', (dt) => {
   // Visibility based on trigger zone
   const visible = triggerZoneVisible()
-  statusUI.active = visible
-  connectAction.active = visible
+  if (statusUI) statusUI.active = visible
+  if (connectAction) connectAction.active = visible
 
   doInitialCheck(dt)
 
@@ -235,10 +244,12 @@ app.on('update', (dt) => {
       app.state.address = null
       app.state.shard = null
 
-      statusText.value = '🌐 Disconnected'
-      statusText.color = '#cccccc'
-      shardText.value = ''
-      connectAction.label = 'Connect Pelagus'
+      if (statusText) {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
+      if (shardText) shardText.value = ''
+      if (connectAction) connectAction.label = 'Connect Pelagus'
 
       rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
 
@@ -261,12 +272,16 @@ async function connectWallet() {
   // Check if QUAI system is available
   const quai = world.quai
   if (!quai || typeof quai.connect !== 'function') {
-    statusText.value = '⏳ Loading...'
-    statusText.color = '#f59e0b'
+    if (statusText) {
+      statusText.value = '⏳ Loading...'
+      statusText.color = '#f59e0b'
+    }
     console.error('[Quai] QUAI system not yet initialized')
     setTimeout(() => {
-      statusText.value = '🌐 Disconnected'
-      statusText.color = '#cccccc'
+      if (statusText) {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
     }, 2000)
     return
   }
@@ -274,21 +289,27 @@ async function connectWallet() {
   // Check if Pelagus is installed
   const isInstalled = quai.isPelagusInstalled ? quai.isPelagusInstalled() : false
   if (!isInstalled) {
-    statusText.value = '❌ Install Pelagus'
-    statusText.color = '#ef4444'
+    if (statusText) {
+      statusText.value = '❌ Install Pelagus'
+      statusText.color = '#ef4444'
+    }
     console.error('[Quai] Pelagus wallet not installed')
     console.log('[Quai] Download from: https://pelaguswallet.io')
 
     // Reset after delay
     setTimeout(() => {
-      statusText.value = '🌐 Disconnected'
-      statusText.color = '#cccccc'
+      if (statusText) {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
     }, 3000)
     return
   }
 
-  statusText.value = '⏳ Connecting...'
-  statusText.color = '#f59e0b'
+  if (statusText) {
+    statusText.value = '⏳ Connecting...'
+    statusText.color = '#f59e0b'
+  }
 
   try {
     const result = await quai.connect()
@@ -312,21 +333,29 @@ async function connectWallet() {
         shard: result.shard
       })
     } else if (result.reason === 'user_rejected') {
-      statusText.value = '❌ Cancelled'
-      statusText.color = '#ef4444'
+      if (statusText) {
+        statusText.value = '❌ Cancelled'
+        statusText.color = '#ef4444'
+      }
       setTimeout(() => {
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
+        if (statusText) {
+          statusText.value = '🌐 Disconnected'
+          statusText.color = '#cccccc'
+        }
       }, 2000)
     }
   } catch (error) {
     console.error('[Quai] Connect error:', error)
-    statusText.value = '❌ Error'
-    statusText.color = '#ef4444'
+    if (statusText) {
+      statusText.value = '❌ Error'
+      statusText.color = '#ef4444'
+    }
 
     setTimeout(() => {
-      statusText.value = '🌐 Disconnected'
-      statusText.color = '#cccccc'
+      if (statusText) {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }
     }, 3000)
   }
 }
