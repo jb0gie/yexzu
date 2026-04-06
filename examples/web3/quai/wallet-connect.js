@@ -36,22 +36,28 @@ const localPlayer = world.getPlayer()
 
 if (triggerBody) {
   triggerBody.onTriggerEnter = (e) => {
-    if (e.playerId) {
-      const player = world.getPlayer(e.playerId)
-      const isLocalPlayer = player && player.id === localPlayer?.id
-      if (isLocalPlayer) {
-        isPlayerNearby = true
+    try {
+      if (e.playerId && localPlayer?.id) {
+        const player = world.getPlayer(e.playerId)
+        if (player && player.id === localPlayer.id) {
+          isPlayerNearby = true
+        }
       }
+    } catch (err) {
+      // Silent fail
     }
   }
 
   triggerBody.onTriggerLeave = (e) => {
-    if (e.playerId) {
-      const player = world.getPlayer(e.playerId)
-      const isLocalPlayer = player && player.id === localPlayer?.id
-      if (isLocalPlayer) {
-        isPlayerNearby = false
+    try {
+      if (e.playerId && localPlayer?.id) {
+        const player = world.getPlayer(e.playerId)
+        if (player && player.id === localPlayer.id) {
+          isPlayerNearby = false
+        }
       }
+    } catch (err) {
+      // Silent fail
     }
   }
 } else {
