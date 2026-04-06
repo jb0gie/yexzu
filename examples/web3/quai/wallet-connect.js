@@ -115,7 +115,8 @@ if (rig) rig.add(connectAction)
 
 // Check if QUAI system is available
 function isQuaiAvailable() {
-  return world.quai && typeof world.quai.connect === 'function'
+  const quai = world.quai
+  return quai && typeof quai.connect === 'function'
 }
 
 // State tracking
@@ -130,7 +131,8 @@ const doInitialCheck = (dt) => {
   if (initCheckTimer < 0.5) return
 
   // Check if QUAI system is ready
-  if (!isQuaiAvailable()) {
+  const quai = world.quai
+  if (!quai || typeof quai.connect !== 'function') {
     if (app.props.debug === 'enabled') {
       console.log('[Quai] QUAI system not yet available, waiting...')
     }
@@ -138,7 +140,7 @@ const doInitialCheck = (dt) => {
   }
 
   const player = world.getPlayer()
-  const address = player?.quai || world.quai.getAddress?.()
+  const address = player?.quai || (quai.getAddress ? quai.getAddress() : null)
 
   if (app.props.debug === 'enabled') {
     console.log('[Quai] Initial state:', { address })
@@ -150,7 +152,7 @@ const doInitialCheck = (dt) => {
     previousAddress = address
 
     // Get shard info
-    const shard = world.quai.getShard?.()
+    const shard = quai.getShard ? quai.getShard() : null
     app.state.shard = shard
 
     updateStatusUI(address, shard)
@@ -195,7 +197,8 @@ app.on('update', (dt) => {
   doInitialCheck(dt)
 
   // Skip if QUAI system not available yet
-  if (!isQuaiAvailable()) {
+  const quai = world.quai
+  if (!quai || typeof quai.connect !== 'function') {
     return
   }
 
@@ -204,7 +207,7 @@ app.on('update', (dt) => {
   checkTimer = 0
 
   const player = world.getPlayer()
-  const address = player?.quai || world.quai.getAddress?.()
+  const address = player?.quai || (quai.getAddress ? quai.getAddress() : null)
 
   if (address !== previousAddress) {
     previousAddress = address
@@ -213,7 +216,7 @@ app.on('update', (dt) => {
       app.state.connected = true
       app.state.address = address
 
-      const shard = world.quai.getShard?.()
+      const shard = quai.getShard ? quai.getShard() : null
       app.state.shard = shard
 
       updateStatusUI(address, shard)
@@ -252,7 +255,8 @@ async function connectWallet() {
   }
 
   // Check if QUAI system is available
-  if (!isQuaiAvailable()) {
+  const quai = world.quai
+  if (!quai || typeof quai.connect !== 'function') {
     statusText.value = '⏳ Loading...'
     statusText.color = '#f59e0b'
     console.error('[Quai] QUAI system not yet initialized')
@@ -264,7 +268,7 @@ async function connectWallet() {
   }
 
   // Check if Pelagus is installed
-  const isInstalled = world.quai.isPelagusInstalled?.()
+  const isInstalled = quai.isPelagusInstalled ? quai.isPelagusInstalled() : false
   if (!isInstalled) {
     statusText.value = '❌ Install Pelagus'
     statusText.color = '#ef4444'
@@ -283,7 +287,7 @@ async function connectWallet() {
   statusText.color = '#f59e0b'
 
   try {
-    const result = await world.quai.connect()
+    const result = await quai.connect()
 
     if (app.props.debug === 'enabled') {
       console.log('[Quai] Connect result:', result)
@@ -333,13 +337,14 @@ async function disconnectWallet() {
   }
 
   // Check if QUAI system is available
-  if (!isQuaiAvailable()) {
+  const quai = world.quai
+  if (!quai || typeof quai.disconnect !== 'function') {
     console.error('[Quai] QUAI system not available')
     return
   }
 
   try {
-    await world.quai.disconnect()
+    await quai.disconnect()
     if (app.props.debug === 'enabled') {
       console.log('[Quai] Disconnected')
     }
@@ -349,18 +354,16 @@ async function disconnectWallet() {
 }
 
 // Quick action hotkey (Q)
-if (world.isClient) {
-  const control = app.control()
-  const quickKey = control.keyQ
-  if (quickKey) quickKey.capture = true
-
+const control = app.control()
+if (control && control.keyQ) {
+  control.keyQ.capture = true
   let quickKeyPressed = false
   app.on('update', () => {
-    if (quickKey?.pressed && !quickKeyPressed) {
+    if (control.keyQ?.pressed && !quickKeyPressed) {
       if (app.state.connected) disconnectWallet()
       else connectWallet()
     }
-    quickKeyPressed = quickKey?.pressed
+    quickKeyPressed = control.keyQ?.pressed
   })
 }
 
