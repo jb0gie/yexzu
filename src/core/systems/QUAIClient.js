@@ -30,9 +30,17 @@ export class QUAIClient extends System {
     try {
       web3Logger.info('Initializing QUAI client system...')
 
+      // Check if we're in browser environment
+      if (!web3Environment.isBrowser()) {
+        web3Logger.info('QUAI client: Not in browser environment, skipping initialization')
+        this.createMockAPI()
+        return
+      }
+
       // Validate browser environment
       web3Environment.validateBrowser(['browser', 'localStorage', 'WebSocket'])
 
+      this.createWorldAPI()
       this.isInitialized = true
       web3Logger.success('QUAI client system initialized')
     } catch (error) {
