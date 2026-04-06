@@ -111,7 +111,8 @@ const connectAction = app.create('action', {
   }
 })
 
-if (rig) rig.add(connectAction)
+// Add action to app (not rig) to avoid mounting issues
+app.add(connectAction)
 
 // Check if QUAI system is available
 function isQuaiAvailable() {
@@ -188,8 +189,15 @@ function triggerZoneVisible() {
 
 // Main update loop
 let checkTimer = 0
+let uiReady = false
 
 app.on('update', (dt) => {
+  // Wait one frame for UI to be fully mounted
+  if (!uiReady) {
+    uiReady = true
+    return
+  }
+
   const visible = triggerZoneVisible()
   statusUI.active = visible
   connectAction.active = visible
