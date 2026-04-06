@@ -32,14 +32,18 @@ const triggerBody = app.get('AreaTrigger')
 
 // Initialize trigger zone
 let isPlayerNearby = false
-const localPlayer = world.getPlayer()
+
+// Get local player ID dynamically
+function getLocalPlayerId() {
+  const player = world.getPlayer()
+  return player?.id
+}
 
 if (triggerBody) {
   triggerBody.onTriggerEnter = (e) => {
     if (e.playerId) {
-      const player = world.getPlayer(e.playerId)
-      const isLocalPlayer = player && player.id === localPlayer?.id
-      if (isLocalPlayer) {
+      const localPlayerId = getLocalPlayerId()
+      if (e.playerId === localPlayerId) {
         isPlayerNearby = true
       }
     }
@@ -47,9 +51,8 @@ if (triggerBody) {
 
   triggerBody.onTriggerLeave = (e) => {
     if (e.playerId) {
-      const player = world.getPlayer(e.playerId)
-      const isLocalPlayer = player && player.id === localPlayer?.id
-      if (isLocalPlayer) {
+      const localPlayerId = getLocalPlayerId()
+      if (e.playerId === localPlayerId) {
         isPlayerNearby = false
       }
     }
@@ -112,10 +115,12 @@ function isQuaiAvailable() {
   return world.quai && typeof world.quai.connect === 'function'
 }
 
-// Check initial connection state
+// State tracking
 let initCheckTimer = 0
 let initChecked = false
+let previousAddress = null
 
+// Check initial connection state
 const doInitialCheck = (dt) => {
   if (initChecked) return
   initCheckTimer += dt
@@ -178,7 +183,6 @@ function triggerZoneVisible() {
 
 // Main update loop
 let checkTimer = 0
-let previousAddress = null
 
 app.on('update', (dt) => {
   const visible = triggerZoneVisible()
