@@ -1,58 +1,8 @@
-import { createPublicClient, createWalletClient, erc20Abi, getContract, http, defineChain } from 'viem'
+import { createPublicClient, createWalletClient, erc20Abi, getContract, http } from 'viem'
 import { mnemonicToAccount } from 'viem/accounts'
 import * as utils from 'viem/utils'
 import * as chains from 'viem/chains'
 import { System } from './System'
-
-// Define Quai Network custom chains
-const quaiNetwork = defineChain({
-  id: 9000,
-  name: 'Quai Network',
-  nativeCurrency: {
-    name: 'Quai',
-    symbol: 'QUAI',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://rpc.quai.network'],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: 'Quaiscan',
-      url: 'https://quaiscan.io',
-    },
-  },
-})
-
-const quaiTestnet = defineChain({
-  id: 2999,
-  name: 'Quai Testnet',
-  nativeCurrency: {
-    name: 'Quai',
-    symbol: 'QUAI',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://rpc.colosseum.quai.network'],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: 'Quaiscan Testnet',
-      url: 'https://colosseum.quaiscan.io',
-    },
-  },
-})
-
-// Extend chains with Quai Network
-const customChains = {
-  ...chains,
-  quaiNetwork,
-  quaiTestnet,
-}
 
 export class EVM extends System {
   constructor(world) {
@@ -60,7 +10,7 @@ export class EVM extends System {
     this.evm = null
 
     const chainName = process.env.PUBLIC_EVM ?? 'mainnet'
-    const chain = customChains[chainName]
+    const chain = chains[chainName]
 
     if (!chain) throw new Error('invalid chain string')
 

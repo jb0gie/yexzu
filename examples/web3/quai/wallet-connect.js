@@ -1,0 +1,328 @@
+// Quai Wallet Connect Example
+// Demonstrates Pelagus wallet integration with Quai Network
+// Quai is NOT standard EVM - it uses 9-zone sharded architecture
+
+app.configure([
+  {
+    key: 'buttonText',
+    type: 'text',
+    label: 'Connect Button Text',
+    initial: 'Connect Pelagus',
+  },
+  {
+    key: 'debug',
+    type: 'switch',
+    label: 'Debug Logging',
+    options: [
+      { label: 'Enabled', value: 'enabled' },
+      { label: 'Disabled', value: 'disabled' },
+    ],
+    initial: 'disabled',
+  },
+])
+
+// State
+app.state.connected = false
+app.state.address = null
+app.state.shard = null
+
+// Get entities
+const rig = app.get('QuaiRig')
+const triggerBody = app.get('AreaTrigger')
+
+// Initialize trigger zone
+let isPlayerNearby = false
+const localPlayer = world.getPlayer()
+
+if (triggerBody) {
+  triggerBody.onTriggerEnter = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = true
+      }
+    }
+  }
+
+  triggerBody.onTriggerLeave = (e) => {
+    if (e.playerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
+        isPlayerNearby = false
+      }
+    }
+  }
+} else {
+  isPlayerNearby = true
+}
+
+// Create status UI
+const statusUI = app.create('ui', {
+  space: 'screen',
+  position: [0.89, 0.1, 0],
+  width: 220,
+  height: 60,
+  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  borderRadius: 6,
+  padding: 8,
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+})
+
+const statusText = app.create('uitext', {
+  value: '🌐 Disconnected',
+  color: '#cccccc',
+  fontSize: 14,
+  textAlign: 'center',
+})
+
+const shardText = app.create('uitext', {
+  value: '',
+  color: '#888888',
+  fontSize: 12,
+  textAlign: 'center',
+})
+
+statusUI.add(statusText)
+statusUI.add(shardText)
+if (rig) rig.add(statusUI)
+
+// Create Action for wallet connection
+const connectAction = app.create('action', {
+  label: 'Connect Pelagus',
+  distance: 4,
+  duration: 0.3,
+  position: [0, .67, .2],
+  onTrigger: () => {
+    if (app.state.connected) {
+      disconnectWallet()
+    } else {
+      connectWallet()
+    }
+  }
+})
+
+if (rig) rig.add(connectAction)
+
+// Check initial connection state
+let initCheckTimer = 0
+let initChecked = false
+
+const doInitialCheck = (dt) => {
+  if (initChecked) return
+  initCheckTimer += dt
+  if (initCheckTimer < 0.5) return
+
+  const player = world.getPlayer()
+  const address = player?.quai || world.quai?.getAddress?.()
+
+  if (app.props.debug === 'enabled') {
+    console.log('[Quai] Initial state:', { address })
+  }
+
+  if (address) {
+    app.state.connected = true
+    app.state.address = address
+    previousAddress = address
+
+    // Get shard info
+    const shard = world.quai?.getShard?.()
+    app.state.shard = shard
+
+    updateStatusUI(address, shard)
+
+    if (rig) {
+      rig.play({ name: 'ON', loop: true, fade: 0.3 })
+    }
+
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] Already connected on init:', address, shard)
+    }
+  }
+
+  initChecked = true
+}
+
+function updateStatusUI(address, shard) {
+  const short = address.substring(0, 6) + '...' + address.substring(address.length - 4)
+  statusText.value = `✅ ${short}`
+  statusText.color = '#10b981'
+  connectAction.label = 'Disconnect'
+
+  if (shard?.name) {
+    shardText.value = `📍 ${shard.name}`
+  } else {
+    shardText.value = ''
+  }
+}
+
+function triggerZoneVisible() {
+  return !triggerBody || isPlayerNearby
+}
+
+// Main update loop
+let checkTimer = 0
+let previousAddress = null
+
+app.on('update', (dt) => {
+  const visible = triggerZoneVisible()
+  statusUI.active = visible
+  connectAction.active = visible
+
+  doInitialCheck(dt)
+
+  checkTimer += dt
+  if (checkTimer < 0.5) return
+  checkTimer = 0
+
+  const player = world.getPlayer()
+  const address = player?.quai || world.quai?.getAddress?.()
+
+  if (address !== previousAddress) {
+    previousAddress = address
+
+    if (address) {
+      app.state.connected = true
+      app.state.address = address
+
+      const shard = world.quai?.getShard?.()
+      app.state.shard = shard
+
+      updateStatusUI(address, shard)
+
+      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+
+      if (app.props.debug === 'enabled') {
+        console.log('[Quai] Connected:', address, shard)
+      }
+    } else if (app.state.connected) {
+      app.state.connected = false
+      app.state.address = null
+      app.state.shard = null
+
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+      shardText.value = ''
+      connectAction.label = 'Connect Pelagus'
+
+      rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
+
+      if (app.props.debug === 'enabled') {
+        console.log('[Quai] Disconnected')
+      }
+    }
+  }
+})
+
+// Connection function
+async function connectWallet() {
+  if (app.state.connected) {
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] Already connected')
+    }
+    return
+  }
+
+  // Check if Pelagus is installed
+  const isInstalled = world.quai?.isPelagusInstalled?.()
+  if (!isInstalled) {
+    statusText.value = '❌ Install Pelagus'
+    statusText.color = '#ef4444'
+    console.error('[Quai] Pelagus wallet not installed')
+    console.log('[Quai] Download from: https://pelaguswallet.io')
+
+    // Reset after delay
+    setTimeout(() => {
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+    }, 3000)
+    return
+  }
+
+  statusText.value = '⏳ Connecting...'
+  statusText.color = '#f59e0b'
+
+  try {
+    const result = await world.quai.connect()
+
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] Connect result:', result)
+    }
+
+    if (result.success) {
+      app.state.connected = true
+      app.state.address = result.address
+      app.state.shard = result.shard
+
+      updateStatusUI(result.address, result.shard)
+
+      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+
+      app.emit('quaiConnected', {
+        connected: true,
+        address: result.address,
+        shard: result.shard
+      })
+    } else if (result.reason === 'user_rejected') {
+      statusText.value = '❌ Cancelled'
+      statusText.color = '#ef4444'
+      setTimeout(() => {
+        statusText.value = '🌐 Disconnected'
+        statusText.color = '#cccccc'
+      }, 2000)
+    }
+  } catch (error) {
+    console.error('[Quai] Connect error:', error)
+    statusText.value = '❌ Error'
+    statusText.color = '#ef4444'
+
+    setTimeout(() => {
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+    }, 3000)
+  }
+}
+
+// Disconnect function
+async function disconnectWallet() {
+  if (!app.state.connected) {
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] Not connected')
+    }
+    return
+  }
+
+  try {
+    await world.quai.disconnect()
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] Disconnected')
+    }
+  } catch (error) {
+    console.error('[Quai] Disconnect error:', error)
+  }
+}
+
+// Quick action hotkey (Q)
+if (world.isClient) {
+  const control = app.control()
+  const quickKey = control.keyQ
+  if (quickKey) quickKey.capture = true
+
+  let quickKeyPressed = false
+  app.on('update', () => {
+    if (quickKey?.pressed && !quickKeyPressed) {
+      if (app.state.connected) disconnectWallet()
+      else connectWallet()
+    }
+    quickKeyPressed = quickKey?.pressed
+  })
+}
+
+if (app.props.debug === 'enabled') {
+  console.log('✅ Quai Wallet Connect initialized')
+  console.log('🔷 Requires Pelagus wallet (not MetaMask)')
+  console.log('🔷 Quai uses 9-zone sharded architecture')
+}

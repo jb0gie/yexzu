@@ -53,56 +53,6 @@ import {
   hederaTestnet,
 } from '@reown/appkit/networks'
 
-// Define Quai Network custom configurations
-// Quai uses sharded architecture with multiple shards per region
-const quaiNetwork = {
-  id: 9000,
-  name: 'Quai Network',
-  nativeCurrency: {
-    name: 'Quai',
-    symbol: 'QUAI',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://rpc.quai.network'],
-    },
-    public: {
-      http: ['https://rpc.quai.network'],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: 'Quaiscan',
-      url: 'https://quaiscan.io',
-    },
-  },
-}
-
-const quaiTestnet = {
-  id: 2999,
-  name: 'Quai Testnet',
-  nativeCurrency: {
-    name: 'Quai',
-    symbol: 'QUAI',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://rpc.colosseum.quai.network'],
-    },
-    public: {
-      http: ['https://rpc.colosseum.quai.network'],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: 'Quaiscan Testnet',
-      url: 'https://colosseum.quaiscan.io',
-    },
-  },
-}
-
 const queryClient = new QueryClient()
 
 // Reown AppKit Project ID - required for mobile wallet connections
@@ -163,9 +113,6 @@ const networks = [
   oasys,
   hedera,
   hederaTestnet,
-  // Quai Network
-  quaiNetwork,
-  quaiTestnet,
 ]
 
 // Create Wagmi adapter with AppKit
