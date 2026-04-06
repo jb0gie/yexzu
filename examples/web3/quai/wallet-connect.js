@@ -64,7 +64,7 @@ if (triggerBody) {
   isPlayerNearby = true
 }
 
-// Create status UI
+// Create status UI - add to app root to ensure proper context
 const statusUI = app.create('ui', {
   space: 'screen',
   position: [0.89, 0.1, 0],
@@ -94,9 +94,11 @@ const shardText = app.create('uitext', {
 
 statusUI.add(statusText)
 statusUI.add(shardText)
-if (rig) rig.add(statusUI)
 
-// Create Action for wallet connection
+// Add UI to app root (not rig) to ensure proper mounting context
+app.add(statusUI)
+
+// Create Action for wallet connection - add to app root
 const connectAction = app.create('action', {
   label: 'Connect Pelagus',
   distance: 4,
@@ -111,7 +113,8 @@ const connectAction = app.create('action', {
   }
 })
 
-if (rig) rig.add(connectAction)
+// Add action to app root
+app.add(connectAction)
 
 // Check if QUAI system is available
 function isQuaiAvailable() {
@@ -188,23 +191,12 @@ function triggerZoneVisible() {
 
 // Main update loop
 let checkTimer = 0
-let hasInitialized = false
 
 app.on('update', (dt) => {
-  // Delay visibility changes until UI is fully mounted with context
-  if (!hasInitialized) {
-    // Check if UI has been mounted with proper context
-    if (statusUI.ctx && statusUI.ctx.world) {
-      hasInitialized = true
-      const visible = triggerZoneVisible()
-      statusUI.active = visible
-      connectAction.active = visible
-    }
-  } else {
-    const visible = triggerZoneVisible()
-    statusUI.active = visible
-    connectAction.active = visible
-  }
+  // Visibility based on trigger zone
+  const visible = triggerZoneVisible()
+  statusUI.active = visible
+  connectAction.active = visible
 
   doInitialCheck(dt)
 
