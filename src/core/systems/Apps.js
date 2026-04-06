@@ -59,6 +59,9 @@ export class Apps extends System {
       dojo(entity) {
         return world.dojo || null
       },
+      quai(entity) {
+        return world.quai || null
+      },
     }
     this.worldSetters = {
       // ...

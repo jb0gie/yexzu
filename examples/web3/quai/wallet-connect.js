@@ -32,18 +32,14 @@ const triggerBody = app.get('AreaTrigger')
 
 // Initialize trigger zone
 let isPlayerNearby = false
-
-// Get local player ID dynamically
-function getLocalPlayerId() {
-  const player = world.getPlayer()
-  return player?.id
-}
+const localPlayer = world.getPlayer()
 
 if (triggerBody) {
   triggerBody.onTriggerEnter = (e) => {
     if (e.playerId) {
-      const localPlayerId = getLocalPlayerId()
-      if (e.playerId === localPlayerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
         isPlayerNearby = true
       }
     }
@@ -51,8 +47,9 @@ if (triggerBody) {
 
   triggerBody.onTriggerLeave = (e) => {
     if (e.playerId) {
-      const localPlayerId = getLocalPlayerId()
-      if (e.playerId === localPlayerId) {
+      const player = world.getPlayer(e.playerId)
+      const isLocalPlayer = player && player.id === localPlayer?.id
+      if (isLocalPlayer) {
         isPlayerNearby = false
       }
     }
