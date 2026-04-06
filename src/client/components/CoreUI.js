@@ -18,6 +18,7 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 import { ChevronDoubleUpIcon, HandIcon } from './Icons'
 import { Sidebar } from './Sidebar'
 import { EVM } from './EVM'
+import { QUAI } from './QUAI'
 
 export function CoreUI({ world }) {
   const ref = useRef()
@@ -107,6 +108,7 @@ export function CoreUI({ world }) {
       {ready && isTouch && <TouchStick world={world} />}
       {confirm && <Confirm options={confirm} />}
       {ready && <EVM world={world} />}
+      {ready && <QUAI world={world} />}
       <div id='core-ui-portal' />
     </div>
   )

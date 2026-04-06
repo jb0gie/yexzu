@@ -107,6 +107,11 @@ const connectAction = app.create('action', {
 
 if (rig) rig.add(connectAction)
 
+// Check if QUAI system is available
+function isQuaiAvailable() {
+  return world.quai && typeof world.quai.connect === 'function'
+}
+
 // Check initial connection state
 let initCheckTimer = 0
 let initChecked = false
@@ -116,8 +121,16 @@ const doInitialCheck = (dt) => {
   initCheckTimer += dt
   if (initCheckTimer < 0.5) return
 
+  // Check if QUAI system is ready
+  if (!isQuaiAvailable()) {
+    if (app.props.debug === 'enabled') {
+      console.log('[Quai] QUAI system not yet available, waiting...')
+    }
+    return
+  }
+
   const player = world.getPlayer()
-  const address = player?.quai || world.quai?.getAddress?.()
+  const address = player?.quai || world.quai.getAddress?.()
 
   if (app.props.debug === 'enabled') {
     console.log('[Quai] Initial state:', { address })
@@ -129,7 +142,7 @@ const doInitialCheck = (dt) => {
     previousAddress = address
 
     // Get shard info
-    const shard = world.quai?.getShard?.()
+    const shard = world.quai.getShard?.()
     app.state.shard = shard
 
     updateStatusUI(address, shard)
@@ -174,12 +187,17 @@ app.on('update', (dt) => {
 
   doInitialCheck(dt)
 
+  // Skip if QUAI system not available yet
+  if (!isQuaiAvailable()) {
+    return
+  }
+
   checkTimer += dt
   if (checkTimer < 0.5) return
   checkTimer = 0
 
   const player = world.getPlayer()
-  const address = player?.quai || world.quai?.getAddress?.()
+  const address = player?.quai || world.quai.getAddress?.()
 
   if (address !== previousAddress) {
     previousAddress = address
@@ -188,7 +206,7 @@ app.on('update', (dt) => {
       app.state.connected = true
       app.state.address = address
 
-      const shard = world.quai?.getShard?.()
+      const shard = world.quai.getShard?.()
       app.state.shard = shard
 
       updateStatusUI(address, shard)
@@ -226,8 +244,20 @@ async function connectWallet() {
     return
   }
 
+  // Check if QUAI system is available
+  if (!isQuaiAvailable()) {
+    statusText.value = '⏳ Loading...'
+    statusText.color = '#f59e0b'
+    console.error('[Quai] QUAI system not yet initialized')
+    setTimeout(() => {
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+    }, 2000)
+    return
+  }
+
   // Check if Pelagus is installed
-  const isInstalled = world.quai?.isPelagusInstalled?.()
+  const isInstalled = world.quai.isPelagusInstalled?.()
   if (!isInstalled) {
     statusText.value = '❌ Install Pelagus'
     statusText.color = '#ef4444'
@@ -292,6 +322,12 @@ async function disconnectWallet() {
     if (app.props.debug === 'enabled') {
       console.log('[Quai] Not connected')
     }
+    return
+  }
+
+  // Check if QUAI system is available
+  if (!isQuaiAvailable()) {
+    console.error('[Quai] QUAI system not available')
     return
   }
 

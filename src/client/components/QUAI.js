@@ -31,7 +31,7 @@ export function QUAI({ world }) {
 
   // Listen for account changes
   useEffect(() => {
-    if (!window.pelagus) return
+    if (!window.pelagus || !world) return
 
     const handleAccountsChanged = (accounts) => {
       if (accounts.length === 0) {
@@ -156,7 +156,7 @@ export function QUAI({ world }) {
     setAddress(null)
     setShard(null)
 
-    if (world.entities?.player) {
+    if (world?.entities?.player) {
       world.entities.player.modify({ quai: null })
     }
 
@@ -237,6 +237,8 @@ export function QUAI({ world }) {
 
   // Bind to world.quai API
   useEffect(() => {
+    if (!world) return
+
     world.quai = {
       connect,
       disconnect,
