@@ -142,9 +142,7 @@ const doInitialCheck = (dt) => {
   // Check if QUAI system is ready
   const quai = world.quai
   if (!quai || typeof quai.connect !== 'function') {
-    if (app.props.debug === 'enabled') {
-      console.log('[Quai] QUAI system not yet available, waiting...')
-    }
+    // Silently skip until QUAI is ready
     return
   }
 
