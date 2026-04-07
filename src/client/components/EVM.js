@@ -193,29 +193,18 @@ function Logic({ world }) {
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
   const { open, close } = useAppKit()
   const [initialized, setInitialized] = useState(false)
-  const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false)
 
-  // Prevent auto-reconnect from opening the modal
+  // Prevent any auto-reconnect by immediately closing on mount
   useEffect(() => {
-    // Close any auto-opened modal on first mount
     if (!initialized) {
       setInitialized(true)
-      // Close modal if it was auto-opened by reconnect
-      if (isReconnecting) {
-        console.log('[EVM] Preventing auto-reconnect modal...')
+      // If there's any reconnect happening, close it immediately
+      if (isReconnecting || isConnecting) {
+        console.log('[EVM] Preventing auto-connect...')
         close()
       }
     }
-  }, [initialized, isReconnecting, close])
-
-  // Track reconnection attempts
-  useEffect(() => {
-    if (isReconnecting && !hasAttemptedReconnect) {
-      setHasAttemptedReconnect(true)
-      // Close the modal that was auto-opened
-      setTimeout(() => close(), 100)
-    }
-  }, [isReconnecting, hasAttemptedReconnect, close])
+  }, [initialized, isReconnecting, isConnecting, close])
 
   // Set player.evm when wallet connects/disconnects
   useEffect(() => {
