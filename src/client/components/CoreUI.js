@@ -19,7 +19,6 @@ import { ChevronDoubleUpIcon, HandIcon } from './Icons'
 import { Sidebar } from './Sidebar'
 import { EVM } from './EVM'
 import { QUAI } from './QUAI'
-import { useState, useEffect } from 'react'
 
 export function CoreUI({ world }) {
   const ref = useRef()
