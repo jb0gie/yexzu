@@ -386,18 +386,25 @@ async function disconnectWallet() {
   }
 }
 
-// Quick action hotkey (Q)
-const control = app.control()
-if (control && control.keyQ) {
-  control.keyQ.capture = true
-  let quickKeyPressed = false
-  app.on('update', () => {
-    if (control.keyQ?.pressed && !quickKeyPressed) {
-      if (app.state.connected) disconnectWallet()
-      else connectWallet()
+// Quick action hotkey (Q) - only on client
+if (world.isClient) {
+  try {
+    const control = app.control()
+    if (control && control.keyQ) {
+      control.keyQ.capture = true
+      let quickKeyPressed = false
+      app.on('update', () => {
+        if (control.keyQ?.pressed && !quickKeyPressed) {
+          if (app.state.connected) disconnectWallet()
+          else connectWallet()
+        }
+        quickKeyPressed = control.keyQ?.pressed
+      })
     }
-    quickKeyPressed = control.keyQ?.pressed
-  })
+  } catch (err) {
+    // Control not available (server-side or not initialized)
+    console.log('[Quai] Quick action hotkey not available')
+  }
 }
 
 if (app.props.debug === 'enabled') {
