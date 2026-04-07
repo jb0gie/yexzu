@@ -3,30 +3,46 @@ import { useState, useEffect, useCallback } from 'react'
 /**
  * QUAI Component
  *
- * Handles Quai Network wallet integration via Pelagus.
+ * Handles Quai Network wallet integration via Pelagus or Tangem.
  * Unlike EVM chains, Quai uses a unique sharded architecture
- * and requires Pelagus wallet (MetaMask doesn't support Quai).
+ * and requires Pelagus wallet or Tangem hardware wallet.
+ *
+ * Supported wallets:
+ * - Pelagus (browser extension)
+ * - Tangem (hardware wallet via web extension)
  */
 export function QUAI({ world }) {
   const [isConnected, setIsConnected] = useState(false)
   const [address, setAddress] = useState(null)
   const [shard, setShard] = useState(null)
   const [chainId, setChainId] = useState(null)
+  const [walletType, setWalletType] = useState(null) // 'pelagus' | 'tangem' | null
   const [isPelagusInstalled, setIsPelagusInstalled] = useState(false)
+  const [isTangemInstalled, setIsTangemInstalled] = useState(false)
 
-  // Check if Pelagus is installed
+  // Check if wallets are installed
   useEffect(() => {
-    const checkPelagus = () => {
-      const installed = typeof window !== 'undefined' && !!window.pelagus
-      setIsPelagusInstalled(installed)
-      return installed
+    const checkWallets = () => {
+      // Check Pelagus
+      const pelagusInstalled = typeof window !== 'undefined' && !!window.pelagus
+      setIsPelagusInstalled(pelagusInstalled)
+
+      // Check Tangem (via window.tangem or window.ethereum with Tangem provider)
+      const tangemInstalled = typeof window !== 'undefined' && (
+        !!window.tangem ||
+        (window.ethereum?.isTangem) ||
+        (window.ethereum?.providers?.some(p => p.isTangem))
+      )
+      setIsTangemInstalled(tangemInstalled)
+
+      return { pelagusInstalled, tangemInstalled }
     }
 
-    checkPelagus()
+    checkWallets()
 
-    // Pelagus might inject after page load
-    window.addEventListener('load', checkPelagus)
-    return () => window.removeEventListener('load', checkPelagus)
+    // Wallets might inject after page load
+    window.addEventListener('load', checkWallets)
+    return () => window.removeEventListener('load', checkWallets)
   }, [])
 
   // Listen for account changes
@@ -114,33 +130,51 @@ export function QUAI({ world }) {
     setShard(zoneMap[shardPrefix] || { name: 'Unknown', zone: 'unknown' })
   }, [])
 
-  // Connect function
-  const connect = useCallback(async () => {
-    if (!window.pelagus) {
+  // Connect function with multi-wallet support
+  const connect = useCallback(async (preferredWallet = null) => {
+    // Try preferred wallet first, then fall back to any available
+    let provider = null
+    let detectedWallet = null
+
+    if (preferredWallet === 'pelagus' || (!preferredWallet && window.pelagus)) {
+      provider = window.pelagus
+      detectedWallet = 'pelagus'
+    } else if (preferredWallet === 'tangem' || (!preferredWallet && window.tangem)) {
+      provider = window.tangem
+      detectedWallet = 'tangem'
+    } else if (window.ethereum?.isTangem) {
+      provider = window.ethereum
+      detectedWallet = 'tangem'
+    }
+
+    if (!provider) {
       return {
         success: false,
-        reason: 'pelagus_not_installed',
-        message: 'Please install Pelagus wallet from pelaguswallet.io'
+        reason: 'no_wallet_installed',
+        message: 'Please install Pelagus (pelaguswallet.io) or Tangem wallet'
       }
     }
 
     try {
-      const accounts = await window.pelagus.request({
+      // Both wallets use the same Quai JSON-RPC interface
+      const accounts = await provider.request({
         method: 'quai_requestAccounts'
       })
 
       if (accounts && accounts.length > 0) {
         setAddress(accounts[0])
         setIsConnected(true)
+        setWalletType(detectedWallet)
         updateShard(accounts[0])
 
-        const chainId = await window.pelagus.request({ method: 'quai_chainId' })
+        const chainId = await provider.request({ method: 'quai_chainId' })
         setChainId(chainId)
 
         return {
           success: true,
           address: accounts[0],
-          chainId
+          chainId,
+          walletType: detectedWallet
         }
       }
 
@@ -255,16 +289,24 @@ export function QUAI({ world }) {
       signMessage,
       sendTransaction,
       getBalance,
+      // Wallet detection
       isPelagusInstalled: () => isPelagusInstalled,
+      isTangemInstalled: () => isTangemInstalled,
+      getWalletType: () => walletType,
+      // Multi-wallet connect
+      connectPelagus: () => connect('pelagus'),
+      connectTangem: () => connect('tangem'),
       _reactData: {
         isConnected,
         address,
         shard,
         chainId,
-        isPelagusInstalled
+        walletType,
+        isPelagusInstalled,
+        isTangemInstalled
       }
     }
-  }, [world, connect, disconnect, isConnected, address, shard, chainId, isPelagusInstalled, signMessage, sendTransaction, getBalance])
+  }, [world, connect, disconnect, isConnected, address, shard, chainId, walletType, isPelagusInstalled, isTangemInstalled, signMessage, sendTransaction, getBalance])
 
   // Component doesn't render anything visible
   return null

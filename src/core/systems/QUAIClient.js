@@ -10,10 +10,11 @@ import { web3Environment } from '../utils/web3Environment.js'
  * - Dual-ledger architecture (EVM + UTXO)
  * - Hierarchical sharding with 9 zones
  * - Proof of Entropy Minima consensus
- * - Pelagus wallet for browser integration
+ * - Supports Pelagus wallet and Tangem hardware wallet
  *
- * IMPORTANT: This system requires the quais SDK (@quai/quai)
- * and Pelagus wallet extension to be installed.
+ * Supported wallets:
+ * - Pelagus (browser extension): https://pelaguswallet.io
+ * - Tangem (hardware wallet): https://tangem.com
  */
 export class QUAIClient extends System {
   constructor(world) {
@@ -22,6 +23,7 @@ export class QUAIClient extends System {
     this.signer = null
     this.address = null
     this.shard = null
+    this.walletType = null // 'pelagus' | 'tangem' | null
     this.isInitialized = false
     this.initError = null
   }
@@ -54,26 +56,75 @@ export class QUAIClient extends System {
    * Check if Pelagus wallet is installed
    */
   isPelagusInstalled() {
-    return typeof window !== 'undefined' && window.pelagus
+    return typeof window !== 'undefined' && !!window.pelagus
   }
 
   /**
-   * Connect to Quai Network via Pelagus wallet
+   * Check if Tangem wallet is installed
    */
-  async connect() {
-    if (!this.isPelagusInstalled()) {
+  isTangemInstalled() {
+    if (typeof window === 'undefined') return false
+    // Check for Tangem browser extension
+    return !!window.tangem ||
+           !!(window.ethereum?.isTangem) ||
+           !!(window.ethereum?.providers?.some(p => p.isTangem))
+  }
+
+  /**
+   * Get the first available Quai provider
+   */
+  getProvider() {
+    // Prefer Pelagus if available
+    if (window.pelagus) {
+      this.walletType = 'pelagus'
+      return window.pelagus
+    }
+    // Fall back to Tangem
+    if (window.tangem) {
+      this.walletType = 'tangem'
+      return window.tangem
+    }
+    // Check ethereum providers (Tangem can inject here)
+    if (window.ethereum?.isTangem) {
+      this.walletType = 'tangem'
+      return window.ethereum
+    }
+    return null
+  }
+
+  /**
+   * Connect to Quai Network via available wallet (Pelagus or Tangem)
+   */
+  async connect(preferredWallet = null) {
+    // Determine which wallet to use
+    let provider = null
+
+    if (preferredWallet === 'pelagus' && this.isPelagusInstalled()) {
+      provider = window.pelagus
+      this.walletType = 'pelagus'
+    } else if (preferredWallet === 'tangem' && this.isTangemInstalled()) {
+      provider = window.tangem || window.ethereum
+      this.walletType = 'tangem'
+    } else {
+      // Auto-select first available
+      provider = this.getProvider()
+    }
+
+    if (!provider) {
       return {
         success: false,
-        reason: 'pelagus_not_installed',
-        message: 'Pelagus wallet not detected. Please install Pelagus from https://pelaguswallet.io'
+        reason: 'no_wallet_installed',
+        message: 'No Quai wallet detected. Please install Pelagus (pelaguswallet.io) or Tangem wallet'
       }
     }
 
-    try {
-      web3Logger.network('Connecting to Quai Network via Pelagus...')
+    const walletName = this.walletType === 'tangem' ? 'Tangem' : 'Pelagus'
 
-      // Request account access
-      const accounts = await window.pelagus.request({
+    try {
+      web3Logger.network(`Connecting to Quai Network via ${walletName}...`)
+
+      // Request account access (same API for both wallets)
+      const accounts = await provider.request({
         method: 'quai_requestAccounts'
       })
 
@@ -88,13 +139,13 @@ export class QUAIClient extends System {
       this.address = accounts[0]
 
       // Get current chain/shard info
-      const chainId = await window.pelagus.request({
+      const chainId = await provider.request({
         method: 'quai_chainId'
       })
 
       // Determine shard from address
       this.shard = this.getShardFromAddress(this.address)
-
+      this.provider = provider
       this.connected = true
 
       // Update player data
@@ -102,23 +153,26 @@ export class QUAIClient extends System {
         this.world.entities.player.modify({ quai: this.address })
       }
 
-      web3Logger.success('Connected to Quai Network:', {
+      web3Logger.success(`Connected to Quai Network via ${walletName}:`, {
         address: this.address,
         chainId,
-        shard: this.shard
+        shard: this.shard,
+        walletType: this.walletType
       })
 
       this.emit('quaiConnect', {
         address: this.address,
         chainId,
-        shard: this.shard
+        shard: this.shard,
+        walletType: this.walletType
       })
 
       return {
         success: true,
         address: this.address,
         chainId,
-        shard: this.shard
+        shard: this.shard,
+        walletType: this.walletType
       }
     } catch (error) {
       web3Logger.error('Quai connection failed:', error)
@@ -135,9 +189,11 @@ export class QUAIClient extends System {
    */
   async disconnect() {
     try {
-      // Pelagus doesn't have a disconnect method, just clear state
+      // Clear all connection state
       this.address = null
       this.shard = null
+      this.walletType = null
+      this.provider = null
       this.connected = false
 
       if (this.world.entities?.player) {
@@ -191,12 +247,12 @@ export class QUAIClient extends System {
    * Sign a message
    */
   async signMessage(message) {
-    if (!this.connected || !this.address) {
+    if (!this.connected || !this.address || !this.provider) {
       throw new Error('Not connected to Quai Network')
     }
 
     try {
-      const signature = await window.pelagus.request({
+      const signature = await this.provider.request({
         method: 'quai_sign',
         params: [this.address, message]
       })
@@ -213,12 +269,12 @@ export class QUAIClient extends System {
    * Quai transactions include shard info and may need cross-shard coordination
    */
   async sendTransaction(tx) {
-    if (!this.connected || !this.address) {
+    if (!this.connected || !this.address || !this.provider) {
       throw new Error('Not connected to Quai Network')
     }
 
     try {
-      const txHash = await window.pelagus.request({
+      const txHash = await this.provider.request({
         method: 'quai_sendTransaction',
         params: [{
           from: this.address,
@@ -246,10 +302,14 @@ export class QUAIClient extends System {
       return { success: false, reason: 'no_address' }
     }
 
+    // Use stored provider if available, otherwise try to get one
+    const provider = this.provider || this.getProvider()
+    if (!provider) {
+      return { success: false, reason: 'no_provider', error: 'No wallet provider available' }
+    }
+
     try {
-      // This would use quais SDK in full implementation
-      // For now, return placeholder
-      const balance = await window.pelagus.request({
+      const balance = await provider.request({
         method: 'quai_getBalance',
         params: [address, 'latest']
       })
@@ -292,6 +352,10 @@ export class QUAIClient extends System {
       sendTransaction: async () => ({ success: false }),
       getBalance: async () => ({ success: false }),
       isPelagusInstalled: () => false,
+      isTangemInstalled: () => false,
+      getWalletType: () => null,
+      connectPelagus: async () => ({ success: false, reason: 'not_initialized' }),
+      connectTangem: async () => ({ success: false, reason: 'not_initialized' }),
     }
   }
 
@@ -305,10 +369,15 @@ export class QUAIClient extends System {
       isConnected: () => this.connected,
       getAddress: () => this.address,
       getShard: () => this.shard,
+      getWalletType: () => this.walletType,
       signMessage: this.signMessage.bind(this),
       sendTransaction: this.sendTransaction.bind(this),
       getBalance: this.getBalance.bind(this),
       isPelagusInstalled: this.isPelagusInstalled.bind(this),
+      isTangemInstalled: this.isTangemInstalled.bind(this),
+      // Convenience methods for specific wallets
+      connectPelagus: () => this.connect('pelagus'),
+      connectTangem: () => this.connect('tangem'),
     }
   }
 
