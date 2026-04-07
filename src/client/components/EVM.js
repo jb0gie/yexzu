@@ -120,6 +120,8 @@ const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
   ssr: false,
+  // Disable persistence to prevent auto-reconnect
+  storage: null,
 })
 
 // Initialize AppKit if project ID is available
@@ -144,6 +146,12 @@ if (projectId && projectId.length >= 32) {
       swaps: false,
       onramp: false,
       email: false,
+      // Disable auto-connect on page load
+      connectMethodsOrder: ['wallet', 'email', 'social'],
+    },
+    // Prevent auto-opening the modal
+    defaultAccountTypes: {
+      eip155: 'EOA',
     },
     })
     console.log('[EVM] AppKit initialized successfully')
@@ -183,8 +191,31 @@ function Logic({ world }) {
   const config = useConfig()
   const chainId = useChainId()
   const { address, isConnected, isConnecting, isReconnecting, isDisconnected } = useAccount()
-  const { open } = useAppKit()
+  const { open, close } = useAppKit()
   const [initialized, setInitialized] = useState(false)
+  const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false)
+
+  // Prevent auto-reconnect from opening the modal
+  useEffect(() => {
+    // Close any auto-opened modal on first mount
+    if (!initialized) {
+      setInitialized(true)
+      // Close modal if it was auto-opened by reconnect
+      if (isReconnecting) {
+        console.log('[EVM] Preventing auto-reconnect modal...')
+        close()
+      }
+    }
+  }, [initialized, isReconnecting, close])
+
+  // Track reconnection attempts
+  useEffect(() => {
+    if (isReconnecting && !hasAttemptedReconnect) {
+      setHasAttemptedReconnect(true)
+      // Close the modal that was auto-opened
+      setTimeout(() => close(), 100)
+    }
+  }, [isReconnecting, hasAttemptedReconnect, close])
 
   // Set player.evm when wallet connects/disconnects
   useEffect(() => {
