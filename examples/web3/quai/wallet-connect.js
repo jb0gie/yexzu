@@ -107,7 +107,7 @@ let connectAction = null
 
 if (rig) {
   connectAction = app.create('action', {
-    label: 'Connect Pelagus',
+    label: 'Connect Wallet',
     distance: 4,
     duration: 0.3,
     position: [0, .67, .2],
@@ -139,18 +139,26 @@ const doInitialCheck = (dt) => {
   initCheckTimer += dt
   if (initCheckTimer < 0.5) return
 
-  // Check if QUAI system is ready
+  const player = world.getPlayer()
   const quai = world.quai
-  if (!quai || typeof quai.connect !== 'function') {
-    // Silently skip until QUAI is ready
-    return
+  const evm = world.evm
+
+  // Check for existing connection (QUAI direct or EVM/Reown)
+  let address = player?.quai
+  let walletType = 'quai'
+
+  if (!address && quai?.getAddress) {
+    address = quai.getAddress()
   }
 
-  const player = world.getPlayer()
-  const address = player?.quai || (quai.getAddress ? quai.getAddress() : null)
+  // Also check EVM if no QUAI connection
+  if (!address && evm?.address) {
+    address = evm.address
+    walletType = 'evm-reown'
+  }
 
   if (app.props.debug === 'enabled') {
-    console.log('[Quai] Initial state:', { address })
+    console.log('[Quai] Initial state:', { address, walletType })
   }
 
   if (address) {
@@ -159,7 +167,7 @@ const doInitialCheck = (dt) => {
     previousAddress = address
 
     // Get shard info
-    const shard = quai.getShard ? quai.getShard() : null
+    const shard = quai?.getShard ? quai.getShard() : null
     app.state.shard = shard
 
     updateStatusUI(address, shard)
@@ -169,7 +177,7 @@ const doInitialCheck = (dt) => {
     }
 
     if (app.props.debug === 'enabled') {
-      console.log('[Quai] Already connected on init:', address, shard)
+      console.log('[Quai] Already connected on init:', address, shard, walletType)
     }
   }
 
@@ -218,7 +226,17 @@ app.on('update', (dt) => {
   checkTimer = 0
 
   const player = world.getPlayer()
-  const address = player?.quai || (quai.getAddress ? quai.getAddress() : null)
+  const quai = world.quai
+  const evm = world.evm
+
+  // Check for connection from either QUAI or EVM
+  let address = player?.quai
+  if (!address && quai?.getAddress) {
+    address = quai.getAddress()
+  }
+  if (!address && evm?.address) {
+    address = evm.address
+  }
 
   if (address !== previousAddress) {
     previousAddress = address
@@ -227,7 +245,7 @@ app.on('update', (dt) => {
       app.state.connected = true
       app.state.address = address
 
-      const shard = quai.getShard ? quai.getShard() : null
+      const shard = quai?.getShard ? quai.getShard() : null
       app.state.shard = shard
 
       updateStatusUI(address, shard)
@@ -247,7 +265,7 @@ app.on('update', (dt) => {
         statusText.color = '#cccccc'
       }
       if (shardText) shardText.value = ''
-      if (connectAction) connectAction.label = 'Connect Pelagus'
+      if (connectAction) connectAction.label = 'Connect Wallet'
 
       rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
 
@@ -267,95 +285,91 @@ async function connectWallet() {
     return
   }
 
-  // Check if QUAI system is available
-  const quai = world.quai
-  if (!quai || typeof quai.connect !== 'function') {
-    if (statusText) {
-      statusText.value = '⏳ Loading...'
-      statusText.color = '#f59e0b'
-    }
-    console.error('[Quai] QUAI system not yet initialized')
-    setTimeout(() => {
-      if (statusText) {
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
-      }
-    }, 2000)
-    return
-  }
-
-  // Check if Pelagus is installed
-  const isInstalled = quai.isPelagusInstalled ? quai.isPelagusInstalled() : false
-  if (!isInstalled) {
-    if (statusText) {
-      statusText.value = '❌ Install Pelagus'
-      statusText.color = '#ef4444'
-    }
-    console.error('[Quai] Pelagus wallet not installed')
-    console.log('[Quai] Download from: https://pelaguswallet.io')
-
-    // Reset after delay
-    setTimeout(() => {
-      if (statusText) {
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
-      }
-    }, 3000)
-    return
-  }
-
   if (statusText) {
     statusText.value = '⏳ Connecting...'
     statusText.color = '#f59e0b'
   }
 
-  try {
-    const result = await quai.connect()
+  // Try QUAI direct connection first (Pelagus/Tangem)
+  const quai = world.quai
+  if (quai?.isPelagusInstalled?.()) {
+    try {
+      const result = await quai.connect()
 
-    if (app.props.debug === 'enabled') {
-      console.log('[Quai] Connect result:', result)
-    }
+      if (result.success) {
+        app.state.connected = true
+        app.state.address = result.address
+        app.state.shard = result.shard
 
-    if (result.success) {
-      app.state.connected = true
-      app.state.address = result.address
-      app.state.shard = result.shard
+        updateStatusUI(result.address, result.shard)
+        rig?.play({ name: 'ON', loop: true, fade: 0.3 })
 
-      updateStatusUI(result.address, result.shard)
-
-      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
-
-      app.emit('quaiConnected', {
-        connected: true,
-        address: result.address,
-        shard: result.shard
-      })
-    } else if (result.reason === 'user_rejected') {
-      if (statusText) {
-        statusText.value = '❌ Cancelled'
-        statusText.color = '#ef4444'
+        app.emit('quaiConnected', {
+          connected: true,
+          address: result.address,
+          shard: result.shard,
+          walletType: result.walletType || 'pelagus'
+        })
+        return
       }
-      setTimeout(() => {
-        if (statusText) {
-          statusText.value = '🌐 Disconnected'
-          statusText.color = '#cccccc'
-        }
-      }, 2000)
+    } catch (error) {
+      console.log('[Quai] Direct connect failed, trying EVM/Reown...')
     }
-  } catch (error) {
-    console.error('[Quai] Connect error:', error)
-    if (statusText) {
-      statusText.value = '❌ Error'
-      statusText.color = '#ef4444'
-    }
-
-    setTimeout(() => {
-      if (statusText) {
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
-      }
-    }, 3000)
   }
+
+  // Fall back to EVM/Reown (for WalletConnect to Pelagus or other wallets)
+  const evm = world.evm
+  if (evm?.connect) {
+    try {
+      console.log('[Quai] Connecting via EVM/Reown...')
+      const result = await evm.connect()
+
+      if (result.success || evm.connected) {
+        // Wait for address to be available
+        let attempts = 0
+        while (!evm.address && attempts < 10) {
+          await new Promise(r => setTimeout(r, 500))
+          attempts++
+        }
+
+        if (evm.address) {
+          app.state.connected = true
+          app.state.address = evm.address
+          // Determine shard from EVM address
+          const shard = quai?.getShard ? quai.getShard() : null
+          app.state.shard = shard
+
+          updateStatusUI(evm.address, shard)
+          rig?.play({ name: 'ON', loop: true, fade: 0.3 })
+
+          app.emit('quaiConnected', {
+            connected: true,
+            address: evm.address,
+            shard: shard,
+            walletType: 'evm-reown'
+          })
+          return
+        }
+      }
+    } catch (error) {
+      console.error('[Quai] EVM connect failed:', error)
+    }
+  }
+
+  // Connection failed
+  if (statusText) {
+    statusText.value = '❌ Install Pelagus'
+    statusText.color = '#ef4444'
+  }
+  console.error('[Quai] No wallet available')
+  console.log('[Quai] Download from: https://pelaguswallet.io')
+
+  setTimeout(() => {
+    if (statusText) {
+      statusText.value = '🌐 Disconnected'
+      statusText.color = '#cccccc'
+    }
+  }, 3000)
 }
 
 // Disconnect function
@@ -367,20 +381,30 @@ async function disconnectWallet() {
     return
   }
 
-  // Check if QUAI system is available
+  // Try QUAI disconnect first
   const quai = world.quai
-  if (!quai || typeof quai.disconnect !== 'function') {
-    console.error('[Quai] QUAI system not available')
-    return
+  if (quai?.disconnect) {
+    try {
+      await quai.disconnect()
+      if (app.props.debug === 'enabled') {
+        console.log('[Quai] Disconnected from QUAI')
+      }
+    } catch (error) {
+      // Silent fail
+    }
   }
 
-  try {
-    await quai.disconnect()
-    if (app.props.debug === 'enabled') {
-      console.log('[Quai] Disconnected')
+  // Also disconnect EVM if connected there
+  const evm = world.evm
+  if (evm?.disconnect && evm.connected) {
+    try {
+      await evm.disconnect()
+      if (app.props.debug === 'enabled') {
+        console.log('[Quai] Disconnected from EVM')
+      }
+    } catch (error) {
+      // Silent fail
     }
-  } catch (error) {
-    console.error('[Quai] Disconnect error:', error)
   }
 }
 
@@ -407,6 +431,6 @@ if (world.isClient) {
 
 if (app.props.debug === 'enabled') {
   console.log('✅ Quai Wallet Connect initialized')
-  console.log('🔷 Requires Pelagus wallet (not MetaMask)')
+  console.log('🔷 Supports: Pelagus, Tangem, Reown/WalletConnect')
   console.log('🔷 Quai uses 9-zone sharded architecture')
 }
