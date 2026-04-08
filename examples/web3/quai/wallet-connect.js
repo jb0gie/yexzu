@@ -131,57 +131,20 @@ function isQuaiAvailable() {
 // State tracking
 let initCheckTimer = 0
 let initChecked = false
-let previousAddress = null
 
-// Check initial connection state
+// Check initial connection state - ONLY for UI sync, never auto-connect
 const doInitialCheck = (dt) => {
   if (initChecked) return
   initCheckTimer += dt
-  if (initCheckTimer < 0.5) return
+  if (initCheckTimer < 1.0) return // Wait longer before first check
 
-  const player = world.getPlayer()
-  const quai = world.quai
-  const evm = world.evm
-
-  // Check for existing connection (QUAI direct or EVM/Reown)
-  let address = player?.quai
-  let walletType = 'quai'
-
-  if (!address && quai?.getAddress) {
-    address = quai.getAddress()
-  }
-
-  // Also check EVM if no QUAI connection
-  if (!address && evm?.address) {
-    address = evm.address
-    walletType = 'evm-reown'
-  }
+  // Don't auto-detect or auto-connect anything
+  // Just mark as checked so the update loop takes over
+  initChecked = true
 
   if (app.props.debug === 'enabled') {
-    console.log('[Quai] Initial state:', { address, walletType })
+    console.log('[Quai] Init check complete - waiting for user action')
   }
-
-  if (address) {
-    app.state.connected = true
-    app.state.address = address
-    previousAddress = address
-
-    // Get shard info
-    const shard = quai?.getShard ? quai.getShard() : null
-    app.state.shard = shard
-
-    updateStatusUI(address, shard)
-
-    if (rig) {
-      rig.play({ name: 'ON', loop: true, fade: 0.3 })
-    }
-
-    if (app.props.debug === 'enabled') {
-      console.log('[Quai] Already connected on init:', address, shard, walletType)
-    }
-  }
-
-  initChecked = true
 }
 
 function updateStatusUI(address, shard) {
@@ -215,65 +178,8 @@ app.on('update', (dt) => {
 
   doInitialCheck(dt)
 
-  // Skip if QUAI system not available yet
-  const quai = world.quai
-  if (!quai || typeof quai.connect !== 'function') {
-    return
-  }
-
-  checkTimer += dt
-  if (checkTimer < 0.5) return
-  checkTimer = 0
-
-  const player = world.getPlayer()
-  const quai = world.quai
-  const evm = world.evm
-
-  // Check for connection from either QUAI or EVM
-  let address = player?.quai
-  if (!address && quai?.getAddress) {
-    address = quai.getAddress()
-  }
-  if (!address && evm?.address) {
-    address = evm.address
-  }
-
-  if (address !== previousAddress) {
-    previousAddress = address
-
-    if (address) {
-      app.state.connected = true
-      app.state.address = address
-
-      const shard = quai?.getShard ? quai.getShard() : null
-      app.state.shard = shard
-
-      updateStatusUI(address, shard)
-
-      rig?.play({ name: 'ON', loop: true, fade: 0.3 })
-
-      if (app.props.debug === 'enabled') {
-        console.log('[Quai] Connected:', address, shard)
-      }
-    } else if (app.state.connected) {
-      app.state.connected = false
-      app.state.address = null
-      app.state.shard = null
-
-      if (statusText) {
-        statusText.value = '🌐 Disconnected'
-        statusText.color = '#cccccc'
-      }
-      if (shardText) shardText.value = ''
-      if (connectAction) connectAction.label = 'Connect Wallet'
-
-      rig?.play({ name: 'OFF', loop: true, fade: 0.3 })
-
-      if (app.props.debug === 'enabled') {
-        console.log('[Quai] Disconnected')
-      }
-    }
-  }
+  // Update visibility based on trigger zone only
+  // No polling for wallet connection - only connect via onTrigger
 })
 
 // Connection function
