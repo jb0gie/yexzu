@@ -11,11 +11,10 @@ import { Emotes } from '../extras/playerEmotes'
 import { ControlPriorities } from '../extras/ControlPriorities'
 import { isBoolean, isNumber } from 'lodash-es'
 import { hasRank, Ranks } from '../extras/ranks'
+import { FORWARD, Modes } from '../extras/vrmHelpers'
 
 const UP = new THREE.Vector3(0, 1, 0)
 const DOWN = new THREE.Vector3(0, -1, 0)
-const FORWARD = new THREE.Vector3(0, 0, -1)
-const BACKWARD = new THREE.Vector3(0, 0, 1)
 const SCALE_IDENTITY = new THREE.Vector3(1, 1, 1)
 const POINTER_LOOK_SPEED = 0.1
 const PAN_LOOK_SPEED = 0.4
@@ -42,29 +41,7 @@ const m2 = new THREE.Matrix4()
 const m3 = new THREE.Matrix4()
 
 const gazeTiltAngle = 10 * DEG2RAD
-const gazeTiltAxis = new THREE.Vector3(1, 0, 0) // X-axis for pitch
-
-// TODO: de-dup createVRMFactory.js has a copy
-const Modes = {
-  IDLE: 0,
-  WALK: 1,
-  RUN: 2,
-  JUMP: 3,
-  FALL: 4,
-  FLY: 5,
-  TALK: 6,
-  FLIP: 7,
-  BACKFLIP: 8,
-  SIDEFLIP_LEFT: 9,
-  SIDEFLIP_RIGHT: 10,
-  STRAFE_JUMP_LEFT: 11,
-  STRAFE_JUMP_RIGHT: 12,
-  GRINDING: 13,
-  CLIMBING: 14,
-  LEDGE_HANGING: 15,
-  AIR_DIVING: 16,
-  WALL_SLIDING: 17,
-}
+const gazeTiltAxis = new THREE.Vector3(1, 0, 0)
 
 export class PlayerLocal extends Entity {
   constructor(world, data, local) {
@@ -256,7 +233,7 @@ export class PlayerLocal extends Entity {
     const shape = this.world.physics.physics.createShape(geometry, this.material, true, flags)
     const localPose = new PHYSX.PxTransform(PHYSX.PxIDENTITYEnum.PxIdentity)
     // rotate to stand up
-    q1.set(0, 0, 0).setFromAxisAngle(BACKWARD, Math.PI / 2)
+    q1.set(0, 0, 0).setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2)
     q1.toPxTransform(localPose)
     // move capsule up so its base is at 0,0,0
     v1.set(0, halfHeight + radius, 0)

@@ -149,7 +149,7 @@ export class ConnectionManager extends EventEmitter {
       this.emit('connected', connectionData)
       this.emit('stateChange', { state: this.state, event: 'connected' })
 
-      console.log(`[ConnectionManager:${this.providerName}] ✅ Connected:`, connectionData)
+      // console.log(`[ConnectionManager:${this.providerName}] ✅ Connected:`, connectionData)
 
       return connectionData
 
@@ -215,7 +215,7 @@ export class ConnectionManager extends EventEmitter {
       this.emit('disconnected', { provider: this.providerName })
       this.emit('stateChange', { state: this.state, event: 'disconnected' })
 
-      console.log(`[ConnectionManager:${this.providerName}] Disconnected`)
+      // console.log(`[ConnectionManager:${this.providerName}] Disconnected`)
 
     } catch (error) {
       this.setError(error)
@@ -352,7 +352,7 @@ export class ConnectionManager extends EventEmitter {
    * @param {Object} options - Reconnection options
    */
   async forceReconnect(options = {}) {
-    console.log(`[ConnectionManager:${this.providerName}] Forcing reconnection...`)
+    // console.log(`[ConnectionManager:${this.providerName}] Forcing reconnection...`)
 
     // Clear any existing reconnection timer
     this._clearReconnectTimer()
@@ -434,7 +434,7 @@ export class ConnectionManager extends EventEmitter {
       this.options.maxReconnectDelay
     )
 
-    console.log(`[ConnectionManager:${this.providerName}] Scheduling reconnect attempt ${this._reconnectAttempts}/${this.options.maxReconnectAttempts} in ${delay}ms`)
+    // console.log(`[ConnectionManager:${this.providerName}] Scheduling reconnect attempt ${this._reconnectAttempts}/${this.options.maxReconnectAttempts} in ${delay}ms`)
 
     this._reconnectTimer = setTimeout(async () => {
       try {

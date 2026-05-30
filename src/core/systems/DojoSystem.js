@@ -1,10 +1,10 @@
 import { System } from './System.js'
-console.log('[DojoSystem] Module loaded')
+// console.log('[DojoSystem] Module loaded')
 
 // Import real DojoEngine dependencies
 try {
   // These will be dynamically imported in init() to avoid SES issues
-  console.log('[DojoSystem] DojoEngine dependencies available for dynamic import')
+  // console.log('[DojoSystem] DojoEngine dependencies available for dynamic import')
 } catch (error) {
   console.warn('[DojoSystem] ⚠️ DojoEngine dependencies not available:', error.message)
 }
@@ -85,9 +85,9 @@ export class DojoSystem extends System {
 
   async init(options = {}) {
     try {
-      console.log('[DojoSystem] Initializing REAL DojoEngine integration...')
-      console.log('[DojoSystem] RPC URL:', this.config.rpcUrl)
-      console.log('[DojoSystem] Torii URL:', this.config.toriiUrl)
+      // console.log('[DojoSystem] Initializing REAL DojoEngine integration...')
+      // console.log('[DojoSystem] RPC URL:', this.config.rpcUrl)
+      // console.log('[DojoSystem] Torii URL:', this.config.toriiUrl)
 
       // Merge configuration
       Object.assign(this.config, options)
@@ -101,15 +101,15 @@ export class DojoSystem extends System {
       const { ToriiClient } = await import('@dojoengine/torii-client')
       const { RpcProvider, Account } = await import('starknet')
 
-      console.log('[DojoSystem] ✅ Dojo libraries imported successfully')
+      // console.log('[DojoSystem] ✅ Dojo libraries imported successfully')
 
       // Initialize StarkNet provider
       this.provider = new RpcProvider({ nodeUrl: this.config.rpcUrl })
-      console.log('[DojoSystem] ✅ StarkNet provider initialized')
+      // console.log('[DojoSystem] ✅ StarkNet provider initialized')
 
       // Initialize account for transactions
       this.account = new Account(this.provider, this.config.masterAddress, this.config.masterPrivateKey)
-      console.log('[DojoSystem] ✅ Account initialized:', this.config.masterAddress)
+      // console.log('[DojoSystem] ✅ Account initialized:', this.config.masterAddress)
 
       // Test connection to Katana
       await this.testConnection()
@@ -120,7 +120,7 @@ export class DojoSystem extends System {
         toriiUrl: this.config.toriiUrl,
         worldAddress: this.config.worldAddress,
       })
-      console.log('[DojoSystem] ✅ Torii client initialized')
+      // console.log('[DojoSystem] ✅ Torii client initialized')
 
       // Set up entity synchronization
       this.setupEntitySync()
@@ -129,9 +129,9 @@ export class DojoSystem extends System {
       this._isConnected = true
       this._networkId = 'LOCAL_KATANA'
 
-      console.log('[DojoSystem] ✅ DojoEngine integration initialized successfully')
-      console.log('[DojoSystem] Network:', this._networkId)
-      console.log('[DojoSystem] Account:', this.config.masterAddress)
+      // console.log('[DojoSystem] ✅ DojoEngine integration initialized successfully')
+      // console.log('[DojoSystem] Network:', this._networkId)
+      // console.log('[DojoSystem] Account:', this.config.masterAddress)
     } catch (error) {
       console.error('[DojoSystem] ❌ Failed to initialize DojoEngine:', error)
       throw new Error(`DojoEngine initialization failed: ${error.message}. Please ensure DojoEngine dependencies are installed and configured correctly.`)
@@ -141,7 +141,7 @@ export class DojoSystem extends System {
   async testConnection() {
     try {
       const blockNumber = await this.provider.getBlockNumber()
-      console.log('[DojoSystem] ✅ Connected to Katana, block:', blockNumber)
+      // console.log('[DojoSystem] ✅ Connected to Katana, block:', blockNumber)
       return true
     } catch (error) {
       console.error('[DojoSystem] ❌ Failed to connect to Katana:', error.message)
@@ -164,7 +164,7 @@ export class DojoSystem extends System {
       this.entitySync.set(hyperfyEntity.data.id, dojoEntityId)
       this.dojoEntities.set(dojoEntityId, hyperfyEntity.data.id)
 
-      console.log('[DojoSystem] ✅ Synced entity:', hyperfyEntity.data.id, '<->', dojoEntityId)
+      // console.log('[DojoSystem] ✅ Synced entity:', hyperfyEntity.data.id, '<->', dojoEntityId)
 
       // Initial state sync
       await this.pushEntityState(hyperfyEntity, dojoEntityId)
@@ -201,7 +201,7 @@ export class DojoSystem extends System {
       }
 
       // In real implementation, this would call setComponent on the world contract
-      console.log('[DojoSystem] 📤 Entity state ready for onchain push:', dojoEntityId)
+      // console.log('[DojoSystem] 📤 Entity state ready for onchain push:', dojoEntityId)
 
       return entityData
     } catch (error) {
@@ -216,7 +216,7 @@ export class DojoSystem extends System {
     this.entitySync.delete(hyperfyEntityId)
     this.dojoEntities.delete(dojoEntityId)
 
-    console.log('[DojoSystem] 🗑️ Unsynced entity:', hyperfyEntityId, '<->', dojoEntityId)
+    // console.log('[DojoSystem] 🗑️ Unsynced entity:', hyperfyEntityId, '<->', dojoEntityId)
   }
 
   async executeOnchain(calls) {
@@ -225,7 +225,7 @@ export class DojoSystem extends System {
     }
 
     try {
-      console.log('[DojoSystem] 💰 Executing REAL transaction:', calls)
+      // console.log('[DojoSystem] 💰 Executing REAL transaction:', calls)
 
       // Execute transaction through account
       const result = await this.account.execute(calls)
@@ -237,7 +237,7 @@ export class DojoSystem extends System {
         status: 'pending',
       })
 
-      console.log('[DojoSystem] ✅ Transaction submitted:', result.transaction_hash)
+      // console.log('[DojoSystem] ✅ Transaction submitted:', result.transaction_hash)
       return result
     } catch (error) {
       console.error('[DojoSystem] ❌ Transaction failed:', error)
@@ -290,7 +290,7 @@ export class DojoSystem extends System {
       ]
 
       const result = await this.executeOnchain(calls)
-      console.log('[DojoSystem] ✅ Component updated:', dojoEntityId, componentType)
+      // console.log('[DojoSystem] ✅ Component updated:', dojoEntityId, componentType)
       return result
     } catch (error) {
       console.error('[DojoSystem] ❌ Failed to set component:', error)
@@ -304,7 +304,7 @@ export class DojoSystem extends System {
       this.syncOnchainState()
     }, this.config.syncInterval)
 
-    console.log('[DojoSystem] 🔄 Entity synchronization set up')
+    // console.log('[DojoSystem] 🔄 Entity synchronization set up')
   }
 
   async syncOnchainState() {
@@ -322,7 +322,7 @@ export class DojoSystem extends System {
       }
 
       if (updates.length > 0) {
-        console.log(`[DojoSystem] 🔄 Synced ${updates.length} entity updates`)
+        // console.log(`[DojoSystem] 🔄 Synced ${updates.length} entity updates`)
       }
 
       this.lastSyncTime = Date.now()
@@ -349,7 +349,7 @@ export class DojoSystem extends System {
       this.updateEntityComponent(entity, componentName, value)
     }
 
-    console.log('[DojoSystem] ✅ Applied onchain update to entity:', hyperfyEntityId)
+    // console.log('[DojoSystem] ✅ Applied onchain update to entity:', hyperfyEntityId)
   }
 
   updateEntityComponent(entity, componentType, value) {
@@ -375,7 +375,7 @@ export class DojoSystem extends System {
         }
         break
       default:
-        console.log('[DojoSystem] Unknown component type:', componentType, value)
+        // console.log('[DojoSystem] Unknown component type:', componentType, value)
     }
   }
 
@@ -388,7 +388,7 @@ export class DojoSystem extends System {
       // For now, simulate confirmation after delay
       if (Date.now() - transaction.timestamp > 3000) {
         this.pendingTransactions.delete(txHash)
-        console.log('[DojoSystem] ✅ Transaction confirmed:', txHash)
+        // console.log('[DojoSystem] ✅ Transaction confirmed:', txHash)
       }
     }
   }
@@ -406,6 +406,6 @@ export class DojoSystem extends System {
     this.dojoEntities.clear()
     this.pendingTransactions.clear()
 
-    console.log('[DojoSystem] 🛑 DojoEngine system destroyed')
+    // console.log('[DojoSystem] 🛑 DojoEngine system destroyed')
   }
 }

@@ -57,8 +57,8 @@ export class BaseWeb3System extends System {
    */
   async init(options = {}) {
     try {
-      console.log(`[${this.constructor.name}] Initializing Web3 system...`)
-      console.log(`[${this.constructor.name}] Environment:`, this.environment)
+      // console.log(`[${this.constructor.name}] Initializing Web3 system...`)
+      // console.log(`[${this.constructor.name}] Environment:`, this.environment)
 
       // Merge configuration
       Object.assign(this.config, options)
@@ -67,7 +67,7 @@ export class BaseWeb3System extends System {
       this.initError = null
 
       this.isInitialized = true
-      console.log(`[${this.constructor.name}] Base initialization completed`)
+      // console.log(`[${this.constructor.name}] Base initialization completed`)
     } catch (error) {
       console.error(`[${this.constructor.name}] Initialization failed:`, error)
       this.initError = error
@@ -261,7 +261,7 @@ export class BaseWeb3System extends System {
    * Subclasses should call super.destroy() before their specific cleanup
    */
   destroy() {
-    console.log(`[${this.constructor.name}] Destroying Web3 system...`)
+    // console.log(`[${this.constructor.name}] Destroying Web3 system...`)
 
     // Reset connection state
     this.isConnected = false
@@ -276,6 +276,6 @@ export class BaseWeb3System extends System {
     this.initError = null
     this.isInitialized = false
 
-    console.log(`[${this.constructor.name}] Web3 system destroyed`)
+    // console.log(`[${this.constructor.name}] Web3 system destroyed`)
   }
 }

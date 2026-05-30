@@ -102,7 +102,7 @@ export class EVM extends System {
     // If React has updated but isn't done connecting yet, don't block it
     // Check both local state and React state - if they're different, we're in transition
     if (this.connected && this._reactData?.isConnecting) {
-      console.log('[EVM] Already connected locally, but React is still processing')
+      // console.log('[EVM] Already connected locally, but React is still processing')
     }
 
     // Check if already connected using both local state AND we have an address
@@ -110,7 +110,7 @@ export class EVM extends System {
     const isAlreadyConnected = this.connected && (this.address || this._reactData?.address || this._cachedReactAddress)
 
     if (isAlreadyConnected) {
-      console.log('[EVM] Already connected (has connection and address), skipping...')
+      // console.log('[EVM] Already connected (has connection and address), skipping...')
       // Get address from React data if available
       const address = this._reactData?.address || this.address
       return { success: false, reason: 'already_connected', address }
@@ -139,7 +139,7 @@ export class EVM extends System {
       await this.connection.connect({ connector })
 
       // Wait for React to update with the address (max 2 seconds)
-      console.log('[EVM] Waiting for address from React...')
+      // console.log('[EVM] Waiting for address from React...')
       const maxWait = 2000
       const startTime = Date.now()
 
@@ -278,7 +278,7 @@ export class EVM extends System {
     const cacheKey = `name:${address.toLowerCase()}`
     const cached = this.ensCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < this.ensCacheTimeout) {
-      console.log('[EVM] ENS name resolved from cache:', cached.value)
+      // console.log('[EVM] ENS name resolved from cache:', cached.value)
       return { success: true, name: cached.value }
     }
 
@@ -293,10 +293,10 @@ export class EVM extends System {
           value: name,
           timestamp: Date.now()
         })
-        console.log('[EVM] ENS name resolved:', name)
+        // console.log('[EVM] ENS name resolved:', name)
         return { success: true, name }
       } else {
-        console.log('[EVM] No ENS name found for address:', address)
+        // console.log('[EVM] No ENS name found for address:', address)
         return { success: true, name: null }
       }
     } catch (error) {
@@ -325,7 +325,7 @@ export class EVM extends System {
 
     // Validate ENS name format
     if (!ensName.endsWith('.eth')) {
-      console.log('[EVM] Not an ENS name:', ensName)
+      // console.log('[EVM] Not an ENS name:', ensName)
       return { success: true, address: null }
     }
 
@@ -333,7 +333,7 @@ export class EVM extends System {
     const cacheKey = `address:${ensName.toLowerCase()}`
     const cached = this.ensCache.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < this.ensCacheTimeout) {
-      console.log('[EVM] ENS address resolved from cache:', cached.value)
+      // console.log('[EVM] ENS address resolved from cache:', cached.value)
       return { success: true, address: cached.value }
     }
 
@@ -348,10 +348,10 @@ export class EVM extends System {
           value: address,
           timestamp: Date.now()
         })
-        console.log('[EVM] ENS address resolved:', address)
+        // console.log('[EVM] ENS address resolved:', address)
         return { success: true, address }
       } else {
-        console.log('[EVM] No address found for ENS name:', ensName)
+        // console.log('[EVM] No address found for ENS name:', ensName)
         return { success: true, address: null }
       }
     } catch (error) {
@@ -376,7 +376,7 @@ export class EVM extends System {
       }
     }
     if (cleaned > 0) {
-      console.log(`[EVM] Cleaned ${cleaned} expired ENS cache entries`)
+      // console.log(`[EVM] Cleaned ${cleaned} expired ENS cache entries`)
     }
   }
 }
