@@ -12,6 +12,28 @@ export class QUAI extends System {
     this.rpcUrl = process.env.QUAI_RPC_URL || 'https://rpc.quai.network'
   }
 
+  init() {
+    this.world.quai = {
+      connect: async () => ({
+        success: false,
+        reason: 'server_side',
+        message: 'QUAI wallet connection only available on client'
+      }),
+      disconnect: async () => ({ success: true }),
+      isConnected: () => false,
+      getAddress: () => null,
+      getShard: () => null,
+      getWalletType: () => null,
+      signMessage: async () => ({ success: false }),
+      sendTransaction: async () => ({ success: false }),
+      getBalance: async () => ({ success: false }),
+      isPelagusInstalled: () => false,
+      isTangemInstalled: () => false,
+      connectPelagus: async () => ({ success: false, reason: 'server_side' }),
+      connectTangem: async () => ({ success: false, reason: 'server_side' }),
+    }
+  }
+
   onQuaiConnect(socket, address) {
     socket.player.data.quai = address
     socket.player.modify({ quai: address })
