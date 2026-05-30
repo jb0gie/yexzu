@@ -1105,7 +1105,6 @@ export class PlayerLocal extends Entity {
       this.world.controls.applyXRRig(this.xrRig)
     }
 
-    // apply locomotion
     this.avatar?.instance?.setLocomotion(this.mode, this.axis, this.gaze)
 
     // send network updates

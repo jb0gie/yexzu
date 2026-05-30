@@ -1062,7 +1062,6 @@ export function createVRMFactory(glb, setupMaterial) {
             // console.log(`[VRM] Locomotion DISABLED - currentEmote: ${currentEmote?.url || 'none'}`)
           }
         }
-        // facial expressions per frame
         if (expressionsEnabled) {
           updateBlink(elapsed)
           updateMouth(elapsed, talking)
