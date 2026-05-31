@@ -18,7 +18,6 @@ export class ClientP2PVoice extends System {
     this.muted = new Set()
     this.localStream = null
     this.initialized = false
-    this.localAnalyser = null
     this.localPCM = null
     this.localSpeaking = false
     this.localTimer = 0
@@ -57,7 +56,7 @@ export class ClientP2PVoice extends System {
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       this.status.mic = true
-      this._initLocal()
+      this.world.audio.ready(() => this._initLocal())
     } catch (err) {
       console.error('[p2pvoice] mic failed:', err.message)
     }
@@ -70,44 +69,47 @@ export class ClientP2PVoice extends System {
     const ctx = this.world.audio.ctx
     if (!ctx) return
     const source = ctx.createMediaStreamSource(this.localStream)
-    this.localAnalyser = ctx.createAnalyser()
-    this.localAnalyser.fftSize = FFT_SIZE
-    source.connect(this.localAnalyser)
     this.localPCM = new Float32Array(FFT_SIZE)
+    const processor = ctx.createScriptProcessor(FFT_SIZE, 1, 1)
+    processor.onaudioprocess = e => {
+      const input = e.inputBuffer.getChannelData(0)
+      this.localPCM.set(input)
+
+      let sum = 0
+      for (let i = 0; i < input.length; i++) {
+        sum += input[i] * input[i]
+      }
+      const rms = Math.sqrt(sum / input.length)
+
+      if (rms > THRESHOLD) this.localTimer = DEBOUNCE
+      else this.localTimer = Math.max(0, this.localTimer - this.localDelta)
+
+      const speaking = this.localTimer > 0
+      if (speaking !== this.localSpeaking) {
+        this.localSpeaking = speaking
+        this.world.entities.player?.setSpeaking(speaking)
+        this.world.network.send('voiceSpeaking', { speaking })
+        this.emit('speaking', { playerId: this.world.network.id, speaking })
+      }
+
+      if (speaking) {
+        this.frameCounter++
+        if (this.frameCounter % CHUNK_INTERVAL === 0) {
+          this.world.network.send('voiceAudio', { pcm: Array.from(input) })
+        }
+      }
+    }
+    this._processor = processor
+    source.connect(processor)
+    const silence = ctx.createGain()
+    silence.gain.value = 0
+    processor.connect(silence)
+    silence.connect(ctx.destination)
   }
 
   lateUpdate(delta) {
-    this._detectLocal(delta)
+    this.localDelta = delta
     this.remoteVoices.forEach(v => v.update(delta))
-  }
-
-  _detectLocal(delta) {
-    if (!this.localAnalyser) return
-    this.localAnalyser.getFloatTimeDomainData(this.localPCM)
-
-    let sum = 0
-    for (let i = 0; i < this.localPCM.length; i++) {
-      sum += this.localPCM[i] * this.localPCM[i]
-    }
-    const rms = Math.sqrt(sum / this.localPCM.length)
-
-    if (rms > THRESHOLD) this.localTimer = DEBOUNCE
-    else this.localTimer = Math.max(0, this.localTimer - delta)
-
-    const speaking = this.localTimer > 0
-    if (speaking !== this.localSpeaking) {
-      this.localSpeaking = speaking
-      this.world.entities.player?.setSpeaking(speaking)
-      this.world.network.send('voiceSpeaking', { speaking })
-      this.emit('speaking', { playerId: this.world.network.id, speaking })
-    }
-
-    if (speaking) {
-      this.frameCounter++
-      if (this.frameCounter % CHUNK_INTERVAL === 0) {
-        this.world.network.send('voiceAudio', { pcm: Array.from(this.localPCM) })
-      }
-    }
   }
 
   handleSpeaking(data) {
@@ -192,6 +194,10 @@ export class ClientP2PVoice extends System {
   destroy() {
     this.remoteVoices.forEach(v => v.destroy())
     this.remoteVoices.clear()
+    if (this._processor) {
+      this._processor.disconnect()
+      this._processor = null
+    }
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop())
       this.localStream = null
