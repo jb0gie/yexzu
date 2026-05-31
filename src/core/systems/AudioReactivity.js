@@ -28,7 +28,8 @@ export class AudioReactivity extends System {
     try {
       const analyser = audio.ctx.createAnalyser()
       analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.8
+      analyser.smoothingTimeConstant = 0
+      analyser._freqBuffer = new Uint8Array(analyser.frequencyBinCount)
 
       audioNode.connect(analyser)
 
@@ -38,7 +39,7 @@ export class AudioReactivity extends System {
         bass: 0,
         mid: 0,
         treble: 0,
-        raw: new Uint8Array(128),
+        raw: analyser._freqBuffer,
         prevVolume: 0
       })
 
@@ -60,7 +61,8 @@ export class AudioReactivity extends System {
       const source = audio.ctx.createMediaElementSource(mediaElement)
       const analyser = audio.ctx.createAnalyser()
       analyser.fftSize = 256
-      analyser.smoothingTimeConstant = 0.8
+      analyser.smoothingTimeConstant = 0
+      analyser._freqBuffer = new Uint8Array(analyser.frequencyBinCount)
 
       source.connect(analyser)
 
@@ -70,7 +72,7 @@ export class AudioReactivity extends System {
         bass: 0,
         mid: 0,
         treble: 0,
-        raw: new Uint8Array(128),
+        raw: analyser._freqBuffer,
         prevVolume: 0
       })
 
@@ -120,6 +122,12 @@ export class AudioReactivity extends System {
       from: options.from,
       to: options.to
     }
+
+    // Pre-cache color objects to avoid per-frame allocation
+    link._color = options.color ? new THREE.Color(options.color) : new THREE.Color(1, 1, 1)
+    if (options.from) link._fromColor = new THREE.Color(options.from)
+    if (options.to) link._toColor = new THREE.Color(options.to)
+    if (options.from && options.to) link._tempColor = new THREE.Color()
 
     // If source doesn't exist yet, queue as pending
     if (!this.data.has(sourceId)) {
@@ -196,9 +204,10 @@ export class AudioReactivity extends System {
 
   update(delta) {
     if (typeof window === 'undefined') return
+    if (this.analysers.size === 0) return
 
     for (const [nodeId, analyser] of this.analysers) {
-      const freq = new Uint8Array(analyser.frequencyBinCount)
+      const freq = analyser._freqBuffer
       analyser.getByteFrequencyData(freq)
 
       const d = this.data.get(nodeId)
@@ -206,14 +215,27 @@ export class AudioReactivity extends System {
 
       d.raw = freq
 
-      const avg = freq.reduce((a, b) => a + b, 0) / freq.length / 255
-      d.volume = d.prevVolume * this.smoothing + avg * (1 - this.smoothing)
-      d.prevVolume = d.volume
+      const len = freq.length
+      let sum = 0, bassSum = 0, midSum = 0, trebleSum = 0
+      const bassEnd = Math.min(10, len)
+      const midEnd = Math.min(40, len)
+      for (let i = 0; i < len; i++) {
+        const val = freq[i]
+        sum += val
+        if (i < bassEnd) bassSum += val
+        else if (i < midEnd) midSum += val
+        else trebleSum += val
+      }
 
-      d.bass = freq.slice(0, 10).reduce((a, b) => a + b, 0) / 10 / 255
-      d.mid = freq.slice(10, 40).reduce((a, b) => a + b, 0) / 30 / 255
-      d.treble = freq.slice(40).reduce((a, b) => a + b, 0) / (freq.length - 40) / 255
+      const inv255 = 1 / 255
+      d.volume = d.prevVolume * this.smoothing + (sum / len * inv255) * (1 - this.smoothing)
+      d.prevVolume = d.volume
+      d.bass = bassSum / bassEnd * inv255
+      d.mid = midSum / (midEnd - bassEnd) * inv255
+      d.treble = trebleSum / (len - midEnd) * inv255
     }
+
+    if (this.reactive.size === 0) return
 
     for (const [sourceId, targets] of this.reactive) {
       const srcData = this.data.get(sourceId)
@@ -283,21 +305,11 @@ export class AudioReactivity extends System {
   }
 
   getColorFromOptions(val, options) {
-    // If from/to colors provided, interpolate between them
     if (options.from && options.to) {
-      const fromColor = new THREE.Color(options.from)
-      const toColor = new THREE.Color(options.to)
       const scaled = Math.max(0, Math.min(1, val))
-      return fromColor.clone().lerp(toColor, scaled)
+      return options._tempColor.copy(options._fromColor).lerp(options._toColor, scaled)
     }
-
-    // Use the configured color (pulses with intensity)
-    if (options.color) {
-      return new THREE.Color(options.color)
-    }
-
-    // Fallback: white
-    return new THREE.Color(1, 1, 1)
+    return options._color
   }
 
   destroy() {
