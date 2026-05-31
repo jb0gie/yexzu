@@ -205,6 +205,22 @@ export class ClientNetwork extends System {
     this.world.livekit.setMuted(data.playerId, data.muted)
   }
 
+  onVoiceSpeaking = data => {
+    this.world.livekit.handleSpeaking?.(data)
+  }
+
+  onVoiceAudio = data => {
+    this.world.livekit.handleAudio?.(data)
+  }
+
+  onVoicePeerJoined = data => {
+    this.world.livekit.handlePeerJoined?.(data)
+  }
+
+  onVoicePeerLeft = data => {
+    this.world.livekit.handlePeerLeft?.(data)
+  }
+
   onPong = time => {
     this.world.stats?.onPong(time)
   }

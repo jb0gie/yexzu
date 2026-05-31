@@ -1,7 +1,7 @@
 import { World } from './World'
 
 import { Client } from './systems/Client'
-import { ClientLiveKit } from './systems/ClientLiveKit'
+import { ClientVoiceProvider } from './systems/ClientVoiceProvider'
 import { ClientPointer } from './systems/ClientPointer'
 import { ClientPrefs } from './systems/ClientPrefs'
 import { ClientControls } from './systems/ClientControls'
@@ -27,7 +27,7 @@ import { ClientAI } from './systems/ClientAI'
 export function createClientWorld() {
   const world = new World()
   world.register('client', Client)
-  world.register('livekit', ClientLiveKit)
+  world.register('livekit', ClientVoiceProvider)
   world.register('pointer', ClientPointer)
   world.register('prefs', ClientPrefs)
   world.register('controls', ClientControls)

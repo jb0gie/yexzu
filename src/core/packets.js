@@ -26,6 +26,10 @@ const names = [
   'ai',
   'ping',
   'pong',
+  'voicePeerJoined',
+  'voicePeerLeft',
+  'voiceSpeaking',
+  'voiceAudio',
 ]
 
 const byName = {}

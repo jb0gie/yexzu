@@ -297,6 +297,8 @@ export class ServerNetwork extends System {
 
       this.sockets.set(socket.id, socket)
 
+      this.world.livekit.addPeer?.(user.id, name || user.name)
+
       // enter events on the server are sent after the snapshot.
       // on the client these are sent during PlayerRemote.js entity instantiation!
       this.world.events.emit('enter', { playerId: socket.player.data.id })
@@ -416,6 +418,14 @@ export class ServerNetwork extends System {
     const tSocket = this.sockets.get(playerId)
     tSocket.send('kick', 'moderation')
     tSocket.disconnect()
+  }
+
+  onVoiceSpeaking = (socket, data) => {
+    this.send('voiceSpeaking', { peerId: socket.id, speaking: data.speaking }, socket.id)
+  }
+
+  onVoiceAudio = (socket, data) => {
+    this.send('voiceAudio', { peerId: socket.id, pcm: data.pcm }, socket.id)
   }
 
   onMute = (socket, data) => {
@@ -566,6 +576,7 @@ export class ServerNetwork extends System {
   }
 
   onDisconnect = (socket, code) => {
+    this.world.livekit.removePeer?.(socket.id)
     this.world.livekit.clearModifiers(socket.id)
     socket.player.destroy(true)
     this.sockets.delete(socket.id)
