@@ -59,6 +59,10 @@ const clientHtmlDest = path.join(rootDir, 'build/public/index.html')
             const physxWasmSrc = path.join(rootDir, 'src/core/physx-js-webidl.wasm')
             const physxWasmDest = path.join(rootDir, 'build/public/physx-js-webidl.wasm')
             await fs.copy(physxWasmSrc, physxWasmDest)
+            // copy draco decoder to public
+            const dracoSrc = path.join(rootDir, 'node_modules/three/examples/jsm/libs/draco')
+            const dracoDest = path.join(rootDir, 'build/public/draco')
+            await fs.copy(dracoSrc, dracoDest)
             // find js output files
             const metafile = result.metafile
             const outputFiles = Object.keys(metafile.outputs)

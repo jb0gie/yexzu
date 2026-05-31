@@ -6,6 +6,7 @@ import { GLTFLoader } from '../libs/gltfloader/GLTFLoader.js'
 // import { VRMLoaderPlugin } from '@pixiv/three-vrm'
 
 import { System } from './System'
+import { ServerDracoDecoder } from './ServerDracoDecoder'
 import { createVRMFactory } from '../extras/createVRMFactory'
 import { glbToNodes } from '../extras/glbToNodes'
 import { createNode } from '../extras/createNode'
@@ -25,6 +26,10 @@ export class ServerLoader extends System {
     this.results = new Map()
     this.rgbeLoader = new RGBELoader()
     this.gltfLoader = new GLTFLoader()
+    const dracoPath = 'file://' + path.join(__dirname, 'public/draco/').replace(/\\/g, '/')
+    const dracoDecoder = new ServerDracoDecoder()
+    dracoDecoder.setDecoderPath(dracoPath)
+    this.gltfLoader.setDRACOLoader(dracoDecoder)
     this.preloadItems = []
     // this.gltfLoader.register(parser => new VRMLoaderPlugin(parser))
 
