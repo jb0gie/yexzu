@@ -115,7 +115,7 @@ export class ServerLoader extends System {
         try {
           const arrayBuffer = await this.fetchArrayBuffer(url)
           this.gltfLoader.parse(arrayBuffer, '', glb => {
-            const node = glbToNodes(glb, this.world)
+            const node = glbToNodes(glb, this.world, url)
             const model = {
               toNodes() {
                 return node.clone(true)

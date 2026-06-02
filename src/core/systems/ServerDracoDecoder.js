@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads'
+import { readFile } from 'node:fs/promises'
 
 const NH = `
 const { parentPort } = require('worker_threads');
@@ -36,7 +37,7 @@ onmessage = function(e) {
         const decoder = new draco.Decoder();
         try {
           const geometry = decodeGeometry(draco, decoder, new Int8Array(buffer), taskConfig);
-          const buffers = geometry.attributes.map(function(attr) { return attr.array.buffer; });
+          const buffers = Object.values(geometry.attributes).map(function(attr) { return attr.array.buffer; });
           if (geometry.index) buffers.push(geometry.index.array.buffer);
           self.postMessage({ type: 'decode', id: message.id, geometry }, buffers);
         } catch (error) {
@@ -67,7 +68,7 @@ function decodeGeometry(draco, decoder, array, taskConfig) {
   if (!decodingStatus.ok() || dracoGeometry.ptr === 0) {
     throw new Error('THREE.DRACOLoader: Decoding failed: ' + decodingStatus.error_msg());
   }
-  const geometry = { index: null, attributes: [] };
+  const geometry = { index: null, attributes: {} };
   for (const name in aI) {
     const attrType = self[aT[name]];
     let attribute, attributeID;
@@ -81,7 +82,7 @@ function decodeGeometry(draco, decoder, array, taskConfig) {
     }
     const result = decodeAttribute(draco, decoder, dracoGeometry, name, attrType, attribute);
     if (name === 'color') result.vertexColorSpace = taskConfig.vertexColorSpace;
-    geometry.attributes.push(result);
+    geometry.attributes[name] = result;
   }
   if (gt === draco.TRIANGULAR_MESH) {
     geometry.index = decodeIndex(draco, decoder, dracoGeometry);
@@ -163,20 +164,25 @@ export class ServerDracoDecoder {
   }
 
   async _load(url, type) {
-    const resp = await fetch(url)
-    return type === 'text' ? resp.text() : resp.arrayBuffer()
+    const buf = await readFile(new URL(url))
+    if (type === 'text') return buf.toString()
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   }
 
-  decodeDracoFile(buffer, callback, attributeIDs, attributeTypes, useUniqueIDs, vertexColorSpace) {
-    const taskConfig = { attributeIDs, attributeTypes, useUniqueIDs, vertexColorSpace }
+  decodeDracoFile(buffer, callback, attributeIDs, attributeTypes, useUniqueIDs, reject) {
+    const taskConfig = { attributeIDs, attributeTypes, useUniqueIDs }
     const taskId = ++this._taskId
     this._getWorker().then((worker) => {
       this._callbacks[taskId] = {
-        resolve: (geometry) => callback(geometry),
-        reject: (error) => {
+        resolve: (geometry) => {
+          geometry.setAttribute = (name, accessor) => { geometry.attributes[name] = accessor }
+          geometry.morphAttributes = geometry.morphAttributes || {}
+          callback(geometry)
+        },
+        reject: reject || ((error) => {
           console.error('ServerDracoDecoder decode error:', error)
           callback({ index: null, attributes: [] })
-        },
+        }),
       }
       worker.postMessage({ type: 'decode', id: taskId, taskConfig, buffer }, [buffer])
     })

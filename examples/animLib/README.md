@@ -11,13 +11,15 @@ Event-driven animation management for SkinnedMesh nodes.
 3. Create an **App** (empty app is fine)
 4. Attach `animation-library.js` script to the app
 5. Configure: **Rig Node ID** = "VrmRig"
-6. Done!
+6. Done! The library uses `rig.url` automatically — no need to re-select the GLB file.
 
 ### 2. Configure the Library
 
 In the animation library app settings:
 - **Rig Node ID**: Enter the ID of your SkinnedMesh node (e.g., "VrmRig")
 - **Debug**: Enable to see console logs
+
+The library automatically uses the rig's GLB URL for player animations — no need to select the GLB file again.
 
 ### 3. Play Animations from Any App
 

@@ -174,7 +174,7 @@ export class ClientLoader extends System {
       if (type === 'model') {
         const buffer = await file.arrayBuffer()
         const glb = await this.gltfLoader.parseAsync(buffer)
-        const node = glbToNodes(glb, this.world)
+        const node = glbToNodes(glb, this.world, url)
         const model = {
           toNodes() {
             return node.clone(true)
@@ -283,7 +283,7 @@ export class ClientLoader extends System {
     }
     if (type === 'model') {
       promise = this.gltfLoader.loadAsync(localUrl).then(glb => {
-        const node = glbToNodes(glb, this.world)
+        const node = glbToNodes(glb, this.world, url)
         const model = {
           toNodes() {
             return node.clone(true)

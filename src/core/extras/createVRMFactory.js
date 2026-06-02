@@ -73,7 +73,15 @@ export function createVRMFactory(glb, setupMaterial) {
   const headToHeight = height - headPos.y
 
   const getBoneName = vrmBoneName => {
-    return glb.userData.vrm.humanoid.getRawBoneNode(vrmBoneName)?.name
+    if (!vrmBoneName) return
+    const humanoid = glb.userData.vrm.humanoid
+    const rawNode = humanoid.getRawBoneNode(vrmBoneName)
+    if (rawNode) return rawNode.name
+    const bones = humanoid._rawHumanBones?.humanBones
+    if (bones) {
+      const altKey = Object.keys(bones).find(k => k.toLowerCase() === vrmBoneName.toLowerCase())
+      if (altKey) return bones[altKey].node?.name
+    }
   }
 
   const noop = () => {}
@@ -100,6 +108,9 @@ export function createVRMFactory(glb, setupMaterial) {
     const exprManager = vrm.userData.vrmExpressionManager || expressionManager
     const skinnedMeshes = getSkinnedMeshes(vrm.scene)
     const skeleton = skinnedMeshes[0].skeleton
+    const hasBone = name => !!skeleton.getBoneByName(name)
+
+    console.warn('[VRM] Skeleton bones:', skeleton.bones.map(b => b.name).join(', '))
 
     try {
       const springManager = tvrm?.springBoneManager
@@ -251,7 +262,7 @@ export function createVRMFactory(glb, setupMaterial) {
         hooks.loader
           .load('emote', url)
           .then(emo => {
-            const clip = emo.toClip({ rootToHips, version, getBoneName })
+            const clip = emo.toClip({ rootToHips, version, getBoneName, hasBone })
             const action = mixer.clipAction(clip)
             action.timeScale = speed
             emote.action = action
@@ -550,7 +561,7 @@ export function createVRMFactory(glb, setupMaterial) {
       const opts = getQueryParams(url)
       const speed = parseFloat(opts.s || 1)
       hooks.loader.load('emote', url).then(emo => {
-        const clip = emo.toClip({ rootToHips, version, getBoneName })
+        const clip = emo.toClip({ rootToHips, version, getBoneName, hasBone })
         pose.action = mixer.clipAction(clip)
         pose.action.timeScale = speed
         pose.action.weight = pose.weight

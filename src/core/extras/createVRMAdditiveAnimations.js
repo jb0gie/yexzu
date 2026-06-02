@@ -113,10 +113,12 @@ export function createVRMAdditiveAnimations({ mixer, hooks, skeleton, rootToHips
     return hooks.loader
       .load('emote', url)
       .then(emo => {
+        const hasBone = name => !!skeleton.getBoneByName(name)
         const originalClip = emo.toClip({
           rootToHips,
           version,
           getBoneName,
+          hasBone,
         })
         const allAffectedBones = getAffectedBones(originalClip)
         const filteredBones = filterWeaponBones(allAffectedBones)

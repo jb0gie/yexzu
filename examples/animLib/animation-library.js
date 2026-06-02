@@ -4,7 +4,7 @@
 
 app.configure([
   { key: 'rig', type: 'text', label: 'Rig Node ID', placeholder: 'VrmRig', initial: 'VrmRig', hint: 'ID of the SkinnedMesh node (for discovery)' },
-  { key: 'emoteGLB', type: 'file', kind: 'emote', label: 'Emote Library GLB', hint: 'Same GLB file used on the rig - for player animation URLs' },
+  { key: 'heightAdj', type: 'range', label: 'Height Adjust', initial: 0, min: -0.5, max: 0.5, step: 0.01, hint: 'Y offset applied to animation position tracks' },
   { key: 'debug', type: 'toggle', label: 'Debug', initial: false }
 ])
 
@@ -16,15 +16,7 @@ if (!config.rig) {
   return
 }
 
-if (!props.emoteGLB) {
-  console.error('Please select the Emote Library GLB file')
-  console.error('This should be the same GLB used on your rig node')
-  return
-}
-
-// Get references
 const rig = app.get(config.rig)
-const glbUrl = props.emoteGLB.url
 
 if (!rig) {
   console.error('Rig not found:', config.rig)
@@ -35,6 +27,14 @@ if (!rig) {
 if (!rig.anims || rig.anims.length === 0) {
   console.error('No animations found on rig:', config.rig)
   console.error('Make sure it is a SkinnedMesh with animations')
+  return
+}
+
+const glbUrl = rig.url
+
+if (!glbUrl) {
+  console.error('Rig has no URL:', config.rig)
+  console.error('This rig was not loaded from a URL')
   return
 }
 
@@ -86,6 +86,9 @@ function buildAnimationUrl(animName, options = {}) {
   // Loop - explicitly set to 0 or 1 (don't rely on default)
   params.push(`l=${options.loop ? 1 : 0}`)
 
+  // Height adjustment
+  if (options.heightAdj) params.push(`y=${options.heightAdj}`)
+
   const query = params.join('&')
   return `${baseUrl}?${query}`
 }
@@ -120,11 +123,12 @@ world.on('animlib:play', (data) => {
       return
     }
 
-    const url = buildAnimationUrl(anim.name, data.options || {})
+    const opts = { ...(data.options || {}), heightAdj: config.heightAdj || 0 }
+    const url = buildAnimationUrl(anim.name, opts)
 
     debugLog('URL built for player:', url)
     debugLog('  - Animation:', anim.name)
-    debugLog('  - Options:', data.options || {})
+    debugLog('  - Options:', opts)
 
     player.applyEffect({
       emote: url,

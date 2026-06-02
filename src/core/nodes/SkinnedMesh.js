@@ -7,6 +7,7 @@ import { isBoolean } from 'lodash-es'
 const defaults = {
   object3d: null,
   animations: [],
+  url: null,
   castShadow: true,
   receiveShadow: true,
 }
@@ -22,6 +23,7 @@ export class SkinnedMesh extends Node {
 
     this._object3d = data.object3d
     this._animations = data.animations
+    this._url = data.url
 
     this.castShadow = data.castShadow
     this.receiveShadow = data.receiveShadow
@@ -96,6 +98,7 @@ export class SkinnedMesh extends Node {
     super.copy(source, recursive)
     this._object3d = source._object3d
     this._animations = source._animations
+    this._url = source._url
     this._castShadow = source._castShadow
     this._receiveShadow = source._receiveShadow
     return this
@@ -103,6 +106,10 @@ export class SkinnedMesh extends Node {
 
   get anims() {
     return this.animNames.slice()
+  }
+
+  get url() {
+    return this._url
   }
 
   get castShadow() {
@@ -291,6 +298,9 @@ export class SkinnedMesh extends Node {
       let proxy = {
         get anims() {
           return self.anims
+        },
+        get url() {
+          return self._url
         },
         get castShadow() {
           return self.castShadow

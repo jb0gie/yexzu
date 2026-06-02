@@ -4,6 +4,98 @@ const q1 = new THREE.Quaternion()
 const restRotationInverse = new THREE.Quaternion()
 const parentRestWorldRotation = new THREE.Quaternion()
 
+function extractBoneName(trackName) {
+  const i = trackName.lastIndexOf('.')
+  return i > 0 ? trackName.slice(0, i) : trackName
+}
+
+function normalizeBoneName(raw) {
+  const bare = raw
+  let side
+  let base = bare
+  const sm = bare.match(/[._-]([LlRr])$/)
+  if (sm) {
+    side = sm[1].toUpperCase()
+    base = bare.slice(0, -2)
+  }
+  base = base.replace(/\.\d+$/, '')
+  const camel = base.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+  let alias = boneNameAliases[base] || boneNameAliases[camel]
+  if (!alias && camel.length > 1 && !isNaN(camel[camel.length - 1])) {
+    alias = boneNameAliases[camel.slice(0, -1) + camel[camel.length - 1]]
+  }
+  if (!alias) return null
+  if (typeof alias === 'object') return side ? alias[side] || null : null
+  return alias
+}
+
+function createDirectEmoteFactory(glb, url, queryParams = {}) {
+  const animName = queryParams.name || queryParams.animation
+  let clip = glb.animations[0]
+  if (animName && glb.animations.length > 1) {
+    const found = glb.animations.find(a => a.name === animName)
+    if (found) clip = found
+  }
+
+  if (!glb.scene.children || glb.scene.children.length === 0) {
+    return {
+      toClip() { return new THREE.AnimationClip('empty', 0, []) },
+    }
+  }
+
+  const scale = glb.scene.children[0].scale.x
+
+  return {
+    toClip({ rootToHips, version, getBoneName, hasBone }) {
+      const height = rootToHips
+      const tracks = []
+
+      for (const track of clip.tracks) {
+        const i = track.name.lastIndexOf('.')
+        const boneName = i > 0 ? track.name.slice(0, i) : track.name
+        const propertyName = track.name.slice(i + 1)
+        const normName = vrmNormalizedNames.has(boneName) ? boneName : normalizeBoneName(boneName)
+        if (!normName) continue
+
+        const mappedName = getBoneName(normName)
+        const candidates = [mappedName, boneName, normName].filter(Boolean)
+        const vrmNodeName = hasBone
+          ? candidates.find(n => hasBone(n)) || mappedName || boneName
+          : (mappedName ?? boneName)
+
+        if (hasBone && vrmNodeName !== mappedName && vrmNodeName !== boneName) {
+          console.warn(
+            `[emote] ${track.name} → mapped ${normName}=${mappedName} fallback ${vrmNodeName}`
+          )
+        }
+
+        if (track instanceof THREE.QuaternionKeyframeTrack) {
+          tracks.push(
+            new THREE.QuaternionKeyframeTrack(
+              `${vrmNodeName}.${propertyName}`,
+              track.times,
+              track.values.map((v, i) => (version === '0' && i % 2 === 0 ? -v : v))
+            )
+          )
+        } else if (track instanceof THREE.VectorKeyframeTrack && propertyName === 'position') {
+          const scaler = height * scale
+          tracks.push(
+            new THREE.VectorKeyframeTrack(
+              `${vrmNodeName}.${propertyName}`,
+              track.times,
+              track.values.map((v, i) => {
+                return (version === '0' && i % 3 !== 1 ? -v : v) * scaler
+              })
+            )
+          )
+        }
+      }
+
+      return new THREE.AnimationClip(clip.name, clip.duration, tracks)
+    },
+  }
+}
+
 export function createEmoteFactory(glb, url, queryParams = {}) {
   // console.time('emote-init')
 
@@ -15,6 +107,14 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
   if (animName && glb.animations.length > 1) {
     const found = glb.animations.find(a => a.name === animName)
     if (found) clip = found
+  }
+
+  // Auto-detect: if clip uses VRM-standard bone names, skip Mixamo retargeting
+  if (clip && clip.tracks.some(t => {
+    const n = extractBoneName(t.name)
+    return vrmNormalizedNames.has(n)
+  })) {
+    return createDirectEmoteFactory(glb, url, queryParams)
   }
 
   // Safety check: ensure GLB has children before accessing scale
@@ -30,9 +130,7 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
 
   const scale = glb.scene.children[0].scale.x // armature should be here?
 
-  // no matter what vrm/emote combo we use for some reason avatars
-  // levitate roughly 5cm above ground. this is a hack but it works.
-  const yOffset = -0.05 / scale
+  const yOffset = queryParams.y !== undefined ? parseFloat(queryParams.y) : -0.05 / scale
 
   // we only keep tracks that are:
   // 1. the root position
@@ -63,14 +161,20 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
 
   // fix new mixamo update normalized bones
   // see: https://github.com/pixiv/three-vrm/pull/1032/files
+  let tracked = 0
   clip.tracks.forEach(track => {
-    const trackSplitted = track.name.split('.')
-    const mixamoRigName = trackSplitted[0]
-    const mixamoRigNode = glb.scene.getObjectByName(mixamoRigName)
+    const mixamoRigName = extractBoneName(track.name)
+    let mixamoRigNode = glb.scene.getObjectByName(mixamoRigName)
     if (!mixamoRigNode) {
-      // console.warn(`[createEmoteFactory] Could not find bone: ${mixamoRigName} in ${url}`)
+      const altName = mixamoRigName.replace(/\.([LR])$/i, '$1')
+      if (altName !== mixamoRigName) {
+        mixamoRigNode = glb.scene.getObjectByName(altName)
+      }
+    }
+    if (!mixamoRigNode) {
       return
     }
+    tracked++
     mixamoRigNode.getWorldQuaternion(restRotationInverse).invert()
     const parent = mixamoRigNode.parent
     if (!parent) {
@@ -104,43 +208,29 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
     }
   })
 
+  console.warn(`[emote] retargeted ${tracked}/${clip.tracks.length} tracks for ${url}`)
   clip.optimize()
 
-  // console.timeEnd('emote-init')
-  // console.log(clip)
-
   return {
-    toClip({ rootToHips, version, getBoneName }) {
-      // we're going to resize animation to match vrm height
+    toClip({ rootToHips, version, getBoneName, hasBone }) {
       const height = rootToHips
 
       const tracks = []
 
       clip.tracks.forEach(track => {
-        const trackSplitted = track.name.split('.')
-        const ogBoneName = trackSplitted[0]
-        const vrmBoneName = normalizedBoneNames[ogBoneName]
-        // TODO: use vrm.bones[name] not getBoneNode
-        const vrmNodeName = getBoneName(vrmBoneName)
+        const i = track.name.lastIndexOf('.')
+        const ogBoneName = i > 0 ? track.name.slice(0, i) : track.name
+        const propertyName = track.name.slice(i + 1)
+        const vrmBoneName = normalizedBoneNames[ogBoneName] || normalizeBoneName(ogBoneName)
+        const mappedName = getBoneName(vrmBoneName)
+        const candidates = [mappedName, ogBoneName, vrmBoneName].filter(Boolean)
+        const vrmNodeName = hasBone && mappedName
+          ? candidates.find(n => hasBone(n)) || mappedName
+          : mappedName
 
-        // console.log('----')
-        // console.log('trackSplitted', trackSplitted)
-        // console.log('mixamoRigName', mixamoRigName)
-        // console.log('vrmBoneName', vrmBoneName)
-        // console.log('vrmNodeName', vrmNodeName)
-        // console.log('----')
-
-        // animations come from mixamo X Bot character
-        // and we scale based on height of our VRM.
-        // usually this would 0.01 if our VRM was for example the X Bot
-        // but since we're applying this to any arbitrary sized VRM we
-        // need to scale it by height too.
-        // i found that feet-to-hips height scales animations almost perfectly
-        // and ensures feet stay on the ground
         const scaler = height * scale
 
-        if (vrmNodeName !== undefined) {
-          const propertyName = trackSplitted[1]
+        if (vrmNodeName) {
 
           if (track instanceof THREE.QuaternionKeyframeTrack) {
             tracks.push(
@@ -165,7 +255,7 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
       })
 
       return new THREE.AnimationClip(
-        clip.name, // todo: name variable?
+        clip.name,
         clip.duration,
         tracks
       )
@@ -346,3 +436,28 @@ const normalizedBoneNames = {
   mixamorigRightFoot: 'rightFoot',
   mixamorigRightToeBase: 'rightToes',
 }
+
+const boneNameAliases = {
+  spine:        'spine',
+  spine1:       'chest',
+  spine2:       'upperChest',
+  chest:        'chest',
+  chest2:       'upperChest',
+  chest_end:    'upperChest',
+  upperChest:   'upperChest',
+  neck:         'neck',
+  head:         'head',
+  shoulder:     { L: 'leftShoulder', R: 'rightShoulder' },
+  upperArm:     { L: 'leftUpperArm', R: 'rightUpperArm' },
+  lowerArm:     { L: 'leftLowerArm', R: 'rightLowerArm' },
+  forearm:      { L: 'leftLowerArm', R: 'rightLowerArm' },
+  hand:         { L: 'leftHand',     R: 'rightHand' },
+  upperLeg:     { L: 'leftUpperLeg', R: 'rightUpperLeg' },
+  thigh:        { L: 'leftUpperLeg', R: 'rightUpperLeg' },
+  lowerLeg:     { L: 'leftLowerLeg', R: 'rightLowerLeg' },
+  shin:         { L: 'leftLowerLeg', R: 'rightLowerLeg' },
+  foot:         { L: 'leftFoot',     R: 'rightFoot' },
+  toe:          { L: 'leftToes',     R: 'rightToes' },
+}
+
+const vrmNormalizedNames = new Set(Object.values(normalizedBoneNames))

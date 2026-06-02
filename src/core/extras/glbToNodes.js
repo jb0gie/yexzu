@@ -3,7 +3,7 @@ import CustomShaderMaterial from '../libs/three-custom-shader-material'
 
 const groupTypes = ['Scene', 'Group', 'Object3D']
 
-export function glbToNodes(glb, world) {
+export function glbToNodes(glb, world, url) {
   function registerNode(name, data) {
     const node = createNode(name, data)
     return node
@@ -18,6 +18,7 @@ export function glbToNodes(glb, world) {
           id: object3d.name,
           object3d,
           animations: glb.animations,
+          url,
           castShadow: props.castShadow,
           receiveShadow: props.receiveShadow,
           active: props.active,
@@ -96,7 +97,7 @@ export function glbToNodes(glb, world) {
         const node = registerNode('mesh', {
           id: object3d.name,
           type: 'geometry',
-          geometry: object3d.geometry,
+          geometry: object3d.geometry?.isBufferGeometry ? object3d.geometry : null,
           material: object3d.material,
           linked: !hasMorphTargets,
           castShadow: props.castShadow,
