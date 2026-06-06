@@ -56,6 +56,7 @@ export class World extends EventEmitter {
     const system = new System(this)
     this.systems.push(system)
     this[key] = system
+    system._key = key
     return system
   }
 

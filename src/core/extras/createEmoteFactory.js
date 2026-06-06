@@ -208,7 +208,7 @@ export function createEmoteFactory(glb, url, queryParams = {}) {
     }
   })
 
-  console.warn(`[emote] retargeted ${tracked}/${clip.tracks.length} tracks for ${url}`)
+
   clip.optimize()
 
   return {

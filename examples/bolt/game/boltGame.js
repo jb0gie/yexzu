@@ -1830,7 +1830,7 @@ if (world.isClient) {
 }
 
 // Key state tracking
-let keyStates = {
+const keyStates = {
   left: false,
   right: false,
   up: false,

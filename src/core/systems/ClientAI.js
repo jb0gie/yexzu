@@ -26,7 +26,7 @@ export class ClientAI extends System {
     this.provider = data.provider
     this.model = data.model
     this.effort = data.effort
-    console.log('[ai]', data)
+
   }
 
   create = async ({ value: prompt }) => {
@@ -84,7 +84,7 @@ export class ClientAI extends System {
       appId: appData.id,
       prompt,
     }
-    console.log('[ai] creating', action)
+
     this.world.network.send('ai', action)
   }
 
@@ -107,7 +107,7 @@ export class ClientAI extends System {
       prompt,
     }
     this.world.network.send('ai', action)
-    console.log('[ai] editing', action)
+
   }
 
   fix = async () => {
@@ -132,6 +132,6 @@ export class ClientAI extends System {
       error: entity.scriptError,
     }
     this.world.network.send('ai', action)
-    console.log('[ai] fixing', action)
+
   }
 }

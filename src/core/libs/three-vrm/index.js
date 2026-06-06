@@ -6503,6 +6503,10 @@ class VRMSpringBoneJoint {
       dragForce: (_f = settings.dragForce) !== null && _f !== void 0 ? _f : 0.4,
     }
     this.colliderGroups = colliderGroups
+    this._skipCollision = false
+    this._cachedDeps = null
+    this._isChainTip = true
+    this._chainChild = null
   }
   /**
    * Set the initial state of this spring bone.
@@ -6526,6 +6530,7 @@ class VRMSpringBoneJoint {
     this._prevTail.copy(this._currentTail)
     // set initial states that are related to local child position
     this._boneAxis.copy(this._initialLocalChildPosition).normalize()
+    this._calcWorldSpaceBoneLength()
   }
   /**
    * Reset the state of this bone.
@@ -6549,8 +6554,13 @@ class VRMSpringBoneJoint {
    */
   update(delta) {
     if (delta <= 0) return
-    // Update the _worldSpaceBoneLength
-    this._calcWorldSpaceBoneLength()
+    if (!this._isChainTip && this._chainChild) {
+      this.bone.quaternion.copy(this._initialLocalRotation)
+      this.bone.quaternion.slerp(this._chainChild.bone.quaternion, 0.4)
+      this.bone.updateMatrix()
+      this.bone.matrixWorld.multiplyMatrices(this._parentMatrixWorld, this.bone.matrix)
+      return
+    }
     // Get bone position in center space
     _worldSpacePosition.setFromMatrixPosition(this.bone.matrixWorld)
     let matrixWorldToCenter = this._getMatrixWorldToCenter(_matA)
@@ -6608,6 +6618,7 @@ class VRMSpringBoneJoint {
    * @param tail The tail you want to process
    */
   _collision(tail) {
+    if (this._skipCollision) return
     this.colliderGroups.forEach(colliderGroup => {
       colliderGroup.colliders.forEach(collider => {
         const dist = collider.shape.calculateCollision(collider.matrixWorld, tail, this.settings.hitRadius, _v3A)
@@ -6825,26 +6836,22 @@ class VRMSpringBoneManager {
     const springBonesTried = new Set()
     const springBonesDone = new Set()
     const objectUpdated = new Set()
+    const childrenUpdated = new Set()
     for (const springBone of this._joints) {
-      // update the springbone
       this._processSpringBone(springBone, springBonesTried, springBonesDone, objectUpdated, springBone =>
         springBone.update(delta)
       )
-      // update children world matrices
-      // it is required when the spring bone chain is sparse
+      if (springBone.bone.children.length === 0) continue
       traverseChildrenUntilConditionMet(springBone.bone, object => {
-        var _a, _b
-        // if the object has attached springbone, halt the traversal
-        if (
-          ((_b = (_a = this._objectSpringBonesMap.get(object)) === null || _a === void 0 ? void 0 : _a.size) !== null &&
-          _b !== void 0
-            ? _b
-            : 0) > 0
-        ) {
+        const objectSet = this._objectSpringBonesMap.get(object)
+        if (objectSet && objectSet.size > 0) {
           return true
         }
-        // otherwise update its world matrix
+        if (childrenUpdated.has(object)) {
+          return false
+        }
         object.updateWorldMatrix(false, false)
+        childrenUpdated.add(object)
         return false
       })
     }
@@ -6873,13 +6880,13 @@ class VRMSpringBoneManager {
     const depObjects = this._getDependencies(springBone)
     for (const depObject of depObjects) {
       traverseAncestorsFromRoot(depObject, depObjectAncestor => {
+        if (objectUpdated.has(depObjectAncestor)) return
         const objectSet = this._objectSpringBonesMap.get(depObjectAncestor)
         if (objectSet) {
           for (const depSpringBone of objectSet) {
             this._processSpringBone(depSpringBone, springBonesTried, springBonesDone, objectUpdated, callback)
           }
-        } else if (!objectUpdated.has(depObjectAncestor)) {
-          // update matrix of non-springbone
+        } else {
           depObjectAncestor.updateWorldMatrix(false, false)
           objectUpdated.add(depObjectAncestor)
         }
@@ -6898,17 +6905,16 @@ class VRMSpringBoneManager {
    * @return A set of objects that are dependant of given spring bone
    */
   _getDependencies(springBone) {
-    const set = new Set()
-    const parent = springBone.bone.parent
-    if (parent) {
-      set.add(parent)
+    if (springBone._cachedDeps) return springBone._cachedDeps
+    const deps = []
+    if (springBone.bone.parent) deps.push(springBone.bone.parent)
+    for (const group of springBone.colliderGroups) {
+      for (const collider of group.colliders) {
+        deps.push(collider)
+      }
     }
-    springBone.colliderGroups.forEach(colliderGroup => {
-      colliderGroup.colliders.forEach(collider => {
-        set.add(collider)
-      })
-    })
-    return set
+    springBone._cachedDeps = deps
+    return deps
   }
 }
 
@@ -7134,27 +7140,9 @@ class VRMSpringBoneLoaderPlugin {
               return
             }
             rootIndices.forEach(rootIndex => {
-              var _a, _b, _c, _d
+              var _d
               const root = threeNodes[rootIndex]
-              // prepare setting
-              const gravityDir = new THREE.Vector3()
-              if (schemaBoneGroup.gravityDir) {
-                gravityDir.set(
-                  (_a = schemaBoneGroup.gravityDir.x) !== null && _a !== void 0 ? _a : 0.0,
-                  (_b = schemaBoneGroup.gravityDir.y) !== null && _b !== void 0 ? _b : 0.0,
-                  (_c = schemaBoneGroup.gravityDir.z) !== null && _c !== void 0 ? _c : 0.0
-                )
-              } else {
-                gravityDir.set(0.0, -1.0, 0.0)
-              }
               const center = schemaBoneGroup.center != null ? threeNodes[schemaBoneGroup.center] : undefined
-              const setting = {
-                hitRadius: schemaBoneGroup.hitRadius,
-                dragForce: schemaBoneGroup.dragForce,
-                gravityPower: schemaBoneGroup.gravityPower,
-                stiffness: schemaBoneGroup.stiffiness,
-                gravityDir,
-              }
               // prepare colliders
               const colliderGroupsForSpring =
                 (_d = schemaBoneGroup.colliderGroups) === null || _d === void 0
@@ -7171,8 +7159,25 @@ class VRMSpringBoneLoaderPlugin {
                     })
               // create spring bones
               root.traverse(node => {
-                var _a
-                const child = (_a = node.children[0]) !== null && _a !== void 0 ? _a : null
+                var _a, _b, _c
+                const gravityDir = new THREE.Vector3()
+                if (schemaBoneGroup.gravityDir) {
+                  gravityDir.set(
+                    (_a = schemaBoneGroup.gravityDir.x) !== null && _a !== void 0 ? _a : 0.0,
+                    (_b = schemaBoneGroup.gravityDir.y) !== null && _b !== void 0 ? _b : 0.0,
+                    (_c = schemaBoneGroup.gravityDir.z) !== null && _c !== void 0 ? _c : 0.0
+                  )
+                } else {
+                  gravityDir.set(0.0, -1.0, 0.0)
+                }
+                const setting = {
+                  hitRadius: schemaBoneGroup.hitRadius,
+                  dragForce: schemaBoneGroup.dragForce,
+                  gravityPower: schemaBoneGroup.gravityPower,
+                  stiffness: schemaBoneGroup.stiffiness,
+                  gravityDir,
+                }
+                const child = node.children[0] !== null && node.children[0] !== void 0 ? node.children[0] : null
                 const joint = this._importJoint(node, child, setting, colliderGroupsForSpring)
                 if (center) {
                   joint.center = center

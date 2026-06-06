@@ -24,10 +24,13 @@ export class Avatars extends System {
   }
 
   update() {
-    if (!this.avatars.length) return
-    const avatar = this.avatars[this.cursor % this.avatars.length]
-    avatar.updateRate()
-    this.cursor++
+    const n = this.avatars.length
+    if (!n) return
+    for (let i = 0; i < Math.min(3, n); i++) {
+      const avatar = this.avatars[this.cursor % n]
+      avatar.updateRate()
+      this.cursor++
+    }
   }
 
   destroy() {

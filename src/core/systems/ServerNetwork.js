@@ -58,7 +58,7 @@ export class ServerNetwork extends System {
       this.world.entities.add(data, true)
     }
     // hydrate settings
-    let settingsRow = await this.db('config').where('key', 'settings').first()
+    const settingsRow = await this.db('config').where('key', 'settings').first()
     try {
       const settings = JSON.parse(settingsRow?.value || '{}')
       this.world.settings.deserialize(settings)
@@ -220,8 +220,8 @@ export class ServerNetwork extends System {
 
       // check connection params
       let authToken = params.authToken
-      let name = params.name
-      let avatar = params.avatar
+      const name = params.name
+      const avatar = params.avatar
 
       // get or create user
       let user
@@ -429,11 +429,39 @@ export class ServerNetwork extends System {
   }
 
   onVoiceSpeaking = (socket, data) => {
-    this.send('voiceSpeaking', { peerId: socket.id, speaking: data.speaking }, socket.id)
+    const senderPos = this.world.entities.getPlayer(socket.id)?.data.position
+    this.sockets.forEach(targetSocket => {
+      if (targetSocket.id === socket.id) return
+      if (this.world.livekit.muted?.has(socket.id)) return
+      if (senderPos) {
+        const targetPos = this.world.entities.getPlayer(targetSocket.id)?.data.position
+        if (targetPos) {
+          const dx = senderPos[0] - targetPos[0]
+          const dy = senderPos[1] - targetPos[1]
+          const dz = senderPos[2] - targetPos[2]
+          if (dx * dx + dy * dy + dz * dz > 2025) return
+        }
+      }
+      targetSocket.send('voiceSpeaking', { peerId: socket.id, speaking: data.speaking })
+    })
   }
 
   onVoiceAudio = (socket, data) => {
-    this.send('voiceAudio', { peerId: socket.id, pcm: data.pcm }, socket.id)
+    const senderPos = this.world.entities.getPlayer(socket.id)?.data.position
+    this.sockets.forEach(targetSocket => {
+      if (targetSocket.id === socket.id) return
+      if (this.world.livekit.muted?.has(socket.id)) return
+      if (senderPos) {
+        const targetPos = this.world.entities.getPlayer(targetSocket.id)?.data.position
+        if (targetPos) {
+          const dx = senderPos[0] - targetPos[0]
+          const dy = senderPos[1] - targetPos[1]
+          const dz = senderPos[2] - targetPos[2]
+          if (dx * dx + dy * dy + dz * dz > 2025) return
+        }
+      }
+      targetSocket.send('voiceAudio', { peerId: socket.id, ...data })
+    })
   }
 
   onMute = (socket, data) => {

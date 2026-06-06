@@ -5,7 +5,7 @@ import { Node } from './Node'
 const defaults = {
   type: 'point',
   color: '#ffffff',
-  intensity: 1,
+  intensity: Math.PI,
   distance: 100,
   decay: 2,
   angle: Math.PI / 3,

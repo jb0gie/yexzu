@@ -29,9 +29,8 @@ export class DOFController {
 
     // Performance optimization
     this.lastRaycastTime = 0
-    this.raycastInterval = 16  // Raycast every ~16ms (60fps), increase for better performance
-    this.frameSkipCounter = 0
-    this.frameSkipInterval = 1  // Raycast every N frames (1=no skip, 2=every other frame, etc.)
+    this.raycastInterval = 100  // Raycast every ~100ms (10fps), more than enough for smooth DOF
+    this._raycastAccum = 0
 
     // Fallback focus distance (from zoom-based calculation)
     this.fallbackFocusDistance = 10
@@ -53,10 +52,10 @@ export class DOFController {
     if (!this.world.prefs?.dofEnabled) return
     if (!this.world.camera) return
 
-    // Performance: Skip frames to reduce raycast frequency
-    this.frameSkipCounter++
-    if (this.frameSkipCounter >= this.frameSkipInterval) {
-      this.frameSkipCounter = 0
+    // Throttle raycasts to reduce CPU cost
+    this._raycastAccum += delta
+    if (this._raycastAccum >= this.raycastInterval / 1000) {
+      this._raycastAccum = 0
 
       // Update camera position/rotation for accurate raycasting
       if (this.world.camera.parent) {
@@ -157,15 +156,34 @@ export class DOFController {
   _performRaycast(origin, direction) {
     this.raycaster.set(origin, direction)
 
-    const intersectables = this.world.stage?.scene
-    if (!intersectables) return null
+    const scene = this.world.stage?.scene
+    if (!scene) return null
 
-    const intersects = this.raycaster.intersectObjects(
-      intersectables.children || [],
-      true
-    )
+    // Collect meshes with depth limit to avoid VRM internal skeleton recursion.
+    // Depth 3 reaches: scene.children -> vrm.scene -> skinnedMeshes
+    // This catches all meaningful geometry while skipping deep VRM internals
+    const targets = []
+    this._collectMeshes(scene, targets, 0, 3)
+
+    if (!targets.length) return null
+
+    const intersects = this.raycaster.intersectObjects(targets, false)
 
     return this._processRaycastHits(intersects)
+  }
+
+  /**
+   * Collect mesh objects up to maxDepth, avoiding deep skeleton/internals recursion
+   */
+  _collectMeshes(parent, out, depth, maxDepth) {
+    for (const child of parent.children) {
+      if (child.isMesh) {
+        out.push(child)
+      }
+      if (child.children && child.children.length && depth < maxDepth) {
+        this._collectMeshes(child, out, depth + 1, maxDepth)
+      }
+    }
   }
 
   /**

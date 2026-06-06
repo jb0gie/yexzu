@@ -168,7 +168,7 @@ function triggerZoneVisible() {
 }
 
 // Main update loop
-let checkTimer = 0
+const checkTimer = 0
 
 app.on('update', (dt) => {
   // Visibility based on trigger zone

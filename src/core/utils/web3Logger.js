@@ -41,21 +41,21 @@ export function createLogger(prefix, options = {}) {
 }
 
 export const web3Logger = createLogger('Web3', {
-  level: 'info',
+  level: 'error',
   enableColors: true,
   timestamp: true,
   enableEmojis: true
 })
 
 export const evmLogger = createLogger('EVM', {
-  level: 'info',
+  level: 'error',
   enableColors: true,
   timestamp: true,
   enableEmojis: false
 })
 
 export const dojoLogger = createLogger('DojoSystem', {
-  level: 'info',
+  level: 'error',
   enableColors: true,
   timestamp: true,
   enableEmojis: true

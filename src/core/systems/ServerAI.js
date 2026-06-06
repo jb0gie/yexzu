@@ -70,18 +70,13 @@ export class ServerAI extends System {
   }
 
   async create({ blueprintId, appId, prompt }) {
-    console.log('[ai] creating...')
     // classify prompt to a short descriptive name for the app
     this.classify({ blueprintId, prompt })
     // send prompt to ai to generate code
-    const startAt = performance.now()
     let output = await this.client.create(prompt)
     output = stripCodeFences(output)
     const changelog = [`create: ${prompt}`]
     const code = prefix + writeChangelog(output, changelog)
-    const elapsed = (performance.now() - startAt) / 1000
-    // console.log(code)
-    console.log(`[ai] created in ${elapsed}s`)
     // convert new code to asset
     const file = new File([code], 'script.js', { type: 'text/plain' })
     const fileContent = await file.arrayBuffer()
@@ -101,7 +96,6 @@ export class ServerAI extends System {
   }
 
   async edit({ blueprintId, appId, prompt }) {
-    console.log('[ai] editing...')
     // get existing blueprint
     let blueprint = this.world.blueprints.get(blueprintId)
     if (!blueprint) return console.error('[ai] edit blueprint but blueprint not found')
@@ -109,15 +103,12 @@ export class ServerAI extends System {
     let script = this.world.loader.get('script', blueprint.script)
     if (!script) script = await this.world.loader.load('script', blueprint.script)
     // send prompt to ai to generate code
-    const startAt = performance.now()
     const code = script.code.replace(prefix, '')
     const changelog = readChangelog(code)
     changelog.push(`edit: ${prompt}`)
     let output = await this.client.edit(code, prompt)
     output = stripCodeFences(output)
     const newCode = prefix + writeChangelog(output, changelog)
-    const elapsed = (performance.now() - startAt) / 1000
-    console.log(`[ai] edited in ${elapsed}s`)
     // convert new code to asset
     const file = new File([newCode], 'script.js', { type: 'text/plain' })
     const fileContent = await file.arrayBuffer()
@@ -137,7 +128,6 @@ export class ServerAI extends System {
   }
 
   async fix({ blueprintId, appId, error }) {
-    console.log('[ai] fixing...')
     // get existing blueprint
     let blueprint = this.world.blueprints.get(blueprintId)
     if (!blueprint) return console.error('[ai] fix blueprint but blueprint not found')
@@ -145,14 +135,11 @@ export class ServerAI extends System {
     let script = this.world.loader.get('script', blueprint.script)
     if (!script) script = await this.world.loader.load('script', blueprint.script)
     // send prompt to ai to generate code
-    const startAt = performance.now()
     const code = script.code.replace(prefix, '')
     const changelog = readChangelog(code)
     let output = await this.client.fix(code, error)
     output = stripCodeFences(output)
     const newCode = prefix + writeChangelog(output, changelog)
-    const elapsed = (performance.now() - startAt) / 1000
-    console.log(`[ai] fixed in ${elapsed}s`)
     // convert new code to asset
     const file = new File([newCode], 'script.js', { type: 'text/plain' })
     const fileContent = await file.arrayBuffer() // or file.text() for string

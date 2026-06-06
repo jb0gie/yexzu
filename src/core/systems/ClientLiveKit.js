@@ -78,6 +78,8 @@ export class ClientLiveKit extends System {
     this.world.audio.ready(async () => {
       await this.room.connect(opts.wsUrl, opts.token)
       this.status.connected = true
+      await this.room.localParticipant.setMicrophoneEnabled(false)
+      this.status.mic = false
       this.emit('status', this.status)
     })
   }
@@ -354,6 +356,7 @@ class PlayerVoice {
     const audio = this.world.audio
     const matrix = this.player.base.matrixWorld
     const pos = v1.setFromMatrixPosition(matrix)
+    pos.y += 1.6
     const qua = q1.setFromRotationMatrix(matrix)
     const dir = v2.set(0, 0, -1).applyQuaternion(qua)
     if (this.panner.positionX) {

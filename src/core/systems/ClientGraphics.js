@@ -242,7 +242,7 @@ export class ClientGraphics extends System {
   onSettingsChange = changes => {
     if (changes.ao) {
       this.aoPass.enabled = changes.ao.value && this.world.prefs.ao
-      console.log(this.aoPass.enabled)
+
     }
   }
 

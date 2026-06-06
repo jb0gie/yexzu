@@ -40,7 +40,7 @@ export class QUAIClient extends System {
       }
 
       // Validate browser environment
-      web3Environment.validateBrowser(['browser', 'localStorage', 'WebSocket'])
+      web3Environment.validateBrowser(['browser', 'localStorage', 'websocket'])
 
       this.createWorldAPI()
       this.isInitialized = true

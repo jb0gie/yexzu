@@ -110,7 +110,7 @@ export function createVRMFactory(glb, setupMaterial) {
     const skeleton = skinnedMeshes[0].skeleton
     const hasBone = name => !!skeleton.getBoneByName(name)
 
-    console.warn('[VRM] Skeleton bones:', skeleton.bones.map(b => b.name).join(', '))
+
 
     try {
       const springManager = tvrm?.springBoneManager
@@ -291,6 +291,9 @@ export function createVRMFactory(glb, setupMaterial) {
     let rate = 0
     let rateCheck = true
     let distance
+    let springElapsed = 0
+    let springRate = 0
+    let springLod = 0
 
     const updateRate = () => {
       const vrmPos = v1.setFromMatrixPosition(vrm.scene.matrix)
@@ -299,6 +302,11 @@ export function createVRMFactory(glb, setupMaterial) {
       const clampedDistance = Math.max(distance - DIST_MIN, 0)
       const normalizedDistance = Math.min(clampedDistance / (DIST_MAX - DIST_MIN), 1)
       rate = DIST_MAX_RATE + normalizedDistance * (DIST_MIN_RATE - DIST_MAX_RATE)
+      springRate = Math.max(0.05, Math.min(rate * (1 + normalizedDistance * 2), 0.5))
+      if (distance > 50) springLod = 3
+      else if (distance > 30) springLod = 2
+      else if (distance > 15) springLod = 1
+      else springLod = 0
     }
 
     let springInit = false
@@ -320,25 +328,38 @@ export function createVRMFactory(glb, setupMaterial) {
         const tuning = hooks.springTuning || {
           stiffness: 1.2, dragForce: 1.0, gravityPower: 1.0, hitRadius: 1.0,
         }
+        const tuned = new WeakSet()
         spring.joints.forEach(joint => {
           const s = joint.settings
           if (!s) return
-          if (tuning.stiffness != null) s.stiffness *= tuning.stiffness
-          if (tuning.dragForce != null) s.dragForce *= tuning.dragForce
-          if (tuning.gravityPower != null) s.gravityPower *= tuning.gravityPower
-          if (tuning.hitRadius != null) s.hitRadius *= tuning.hitRadius
+          if (!tuned.has(s)) {
+            tuned.add(s)
+            if (tuning.stiffness != null) s.stiffness *= tuning.stiffness
+            if (tuning.dragForce != null) s.dragForce *= tuning.dragForce
+            if (tuning.gravityPower != null) s.gravityPower *= tuning.gravityPower
+            if (tuning.hitRadius != null) s.hitRadius *= tuning.hitRadius
+            const boneName = joint.bone?.name?.toLowerCase() || ''
+            if (boneName.includes('hair') || boneName.includes('tail')) s.stiffness *= 1.05
+            s.stiffness = Math.max(s.stiffness, 0.5)
+            s.dragForce = Math.max(s.dragForce, 0.1)
+            s.gravityPower = Math.max(s.gravityPower, 0.1)
+          }
           if (hooks.disableSpringColliders === true) joint.colliderGroups = []
-          const boneName = joint.bone?.name?.toLowerCase() || ''
-          if (boneName.includes('hair') || boneName.includes('tail')) s.stiffness *= 1.05
-          s.stiffness = Math.max(s.stiffness, 0.5)
-          s.dragForce = Math.max(s.dragForce, 0.1)
-          s.gravityPower = Math.max(s.gravityPower, 0.1)
           springBoneOrigins.set(joint, {
             gravityDir: s.gravityDir.clone(),
             gravityPower: s.gravityPower,
           })
         })
         spring.setInitState()
+        const boneToJoint = new Map()
+        tvrm.springBoneManager.joints.forEach(j => boneToJoint.set(j.bone, j))
+        tvrm.springBoneManager.joints.forEach(j => {
+          const childJoint = boneToJoint.get(j.child)
+          if (childJoint) {
+            j._isChainTip = false
+            j._chainChild = childJoint
+          }
+        })
       } catch (e) {
         console.warn('[VRM] Spring bone init failed:', e)
       }
@@ -346,15 +367,16 @@ export function createVRMFactory(glb, setupMaterial) {
     }
 
     const update = delta => {
+      if (rateCheck && distance > DIST_MAX) {
+        return
+      }
+
       elapsed += delta
-      const doAnim = hasSprings ? true : rateCheck ? elapsed >= rate : true
+      const doAnim = rateCheck ? elapsed >= rate : true
       if (doAnim) {
-        mixer.update(hasSprings ? delta : elapsed)
+        mixer.update(elapsed)
 
         additiveAnims.update(delta)
-
-        skeleton.bones.forEach(bone => bone.updateMatrixWorld())
-        skeleton.update = THREE.Skeleton.prototype.update
 
         if (!locomotionDisabled) {
           updateLocomotion(delta)
@@ -379,32 +401,42 @@ export function createVRMFactory(glb, setupMaterial) {
           })
         }
 
+        skeleton.bones.forEach(bone => bone.updateMatrixWorld())
         elapsed = 0
-      } else {
-        skeleton.update = noop
       }
 
       if (!springInit) initSpringBones()
-      if (hasSprings && tvrm?.springBoneManager) {
-        for (const m of skinnedMeshes) {
-          m.skeleton.update()
-        }
-        const verticalVelocity = hooks.getVerticalVelocity ? hooks.getVerticalVelocity() : 0
-        const velocityFactor = Math.max(-1, Math.min(1, verticalVelocity / 10))
-        tvrm.springBoneManager.joints.forEach(joint => {
-          if (joint.settings) {
-            const origins = springBoneOrigins.get(joint)
-            if (origins) {
-              const baseGravityY = origins.gravityDir.y
-              const adjustedGravityY = baseGravityY - velocityFactor
-              joint.settings.gravityDir.set(0, adjustedGravityY, 0).normalize()
-              joint.settings.gravityPower = origins.gravityPower * (1 + Math.abs(velocityFactor) * 0.5)
+      let didSpring = false
+      if (hasSprings && tvrm?.springBoneManager && springLod === 0) {
+        springElapsed += delta
+        const doSpring = rateCheck ? springElapsed >= springRate : true
+        if (doSpring) {
+          didSpring = true
+          const verticalVelocity = hooks.getVerticalVelocity ? hooks.getVerticalVelocity() : 0
+          const velocityFactor = Math.max(-1, Math.min(1, verticalVelocity / 10))
+          tvrm.springBoneManager.joints.forEach(joint => {
+            joint._skipCollision = false
+            if (joint.settings) {
+              const origins = springBoneOrigins.get(joint)
+              if (origins) {
+                const baseGravityY = origins.gravityDir.y
+                const adjustedGravityY = baseGravityY - velocityFactor
+                joint.settings.gravityDir.set(0, adjustedGravityY, 0).normalize()
+                joint.settings.gravityPower = origins.gravityPower * (1 + Math.abs(velocityFactor) * 0.5)
+              }
             }
-          }
-        })
-        const physicsDelta = Math.min(delta, 0.02)
-        tvrm.update(physicsDelta)
+          })
+          const physicsDelta = Math.min(delta, 0.033)
+          tvrm.update(physicsDelta)
+          springElapsed = 0
+        }
       }
+
+      if (doAnim || didSpring) {
+        skeleton.update = THREE.Skeleton.prototype.update
+        skeleton.update()
+      }
+      skeleton.update = noop
     }
 
     const aimBone = (() => {
