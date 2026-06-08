@@ -9,6 +9,7 @@ export class Settings extends System {
     this.title = null
     this.desc = null
     this.image = null
+    this.favicon = null
     this.avatar = null
     this.customAvatars = null
     this.voice = null
@@ -31,6 +32,7 @@ export class Settings extends System {
     this.title = data.title
     this.desc = data.desc
     this.image = data.image
+    this.favicon = data.favicon
     this.avatar = data.avatar
     this.customAvatars = data.customAvatars
     this.voice = data.voice
@@ -41,6 +43,7 @@ export class Settings extends System {
       title: { value: this.title },
       desc: { value: this.desc },
       image: { value: this.image },
+      favicon: { value: this.favicon },
       avatar: { value: this.avatar },
       customAvatars: { value: this.customAvatars },
       voice: { value: this.voice },
@@ -55,6 +58,7 @@ export class Settings extends System {
       desc: this.desc,
       title: this.title,
       image: this.image,
+      favicon: this.favicon,
       avatar: this.avatar,
       customAvatars: this.customAvatars,
       voice: this.voice,

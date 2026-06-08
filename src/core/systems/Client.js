@@ -79,6 +79,22 @@ export class Client extends System {
     if (changes.title) {
       document.title = changes.title.value || 'World'
     }
+    if (changes.favicon) {
+      const faviconUrl = changes.favicon.value?.url
+        ? this.world.resolveURL(changes.favicon.value.url)
+        : null
+      let link = document.querySelector('link[rel="icon"]')
+      if (faviconUrl) {
+        if (!link) {
+          link = document.createElement('link')
+          link.rel = 'icon'
+          document.head.appendChild(link)
+        }
+        link.href = faviconUrl
+      } else if (link) {
+        link.remove()
+      }
+    }
   }
 
   onVisibilityChange = () => {

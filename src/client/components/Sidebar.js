@@ -654,6 +654,7 @@ function World({ world, hidden }) {
   const [title, setTitle] = useState(world.settings.title)
   const [desc, setDesc] = useState(world.settings.desc)
   const [image, setImage] = useState(world.settings.image)
+  const [favicon, setFavicon] = useState(world.settings.favicon)
   const [avatar, setAvatar] = useState(world.settings.avatar)
   const [customAvatars, setCustomAvatars] = useState(world.settings.customAvatars)
   const [voice, setVoice] = useState(world.settings.voice)
@@ -665,6 +666,7 @@ function World({ world, hidden }) {
       if (changes.title) setTitle(changes.title.value)
       if (changes.desc) setDesc(changes.desc.value)
       if (changes.image) setImage(changes.image.value)
+      if (changes.favicon) setFavicon(changes.favicon.value)
       if (changes.avatar) setAvatar(changes.avatar.value)
       if (changes.customAvatars) setCustomAvatars(changes.customAvatars.value)
       if (changes.voice) setVoice(changes.voice.value)
@@ -730,6 +732,14 @@ function World({ world, hidden }) {
             kind='image'
             value={image}
             onChange={value => world.settings.set('image', value, true)}
+            world={world}
+          />
+          <FieldFile
+            label='World Icon'
+            hint='Change the icon of the world. This is shown in the browser tab.'
+            kind='favicon'
+            value={favicon}
+            onChange={value => world.settings.set('favicon', value, true)}
             world={world}
           />
           <FieldFile

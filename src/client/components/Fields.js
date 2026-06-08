@@ -430,6 +430,12 @@ export const fileKinds = {
     exts: ['jpg', 'jpeg', 'png', 'webp'],
     placeholder: 'jpg,png,webp',
   },
+  favicon: {
+    type: 'image',
+    accept: '.jpg,.jpeg,.png,.webp,.ico',
+    exts: ['jpg', 'jpeg', 'png', 'webp', 'ico'],
+    placeholder: 'jpg,png,webp,ico',
+  },
   video: {
     type: 'video',
     accept: '.mp4',

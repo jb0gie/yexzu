@@ -39,6 +39,7 @@ class Cleaner {
     const settings = JSON.parse(settingsRow.value)
     if (settings.image) assetsToKeep.add(settings.image.url.replace('asset://', ''))
     if (settings.avatar) assetsToKeep.add(settings.avatar.url.replace('asset://', ''))
+    if (settings.favicon) assetsToKeep.add(settings.favicon.url.replace('asset://', ''))
     // delete orphaned blueprints (no longer referenced by an entity)
     const blueprintsToDelete = []
     for (const blueprint of blueprints) {
