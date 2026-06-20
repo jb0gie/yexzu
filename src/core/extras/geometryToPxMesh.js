@@ -25,6 +25,7 @@ class PMeshHandle {
 }
 
 export function geometryToPxMesh(world, geometry, convex) {
+  if (!geometry) return null
   const id = `${geometry.uuid}_${convex ? 'convex' : 'triangles'}`
 
   // check and return cached if already cooked

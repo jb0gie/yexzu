@@ -57,6 +57,7 @@ export class Collider extends Node {
     } else if (this._type === 'geometry') {
       // note: triggers MUST be convex according to PhysX/Unity
       const isConvex = this._trigger || this._convex
+      if (!this._geometry) return console.error('[collider] geometry shape has no geometry')
       pmesh = geometryToPxMesh(this.ctx.world, this._geometry, isConvex)
       if (!pmesh) return console.error('failed to generate collider pmesh')
       this.matrixWorld.decompose(_v1, _q1, _v2)

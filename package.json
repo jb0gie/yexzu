@@ -97,10 +97,22 @@
   },
   "engines": {
     "npm": ">=10.0.0",
-    "node": "22.11.0"
+    "node": ">=22.11.0"
   },
   "overrides": {
-    "three": "^0.173.0"
+    "three": "^0.173.0",
+    "@wagmi/connectors": "6.2.0",
+    "@wagmi/core": "2.22.1"
   },
-  "license": "GPL-3.0-only"
+  "license": "GPL-3.0-only",
+  "trustedDependencies": [
+    "@reown/appkit",
+    "better-sqlite3",
+    "bufferutil",
+    "cbor-extract",
+    "esbuild",
+    "keccak",
+    "msgpackr-extract",
+    "utf-8-validate"
+  ]
 }
