@@ -145,6 +145,10 @@ export class Avatar extends Node {
     this.instance?.setLocomotion(mode, axis, gazeDir)
   }
 
+  setHandTarget(left, position) {
+    this.instance?.setHandTarget(left, position)
+  }
+
   setSpeaking(active) {
     this.instance?.setSpeaking(active)
   }

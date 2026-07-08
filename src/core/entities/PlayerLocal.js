@@ -662,7 +662,8 @@ export class PlayerLocal extends Entity {
         velocity.sub(projectedVector)
       }
       // when walking off an edge or over the top of a ramp, attempt to snap down to a surface
-      if (this.justLeftGround && !this.jumping) {
+      // ponytail: only snap if we've actually been falling; prevents landing stutter when a frame misses ground
+      if (this.justLeftGround && !this.jumping && this.fallTimer > 0.05) {
         velocity.y = -5
       }
       // if slipping ensure we can't gain upward velocity

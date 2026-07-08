@@ -129,8 +129,11 @@ export class DebugVisualizer extends System {
           const halfHeight = (h - r - r) / 2
           const yOff = halfHeight + r
           entry.update = () => {
-            const pos = node.base?.position || node.position
-            group.position.set(pos.x, pos.y + yOff, pos.z)
+            // ponytail: read physics actor pose directly so wireframe never lags behind interpolation
+            const pose = node.capsule?.getGlobalPose()
+            if (!pose) return
+            const p = pose.p
+            group.position.set(p.x, p.y + yOff, p.z)
           }
         } else {
           entry.update = node.name === 'rigidbody' && node.type === 'dynamic'
@@ -465,9 +468,12 @@ export class DebugVisualizer extends System {
       new THREE.WireframeGeometry(cached.geo),
       new THREE.LineBasicMaterial({ color: 0x00ff88, depthTest: true, transparent: true, opacity: 0.7 })
     ))
-    // ponytail: initial position set here; preUpdate overwrites each frame
-    const pos = node.base?.position || node.position
-    parent.position.set(pos.x, pos.y, pos.z)
+    // ponytail: initial position from physics actor; preUpdate overwrites each frame
+    const pose = node.capsule?.getGlobalPose()
+    const yOff = (inner / 2) + r
+    if (pose) {
+      parent.position.set(pose.p.x, pose.p.y + yOff, pose.p.z)
+    }
   }
 
   buildJointShape(node) {
