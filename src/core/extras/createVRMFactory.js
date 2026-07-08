@@ -11,6 +11,81 @@ import {
 import { createVRMExpressions } from './createVRMExpressions'
 import { createVRMAdditiveAnimations } from './createVRMAdditiveAnimations'
 
+// --- XR IK temp vars ---
+// ponytail: shared across all VRM instances; JS is single-threaded so safe
+const _v1 = new THREE.Vector3()
+const _v2 = new THREE.Vector3()
+const _v3 = new THREE.Vector3()
+const _v4 = new THREE.Vector3()
+const _v5 = new THREE.Vector3()
+const _v6 = new THREE.Vector3()
+const _q1 = new THREE.Quaternion()
+const _q2 = new THREE.Quaternion()
+const _m1 = new THREE.Matrix4()
+
+// ponytail: two-bone arm IK (shoulder + upperArm + lowerArm → hand target)
+// writes directly to bone quaternions in local space; target in world space
+function solveTwoBoneArm(upperBone, lowerBone, handBone, target, isLeft) {
+  const sPos = upperBone.getWorldPosition(_v1)
+  const ePos = lowerBone.getWorldPosition(_v2)
+  const hPos = handBone.getWorldPosition(_v3)
+  const upperLen = ePos.distanceTo(sPos)
+  const lowerLen = hPos.distanceTo(ePos)
+  if (upperLen < 0.001 || lowerLen < 0.001) return
+
+  const dir = _v4.copy(target).sub(sPos)
+  const dDist = dir.length()
+  if (dDist < 0.001) return
+  dir.divideScalar(dDist)
+
+  const sQuat = upperBone.getWorldQuaternion(_q1)
+  const lateral = _v5.set(isLeft ? -1 : 1, 0, 0).applyQuaternion(sQuat)
+  const elbowSide = _v6.crossVectors(dir, lateral)
+  if (elbowSide.lengthSq() < 0.001) {
+    elbowSide.set(0, isLeft ? 1 : -1, 0).applyQuaternion(sQuat)
+  } else {
+    elbowSide.normalize()
+  }
+
+  const behind = lateral.dot(_v3.copy(target).sub(sPos))
+  if ((isLeft && behind > 0) || (!isLeft && behind < 0)) elbowSide.negate()
+
+  const totalLen = upperLen + lowerLen
+  if (dDist >= totalLen * 0.9) {
+    const up = _v3.set(isLeft ? -1 : 1, 0, 0).applyQuaternion(sQuat)
+    _m1.lookAt(_v2.set(0, 0, 0), dir, up)
+    _q1.setFromRotationMatrix(_m1)
+    upperBone.quaternion.copy(_q1).premultiply(_q2.copy(upperBone.parent.getWorldQuaternion(_q2)).invert())
+    lowerBone.quaternion.set(0, 0, 0, 1)
+    return
+  }
+
+  const cosA = (upperLen * upperLen + dDist * dDist - lowerLen * lowerLen) / (2 * upperLen * dDist)
+  const angle = Math.acos(Math.max(-1, Math.min(1, cosA)))
+  const offDist = upperLen * Math.sin(angle) * 0.4
+
+  const mid = _v5.addVectors(sPos, target).multiplyScalar(0.5)
+  const elbowTarget = elbowSide.clone().multiplyScalar(offDist).add(mid)
+
+  // Upper arm → elbow
+  {
+    const upDir = _v3.copy(elbowTarget).sub(sPos).normalize()
+    _m1.lookAt(_v2.set(0, 0, 0), upDir, lateral)
+    _q1.setFromRotationMatrix(_m1)
+    upperBone.quaternion.copy(_q1).premultiply(_q2.copy(upperBone.parent.getWorldQuaternion(_q2)).invert())
+  }
+
+  // Lower arm → hand target
+  {
+    const eWorld = upperBone.getWorldPosition(_v1)
+    const up = _v3.copy(lateral).applyQuaternion(_q2.copy(lowerBone.parent.getWorldQuaternion(_q2)).invert())
+    const loDir = _v4.copy(target).sub(eWorld).normalize()
+    _m1.lookAt(_v2.set(0, 0, 0), loDir, up)
+    _q1.setFromRotationMatrix(_m1)
+    lowerBone.quaternion.copy(_q1).premultiply(_q2.copy(lowerBone.parent.getWorldQuaternion(_q2)).invert())
+  }
+}
+
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
@@ -192,6 +267,29 @@ export function createVRMFactory(glb, setupMaterial) {
     let talking = false
     const setSpeaking = value => {
       talking = !!value
+    }
+
+    // ponytail: hand targets for non-XR IK (e.g. placing hands on surfaces / held objects)
+    const handTargetLeft = new THREE.Vector3()
+    const handTargetRight = new THREE.Vector3()
+    let hasHandTargetLeft = false
+    let hasHandTargetRight = false
+    const setHandTarget = (left, position) => {
+      if (left) {
+        if (position) {
+          handTargetLeft.copy(position)
+          hasHandTargetLeft = true
+        } else {
+          hasHandTargetLeft = false
+        }
+      } else {
+        if (position) {
+          handTargetRight.copy(position)
+          hasHandTargetRight = true
+        } else {
+          hasHandTargetRight = false
+        }
+      }
     }
 
     const emotes = {}
@@ -432,7 +530,59 @@ export function createVRMFactory(glb, setupMaterial) {
         }
       }
 
-      if (doAnim || didSpring) {
+      // --- XR IK ---
+      // ponytail: overrides humanoid pose with XR controller tracking
+      // placed after tvrm.update (which resets bones) and before skeleton.update (which skins)
+      let didXR = false
+      const xrCtrls = hooks.getXRControllers?.()
+      if (xrCtrls) {
+        didXR = true
+        const neckB = findBone('neck')
+        const headB = findBone('head')
+        const leftUA = findBone('leftUpperArm')
+        const leftLA = findBone('leftLowerArm')
+        const leftH = findBone('leftHand')
+        const rightUA = findBone('rightUpperArm')
+        const rightLA = findBone('rightLowerArm')
+        const rightH = findBone('rightHand')
+
+        // Re-apply decapitation after tvrm.update reset
+        if (firstPersonActive && neckB) neckB.scale.setScalar(0)
+
+        // Head follows HMD
+        if (headB) {
+          const hmdQuat = xrCtrls.head.getWorldQuaternion(_q1)
+          headB.quaternion.copy(hmdQuat).premultiply(_q2.copy(headB.parent.getWorldQuaternion(_q2)).invert())
+        }
+
+        // Arm IK
+        if (leftUA && leftLA && leftH && xrCtrls.leftHand) {
+          const lTarget = xrCtrls.leftHand.getWorldPosition(_v1)
+          solveTwoBoneArm(leftUA, leftLA, leftH, lTarget, true)
+        }
+        if (rightUA && rightLA && rightH && xrCtrls.rightHand) {
+          const rTarget = xrCtrls.rightHand.getWorldPosition(_v2)
+          solveTwoBoneArm(rightUA, rightLA, rightH, rTarget, false)
+        }
+      }
+
+      // ponytail: non-XR hand IK targets (set via avatar.setHandTarget)
+      if (!didXR && (hasHandTargetLeft || hasHandTargetRight)) {
+        const leftUA = findBone('leftUpperArm')
+        const leftLA = findBone('leftLowerArm')
+        const leftH = findBone('leftHand')
+        const rightUA = findBone('rightUpperArm')
+        const rightLA = findBone('rightLowerArm')
+        const rightH = findBone('rightHand')
+        if (leftUA && leftLA && leftH && hasHandTargetLeft) {
+          solveTwoBoneArm(leftUA, leftLA, leftH, handTargetLeft, true)
+        }
+        if (rightUA && rightLA && rightH && hasHandTargetRight) {
+          solveTwoBoneArm(rightUA, rightLA, rightH, handTargetRight, false)
+        }
+      }
+
+      if (doAnim || didSpring || didXR) {
         skeleton.update = THREE.Skeleton.prototype.update
         skeleton.update()
       }
@@ -830,6 +980,7 @@ export function createVRMFactory(glb, setupMaterial) {
         return additiveAnims.getAdditiveAnimations()
       },
       setSpeaking,
+      setHandTarget,
       setExpression(name, weight) {
         expr.setExpression(name, weight)
       },
