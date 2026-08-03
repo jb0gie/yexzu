@@ -201,6 +201,15 @@ export class PlayerLocal extends Entity {
             const velocity = this.capsule?.getLinearVelocity()
             return velocity?.y || 0
           },
+          getXRControllers: () => {
+            if (!this.isXR || !this.xrControllerLeft || !this.xrControllerRight) return null
+            return {
+              head: this.world.camera,
+              leftHand: this.xrControllerLeft,
+              rightHand: this.xrControllerRight,
+            }
+          },
+          getFirstPerson: () => this.firstPerson,
         }
         this.avatar = src.toNodes(customHooks).get('avatar')
         this.avatar.disableRateCheck() // max fps for local player
@@ -283,6 +292,7 @@ export class PlayerLocal extends Entity {
       // this.capsule.attachShape(shape2)
     }
     this.capsuleHandle = this.world.physics.addActor(this.capsule, {
+      node: this,
       tag: null,
       playerId: this.data.id,
       onInterpolate: position => {
