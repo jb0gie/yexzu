@@ -289,6 +289,11 @@ export class ClientEnvironment extends System {
           const testMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
           testScene.add(testMesh)
           renderer.compile(testScene, testCamera)
+          // renderer.compile() builds the program but does NOT trigger the
+          // link-status check — that runs on first USE via getUniforms().
+          // Force it now so a broken shader is caught here, not at render.
+          const props = renderer.properties?.get(material)
+          props?.currentProgram?.getUniforms?.()
           renderer.debug.onShaderError = prevOnError
           testMesh.geometry.dispose()
           if (compileError) {

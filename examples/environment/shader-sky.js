@@ -156,9 +156,12 @@ app.on('update', delta => {
   world.environment?.setSunDirection(sunDir)
 
   const cfg = app.config
-  const target = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
-  if (JSON.stringify(target) !== JSON.stringify(last)) {
-    last = target
-    sky.shaderUniforms = target
+  const cfgTarget = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
+  if (JSON.stringify(cfgTarget) !== JSON.stringify(last)) {
+    last = cfgTarget
+    // Rebuild trigger is config-only (uSunDirection changes every frame), but
+    // the SET must always include uSunDirection or the rebuilt shader would
+    // reference an undeclared uniform and fail to compile.
+    sky.shaderUniforms = { uSunDirection: [sunDir.x, sunDir.y, sunDir.z], ...cfgTarget }
   }
 })
