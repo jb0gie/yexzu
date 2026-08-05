@@ -1,4 +1,5 @@
-// Shader sky demo — user-authored GLSL on the sky dome (port of upstream 602a121b).
+// Shader sky demo — single GLSL shader driving a full DAY/NIGHT CYCLE on the
+// sky dome (port of upstream 602a121b + shaderHeader global-slot fix).
 //
 // CONTRACT:
 //   shader        — code injected INSIDE main(). You get `direction` (vec3,
@@ -10,15 +11,20 @@
 //                   inside `shader` — it runs inside main().)
 //   shaderUniforms— plain object: numbers → float, arrays → vec2/3/4.
 //
-// Pattern: app.create('sky') + app.add(sky), then set props live.
-// NOTE: hyperfy's sunDirection is the direction light TRAVELS (points at the
-// scene), so the visible sun sits at -sunDirection.
+// This demo: uTime drives a day/night cycle — the sun azimuth rotates and its
+// elevation dips below the horizon at night; gradient, sun, moon, stars and
+// clouds all blend by sun elevation. No preset switching needed.
 
 // Global helper functions (injected before main())
-const CLOUDS_HEADER = `
+const SKY_HEADER = `
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float hash13(vec3 p3) {
+  p3 = fract(p3 * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);
 }
 float noise(vec2 p) {
@@ -36,90 +42,95 @@ float fbm(vec2 p) {
 }
 `
 
-const NIGHT_HEADER = `
-float hash13(vec3 p3) {
-  p3 = fract(p3 * 0.1031);
-  p3 += dot(p3, p3.zyx + 31.32);
-  return fract((p3.x + p3.y) * p3.z);
-}
-`
+const CYCLE = `
+  // ---- sun position from time (full day/night cycle) ----
+  float phase = fract(uTime * uCycleSpeed);
+  float sunAngle = phase * 6.28318;
+  vec3 sunDir = normalize(vec3(
+    cos(sunAngle),
+    sin(sunAngle) * 0.75 - 0.12,   // dips below horizon -> night
+    sin(sunAngle) * 0.8
+  ));
+  float sunElev = sunDir.y;
+  float day = smoothstep(-0.15, 0.15, sunElev);   // 0 = night, 1 = noon
+  float night = 1.0 - day;
 
-const DAY_SKY = `
-  // simple gradient + sun disc toward the CSM sun direction
+  // ---- base gradient blended by time of day ----
   float h = direction.y;
-  vec3 zenith = vec3(0.12, 0.36, 0.78);
-  vec3 horizon = vec3(0.78, 0.88, 0.98);
-  vec3 ground = vec3(0.35, 0.32, 0.28);
-  vec3 sky = mix(ground, horizon, smoothstep(-0.1, 0.02, h));
-  sky = mix(sky, zenith, smoothstep(0.02, 0.45, h));
-  vec3 sunDir = normalize(-vec3(uSunDirection.x, uSunDirection.y, uSunDirection.z));
-  float sun = pow(max(dot(direction, sunDir), 0.0), 8.0);
-  sky += vec3(1.0, 0.9, 0.7) * sun * 1.5;
-  color = sky;
-`
+  vec3 zenithDay = vec3(0.12, 0.36, 0.78);
+  vec3 horizonDay = vec3(0.78, 0.88, 0.98);
+  vec3 zenithNight = vec3(0.015, 0.018, 0.045);
+  vec3 horizonNight = vec3(0.07, 0.07, 0.11);
+  vec3 ground = vec3(0.18, 0.16, 0.14);
+  vec3 sky = mix(ground, mix(horizonNight, horizonDay, day), smoothstep(-0.1, 0.02, h));
+  sky = mix(sky, mix(zenithNight, zenithDay, day), smoothstep(0.02, 0.45, h));
 
-const CLOUDS = `
-  // drifting FBM cloud layer
-  float h = direction.y;
-  vec3 sky = mix(vec3(0.35, 0.32, 0.28), vec3(0.72, 0.82, 0.92), smoothstep(-0.1, 0.3, h));
-  vec2 p = direction.xz / max(direction.y + 0.12, 0.08);
-  p *= 0.35;
-  p += vec2(uTime * uCloudSpeed, uTime * uCloudSpeed * 0.3);
-  float n = fbm(p);
-  float layer = smoothstep(uCloudCover, uCloudCover + 0.35, n);
-  float mask = smoothstep(-0.02, 0.15, direction.y);
-  sky = mix(sky, vec3(1.0, 1.0, 1.0), layer * mask * 0.9);
-  color = sky;
-`
+  // ---- sun disc + halo (only while the sun is up) ----
+  float sunDot = max(dot(direction, sunDir), 0.0);
+  float warm = smoothstep(0.0, 0.35, sunElev);
+  vec3 sunTint = mix(vec3(1.0, 0.32, 0.08), vec3(1.0, 0.95, 0.85), warm);
+  float disc = pow(sunDot, 8.0);
+  float halo = pow(sunDot, 2.5) * 0.2 * (0.05 + 0.95 * day);
+  sky += sunTint * (disc * day * 1.6 + halo * day);
 
-const NIGHT = `
-  // twinkling hash-grid starfield
-  float h = direction.y;
-  vec3 sky = mix(vec3(0.05, 0.04, 0.08), vec3(0.01, 0.01, 0.03), smoothstep(0.0, 0.4, h));
-  vec3 cell = floor(direction * 110.0);
-  vec3 f = fract(direction * 110.0);
+  // ---- moon opposite the sun (night only) ----
+  vec3 moonDir = -sunDir;
+  float moonDot = max(dot(direction, moonDir), 0.0);
+  sky += vec3(0.85, 0.88, 0.95) * smoothstep(0.997, 0.9998, moonDot) * night * 1.5;
+  sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 8.0) * 0.15 * night;
+
+  // ---- stars (twinkle, fade out with day) ----
+  vec3 cell = floor(direction * 90.0);
+  vec3 f = fract(direction * 90.0);
   vec3 starPos = vec3(hash13(cell + 0.7), hash13(cell + 1.3), hash13(cell + 2.1)) - 0.5;
-  float d = length(f - 0.5 - starPos);
+  float starDist = length(f - 0.5 - starPos);
   float twinkle = 0.6 + 0.4 * hash13(cell + floor(uTime * 0.7) + 3.7);
-  sky += vec3(1.0) * smoothstep(0.022, 0.0, d) * twinkle * uStarsDensity;
+  float stars = smoothstep(0.02, 0.0, starDist) * twinkle;
+  sky += vec3(1.0) * stars * night * uStarsDensity * 2.4;
+
+  // ---- clouds (drifting FBM, tinted by time of day) ----
+  float cmask = smoothstep(-0.05, 0.3, direction.y);
+  vec2 cp = direction.xz / max(direction.y + 0.15, 0.1);
+  cp *= 1.2;
+  cp += vec2(uTime * uCloudSpeed, uTime * uCloudSpeed * 0.3);
+  float cn = fbm(cp);
+  float clouds = smoothstep(0.35, 0.6, cn);
+  float cloudop = clouds * uCloudCover * cmask;
+  vec3 cloudCol = mix(vec3(0.5, 0.5, 0.58), vec3(1.0, 1.0, 1.0), day);
+  sky = mix(sky, cloudCol, clamp(cloudop, 0.0, 1.0));
+
   color = sky;
 `
-
-const PRESETS = {
-  day: { shader: DAY_SKY, header: null, uniforms: () => ({ uSunDirection: [-1, -2, -2] }) },
-  clouds: { shader: CLOUDS, header: CLOUDS_HEADER, uniforms: cfg => ({ uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed }) },
-  night: { shader: NIGHT, header: NIGHT_HEADER, uniforms: cfg => ({ uStarsDensity: cfg.starsDensity }) },
-}
 
 const sky = app.create('sky', {
-  shader: DAY_SKY,
-  shaderUniforms: { uSunDirection: [-1, -2, -2] }, // match baseEnvironment sunDirection
+  shader: CYCLE,
+  shaderHeader: SKY_HEADER,
+  shaderUniforms: {
+    uCycleSpeed: 0.05,
+    uCloudCover: 1.0,
+    uCloudSpeed: 0.01,
+    uStarsDensity: 0.9,
+  },
 })
 app.add(sky)
 app.keepActive = true
 
 app.configure([
-  { key: 'sky', type: 'dropdown', label: 'Sky Shader', initial: 'day', options: ['day', 'clouds', 'night'] },
-  { key: 'cloudCover', type: 'range', label: 'Cloud Cover', initial: 0.35, min: 0, max: 1, step: 0.05, dp: 2 },
-  { key: 'cloudSpeed', type: 'range', label: 'Cloud Speed', initial: 0.02, min: 0, max: 0.2, step: 0.01, dp: 2 },
-  { key: 'starsDensity', type: 'range', label: 'Stars', initial: 0.8, min: 0, max: 1, step: 0.05, dp: 2 },
+  { key: 'cycleSpeed', type: 'range', label: 'Cycle Speed', initial: 0.05, min: 0, max: 0.5, step: 0.01, dp: 2 },
+  { key: 'cloudCover', type: 'range', label: 'Cloud Cover', initial: 1.0, min: 0, max: 1, step: 0.05, dp: 2 },
+  { key: 'cloudSpeed', type: 'range', label: 'Cloud Speed', initial: 0.01, min: 0, max: 0.1, step: 0.005, dp: 3 },
+  { key: 'starsDensity', type: 'range', label: 'Stars', initial: 0.9, min: 0, max: 1, step: 0.05, dp: 2 },
 ])
 
-// Apply live inspector changes only when the relevant values actually change
-// (assigning shader/shaderHeader/shaderUniforms triggers a recompile via updateSky).
-let last = {}
+// Push inspector values into the shader uniforms only when they change
+// (assigning shaderUniforms triggers a recompile via updateSky).
+let last = null
 
 app.on('update', () => {
   const cfg = app.config
-  const preset = PRESETS[cfg.sky] || PRESETS.day
-  if (preset !== last.preset) {
-    last.preset = preset
-    sky.shader = preset.shader
-    sky.shaderHeader = preset.header
-  }
-  const target = preset.uniforms(cfg)
-  if (JSON.stringify(target) !== JSON.stringify(last.uniforms)) {
-    last.uniforms = target
+  const target = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
+  if (JSON.stringify(target) !== JSON.stringify(last)) {
+    last = target
     sky.shaderUniforms = target
   }
 })
