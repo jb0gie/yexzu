@@ -17,6 +17,11 @@
 // shadow light AND the shader's uSunDirection uniform — no rebuild — so the
 // visible sun disc and the directional-light shadows always agree. The moon
 // orbits 4x slower, so its phases emerge from the sun angle.
+// FOG: the engine supports atmospheric distance fog on the world (THREE.Fog
+// installed on the scene) via sky.fogNear / fogFar / fogColor — all three set
+// = fog on, any null = off. The sky dome itself is excluded (material.fog is
+// false), so the shader stays crisp while distant objects fade toward the
+// fog color. Inspector is wired to tune all three live.
 
 // Global helper functions (injected before main())
 const SKY_HEADER = `
@@ -125,6 +130,11 @@ const sky = app.create('sky', {
     uCloudSpeed: 0.01,
     uStarsDensity: 0.9,
   },
+  // Fog on by default ("like we used to have"). Distance fade so distant
+  // geometry melts into the horizon before reaching the 1000-unit dome.
+  fogNear: 350,
+  fogFar: 900,
+  fogColor: '#cfe0f2',
 })
 app.add(sky)
 app.keepActive = true
@@ -134,6 +144,10 @@ app.configure([
   { key: 'cloudCover', type: 'range', label: 'Cloud Cover', initial: 1.0, min: 0, max: 1, step: 0.05, dp: 2 },
   { key: 'cloudSpeed', type: 'range', label: 'Cloud Speed', initial: 0.01, min: 0, max: 0.1, step: 0.005, dp: 3 },
   { key: 'starsDensity', type: 'range', label: 'Stars', initial: 0.9, min: 0, max: 1, step: 0.05, dp: 2 },
+  { key: 'fogOn', type: 'toggle', label: 'Fog', initial: true },
+  { key: 'fogNear', type: 'range', label: 'Fog Near', initial: 350, min: 0, max: 899, step: 10 },
+  { key: 'fogFar', type: 'range', label: 'Fog Far', initial: 900, min: 100, max: 2000, step: 10 },
+  { key: 'fogColor', type: 'color', label: 'Fog Color', initial: '#cfe0f2' },
 ])
 
 // Push inspector values into the shader uniforms only when they change
@@ -141,6 +155,7 @@ app.configure([
 // NOT part of this — it changes every frame and is forwarded live by the sky
 // node, so it never causes a recompile.
 let last = null
+let lastFog = null
 let elapsed = 0
 
 app.on('update', delta => {
@@ -167,5 +182,22 @@ app.on('update', delta => {
     // uSunDirection or the rebuilt shader would reference an undeclared
     // uniform and fail to compile.
     sky.shaderUniforms = { uSunDirection: [lightDir.x, lightDir.y, lightDir.z], ...cfgTarget }
+  }
+
+  // Fog — engine-native THREE.Fog on the scene, driven by the sky node props
+  // (all three must be set for fog to apply; nulls disable it). Setting these
+  // marks the sky dirty + needsRebuild → updateSky installs/removes scene.fog.
+  const fogTarget = { fogOn: cfg.fogOn, fogNear: cfg.fogNear, fogFar: cfg.fogFar, fogColor: cfg.fogColor }
+  if (JSON.stringify(fogTarget) !== JSON.stringify(lastFog)) {
+    lastFog = fogTarget
+    if (cfg.fogOn) {
+      sky.fogNear = cfg.fogNear
+      sky.fogFar = cfg.fogFar
+      sky.fogColor = cfg.fogColor
+    } else {
+      sky.fogNear = null
+      sky.fogFar = null
+      sky.fogColor = null
+    }
   }
 })
