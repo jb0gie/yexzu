@@ -1026,10 +1026,6 @@ export class PlayerLocal extends Entity {
       e1.setFromQuaternion(q1).reorder('YXZ')
       rotY = e1.y
       // rotY = e1.y + this.cam.rotation.y
-    } else if (this.moving && !this.firstPerson) {
-      // classic 3rd-person: face where the player is actually walking,
-      // not the camera orbit — this leaves the camera free to move around the player
-      rotY = Math.atan2(this.moveDir.x, -this.moveDir.z)
     } else {
       rotY = this.cam.rotation.y
     }
