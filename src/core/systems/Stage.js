@@ -496,13 +496,4 @@ class Model {
     console.warn('TODO: remove if you dont ever see this')
     return this.items[instanceId]?.node.ctx.entity
   }
-
-  getTriangles() {
-    const geometry = this.geometry
-    if (geometry.index !== null) {
-      return geometry.index.count / 3
-    } else {
-      return geometry.attributes.position.count / 3
-    }
-  }
 }
