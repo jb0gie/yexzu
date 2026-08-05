@@ -1,18 +1,48 @@
 // Shader sky demo — user-authored GLSL on the sky dome (port of upstream 602a121b).
 //
-// CONTRACT: your `shader` code is injected inside main() of a wrapper fragment
-// shader. You get these in scope to read:
-//   vec3 direction  — normalized view direction from the sky dome center
-//   vec2 vUv        — sphere UV
-//   float uTime     — seconds since the sky shader became active
-//   vec2 uResolution— renderer drawing-buffer size in px
-// plus any `shaderUniforms` you declare (numbers → float, arrays → vec2/3/4).
-// Expect to WRITE: vec3 color (and optionally float alpha).
-// Output is written as-is: no tonemapping or color-space conversion.
+// CONTRACT:
+//   shader        — code injected INSIDE main(). You get `direction` (vec3,
+//                   normalized view dir), `vUv`, `uTime`, `uResolution`, and
+//                   any `shaderUniforms` declared for you. WRITE `color` (and
+//                   optionally `alpha`). Output is written as-is (no tonemap).
+//   shaderHeader  — GLSL injected at GLOBAL scope BEFORE main(). Put helper
+//                   function definitions here. (You cannot define functions
+//                   inside `shader` — it runs inside main().)
+//   shaderUniforms— plain object: numbers → float, arrays → vec2/3/4.
 //
 // Pattern: app.create('sky') + app.add(sky), then set props live.
 // NOTE: hyperfy's sunDirection is the direction light TRAVELS (points at the
 // scene), so the visible sun sits at -sunDirection.
+
+// Global helper functions (injected before main())
+const CLOUDS_HEADER = `
+float hash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+  return v;
+}
+`
+
+const NIGHT_HEADER = `
+float hash13(vec3 p3) {
+  p3 = fract(p3 * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
+  return fract((p3.x + p3.y) * p3.z);
+}
+`
 
 const DAY_SKY = `
   // simple gradient + sun disc toward the CSM sun direction
@@ -30,24 +60,6 @@ const DAY_SKY = `
 
 const CLOUDS = `
   // drifting FBM cloud layer
-  float hash(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-  }
-  float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
-    return v;
-  }
   float h = direction.y;
   vec3 sky = mix(vec3(0.35, 0.32, 0.28), vec3(0.72, 0.82, 0.92), smoothstep(-0.1, 0.3, h));
   vec2 p = direction.xz / max(direction.y + 0.12, 0.08);
@@ -62,11 +74,6 @@ const CLOUDS = `
 
 const NIGHT = `
   // twinkling hash-grid starfield
-  float hash13(vec3 p3) {
-    p3 = fract(p3 * 0.1031);
-    p3 += dot(p3, p3.zyx + 31.32);
-    return fract((p3.x + p3.y) * p3.z);
-  }
   float h = direction.y;
   vec3 sky = mix(vec3(0.05, 0.04, 0.08), vec3(0.01, 0.01, 0.03), smoothstep(0.0, 0.4, h));
   vec3 cell = floor(direction * 110.0);
@@ -77,6 +84,12 @@ const NIGHT = `
   sky += vec3(1.0) * smoothstep(0.022, 0.0, d) * twinkle * uStarsDensity;
   color = sky;
 `
+
+const PRESETS = {
+  day: { shader: DAY_SKY, header: null, uniforms: () => ({ uSunDirection: [-1, -2, -2] }) },
+  clouds: { shader: CLOUDS, header: CLOUDS_HEADER, uniforms: cfg => ({ uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed }) },
+  night: { shader: NIGHT, header: NIGHT_HEADER, uniforms: cfg => ({ uStarsDensity: cfg.starsDensity }) },
+}
 
 const sky = app.create('sky', {
   shader: DAY_SKY,
@@ -93,25 +106,20 @@ app.configure([
 ])
 
 // Apply live inspector changes only when the relevant values actually change
-// (assigning shader/shaderUniforms triggers a recompile via updateSky).
-const snippets = { day: DAY_SKY, clouds: CLOUDS, night: NIGHT }
+// (assigning shader/shaderHeader/shaderUniforms triggers a recompile via updateSky).
 let last = {}
 
 app.on('update', () => {
   const cfg = app.config
-  if (cfg.sky !== last.sky) {
-    last.sky = cfg.sky
-    const next = snippets[cfg.sky]
-    if (next && sky.shader !== next) sky.shader = next
+  const preset = PRESETS[cfg.sky] || PRESETS.day
+  if (preset !== last.preset) {
+    last.preset = preset
+    sky.shader = preset.shader
+    sky.shaderHeader = preset.header
   }
-  const target =
-    cfg.sky === 'clouds' ? ['clouds', cfg.cloudCover, cfg.cloudSpeed] :
-    cfg.sky === 'night' ? ['night', cfg.starsDensity] : ['day']
-  if (String(target) !== String(last.hash)) {
-    last.hash = target
-    sky.shaderUniforms =
-      cfg.sky === 'clouds' ? { uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed } :
-      cfg.sky === 'night' ? { uStarsDensity: cfg.starsDensity } :
-      { uSunDirection: [-1, -2, -2] }
+  const target = preset.uniforms(cfg)
+  if (JSON.stringify(target) !== JSON.stringify(last.uniforms)) {
+    last.uniforms = target
+    sky.shaderUniforms = target
   }
 })

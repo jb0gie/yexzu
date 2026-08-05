@@ -100,13 +100,13 @@ function buildCustomUniformDeclarations(userUniforms) {
   return `${declarations.join('\n')}\n`
 }
 
-function buildSkyFragmentShader(userCode, userUniforms) {
+function buildSkyFragmentShader(userCode, userUniforms, userHeader = '') {
   return `
 varying vec3 vPosition;
 varying vec2 vUv;
 uniform float uTime;
 uniform vec2 uResolution;
-${buildCustomUniformDeclarations(userUniforms)}void main() {
+${buildCustomUniformDeclarations(userUniforms)}${userHeader ? userHeader.trim() + '\n' : ''}void main() {
   vec3 direction = normalize(vPosition);
   vec3 color = vec3(0.0);
   float alpha = 1.0;
@@ -222,6 +222,7 @@ export class ClientEnvironment extends System {
     const base = this.base
     const node = this.skys[this.skys.length - 1]?.node
     const shaderCode = node?._shader || null
+    const shaderHeader = node?._shaderHeader || null
     const shaderUniforms = node?._shaderUniforms || null
     const bgUrl = node?._bg || base.bg
     const hdrUrl = node?._hdr || base.hdr
@@ -249,7 +250,7 @@ export class ClientEnvironment extends System {
         const uniforms = buildShaderUniforms(shaderUniforms)
         const material = new THREE.ShaderMaterial({
           vertexShader: skyVertexShader,
-          fragmentShader: buildSkyFragmentShader(shaderCode, shaderUniforms),
+          fragmentShader: buildSkyFragmentShader(shaderCode, shaderUniforms, shaderHeader),
           uniforms,
           side: THREE.BackSide,
           depthWrite: false,

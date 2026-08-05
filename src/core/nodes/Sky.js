@@ -20,6 +20,7 @@ const defaults = {
   bg: null,
   hdr: null,
   shader: null,
+  shaderHeader: null,
   shaderUniforms: null,
   rotationY: null,
   sunDirection: null,
@@ -38,6 +39,7 @@ export class Sky extends Node {
     this.bg = data.bg
     this.hdr = data.hdr
     this.shader = data.shader
+    this.shaderHeader = data.shaderHeader
     this.shaderUniforms = data.shaderUniforms
     this.rotationY = data.rotationY
     this.sunDirection = data.sunDirection
@@ -69,6 +71,7 @@ export class Sky extends Node {
     this._bg = source._bg
     this._hdr = source._hdr
     this._shader = source._shader
+    this._shaderHeader = source._shaderHeader
     this._shaderUniforms = source._shaderUniforms
     this._rotationY = source._rotationY
     this._sunDirection = source._sunDirection
@@ -104,43 +107,60 @@ export class Sky extends Node {
     }
     if (this._hdr === value) return
     this._hdr = value
-        this.needsRebuild = true
-        this.setDirty()
-      }
+    this.needsRebuild = true
+    this.setDirty()
+  }
 
-      get shader() {
-        return this._shader
-      }
+  get shader() {
+    return this._shader
+  }
 
-      set shader(value = defaults.shader) {
-        if (value !== null && !isString(value)) {
-          throw new Error('[sky] shader not a string')
-        }
-        if (value !== null && value.length > MAX_SHADER_LENGTH) {
-          throw new Error('[sky] shader exceeds max length')
-        }
-        if (this._shader === value) return
-        this._shader = value
-        this.needsRebuild = true
-        this.setDirty()
-      }
+  set shader(value = defaults.shader) {
+    if (value !== null && !isString(value)) {
+      throw new Error('[sky] shader not a string')
+    }
+    if (value !== null && value.length > MAX_SHADER_LENGTH) {
+      throw new Error('[sky] shader exceeds max length')
+    }
+    if (this._shader === value) return
+    this._shader = value
+    this.needsRebuild = true
+    this.setDirty()
+  }
 
-      get shaderUniforms() {
-        return this._shaderUniforms
-      }
+  get shaderHeader() {
+    return this._shaderHeader
+  }
 
-      set shaderUniforms(value = defaults.shaderUniforms) {
-        if (value !== null && !isValidUniforms(value)) {
-          throw new Error('[sky] shaderUniforms must be an object of numbers or number arrays (vec2/vec3/vec4)')
-        }
-        this._shaderUniforms = value
-        this.needsRebuild = true
-        this.setDirty()
-      }
+  set shaderHeader(value = defaults.shaderHeader) {
+    if (value !== null && !isString(value)) {
+      throw new Error('[sky] shaderHeader not a string')
+    }
+    if (value !== null && value.length > MAX_SHADER_LENGTH) {
+      throw new Error('[sky] shaderHeader exceeds max length')
+    }
+    if (this._shaderHeader === value) return
+    this._shaderHeader = value
+    this.needsRebuild = true
+    this.setDirty()
+  }
 
-      get rotationY() {
-        return this._rotationY
-      }
+  get shaderUniforms() {
+    return this._shaderUniforms
+  }
+
+  set shaderUniforms(value = defaults.shaderUniforms) {
+    if (value !== null && !isValidUniforms(value)) {
+      throw new Error('[sky] shaderUniforms must be an object of numbers or number arrays (vec2/vec3/vec4)')
+    }
+    this._shaderUniforms = value
+    this.needsRebuild = true
+    this.setDirty()
+  }
+
+  get rotationY() {
+    return this._rotationY
+  }
 
   set rotationY(value = defaults.rotationY) {
     if (value !== null && !isNumber(value)) {
@@ -257,6 +277,12 @@ export class Sky extends Node {
         },
         set shader(value) {
           self.shader = value
+        },
+        get shaderHeader() {
+          return self.shaderHeader
+        },
+        set shaderHeader(value) {
+          self.shaderHeader = value
         },
         get shaderUniforms() {
           return self.shaderUniforms
