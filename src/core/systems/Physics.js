@@ -573,6 +573,16 @@ export class Physics extends System {
     }
     return material
   }
+
+  destroy() {
+    // ponytail: release the reusable PhysX query result buffers allocated in init()
+    this.raycastResult?.destroy()
+    this.sweepResult?.destroy()
+    this.overlapResult?.destroy()
+    this.queryFilterData?.destroy()
+    this.sweepPose?.destroy()
+    this.overlapPose?.destroy()
+  }
 }
 
 function createPool(factory) {
