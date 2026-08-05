@@ -12,8 +12,9 @@
 //   shaderUniforms— plain object: numbers → float, arrays → vec2/3/4.
 //
 // This demo: uTime drives a day/night cycle — the sun azimuth rotates and its
-// elevation dips below the horizon at night; gradient, sun, moon, stars and
-// clouds all blend by sun elevation. No preset switching needed.
+// elevation dips below the horizon at night; gradient, sun (crisp disk +
+// corona), moon (independent slow orbit, phases, maria), stars and clouds all
+// blend by sun elevation.
 
 // Global helper functions (injected before main())
 const SKY_HEADER = `
@@ -65,19 +66,33 @@ const CYCLE = `
   vec3 sky = mix(ground, mix(horizonNight, horizonDay, day), smoothstep(-0.1, 0.02, h));
   sky = mix(sky, mix(zenithNight, zenithDay, day), smoothstep(0.02, 0.45, h));
 
-  // ---- sun disc + halo (only while the sun is up) ----
+  // ---- sun: crisp disk + hot core + corona ----
   float sunDot = max(dot(direction, sunDir), 0.0);
   float warm = smoothstep(0.0, 0.35, sunElev);
   vec3 sunTint = mix(vec3(1.0, 0.32, 0.08), vec3(1.0, 0.95, 0.85), warm);
-  float disc = pow(sunDot, 8.0);
-  float halo = pow(sunDot, 2.5) * 0.2 * (0.05 + 0.95 * day);
-  sky += sunTint * (disc * day * 1.6 + halo * day);
+  float sunEdge = 0.9999;
+  float sunDisk = smoothstep(sunEdge - 0.00008, sunEdge, sunDot);
+  float sunCore = pow(sunDot, 14.0);
+  float sunCorona = pow(sunDot, 2.5) * 0.4;
+  sky += sunTint * (sunDisk * 2.0 + sunCore * 0.5) * day;
+  sky += sunTint * sunCorona * day * 0.45;
 
-  // ---- moon opposite the sun (night only) ----
-  vec3 moonDir = -sunDir;
+  // ---- moon: slow orbit, phases from sun angle, maria blotches ----
+  float moonAngle = uTime * uCycleSpeed * 0.25;      // moon orbits 4x slower than the sun
+  vec3 moonDir = normalize(vec3(cos(moonAngle) * 0.9, 0.25 + sin(moonAngle) * 0.45, sin(moonAngle) * 0.9));
   float moonDot = max(dot(direction, moonDir), 0.0);
-  sky += vec3(0.85, 0.88, 0.95) * smoothstep(0.997, 0.9998, moonDot) * night * 1.5;
-  sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 8.0) * 0.15 * night;
+  float moonEdge = 0.99955;                          // ~1.7 deg apparent disk
+  float moonMask = smoothstep(moonEdge - 0.00015, moonEdge, moonDot);
+  float moonLit = smoothstep(-0.05, 0.15, dot(direction, sunDir));  // phase terminator
+  vec3 moonTangent = normalize(cross(moonDir, vec3(0.0, 1.0, 0.0)));
+  vec3 moonBitangent = cross(moonDir, moonTangent);
+  vec2 mariaUV = vec2(dot(direction, moonTangent), dot(direction, moonBitangent));
+  float maria = fbm(mariaUV * 120.0 + 5.0) * 0.7 + fbm(mariaUV * 400.0) * 0.3;
+    float moonAlbedo = mix(0.22, 1.0, smoothstep(0.4, 0.6, maria));
+    float moonShade = 0.2 + 0.8 * moonLit;
+    vec3 moonColor = vec3(0.88, 0.9, 0.98) * moonAlbedo;
+    sky += moonColor * moonMask * moonShade * night * 1.2;
+  sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 6.0) * night * 0.06;  // soft halo
 
   // ---- stars (twinkle, fade out with day) ----
   vec3 cell = floor(direction * 90.0);
@@ -106,7 +121,7 @@ const sky = app.create('sky', {
   shader: CYCLE,
   shaderHeader: SKY_HEADER,
   shaderUniforms: {
-    uCycleSpeed: 0.05,
+    uCycleSpeed: 0.005,
     uCloudCover: 1.0,
     uCloudSpeed: 0.01,
     uStarsDensity: 0.9,
@@ -116,7 +131,7 @@ app.add(sky)
 app.keepActive = true
 
 app.configure([
-  { key: 'cycleSpeed', type: 'range', label: 'Cycle Speed', initial: 0.05, min: 0, max: 0.5, step: 0.01, dp: 2 },
+  { key: 'cycleSpeed', type: 'range', label: 'Cycle Speed', initial: 0.005, min: 0.001, max: 0.02, step: 0.001, dp: 3 },
   { key: 'cloudCover', type: 'range', label: 'Cloud Cover', initial: 1.0, min: 0, max: 1, step: 0.05, dp: 2 },
   { key: 'cloudSpeed', type: 'range', label: 'Cloud Speed', initial: 0.01, min: 0, max: 0.1, step: 0.005, dp: 3 },
   { key: 'starsDensity', type: 'range', label: 'Stars', initial: 0.9, min: 0, max: 1, step: 0.05, dp: 2 },
