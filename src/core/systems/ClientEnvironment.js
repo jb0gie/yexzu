@@ -206,16 +206,16 @@ export class ClientEnvironment extends System {
 
   // Live-update the sun WITHOUT a full sky rebuild: keeps the CSM shadow
   // direction and the sky shader's visible sun disc in sync, per frame.
-  // `dir` is the direction TOWARD the sun (hyperfy's sunDirection prop is
-  // the opposite — the direction light travels, which is what CSM expects).
-  setSunDirection(dir) {
-    if (!dir) return
+  // `value` is hyperfy's sunDirection convention: the direction the light
+  // TRAVELS (toward the scene). The shader negates it to find the disc.
+  setSunDirection(value) {
+    if (!value) return
     if (this.csm) {
-      this.csm.lightDirection.copy(dir).negate()
+      this.csm.lightDirection = value
     }
     const mat = this.skyShaderMaterial
     if (mat?.uniforms?.uSunDirection) {
-      mat.uniforms.uSunDirection.value.copy(dir)
+      mat.uniforms.uSunDirection.value.copy(value)
     }
   }
 

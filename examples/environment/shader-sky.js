@@ -12,10 +12,11 @@
 //   shaderUniforms— plain object: numbers → float, arrays → vec2/3/4.
 //
 // This demo: the APP owns the day/night orbit (single source of truth). Each
-// frame it computes the sun direction and pushes it to BOTH the shader sun
-// disc and the directional-light shadows via world.environment.setSunDirection()
-// — so the visible sun and the shadows always agree. The moon orbits 4x slower
-// than the sun, so its phases emerge from the sun angle. Clouds drift via uTime.
+// frame it computes the sun and sets sky.sunDirection (hyperfy convention:
+// the direction light TRAVELS). The sky node forwards that live to the CSM
+// shadow light AND the shader's uSunDirection uniform — no rebuild — so the
+// visible sun disc and the directional-light shadows always agree. The moon
+// orbits 4x slower, so its phases emerge from the sun angle.
 
 // Global helper functions (injected before main())
 const SKY_HEADER = `
@@ -45,9 +46,10 @@ float fbm(vec2 p) {
 `
 
 const CYCLE = `
-  // ---- sun direction comes from the app (uSunDirection uniform) so the
-  //      directional-light shadows stay in sync with the visible disc ----
-  vec3 sunDir = normalize(uSunDirection);
+  // ---- sun direction from the app. uSunDirection is hyperfy's sunDirection
+  //      convention (direction light TRAVELS) so it matches the CSM shadow
+  //      light exactly; negate to find where the disc appears.
+  vec3 sunDir = normalize(-uSunDirection);
   float sunElev = sunDir.y;
   float day = smoothstep(-0.15, 0.15, sunElev);   // 0 = night, 1 = noon
   float night = 1.0 - day;
@@ -117,7 +119,7 @@ const sky = app.create('sky', {
   shader: CYCLE,
   shaderHeader: SKY_HEADER,
   shaderUniforms: {
-    uSunDirection: [0, 0.63, 0.8], // noon-ish; the app overwrites this every frame
+    uSunDirection: [-1, -2, -2], // light-TRAVEL (matches baseEnvironment default); app overrides each frame
     uCycleSpeed: 0.005,
     uCloudCover: 1.0,
     uCloudSpeed: 0.01,
@@ -135,17 +137,18 @@ app.configure([
 ])
 
 // Push inspector values into the shader uniforms only when they change
-// (assigning shaderUniforms triggers a recompile via updateSky). The sun
-// direction is NOT part of this — it changes every frame and is pushed live
-// via setSunDirection so it never causes a recompile.
+// (assigning shaderUniforms triggers a recompile via updateSky). The sun is
+// NOT part of this — it changes every frame and is forwarded live by the sky
+// node, so it never causes a recompile.
 let last = null
 let elapsed = 0
 
 app.on('update', delta => {
   elapsed += delta
 
-  // Day/night orbit — SINGLE source of truth for the visible sun disc AND the
-  // directional-light shadows (CSM), so they always agree.
+  // Day/night orbit — SINGLE source of truth. sky.sunDirection (light-travel)
+  // drives BOTH the CSM shadow light and the shader's sun disc via the node's
+  // live forward, so they always agree.
   const phase = (elapsed * app.config.cycleSpeed) % 1
   const angle = phase * 6.28318
   const sunDir = new Vector3(
@@ -153,15 +156,16 @@ app.on('update', delta => {
     Math.sin(angle) * 0.75 - 0.12,
     Math.sin(angle) * 0.8
   ).normalize()
-  world.environment?.setSunDirection(sunDir)
+  const lightDir = sunDir.clone().negate()
+  sky.sunDirection = lightDir
 
   const cfg = app.config
   const cfgTarget = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
   if (JSON.stringify(cfgTarget) !== JSON.stringify(last)) {
     last = cfgTarget
-    // Rebuild trigger is config-only (uSunDirection changes every frame), but
-    // the SET must always include uSunDirection or the rebuilt shader would
-    // reference an undeclared uniform and fail to compile.
-    sky.shaderUniforms = { uSunDirection: [sunDir.x, sunDir.y, sunDir.z], ...cfgTarget }
+    // Rebuild trigger is config-only, but the SET must always include
+    // uSunDirection or the rebuilt shader would reference an undeclared
+    // uniform and fail to compile.
+    sky.shaderUniforms = { uSunDirection: [lightDir.x, lightDir.y, lightDir.z], ...cfgTarget }
   }
 })

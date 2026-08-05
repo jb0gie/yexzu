@@ -182,7 +182,9 @@ export class Sky extends Node {
     }
     if (this._sunDirection === value) return
     this._sunDirection = value
-    this.needsRebuild = true
+    // Live-update CSM shadow direction + shader sun without rebuilding the
+    // sky material — so an app can rotate the sun every frame cheaply.
+    this.ctx?.world?.environment?.setSunDirection?.(value)
     this.setDirty()
   }
 
