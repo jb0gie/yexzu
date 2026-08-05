@@ -11,10 +11,11 @@
 //                   inside `shader` — it runs inside main().)
 //   shaderUniforms— plain object: numbers → float, arrays → vec2/3/4.
 //
-// This demo: uTime drives a day/night cycle — the sun azimuth rotates and its
-// elevation dips below the horizon at night; gradient, sun (crisp disk +
-// corona), moon (independent slow orbit, phases, maria), stars and clouds all
-// blend by sun elevation.
+// This demo: the APP owns the day/night orbit (single source of truth). Each
+// frame it computes the sun direction and pushes it to BOTH the shader sun
+// disc and the directional-light shadows via world.environment.setSunDirection()
+// — so the visible sun and the shadows always agree. The moon orbits 4x slower
+// than the sun, so its phases emerge from the sun angle. Clouds drift via uTime.
 
 // Global helper functions (injected before main())
 const SKY_HEADER = `
@@ -44,14 +45,9 @@ float fbm(vec2 p) {
 `
 
 const CYCLE = `
-  // ---- sun position from time (full day/night cycle) ----
-  float phase = fract(uTime * uCycleSpeed);
-  float sunAngle = phase * 6.28318;
-  vec3 sunDir = normalize(vec3(
-    cos(sunAngle),
-    sin(sunAngle) * 0.75 - 0.12,   // dips below horizon -> night
-    sin(sunAngle) * 0.8
-  ));
+  // ---- sun direction comes from the app (uSunDirection uniform) so the
+  //      directional-light shadows stay in sync with the visible disc ----
+  vec3 sunDir = normalize(uSunDirection);
   float sunElev = sunDir.y;
   float day = smoothstep(-0.15, 0.15, sunElev);   // 0 = night, 1 = noon
   float night = 1.0 - day;
@@ -61,7 +57,7 @@ const CYCLE = `
   vec3 zenithDay = vec3(0.12, 0.36, 0.78);
   vec3 horizonDay = vec3(0.78, 0.88, 0.98);
   vec3 zenithNight = vec3(0.015, 0.018, 0.045);
-  vec3 horizonNight = vec3(0.07, 0.07, 0.11);
+  vec3 horizonNight = vec3(0.025, 0.025, 0.04);
   vec3 ground = vec3(0.18, 0.16, 0.14);
   vec3 sky = mix(ground, mix(horizonNight, horizonDay, day), smoothstep(-0.1, 0.02, h));
   sky = mix(sky, mix(zenithNight, zenithDay, day), smoothstep(0.02, 0.45, h));
@@ -88,10 +84,10 @@ const CYCLE = `
   vec3 moonBitangent = cross(moonDir, moonTangent);
   vec2 mariaUV = vec2(dot(direction, moonTangent), dot(direction, moonBitangent));
   float maria = fbm(mariaUV * 120.0 + 5.0) * 0.7 + fbm(mariaUV * 400.0) * 0.3;
-    float moonAlbedo = mix(0.22, 1.0, smoothstep(0.4, 0.6, maria));
-    float moonShade = 0.2 + 0.8 * moonLit;
-    vec3 moonColor = vec3(0.88, 0.9, 0.98) * moonAlbedo;
-    sky += moonColor * moonMask * moonShade * night * 1.2;
+  float moonAlbedo = mix(0.22, 1.0, smoothstep(0.4, 0.6, maria));
+  float moonShade = 0.2 + 0.8 * moonLit;
+  vec3 moonColor = vec3(0.88, 0.9, 0.98) * moonAlbedo;
+  sky += moonColor * moonMask * moonShade * night * 1.2;
   sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 6.0) * night * 0.06;  // soft halo
 
   // ---- stars (twinkle, fade out with day) ----
@@ -103,7 +99,7 @@ const CYCLE = `
   float stars = smoothstep(0.02, 0.0, starDist) * twinkle;
   sky += vec3(1.0) * stars * night * uStarsDensity * 2.4;
 
-  // ---- clouds (drifting FBM, tinted by time of day) ----
+  // ---- clouds (drifting FBM, dark at night) ----
   float cmask = smoothstep(-0.05, 0.3, direction.y);
   vec2 cp = direction.xz / max(direction.y + 0.15, 0.1);
   cp *= 1.2;
@@ -111,7 +107,7 @@ const CYCLE = `
   float cn = fbm(cp);
   float clouds = smoothstep(0.35, 0.6, cn);
   float cloudop = clouds * uCloudCover * cmask;
-  vec3 cloudCol = mix(vec3(0.5, 0.5, 0.58), vec3(1.0, 1.0, 1.0), day);
+  vec3 cloudCol = mix(vec3(0.03, 0.035, 0.05), vec3(1.0, 1.0, 1.0), day);
   sky = mix(sky, cloudCol, clamp(cloudop, 0.0, 1.0));
 
   color = sky;
@@ -121,6 +117,7 @@ const sky = app.create('sky', {
   shader: CYCLE,
   shaderHeader: SKY_HEADER,
   shaderUniforms: {
+    uSunDirection: [0, 0.63, 0.8], // noon-ish; the app overwrites this every frame
     uCycleSpeed: 0.005,
     uCloudCover: 1.0,
     uCloudSpeed: 0.01,
@@ -138,10 +135,26 @@ app.configure([
 ])
 
 // Push inspector values into the shader uniforms only when they change
-// (assigning shaderUniforms triggers a recompile via updateSky).
+// (assigning shaderUniforms triggers a recompile via updateSky). The sun
+// direction is NOT part of this — it changes every frame and is pushed live
+// via setSunDirection so it never causes a recompile.
 let last = null
+let elapsed = 0
 
-app.on('update', () => {
+app.on('update', delta => {
+  elapsed += delta
+
+  // Day/night orbit — SINGLE source of truth for the visible sun disc AND the
+  // directional-light shadows (CSM), so they always agree.
+  const phase = (elapsed * app.config.cycleSpeed) % 1
+  const angle = phase * 6.28318
+  const sunDir = new Vector3(
+    Math.cos(angle),
+    Math.sin(angle) * 0.75 - 0.12,
+    Math.sin(angle) * 0.8
+  ).normalize()
+  world.environment?.setSunDirection(sunDir)
+
   const cfg = app.config
   const target = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
   if (JSON.stringify(target) !== JSON.stringify(last)) {
