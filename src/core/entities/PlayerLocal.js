@@ -25,6 +25,9 @@ const STICK_OUTER_RADIUS = 50
 const STICK_INNER_RADIUS = 25
 const DEFAULT_CAM_HEIGHT = 1.2
 
+const COYOTE_TIME = 0.1   // seconds of jump grace after leaving ground (50Hz = 5 frames)
+const BUFFER_TIME = 0.15  // seconds a jump press remains valid before landing (50Hz = ~7 frames)
+
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
 const v3 = new THREE.Vector3()
@@ -76,6 +79,9 @@ export class PlayerLocal extends Entity {
     this.justLeftGround = false
     this.canDoubleJump = true  // Track if we can perform a double jump
     this.doubleJumpUsed = false  // Prevent multiple triggers per air session
+    // coyote time + jump buffer
+    this.coyoteTimer = 0  // grace after leaving ground, decayed in fixedUpdate
+    this.bufferTimer = 0  // grace after jump press, decayed in fixedUpdate
 
     this.flipStartAt = 0
     this.flipUntil = 0
@@ -538,6 +544,7 @@ export class PlayerLocal extends Entity {
       if (sweepHit) {
         this.justLeftGround = false
         this.grounded = true
+        this.coyoteTimer = COYOTE_TIME
         this.groundNormal.copy(sweepHit.normal)
         this.groundAngle = UP.angleTo(this.groundNormal) * RAD2DEG
       } else {
@@ -726,9 +733,16 @@ export class PlayerLocal extends Entity {
         // this.capsule.addForce(moveForce.toPxVec3(), PHYSX.PxForceModeEnum.eFORCE, true)
       }
 
-      // ground/air jump
+      // decay coyote timer (leave ground -> window shrinks; re-grounded -> refilled in sweep)
+      if (this.coyoteTimer > 0 && !this.grounded) this.coyoteTimer -= delta
+      // decay jump buffer
+      if (this.bufferTimer > 0) this.bufferTimer -= delta
+
+      // ground/air jump — coyote time lets us jump shortly after leaving a ledge
+      const groundedOrCoyote = this.grounded || this.coyoteTimer > 0
+      const jumpPressedOrBuffered = this.jumpDown || this.bufferTimer > 0
       const shouldJump =
-        this.grounded && !this.jumping && this.jumpDown && !this.data.effect?.snare && !this.data.effect?.freeze
+        groundedOrCoyote && !this.jumping && jumpPressedOrBuffered && !this.data.effect?.snare && !this.data.effect?.freeze
       const shouldAirJump =
         !this.grounded && this.canDoubleJump && !this.doubleJumpUsed && this.jumpPressed && !this.world.builder?.enabled
       if (shouldJump || shouldAirJump) {
@@ -902,6 +916,7 @@ export class PlayerLocal extends Entity {
     }
     if (xr ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed) {
       this.jumpPressed = true
+      this.bufferTimer = BUFFER_TIME
     }
 
     // get our movement direction
