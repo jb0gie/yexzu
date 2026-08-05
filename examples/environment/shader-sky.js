@@ -80,7 +80,8 @@ const CYCLE = `
   sky += sunTint * (sunDisk * 2.0 + sunCore * 0.5) * day;
   sky += sunTint * sunCorona * day * 0.45;
 
-  // ---- moon: slow orbit, phases from sun angle, maria blotches ----
+  // ---- moon: slow orbit, phases from sun angle, maria blotches. uMoonEmissive
+  //      (0-1) fades the sun-lit phase and adds self-glow + bloom ----
   float moonAngle = uTime * uCycleSpeed * 0.25;      // moon orbits 4x slower than the sun
   vec3 moonDir = normalize(vec3(cos(moonAngle) * 0.9, 0.25 + sin(moonAngle) * 0.45, sin(moonAngle) * 0.9));
   float moonDot = max(dot(direction, moonDir), 0.0);
@@ -92,10 +93,10 @@ const CYCLE = `
   vec2 mariaUV = vec2(dot(direction, moonTangent), dot(direction, moonBitangent));
   float maria = fbm(mariaUV * 120.0 + 5.0) * 0.7 + fbm(mariaUV * 400.0) * 0.3;
   float moonAlbedo = mix(0.22, 1.0, smoothstep(0.4, 0.6, maria));
-  float moonShade = 0.2 + 0.8 * moonLit;
+  float moonShade = mix(0.2 + 0.8 * moonLit, 1.0, uMoonEmissive);  // emissive → full bright disc
   vec3 moonColor = vec3(0.88, 0.9, 0.98) * moonAlbedo;
-  sky += moonColor * moonMask * moonShade * night * 1.2;
-  sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 6.0) * night * 0.06;  // soft halo
+  sky += moonColor * moonMask * moonShade * night * (1.2 + uMoonEmissive * 0.8);
+  sky += vec3(0.85, 0.88, 0.95) * pow(moonDot, 4.0) * night * (0.06 + uMoonEmissive * 0.4);  // emissive bloom
 
   // ---- stars (twinkle, fade out with day) ----
   vec3 cell = floor(direction * 90.0);
@@ -129,6 +130,7 @@ const sky = app.create('sky', {
     uCloudCover: 1.0,
     uCloudSpeed: 0.01,
     uStarsDensity: 0.9,
+    uMoonEmissive: 0.6,
   },
   // Fog on by default ("like we used to have"). Distance fade so distant
   // geometry melts into the horizon before reaching the 1000-unit dome.
@@ -144,6 +146,7 @@ app.configure([
   { key: 'cloudCover', type: 'range', label: 'Cloud Cover', initial: 1.0, min: 0, max: 1, step: 0.05, dp: 2 },
   { key: 'cloudSpeed', type: 'range', label: 'Cloud Speed', initial: 0.01, min: 0, max: 0.1, step: 0.005, dp: 3 },
   { key: 'starsDensity', type: 'range', label: 'Stars', initial: 0.9, min: 0, max: 1, step: 0.05, dp: 2 },
+  { key: 'moonEmissive', type: 'range', label: 'Moon Glow', initial: 0.6, min: 0, max: 1, step: 0.05, dp: 2 },
   { key: 'fogOn', type: 'toggle', label: 'Fog', initial: true },
   { key: 'fogNear', type: 'range', label: 'Fog Near', initial: 350, min: 0, max: 899, step: 10 },
   { key: 'fogFar', type: 'range', label: 'Fog Far', initial: 900, min: 100, max: 2000, step: 10 },
@@ -175,7 +178,7 @@ app.on('update', delta => {
   sky.sunDirection = lightDir
 
   const cfg = app.config
-  const cfgTarget = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity }
+  const cfgTarget = { uCycleSpeed: cfg.cycleSpeed, uCloudCover: cfg.cloudCover, uCloudSpeed: cfg.cloudSpeed, uStarsDensity: cfg.starsDensity, uMoonEmissive: cfg.moonEmissive }
   if (JSON.stringify(cfgTarget) !== JSON.stringify(last)) {
     last = cfgTarget
     // Rebuild trigger is config-only, but the SET must always include
