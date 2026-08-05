@@ -73,13 +73,40 @@ class NodeStorage {
   }
 }
 
+class MemoryStorage {
+  constructor() {
+    this.data = new Map()
+  }
+  get(key, defaultValue = null) {
+    if (!this.data.has(key)) return defaultValue
+    const value = this.data.get(key)
+    return value === undefined ? defaultValue : value
+  }
+  set(key, value) {
+    if (value === undefined || value === null) this.data.delete(key)
+    else this.data.set(key, value)
+  }
+  remove(key) {
+    this.data.delete(key)
+  }
+}
+
 const isBrowser = typeof window !== 'undefined'
 const isNode = typeof process !== 'undefined' && process.versions && process.versions.node
 
 let storage
 
 if (isBrowser) {
-  storage = new LocalStorage() // todo: some browser environments (eg safari incognito) have no local storage so we need a MemoryStorage fallback
+  try {
+    // accessing localStorage even to feature-detect can throw in Safari private mode
+    const probe = '__hermes_probe__'
+    localStorage.setItem(probe, '1')
+    localStorage.removeItem(probe)
+    storage = new LocalStorage()
+  } catch (err) {
+    console.warn('localStorage unavailable (private mode?). Falling back to in-memory storage.')
+    storage = new MemoryStorage()
+  }
 } else if (isNode) {
   storage = new NodeStorage()
 } else {
