@@ -1,17 +1,17 @@
 # Build stage
-FROM node:22.11.0-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
 # Install Python and build dependencies for native modules
 RUN apk add --no-cache python3 make g++ sqlite-dev
 
-# Copy package.json and package-lock.json to leverage layer caching
-COPY package.json package-lock.json ./
-RUN npm install
+# Copy package.json and bun.lock to leverage layer caching
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 # Copy all source files and build
 COPY . .
-RUN npm run build
+RUN bun run build
 
 # Production stage
 FROM node:22.11.0-alpine AS production
