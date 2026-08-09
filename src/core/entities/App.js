@@ -39,6 +39,7 @@ export class App extends Entity {
     this.snaps = []
     this.root = createNode('group')
     this.fields = []
+    this.menuItems = []
     this.target = null
     this.projectLimit = Infinity
     this.resetOnMove = false
@@ -202,7 +203,9 @@ export class App extends Entity {
     // mark dead and re-create hook (timers, async etc)
     this.deadHook.dead = true
     this.deadHook = { dead: false }
-    // clear fields
+    // clear fields + menu items
+    this.menuItems = []
+    this.onMenuItems?.([])
     this.onFields?.([])
   }
 
@@ -320,6 +323,16 @@ export class App extends Entity {
 
   crash() {
     this.build(true)
+  }
+
+  openMenu() {
+    if (!this.world?.network?.isClient) return
+    this.world.ui?.setApp(this)
+  }
+
+  closeMenu() {
+    if (!this.world?.network?.isClient) return
+    this.world.ui?.setApp(null)
   }
 
   destroy(local) {

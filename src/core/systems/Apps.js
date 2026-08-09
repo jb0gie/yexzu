@@ -357,6 +357,24 @@ export class Apps extends System {
         }
         entity.onFields?.(entity.fields)
       },
+      openMenu(entity) {
+        if (!world.network.isClient) return console.warn('[app.openMenu] client only')
+        entity?.openMenu?.()
+      },
+      closeMenu(entity) {
+        if (!world.network.isClient) return
+        entity?.closeMenu?.()
+      },
+      setMenuItems(entity, items) {
+        if (isArray(items)) {
+          entity.menuItems = items.filter(item => item && typeof item.label === 'string')
+        } else if (items === null || items === undefined) {
+          entity.menuItems = []
+        } else {
+          throw new Error('[setMenuItems] expected array or null')
+        }
+        entity.onMenuItems?.(entity.menuItems)
+      },
     }
   }
 

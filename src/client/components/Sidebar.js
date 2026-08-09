@@ -1262,10 +1262,51 @@ function App({ world, hidden }) {
               {transforms && <AppTransformFields app={app} />}
             </div>
           )}
+          <AppMenuItems app={app} />
           <AppFields world={world} app={app} blueprint={blueprint} />
         </div>
       </div>
     </Pane>
+  )
+}
+
+function AppMenuItems({ app }) {
+  const [items, setItems] = useState(() => app.menuItems)
+  useEffect(() => {
+    app.onMenuItems = setItems
+    return () => {
+      app.onMenuItems = null
+    }
+  }, [app])
+  if (!items?.length) return null
+  return (
+    <div
+      css={css`
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        .appmenuitem {
+          display: flex;
+          align-items: center;
+          padding: 0.4rem 0.6rem;
+          border-radius: 0.375rem;
+          background: rgba(255, 255, 255, 0.05);
+          font-size: 0.875rem;
+          &:hover {
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+          }
+        }
+      `}
+    >
+      {items.map((item, i) => (
+        <div key={i} className='appmenuitem' onClick={() => item.onClick?.()}>
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
