@@ -16,7 +16,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5.1.0
@@ -37,14 +37,12 @@ jobs:
             type=ref,event=tag
             type=ref,event=pr
             type=sha,format=long
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
