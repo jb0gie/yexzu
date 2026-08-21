@@ -2,6 +2,7 @@ import { System } from './System'
 import { storage } from '../storage'
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
+import { switchChain as wagmiSwitchChain } from 'wagmi/actions'
 
 const key = 'hyp:solana:auths'
 const template = 'Connect to world:\n{address}'
@@ -22,12 +23,13 @@ export class EVM extends System {
     this._cachedReactAddress = null
   }
 
-  async bind({ connectors, connect, config, actions, abis, address, chainId, isConnected, isConnecting, disconnect }) {
+  async bind({ connectors, connect, config, actions, abis, address, chainId, isConnected, isConnecting, disconnect, supportedChains }) {
     // Store the action bindings
     this.actions = actions
     this.abis = abis
     this.connection = { connect, disconnect, connectors }
     this.config = config
+    this.supportedChains = supportedChains ?? this.supportedChains ?? []
 
     // Cache React-provided data (for checking if state actually changed)
     this._cachedReactIsConnected = isConnected
@@ -91,6 +93,27 @@ export class EVM extends System {
 
     // Periodic cache cleanup (run once on bind)
     this.cleanupCache()
+  }
+
+  // Public method for apps: ask the wallet to switch networks (triggers wallet prompt).
+  async switchChain(chainId) {
+    if (!this.config) {
+      console.error('[EVM] Cannot switch chain: config not bound yet')
+      return { success: false, reason: 'not_bound' }
+    }
+    try {
+      await wagmiSwitchChain(this.config, { id: Number(chainId) })
+      return { success: true, chainId: Number(chainId) }
+    } catch (err) {
+      // Common failure: chain not in the wallet's list / user rejected the prompt.
+      console.error('[EVM] switchChain failed:', err.message)
+      return { success: false, error: err.message, reason: 'switch_failed' }
+    }
+  }
+
+  // Chain list configured on this world (from the client EVM component).
+  getSupportedChains() {
+    return this.supportedChains ?? []
   }
 
   // Public method for apps to call - simplified wrapper

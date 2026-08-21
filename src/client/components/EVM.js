@@ -273,6 +273,7 @@ function Logic({ world }) {
       isConnected,
       isConnecting,
       appKit: { open },
+      supportedChains: networks.map(n => ({ id: n.id, name: n.name })),
     })
   }, [isConnected, isConnecting, address, chainId, appKitConnect, appKitDisconnect, open])
 
