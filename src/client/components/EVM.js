@@ -49,6 +49,9 @@ import {
   meter,
   theta,
   oasys,
+  // PulseChain
+  pulsechain,
+  pulsechainV4,
   hedera,
   hederaTestnet,
 } from '@reown/appkit/networks'
@@ -111,6 +114,9 @@ const networks = [
   meter,
   theta,
   oasys,
+  // PulseChain
+  pulsechain,
+  pulsechainV4,
   hedera,
   hederaTestnet,
 ]
