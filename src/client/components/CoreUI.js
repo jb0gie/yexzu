@@ -108,42 +108,10 @@ export function CoreUI({ world }) {
       {ready && isTouch && <TouchStick world={world} />}
       {confirm && <Confirm options={confirm} />}
       {ready && <QUAI world={world} />}
-      {ready && <EVMLoader world={world} />}
+      {ready && <EVM world={world} />}
       <div id='core-ui-portal' />
     </div>
   )
-}
-
-// Wrapper to lazy-load EVM only when needed
-function EVMLoader({ world }) {
-  const [shouldLoad, setShouldLoad] = useState(false)
-
-  useEffect(() => {
-    // Check if user has explicitly enabled EVM
-    const evmEnabled = localStorage.getItem('hyperfy:evm:enabled')
-    if (evmEnabled === 'true') {
-      setShouldLoad(true)
-    }
-  }, [])
-
-  // Expose function to enable EVM
-  useEffect(() => {
-    if (!world) return
-    world._enableEVM = () => {
-      localStorage.setItem('hyperfy:evm:enabled', 'true')
-      setShouldLoad(true)
-    }
-    world._disableEVM = () => {
-      localStorage.removeItem('hyperfy:evm:enabled')
-      setShouldLoad(false)
-    }
-  }, [world])
-
-  if (!shouldLoad) {
-    return null
-  }
-
-  return <EVM world={world} />
 }
 
 // function Side({ world, menu }) {
