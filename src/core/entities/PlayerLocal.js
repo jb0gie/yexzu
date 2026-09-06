@@ -3,7 +3,6 @@ import { clamp } from '../utils'
 import * as THREE from '../extras/three'
 import { XRControllerModelFactory } from 'three/addons'
 import { Layers } from '../extras/Layers'
-import { DEG2RAD, RAD2DEG } from '../extras/general'
 import { createNode } from '../extras/createNode'
 import { bindRotations } from '../extras/bindRotations'
 import { simpleCamLerp } from '../extras/simpleCamLerp'
@@ -43,7 +42,7 @@ const m1 = new THREE.Matrix4()
 const m2 = new THREE.Matrix4()
 const m3 = new THREE.Matrix4()
 
-const gazeTiltAngle = 10 * DEG2RAD
+const gazeTiltAngle = 10 * THREE.MathUtils.DEG2RAD
 const gazeTiltAxis = new THREE.Vector3(1, 0, 0)
 
 export class PlayerLocal extends Entity {
@@ -86,6 +85,8 @@ export class PlayerLocal extends Entity {
     this.flipStartAt = 0
     this.flipUntil = 0
     this.flipDuration = 0.65
+
+    this.phoneActive = false
 
     this.fallTimer = 0
     this.falling = false
@@ -173,7 +174,7 @@ export class PlayerLocal extends Entity {
     this.cam.rotation = new THREE.Euler(0, 0, 0, 'YXZ')
     bindRotations(this.cam.quaternion, this.cam.rotation)
     this.cam.quaternion.copy(this.base.quaternion)
-    this.cam.rotation.x += -15 * DEG2RAD
+    this.cam.rotation.x += -15 * THREE.MathUtils.DEG2RAD
     this.cam.zoom = 1.5
 
     if (this.world.loader?.preloader) {
@@ -546,7 +547,7 @@ export class PlayerLocal extends Entity {
         this.grounded = true
         this.coyoteTimer = COYOTE_TIME
         this.groundNormal.copy(sweepHit.normal)
-        this.groundAngle = UP.angleTo(this.groundNormal) * RAD2DEG
+        this.groundAngle = UP.angleTo(this.groundNormal) * THREE.MathUtils.RAD2DEG
       } else {
         this.justLeftGround = !!this.grounded
         this.grounded = false
@@ -883,7 +884,7 @@ export class PlayerLocal extends Entity {
 
     // ensure we can't look too far up/down
     if (!xr) {
-      this.cam.rotation.x = clamp(this.cam.rotation.x, -89 * DEG2RAD, 89 * DEG2RAD)
+      this.cam.rotation.x = clamp(this.cam.rotation.x, -89 * THREE.MathUtils.DEG2RAD, 89 * THREE.MathUtils.DEG2RAD)
     }
 
     // zoom camera if scrolling wheel
@@ -917,6 +918,12 @@ export class PlayerLocal extends Entity {
     if (xr ? this.control.xrRightBtn1.pressed : this.control.space.pressed || this.control.touchA.pressed) {
       this.jumpPressed = true
       this.bufferTimer = BUFFER_TIME
+    }
+
+    // phone emote toggle (B key)
+    if (this.control.keyB.pressed && !this.world.builder?.enabled) {
+      this.phoneActive = !this.phoneActive
+      this.world.emit('toast', this.phoneActive ? 'Phone up' : 'Phone down')
     }
 
     // get our movement direction
@@ -1002,7 +1009,7 @@ export class PlayerLocal extends Entity {
     // Left:            247.5° to 292.5°
     // Forward-Left:    292.5° to 337.5°
     const moveRad = Math.atan2(this.axis.x, -this.axis.z)
-    let moveDeg = moveRad * RAD2DEG
+    let moveDeg = moveRad * THREE.MathUtils.RAD2DEG
     if (moveDeg < 0) moveDeg += 360
 
     // rotate direction to face camera Y direction
@@ -1047,6 +1054,8 @@ export class PlayerLocal extends Entity {
     let emote
     if (this.data.effect?.emote) {
       emote = this.data.effect.emote
+    } else if (this.phoneActive) {
+      emote = this.moving ? Emotes.PHONE_WALK : Emotes.PHONE
     }
     if (this.emote !== emote) {
       this.emote = emote

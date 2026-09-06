@@ -33,6 +33,9 @@ export const Emotes = {
   LEDGE_HANGING_MOVING: 'asset://mp-ledge-hanging-moving.glb?s=1.2',
   AIR_DIVE: 'asset://mp-air-dive.glb?s=1.0',
   WALL_SLIDE: 'asset://mp-wallslide.glb?s=1.0',
+  // Phone emote (port from HowieDuhzit Tatted d77655e)
+  PHONE: 'asset://emote-phone.glb',
+  PHONE_WALK: 'asset://emote-phoneWalk.glb?s=1.5',
 }
 
 export const emoteUrls = [
@@ -68,4 +71,6 @@ export const emoteUrls = [
   Emotes.LEDGE_HANGING_MOVING,
   Emotes.AIR_DIVE,
   Emotes.WALL_SLIDE,
+  Emotes.PHONE,
+  Emotes.PHONE_WALK,
 ]
