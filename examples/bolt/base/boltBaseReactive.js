@@ -5,72 +5,11 @@ app.configure([
     label: 'Audio Settings',
   },
   {
-    key: 'audioFile',
-    type: 'file',
-    kind: 'audio',
-    label: 'Audio File',
-    description: 'Upload an audio file to play',
-  },
-  {
-    key: 'autoPlay',
-    type: 'switch',
-    label: 'Auto Play on Load',
-    options: [
-      { label: 'Yes', value: 'enabled' },
-      { label: 'No', value: 'disabled' },
-    ],
-    initial: 'disabled',
-  },
-  {
-    key: 'audioVolume',
-    type: 'range',
-    label: 'Audio Volume',
-    initial: 1,
-    min: 0,
-    max: 2,
-    step: 0.1,
-    description: 'Volume multiplier (0 = silent, 1 = normal, 2 = 2x)',
-  },
-  {
-    key: 'audioIsSpatial',
-    type: 'switch',
-    label: 'Audio Type',
-    options: [
-      { label: 'Spatial (3D)', value: true },
-      { label: 'Global', value: false }
-    ],
-    initial: true,
-    description: 'Spatial audio follows position, global is constant',
-  },
-  {
-    key: 'audioMinDistance',
-    type: 'number',
-    label: 'Min Distance',
-    initial: 5,
-    min: 0.1,
-    max: 100,
-    description: 'Distance where audio starts to fade (meters)',
-  },
-  {
-    key: 'audioMaxDistance',
-    type: 'number',
-    label: 'Max Distance',
-    initial: 30,
-    min: 1,
-    max: 500,
-    description: 'Distance where audio becomes inaudible (meters)',
-  },
-  {
-    key: 'audioRolloffFactor',
-    type: 'switch',
-    label: 'Falloff Rate',
-    options: [
-      { label: 'Gradual', value: 1 },
-      { label: 'Medium', value: 2 },
-      { label: 'Steep', value: 4 }
-    ],
-    initial: 2,
-    description: 'How quickly audio fades with distance',
+    key: 'audioNote',
+    type: 'text',
+    label: 'Playback',
+    initial: 'owned by rig',
+    description: 'Audio playback is owned by the rig (djbooth + speakers). This app is visual-reactive only.',
   },
   {
     key: 'debugMode',
@@ -391,6 +330,13 @@ app.configure([
     key: 'tunnelSection',
     type: 'section',
     label: 'Tunnel Settings',
+  },
+  {
+    key: 'tunnelMesh',
+    type: 'text',
+    label: 'Tunnel Piece Mesh Name',
+    initial: 'tunnelPieceMeshLOD0004_1',
+    description: 'Name of the tunnel piece mesh in the GLB (for rig audio reactivity)'
   },
   {
     key: 'tunnelColor',
@@ -887,6 +833,22 @@ app.configure([
     label: 'Speaker Rig Name',
     initial: 'SpeakerRig',
     description: 'Name of the speaker rig node'
+  },
+  {
+    key: 'rigSection',
+    type: 'section',
+    label: 'Rig Audio Reactivity (v2)',
+  },
+  {
+    key: 'reactiveSource',
+    type: 'switch',
+    label: 'Reactive Source',
+    options: [
+      { label: 'Rig (speakers)', value: 'rig' },
+      { label: 'Disabled (own audio only)', value: 'disabled' },
+    ],
+    initial: 'rig',
+    description: 'rig = materials react to the surround rig\'s track (via boltSpeaker announcements). disabled = legacy own-audio behavior only.'
   }
 ])
 
@@ -899,21 +861,9 @@ function debugLog(...args) {
   }
 }
 
-const audio = app.create('audio', {
-  src: props.audioFile?.url || null,
-  loop: true,
-  volume: props.audioVolume ?? 1,
-  spatial: props.audioIsSpatial !== false,
-  minDistance: props.audioMinDistance ?? 5,
-  maxDistance: props.audioMaxDistance ?? 30,
-  rolloffFactor: props.audioRolloffFactor ?? 2,
-})
-app.add(audio)
-
-// Log the asset URL so you can copy it to boltFans.js
-if (props.audioFile?.url) {
-  console.log('[BoltBase] Audio asset URL:', props.audioFile.url)
-}
+// (local audio engine removed — the rig (djbooth + speakers) owns playback;
+//  reactivity links to the speakers' announced audio node in the v2 section
+//  at the bottom of this script)
 
 // Get meshes from props
 const mesh1 = props.mesh1 ? app.get(props.mesh1) : null
@@ -930,7 +880,7 @@ const engineOuter = app.get('engineOuter')
 const engineInnerLOD = app.get('engineInnerMeshLOD0_2')
 const engineOuterLOD = app.get('engineOuterMeshLOD0_2')
 const tunnel = app.get('tunnel')
-const tunnelPiece = app.get('tunnelPieceMeshLOD0_2')
+const tunnelPiece = app.get(props.tunnelMesh || 'tunnelPieceMeshLOD0004_1')
 const tableMesh = app.get(props.tableMesh || 'TableMeshLOD0_8')
 
 // Get fan meshes
@@ -1011,28 +961,34 @@ if (!src) {
   console.error("No video source provided. Please upload a video or paste a video link.");
 } else if (world.isClient) {
   const mesh = app.get('Screens');
-  const video = app.create('video', {
-    src,
-    linked: true,
-    loop: true,
-    aspect: 16 / 9, // geometry is 16:9
-    geometry: mesh.geometry,
-    cover: true,
-    volume: player.volume / 15, // Convert to 0-1 range for the video element
-    spatial: props.isSpatial !== false, // Spatial audio by default
-    minDistance: props.minDistance || 5,
-    maxDistance: props.maxDistance || 20,
-    rolloffFactor: props.rolloffFactor || 2
-  });
-  // Move video to the same place as mesh and adjust its position slightly
-  video.position.copy(mesh.position);
-  video.quaternion.copy(mesh.quaternion);
-  video.scale.copy(mesh.scale);
-  video.position.z += 0.001;
-  mesh.active = false
-  // Add the video to the scene and play it
-  app.add(video);
-  video.play();
+  if (!mesh) {
+    // GLB edits can drop/rename the Screens node — never crash the whole
+    // script over a missing screen (that killed rig reactivity below)
+    console.error('[BoltBase] video source set but "Screens" mesh not found in GLB — skipping video panel')
+  } else {
+    const video = app.create('video', {
+      src,
+      linked: true,
+      loop: true,
+      aspect: 16 / 9, // geometry is 16:9
+      geometry: mesh.geometry,
+      cover: true,
+      volume: player.volume / 15, // Convert to 0-1 range for the video element
+      spatial: props.isSpatial !== false, // Spatial audio by default
+      minDistance: props.minDistance || 5,
+      maxDistance: props.maxDistance || 20,
+      rolloffFactor: props.rolloffFactor || 2
+    });
+    // Move video to the same place as mesh and adjust its position slightly
+    video.position.copy(mesh.position);
+    video.quaternion.copy(mesh.quaternion);
+    video.scale.copy(mesh.scale);
+    video.position.z += 0.001;
+    mesh.active = false
+    // Add the video to the scene and play it
+    app.add(video);
+    video.play();
+  }
 }
 
 // Play light animation based on configuration
@@ -1061,173 +1017,12 @@ function playSpeakerAnimation(playing) {
   debugLog('Playing speaker animation:', animName)
 }
 
-function buildLinkOptions(meshProps) {
-  const options = {
-    band: meshProps.band,
-    scale: meshProps.scale,
-    intensity: meshProps.intensity,
-    property: 'color',
-    color: meshProps.color || '#ffffff',
-  }
-
-  return options
-}
-
 function startAudio() {
   if (isPlaying) return
-  if (!props.audioFile?.url) {
-    console.log('[Audio Reactivity] No audio file configured')
-    return
-  }
 
-  try {
-    audio.play()
-    isPlaying = true
-  } catch (err) {
-    debugLog('Failed to play audio:', err.message)
-    return
-  }
-
-  // Link mesh 1
-  if (mesh1) {
-    const options = buildLinkOptions({
-      band: props.mesh1Band,
-      scale: props.mesh1Scale,
-      intensity: props.mesh1Intensity,
-      color: props.mesh1Color,
-    })
-    mesh1.linkAudioReactivity(audio.id, options)
-    debugLog('Linked mesh1:', props.mesh1, options)
-  }
-
-  // Link mesh 2
-  if (mesh2) {
-    const options = buildLinkOptions({
-      band: props.mesh2Band,
-      scale: props.mesh2Scale,
-      intensity: props.mesh2Intensity,
-      color: props.mesh2Color,
-    })
-    mesh2.linkAudioReactivity(audio.id, options)
-    debugLog('Linked mesh2:', props.mesh2, options)
-  }
-
-  // Link thruster
-  if (thruster) {
-    const options = {
-      band: props.thrusterBand,
-      scale: props.thrusterScale,
-      intensity: props.thrusterIntensity,
-      property: 'color',
-      color: props.thrusterColor,
-    }
-    thruster.linkAudioReactivity(audio.id, options)
-    debugLog('Linked thruster:', options)
-  }
-
-  // Link engine LOD meshes
-  if (engineInnerLOD) {
-    const options = {
-      band: props.engineInnerBand,
-      scale: props.engineInnerScale,
-      intensity: props.engineInnerIntensity,
-      property: 'color',
-      color: props.engineInnerColor,
-    }
-    engineInnerLOD.linkAudioReactivity(audio.id, options)
-    debugLog('Linked engineInnerLOD:', options)
-  }
-
-  if (engineOuterLOD) {
-    const options = {
-      band: props.engineOuterBand,
-      scale: props.engineOuterScale,
-      intensity: props.engineOuterIntensity,
-      property: 'color',
-      color: props.engineOuterColor,
-    }
-    engineOuterLOD.linkAudioReactivity(audio.id, options)
-    debugLog('Linked engineOuterLOD:', options)
-  }
-
-  // Link tunnel piece
-  if (tunnelPiece) {
-    const options = {
-      band: props.tunnelBand,
-      scale: props.tunnelScale,
-      intensity: props.tunnelIntensity,
-      property: 'color',
-      color: props.tunnelColor,
-    }
-    tunnelPiece.linkAudioReactivity(audio.id, options)
-    debugLog('Linked tunnelPiece:', options)
-  }
-
-  // Link table mesh
-  if (tableMesh) {
-    const options = {
-      band: props.tableBand,
-      scale: props.tableScale,
-      intensity: props.tableIntensity,
-      property: 'color',
-      color: props.tableColor,
-    }
-    tableMesh.linkAudioReactivity(audio.id, options)
-    debugLog('Linked tableMesh:', options)
-  }
-
-  // Link fan mesh
-  if (fanMesh) {
-    const options = {
-      band: props.fanBand,
-      scale: props.fanScale,
-      intensity: props.fanIntensity,
-      property: 'color',
-      color: props.fanColor,
-    }
-    fanMesh.linkAudioReactivity(audio.id, options)
-    debugLog('Linked fanMesh:', options)
-  }
-
-  // Link ring meshes
-  if (r1Mesh) {
-    const options = {
-      band: props.r1Band,
-      scale: props.r1Scale,
-      intensity: props.r1Intensity,
-      property: 'color',
-      color: props.r1Color,
-    }
-    r1Mesh.linkAudioReactivity(audio.id, options)
-    debugLog('Linked r1Mesh:', options)
-  }
-
-  if (r2Mesh) {
-    const options = {
-      band: props.r2Band,
-      scale: props.r2Scale,
-      intensity: props.r2Intensity,
-      property: 'color',
-      color: props.r2Color,
-    }
-    r2Mesh.linkAudioReactivity(audio.id, options)
-    debugLog('Linked r2Mesh:', options)
-  }
-
-  if (r3Mesh) {
-    const options = {
-      band: props.r3Band,
-      scale: props.r3Scale,
-      intensity: props.r3Intensity,
-      property: 'color',
-      color: props.r3Color,
-    }
-    r3Mesh.linkAudioReactivity(audio.id, options)
-    debugLog('Linked r3Mesh:', options)
-  }
-
+  isPlaying = true
   if (playAction) {
-    playAction.label = 'Stop Audio'
+    playAction.label = 'Stop Lights'
   }
 
   // Play speaker animation (speakers bouncing)
@@ -1240,23 +1035,10 @@ function startAudio() {
 function stopAudio() {
   if (!isPlaying) return
 
-  audio.stop()
   isPlaying = false
 
-  if (mesh1) mesh1.unlinkAudioReactivity()
-  if (mesh2) mesh2.unlinkAudioReactivity()
-  if (thruster) thruster.unlinkAudioReactivity()
-  if (engineInnerLOD) engineInnerLOD.unlinkAudioReactivity()
-  if (engineOuterLOD) engineOuterLOD.unlinkAudioReactivity()
-  if (tunnelPiece) tunnelPiece.unlinkAudioReactivity()
-  if (tableMesh) tableMesh.unlinkAudioReactivity()
-  if (fanMesh) fanMesh.unlinkAudioReactivity()
-  if (r1Mesh) r1Mesh.unlinkAudioReactivity()
-  if (r2Mesh) r2Mesh.unlinkAudioReactivity()
-  if (r3Mesh) r3Mesh.unlinkAudioReactivity()
-
   if (playAction) {
-    playAction.label = 'Start Audio'
+    playAction.label = 'Start Lights'
   }
 
   // Stop speaker animation (speakers idle)
@@ -1264,7 +1046,7 @@ function stopAudio() {
 }
 
 const playAction = app.create('action', {
-  label: 'Start Audio',
+  label: 'Start Lights',
   distance: 5,
   duration: 1,
   onTrigger: () => {
@@ -1276,10 +1058,6 @@ const playAction = app.create('action', {
   },
 })
 app.add(playAction)
-
-if (props.autoPlay === 'enabled') {
-  setTimeout(() => startAudio(), 100)
-}
 
 // Initialize lights on startup
 setTimeout(() => playLightAnimation(), 200)
@@ -1371,3 +1149,113 @@ app.on('update', delta => {
 app.on('destroy', () => {
   stopAudio()
 })
+
+// ---------- v2: rig-driven audio reactivity ----------
+// The surround rig (djbooth -> boltSpeaker apps) announces its live audio
+// node id on the client bus ('<ch>:speaker:audio'). AudioReactivity is a
+// world-global registry (systems/AudioReactivity.js), so meshes in THIS app
+// can link to a node created by ANOTHER app. Same prop-driven bands/colors/
+// scales as the local audio links above.
+//
+// Rebuild healing: if this app rebuilds (moved/edited) its links are gone —
+// it whois-es the speakers until one answers with the live audio id.
+if (world.isClient && props.reactiveSource !== 'disabled') {
+  const CHANNEL = props.channel || 'bolt'
+  const AUDIO_EVENT = `${CHANNEL}:speaker:audio`
+  const WHOIS_EVENT = `${CHANNEL}:reactive:whois`
+
+  const reactiveTargets = [
+    { node: mesh1, key: 'mesh1' },
+    { node: mesh2, key: 'mesh2' },
+    { node: thruster, key: 'thruster' },
+    { node: engineInnerLOD, key: 'engineInner' },
+    { node: engineOuterLOD, key: 'engineOuter' },
+    { node: tunnelPiece, key: 'tunnel' },
+    { node: tableMesh, key: 'table' },
+    { node: fanMesh, key: 'fan' },
+    { node: r1Mesh, key: 'r1' },
+    { node: r2Mesh, key: 'r2' },
+    { node: r3Mesh, key: 'r3' },
+  ].filter(t => t.node)
+
+  const missing = [
+    { node: mesh1, key: props.mesh1 || 'MeshLOD0_2' },
+    { node: mesh2, key: props.mesh2 || 'Coolant' },
+    { node: thruster, key: 'Thrusters' },
+    { node: tunnelPiece, key: props.tunnelMesh || 'tunnelPieceMeshLOD0004_1' },
+    { node: fanMesh, key: props.fanMesh || 'FanMeshLOD0_7' },
+  ].filter(t => !t.node).map(t => t.key)
+
+  console.warn(
+    `[BoltBase] rig reactivity armed — ${reactiveTargets.length} targets` +
+    (missing.length ? ` | NOT FOUND in GLB: ${missing.join(', ')} (check Mesh props)` : '')
+  )
+  if (reactiveTargets.length === 0) {
+    console.warn('[BoltBase] no reactivity targets found — GLB node names no longer match props')
+  }
+
+  let linkedSourceId = null
+
+  function rigLinkOptions(key) {
+    const options = {
+      band: props[`${key}Band`] || 'volume',
+      scale: props[`${key}Scale`] ?? 1,
+      intensity: props[`${key}Intensity`] ?? 1,
+      property: 'color',
+      color: props[`${key}Color`] || '#ffffff',
+    }
+    // from/to color lerp (engine supports it natively — getColorFromOptions
+    // lerps _fromColor -> _toColor by the band's raw 0..1 energy)
+    if (props[`${key}FromColor`] && props[`${key}ToColor`]) {
+      options.from = props[`${key}FromColor`]
+      options.to = props[`${key}ToColor`]
+    }
+    return options
+  }
+
+  function unlinkRigAudio() {
+    if (!linkedSourceId) return
+    for (const t of reactiveTargets) {
+      try {
+        t.node.unlinkAudioReactivity()
+      } catch (err) {
+        debugLog('unlink failed', t.key, err.message)
+      }
+    }
+    debugLog('unlinked rig audio', linkedSourceId)
+    linkedSourceId = null
+  }
+
+  function linkRigAudio(audioId) {
+    if (linkedSourceId === audioId) return
+    unlinkRigAudio()
+    for (const t of reactiveTargets) {
+      try {
+        t.node.linkAudioReactivity(audioId, rigLinkOptions(t.key))
+      } catch (err) {
+        debugLog('link failed', t.key, err.message)
+      }
+    }
+    linkedSourceId = audioId
+    debugLog('linked', reactiveTargets.length, 'targets to speaker audio node', audioId)
+  }
+
+  world.on(AUDIO_EVENT, ann => {
+    if (!ann) return
+    if (ann.playing && ann.audioId) linkRigAudio(ann.audioId)
+    else unlinkRigAudio()
+  })
+
+  // rebuild/move healing: ask speakers who is playing until answered
+  let attempts = 0
+  const whois = () => {
+    if (linkedSourceId || attempts >= 8) return
+    attempts++
+    app.emit(WHOIS_EVENT, { channel: CHANNEL })
+    debugLog('whois: asking speakers for live audio node (attempt', attempts + ')')
+    setTimeout(whois, attempts === 1 ? 800 : 2000)
+  }
+  setTimeout(whois, 800)
+
+  app.on('destroy', () => unlinkRigAudio())
+}

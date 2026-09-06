@@ -255,7 +255,10 @@ export class AudioReactivity extends System {
         } else if (link.targetType === 'material') {
           if (link.property === 'color' && target.handle) {
             // Use scaled value for intensity, configured color for color
-            const color = this.getColorFromOptions(1, link)
+            // lerp driver: RAW band energy (0..1) — scale/intensity stay
+            // brightness-only so the gradient position stays predictable
+            // (was: hardcoded 1, which pinned from/to links to the `to` color)
+            const color = this.getColorFromOptions(Math.min(1, srcData[link.band] ?? srcData.volume), link)
             const emissiveIntensity = Math.max(0, val * link.intensity)
 
             // Mesh nodes (from GLB) should use material proxy directly

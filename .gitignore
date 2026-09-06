@@ -11,6 +11,5 @@ build/
 .code-search/
 .glootie-stop-verified
 .claude/
-examples/bolt/
 tmp/
 .gm-stop-verified
