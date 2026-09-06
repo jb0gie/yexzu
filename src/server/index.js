@@ -216,6 +216,70 @@ fastify.post('/api/restore', async (req, reply) => {
   return { success: true, message: 'World restored. Restart server to apply changes.' }
 })
 
+// audio proxy — re-serve remote audio with OUR origin so the client can pipe
+// it into WebAudio (CORS is granted by the serving origin; this route makes
+// any direct audio URL same-origin to the world client). Full rig mode for
+// any direct stream URL: spatial, clock-synced, reactive.
+const ALLOWED_AUDIO_HOSTS = process.env.AUDIO_PROXY_HOSTS
+  ? process.env.AUDIO_PROXY_HOSTS.split(',').map(h => h.trim().toLowerCase())
+  : null // null = allow all hosts (set a comma list to lock it down)
+
+const AUDIO_PROXY_MAX = 100 * 1024 * 1024 // 100MB response cap
+
+fastify.get('/api/audio-proxy', async (req, reply) => {
+  const target = req.query.url
+  if (!target) return reply.code(400).send({ error: 'missing ?url=' })
+  let parsed
+  try {
+    parsed = new URL(target)
+  } catch {
+    return reply.code(400).send({ error: 'invalid url' })
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return reply.code(400).send({ error: 'only http/https' })
+  }
+  // block private ranges — an open proxy into 169.254.169.254 etc is an SSRF hole
+  const host = parsed.hostname.toLowerCase()
+  if (
+    host === 'localhost' ||
+    host.endsWith('.local') ||
+    /^127\./.test(host) ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  ) {
+    return reply.code(403).send({ error: 'private hosts not allowed' })
+  }
+  if (ALLOWED_AUDIO_HOSTS && !ALLOWED_AUDIO_HOSTS.includes(host)) {
+    return reply.code(403).send({ error: `host not allowed (AUDIO_PROXY_HOSTS)` })
+  }
+  try {
+    const upstream = await fetch(parsed, {
+      headers: { Range: req.headers.range || 'bytes=0-' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!upstream.ok && upstream.status !== 206) {
+      return reply.code(upstream.status).send({ error: `upstream ${upstream.status}` })
+    }
+    const headers = {
+      // the whole point: same-origin + readable for WebAudio
+      'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
+      'Accept-Ranges': upstream.headers.get('accept-ranges') || 'bytes',
+      'Content-Type': upstream.headers.get('content-type') || 'audio/mpeg',
+    }
+    const cr = upstream.headers.get('content-range')
+    if (cr) headers['Content-Range'] = cr
+    const cl = upstream.headers.get('content-length')
+    if (cl && Number(cl) <= AUDIO_PROXY_MAX) headers['Content-Length'] = cl
+    reply.code(upstream.status).headers(headers)
+    return reply.send(upstream.body)
+  } catch (err) {
+    return reply.code(502).send({ error: `upstream failed: ${err.message}` })
+  }
+})
+
 fastify.get('/health', async (request, reply) => {
   try {
     // Basic health check

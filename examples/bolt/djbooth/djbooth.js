@@ -152,6 +152,14 @@ const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
 // re-evaluated on app rebuild (prop edits rebuild the app), so both server
 // and client contexts always see the current track
 const trackUrl = props.track?.url || props.trackLink || null
+// route direct audio through our server proxy so it becomes same-origin —
+// CORS is granted by the serving origin, and our proxy grants OURS. That
+// unlocks WebAudio (-> Audio node -> rig: spatial, synced, reactive) for any
+// direct stream URL, which cross-origin fetch could never do client-side.
+const proxiedTrackUrl =
+  trackUrl && /^https?:\/\//.test(trackUrl) && !trackUrl.startsWith(env.assetsUrl || '~')
+    ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(trackUrl)}`
+    : trackUrl
 // embed mode: music-service links (SoundCloud/YT/YTM/Spotify) can't feed the
 // rig's WebAudio graph (DRM/CORS), so they render as a booth-screen embed and
 // play per-client. Full rig (spatial/synced/reactive) requires a direct URL.
@@ -277,12 +285,12 @@ if (world.isServer) {
       console.warn('[djbooth] NO TRACK — set the Track prop on the booth app')
       return
     }
-    console.warn('[djbooth] starting rig with', trackUrl)
+    console.warn('[djbooth] starting rig with', proxiedTrackUrl)
     rigToken = `play-${Date.now()}-${++tokenCounter}`
     emitCommand({
       action: 'play',
       token: rigToken,
-      url: trackUrl,
+      url: proxiedTrackUrl,
       t0: world.getTime(),
       volume: props.volume ?? 1,
     })
@@ -371,7 +379,7 @@ if (world.isServer) {
       emitCommand({
         action: 'play',
         token: rigToken,
-        url: trackUrl,
+        url: proxiedTrackUrl,
         t0: rigT0,
         volume: props.volume ?? 1,
       })
