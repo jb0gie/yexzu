@@ -113,6 +113,34 @@ app.configure([
     initial: 'disabled',
     description: 'start the rig automatically when the booth loads/rebuilds (server-side, synced clock)',
   },
+  {
+    key: 'sourcesSection',
+    type: 'section',
+    label: 'Music Sources',
+  },
+  {
+    key: 'trackLink',
+    type: 'text',
+    label: 'Direct Audio URL',
+    initial: '',
+    hint: 'direct stream URL (mp3/ogg/wav with CORS) — full rig mode: spatial, synced, reactive. Overrides the Track file prop.',
+  },
+  {
+    key: 'embedLink',
+    type: 'text',
+    label: 'Music Service Link',
+    initial: '',
+    hint: 'SoundCloud / YouTube / YT Music / Spotify link — embed mode: renders on the booth screen, plays per-client (no rig sync). Used when Direct Audio URL is empty.',
+  },
+  {
+    key: 'embedWidth',
+    type: 'range',
+    label: 'Embed Screen Width',
+    initial: 2.4,
+    min: 1,
+    max: 6,
+    step: 0.1,
+  },
 ])
 
 const CHANNEL = props.channel || 'bolt'
@@ -123,7 +151,34 @@ const STATE_EVENT = `${CHANNEL}:rig:state`
 const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
 // re-evaluated on app rebuild (prop edits rebuild the app), so both server
 // and client contexts always see the current track
-const trackUrl = props.track?.url || null
+const trackUrl = props.track?.url || props.trackLink || null
+// embed mode: music-service links (SoundCloud/YT/YTM/Spotify) can't feed the
+// rig's WebAudio graph (DRM/CORS), so they render as a booth-screen embed and
+// play per-client. Full rig (spatial/synced/reactive) requires a direct URL.
+const embedUrl = !trackUrl && props.embedLink ? normalizeEmbed(props.embedLink) : null
+
+// normalize music-service share URLs to their embeddable forms.
+// NOTE: regex-only — the SES compartment endows URL as { createObjectURL }
+// only, `new URL()` is not a constructor in there (and it throws silently
+// inside any try/catch, so embeds would get raw un-embeddable links).
+function normalizeEmbed(url) {
+  if (!url) return null
+  let m
+  // YouTube watch / shorts / youtu.be / YT Music -> nocookie embed
+  if ((m = url.match(/(?:youtube\.com\/(?:watch\?.*?v=|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?.*?v=)([\w-]{6,})/))) {
+    return `https://www.youtube-nocookie.com/embed/${m[1]}`
+  }
+  // Spotify track/album/playlist/episode -> open.spotify.com/embed
+  if ((m = url.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode)\/([\w]+)/))) {
+    return `https://open.spotify.com/embed/${m[1]}/${m[2]}`
+  }
+  // SoundCloud (incl. on.soundcloud.com share links) -> widget player
+  if (/soundcloud\.com/.test(url)) {
+    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true&visual=false`
+  }
+  // Bandcamp / Mixcloud / anything else: pass through as-is
+  return url
+}
 
 function debugLog(...args) {
   if (props.debug === 'enabled') {
@@ -324,6 +379,20 @@ if (world.isServer) {
   })
 }
 
+// ---------- client: embed screen for music-service links ----------
+if (world.isClient && embedUrl) {
+  console.warn(`[djbooth] embed mode — ${embedUrl.slice(0, 80)}`)
+
+  const webview = app.create('webview', {
+    src: embedUrl,
+    width: props.embedWidth ?? 2.4,
+    height: (props.embedWidth ?? 2.4) * (9 / 16),
+    space: 'world',
+  })
+  webview.position.set(0, 1.6, 0.05)
+  app.add(webview)
+}
+
 // ---------- client: control panel + action ----------
 if (world.isClient) {
   console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'NOT SET (add a Track in props)'}`)
@@ -360,7 +429,11 @@ if (world.isClient) {
   ui.add(title)
 
   const statusText = app.create('uitext', {
-    value: trackUrl ? 'ready — action to start' : 'no track configured',
+    value: embedUrl
+      ? 'embed mode — play on the screen'
+      : trackUrl
+        ? 'ready — action to start'
+        : 'no track configured',
     fontSize: 12,
     color: '#aaaacc',
     textAlign: 'center',
