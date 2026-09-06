@@ -102,6 +102,17 @@ app.configure([
     max: 10,
     step: 0.1,
   },
+  {
+    key: 'autoPlay',
+    type: 'switch',
+    label: 'Auto Play on Load',
+    options: [
+      { label: 'Yes', value: 'enabled' },
+      { label: 'No', value: 'disabled' },
+    ],
+    initial: 'disabled',
+    description: 'start the rig automatically when the booth loads/rebuilds (server-side, synced clock)',
+  },
 ])
 
 const CHANNEL = props.channel || 'bolt'
@@ -225,6 +236,20 @@ if (world.isServer) {
     app.send('booth:status', { playing: true, url: trackUrl })
     broadcastState()
     debugLog('rig started')
+  }
+
+  // auto play: server-side start shortly after boot/rebuild. Fires on world
+  // load AND on every prop edit/rebuild (heals itself); if the rig is already
+  // playing a stop came first, so re-anchoring the track is correct, and if
+  // the user stopped it manually the last stop is newer than this timer and
+  // wins. Delay lets speaker apps build + join the bus first.
+  if (props.autoPlay === 'enabled' && trackUrl) {
+    setTimeout(() => {
+      if (!isPlaying) {
+        console.warn('[djbooth] auto play — starting rig')
+        startRig()
+      }
+    }, 1500)
   }
 
   function stopRig() {
