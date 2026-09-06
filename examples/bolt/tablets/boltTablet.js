@@ -12,9 +12,12 @@
 // N tablets can control the same rig; all of them mirror rig state. A tablet
 // that rebuilds (moved, prop-edited) re-queries state and heals itself.
 //
-// Controls are proximity actions (this engine build has no uibutton node):
-//   "Play/Stop Rig" -> toggle playback, "Vol Up"/"Vol Down" -> +/- 0.25
-// The tablet's world-space screen mirrors rig state live.
+// CONTROLS
+//   B key (or tablet action) — put the tablet away / bring it up.
+//   Tablet up = PHONE emote (walk variant while moving, GTA-style) and the
+//   control panel appears. Tablet down = emote clears, panel hides.
+//   Emote-hold pattern ported from HowieDuhzit's CoolPhone/hyperfone via the
+//   PlayerLocal PHONE/PHONE_WALK emotes (feat/phone-emote).
 
 app.configure([
   {
@@ -35,6 +38,29 @@ app.configure([
     label: 'Tablet Label',
     initial: 'BOLT REMOTE',
     hint: 'shown on the tablet screen',
+  },
+  {
+    key: 'interactSection',
+    type: 'section',
+    label: 'Interaction',
+  },
+  {
+    key: 'toggleKey',
+    type: 'text',
+    label: 'Toggle Key',
+    initial: 'B',
+    hint: 'keyboard key that raises/lowers the tablet (key name without "key" prefix)',
+  },
+  {
+    key: 'emoteWhileUp',
+    type: 'switch',
+    label: 'Phone Emote While Up',
+    options: [
+      { label: 'Yes', value: 'enabled' },
+      { label: 'No', value: 'disabled' },
+    ],
+    initial: 'enabled',
+    hint: 'play the PHONE/PHONE_WALK emote while the tablet is up',
   },
   {
     key: 'screenSection',
@@ -74,6 +100,9 @@ const REQ_EVENT = `${CHANNEL}:audio:request`
 const STATE_EVENT = `${CHANNEL}:rig:state`
 const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
 const RENDER_EVENT = 'tablet:render'
+
+const PHONE_EMOTE = 'asset://emote-phone.glb'
+const PHONE_WALK_EMOTE = 'asset://emote-phoneWalk.glb?s=1.5'
 
 function debugLog(...args) {
   if (props.debug === 'enabled') {
@@ -118,44 +147,15 @@ if (world.isServer) {
   setTimeout(queryState, 1000)
 }
 
-// ---------- client: actions + status screen ----------
+// ---------- client: input, emote-hold, actions + status screen ----------
 if (world.isClient) {
   console.warn(`[boltTablet] client booted — channel=${CHANNEL}`)
 
-  const playAction = app.create('action', {
-    label: 'Play Rig',
-    distance: 4,
-    duration: 1,
-    onTrigger: () => {
-      console.warn('[boltTablet] toggle -> booth')
-      app.send('tablet:toggle', true)
-    },
-  })
-  app.add(playAction)
-
   let lastState = { playing: false, volume: 1, hasTrack: false }
+  let tabletUp = false
+  let appliedEmote = false
 
-  const volUpAction = app.create('action', {
-    label: 'Vol Up',
-    distance: 4,
-    duration: 1,
-    onTrigger: () => {
-      app.send('tablet:volume', Math.min(2, (lastState.volume ?? 1) + 0.25))
-    },
-  })
-  app.add(volUpAction)
-
-  const volDownAction = app.create('action', {
-    label: 'Vol Down',
-    distance: 4,
-    duration: 1,
-    onTrigger: () => {
-      app.send('tablet:volume', Math.max(0, (lastState.volume ?? 1) - 0.25))
-    },
-  })
-  app.add(volDownAction)
-
-  // ----- world-space status panel -----
+  // ----- UI panel (hidden until tablet is up) -----
   const anchor = props.screenMesh ? app.get(props.screenMesh) : null
   if (props.screenMesh && !anchor) {
     console.warn(`[boltTablet] screen anchor "${props.screenMesh}" not found — panel sits above origin`)
@@ -167,13 +167,14 @@ if (world.isClient) {
 
   const ui = app.create('ui', {
     width: 260,
-    height: 120,
+    height: 140,
     size: props.panelSize ?? 0.004,
     position: panelPos,
     pivot: 'center',
     space: 'world',
     backgroundColor: 'rgba(8, 10, 16, 0.85)',
     borderRadius: 10,
+    active: false, // tablet starts stowed
   })
 
   const title = app.create('uitext', {
@@ -181,7 +182,7 @@ if (world.isClient) {
     fontSize: 16,
     color: '#ff66ff',
     textAlign: 'center',
-    position: [0, 42, 0],
+    position: [0, 52, 0],
   })
   ui.add(title)
 
@@ -190,7 +191,7 @@ if (world.isClient) {
     fontSize: 13,
     color: '#aaaacc',
     textAlign: 'center',
-    position: [0, 8, 0],
+    position: [0, 16, 0],
   })
   ui.add(stateText)
 
@@ -199,9 +200,18 @@ if (world.isClient) {
     fontSize: 12,
     color: '#66ffcc',
     textAlign: 'center',
-    position: [0, -22, 0],
+    position: [0, -14, 0],
   })
   ui.add(volText)
+
+  const hintText = app.create('uitext', {
+    value: `[${(props.toggleKey || 'B').toUpperCase()}] stow`,
+    fontSize: 10,
+    color: '#666688',
+    textAlign: 'center',
+    position: [0, -44, 0],
+  })
+  ui.add(hintText)
 
   app.add(ui)
 
@@ -212,6 +222,88 @@ if (world.isClient) {
         ? '■ ready'
         : 'no track on booth'
     volText.value = `VOL ${Number(lastState.volume ?? 1).toFixed(2)}`
+  }
+
+  // ----- tablet up/down (emote-hold pattern) -----
+  function setTablet(up) {
+    if (up === tabletUp) return
+    tabletUp = up
+    ui.active = up
+    debugLog('tablet', up ? 'UP' : 'down')
+
+    // apply/clear the phone emote on OUR player, GTA-style
+    if (props.emoteWhileUp !== 'disabled') {
+      const me = world.getPlayer()
+      if (me?.applyEffect) {
+        try {
+          if (up) {
+            // engine picks PHONE vs PHONE_WALK by movement in PlayerLocal;
+            // from a script we play the static one and let the player's own
+            // movement emote override while walking (cancellable)
+            me.applyEffect({ emote: PHONE_EMOTE, cancellable: true })
+            appliedEmote = true
+          } else if (appliedEmote) {
+            me.cancelEffect()
+            appliedEmote = false
+          }
+        } catch (err) {
+          console.warn('[boltTablet] emote failed:', err.message)
+        }
+      }
+    }
+  }
+
+  // keyboard toggle — control key names are `key` + <props.toggleKey>
+  const control = app.control()
+  const keyName = `key${(props.toggleKey || 'B').toUpperCase()}`
+  let lastKeyState = false
+
+  app.on('update', () => {
+    if (!control) return
+    const key = control[keyName]
+    const pressedNow = !!key && (key.pressed || key.down === true)
+    // edge-detect (pressed fires once; down is held — accept either)
+    if (pressedNow && !lastKeyState) {
+      setTablet(!tabletUp)
+    }
+    lastKeyState = pressedNow
+  })
+
+  // ----- rig controls (actions only fire when the tablet is up) -----
+  const playAction = app.create('action', {
+    label: 'Play Rig',
+    distance: 4,
+    duration: 1,
+    onTrigger: () => {
+      if (!tabletUp) return // tablet stowed — actions sleep
+      app.send('tablet:toggle', true)
+    },
+  })
+  app.add(playAction)
+
+  const volUpAction = app.create('action', {
+    label: 'Vol Up',
+    distance: 4,
+    duration: 1,
+    onTrigger: () => {
+      if (!tabletUp) return
+      app.send('tablet:volume', Math.min(2, (lastState.volume ?? 1) + 0.25))
+    },
+  })
+  app.add(volUpAction)
+
+  const volDownAction = app.create('action', {
+    label: 'Vol Down',
+    distance: 4,
+    duration: 1,
+    onTrigger: () => {
+      if (!tabletUp) return
+      app.send('tablet:volume', Math.max(0, (lastState.volume ?? 1) - 0.25))
+    },
+  })
+  app.add(volDownAction)
+
+  function refreshActionLabels() {
     playAction.label = lastState.playing ? 'Stop Rig' : 'Play Rig'
   }
 
@@ -220,7 +312,20 @@ if (world.isClient) {
     if (!state) return
     lastState = state
     renderState()
+    refreshActionLabels()
+  })
+
+  // put the emote away if the app is destroyed while the tablet is up
+  app.on('destroy', () => {
+    if (appliedEmote) {
+      try {
+        world.getPlayer()?.cancelEffect()
+      } catch (err) {
+        // player may already be gone — nothing to do
+      }
+    }
   })
 
   renderState()
+  refreshActionLabels()
 }
