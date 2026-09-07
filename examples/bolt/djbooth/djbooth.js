@@ -149,6 +149,8 @@ const QUERY_EVENT = `${CHANNEL}:audio:query`
 const REQ_EVENT = `${CHANNEL}:audio:request`
 const STATE_EVENT = `${CHANNEL}:rig:state`
 const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
+const CRATE_EVENT = `${CHANNEL}:crate:offer`
+const CRATE_WHOIS = `${CHANNEL}:crate:whois`
 // re-evaluated on app rebuild (prop edits rebuild the app), so both server
 // and client contexts always see the current track
 const trackUrl = props.track?.url || props.trackLink || null
@@ -273,6 +275,55 @@ if (world.isServer) {
   let isPlaying = false
   let rigT0 = null // world.getTime() anchor of the live track
   let rigToken = null // token of the live play command (reused for query answers)
+  let selectedCrateId = null // which crate (or null = static props track)
+
+  // ----- crate playlist (collected from boltVinyl apps over the bus) -----
+  // crates: Map<id, { id, url, name, artist }>. Selection by index is what
+  // tablets/panels send; the array order = arrival order (stable enough for
+  // a rig; ids keep dedupe honest across re-offers).
+  const crates = new Map()
+  let crateOrder = []
+
+  function rebuildCrateOrder() {
+    crateOrder = Array.from(crates.values())
+  }
+
+  world.on(CRATE_EVENT, crate => {
+    if (!crate || !crate.url) return
+    const isNew = !crates.has(crate.id)
+    crates.set(crate.id, crate)
+    if (isNew) {
+      rebuildCrateOrder()
+      debugLog('crate added:', crate.name, `(${crateOrder.length} in playlist)`)
+      // if nothing is playing, surface the new crate as selected
+      if (!isPlaying && selectedCrateId === null) selectedCrateId = crate.id
+      broadcastState()
+    }
+  })
+
+  // crates ask the booth to identify itself when THEY (re)build — the booth
+  // re-broadcasts state so a rebuilt vinyl re-learns nowPlaying
+  world.on(CRATE_WHOIS, () => {
+    broadcastState()
+  })
+
+  function proxied(url) {
+    return url && /^https?:\/\//.test(url) && !(env.assetsUrl && url.startsWith(env.assetsUrl))
+      ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(url)}`
+      : url
+  }
+
+  function getSelectedTrack() {
+    // priority: explicit crate selection > static Track/trackLink props
+    if (selectedCrateId && crates.has(selectedCrateId)) {
+      const c = crates.get(selectedCrateId)
+      return { url: c.url, name: c.name, artist: c.artist, crateId: c.id }
+    }
+    if (trackUrl) {
+      return { url: trackUrl, name: props.trackName || 'Deck Track', artist: '', crateId: null }
+    }
+    return null
+  }
 
   function emitCommand(cmd) {
     if (!cmd.token) cmd.token = `${Date.now()}-${++tokenCounter}`
@@ -281,22 +332,23 @@ if (world.isServer) {
   }
 
   function startRig() {
-    if (!trackUrl) {
-      console.warn('[djbooth] NO TRACK — set the Track prop on the booth app')
+    const track = getSelectedTrack()
+    if (!track) {
+      console.warn('[djbooth] NO TRACK — drop a boltVinyl crate in the world or set the Track prop')
       return
     }
-    console.warn('[djbooth] starting rig with', proxiedTrackUrl)
+    console.warn('[djbooth] starting rig with', track.name, proxied(track.url))
     rigToken = `play-${Date.now()}-${++tokenCounter}`
     emitCommand({
       action: 'play',
       token: rigToken,
-      url: proxiedTrackUrl,
+      url: proxied(track.url),
       t0: world.getTime(),
       volume: props.volume ?? 1,
     })
     rigT0 = world.getTime()
     isPlaying = true
-    app.send('booth:status', { playing: true, url: trackUrl })
+    app.send('booth:status', { playing: true, url: track.url })
     broadcastState()
     debugLog('rig started')
   }
@@ -305,14 +357,19 @@ if (world.isServer) {
   // load AND on every prop edit/rebuild (heals itself); if the rig is already
   // playing a stop came first, so re-anchoring the track is correct, and if
   // the user stopped it manually the last stop is newer than this timer and
-  // wins. Delay lets speaker apps build + join the bus first.
-  if (props.autoPlay === 'enabled' && trackUrl) {
-    setTimeout(() => {
-      if (!isPlaying) {
-        console.warn('[djbooth] auto play — starting rig')
-        startRig()
-      }
-    }, 1500)
+  // wins. Delay lets speaker apps build + join the bus first. A second late
+  // window covers crates that offer after the first attempt.
+  if (props.autoPlay === 'enabled') {
+    const tryAutoStart = delay => {
+      setTimeout(() => {
+        if (!isPlaying && getSelectedTrack()) {
+          console.warn('[djbooth] auto play — starting rig')
+          startRig()
+        }
+      }, delay)
+    }
+    tryAutoStart(1500)
+    tryAutoStart(5000)
   }
 
   function stopRig() {
@@ -323,13 +380,20 @@ if (world.isServer) {
     debugLog('rig stopped')
   }
 
-  // rig state broadcast for control surfaces (tablets). State-only — no
-  // command payload, speakers ignore it.
+  // rig state broadcast for control surfaces (tablets) + crates. State-only —
+  // no command payload, speakers ignore it. nowPlaying lets crates/panels
+  // display what's live without parsing command traffic.
   function broadcastState() {
+    const track = getSelectedTrack()
     app.emit(STATE_EVENT, {
       playing: isPlaying,
       volume: props.volume ?? 1,
-      hasTrack: !!trackUrl,
+      hasTrack: !!track,
+      playlist: crateOrder.map(c => ({ id: c.id, name: c.name, artist: c.artist })),
+      selectedCrateId,
+      nowPlaying: track
+        ? { url: track.url, name: track.name, artist: track.artist }
+        : null,
     })
   }
 
@@ -361,6 +425,22 @@ if (world.isServer) {
       props.volume = v // authoritative volume, reused by startRig
       if (isPlaying) emitCommand({ action: 'volume', value: v })
       broadcastState()
+    } else if (req.action === 'selectCrate') {
+      // tablets/panels pick a crate by id; playing rigs restart on the new
+      // track (fresh token -> all speakers re-seek to 0)
+      if (req.crateId && crates.has(req.crateId)) {
+        selectedCrateId = req.crateId
+        debugLog('crate selected:', crates.get(req.crateId).name)
+        if (isPlaying) startRig()
+        else broadcastState()
+      }
+    } else if (req.action === 'nextCrate' && crateOrder.length > 0) {
+      const idx = crateOrder.findIndex(c => c.id === selectedCrateId)
+      const next = crateOrder[(idx + 1) % crateOrder.length]
+      selectedCrateId = next.id
+      debugLog('crate next ->', next.name)
+      if (isPlaying) startRig()
+      else broadcastState()
     }
   })
 
@@ -375,11 +455,12 @@ if (world.isServer) {
   // glitch on every query.
   world.on(QUERY_EVENT, () => {
     debugLog('speaker queried rig state')
-    if (isPlaying && trackUrl) {
+    const track = getSelectedTrack()
+    if (isPlaying && track) {
       emitCommand({
         action: 'play',
         token: rigToken,
-        url: proxiedTrackUrl,
+        url: proxied(track.url),
         t0: rigT0,
         volume: props.volume ?? 1,
       })
@@ -439,15 +520,22 @@ if (world.isClient) {
   const statusText = app.create('uitext', {
     value: embedUrl
       ? 'embed mode — play on the screen'
-      : trackUrl
-        ? 'ready — action to start'
-        : 'no track configured',
+      : 'ready — action to start',
     fontSize: 12,
     color: '#aaaacc',
     textAlign: 'center',
     position: [0, 42, 0],
   })
   ui.add(statusText)
+
+  const nowText = app.create('uitext', {
+    value: '· · ·',
+    fontSize: 11,
+    color: '#66ffcc',
+    textAlign: 'center',
+    position: [0, 14, 0],
+  })
+  ui.add(nowText)
 
   // mount the panel (was missing — that's why nothing rendered)
   app.add(ui)
@@ -457,8 +545,6 @@ if (world.isClient) {
     playAction.label = status.playing ? 'Stop the Rig' : 'Drop the Beat'
     statusText.value = status.playing
       ? '▶ rig live — all speakers synced'
-      : trackUrl
-        ? 'ready — action to start'
-        : 'no track configured'
+      : 'ready — action to start'
   })
 }
