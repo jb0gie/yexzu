@@ -151,6 +151,7 @@ const STATE_EVENT = `${CHANNEL}:rig:state`
 const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
 const CRATE_EVENT = `${CHANNEL}:crate:offer`
 const CRATE_WHOIS = `${CHANNEL}:crate:whois`
+const RENDER_EVENT = `${CHANNEL}:rig:render`
 // re-evaluated on app rebuild (prop edits rebuild the app), so both server
 // and client contexts always see the current track
 const trackUrl = props.track?.url || props.trackLink || null
@@ -271,6 +272,24 @@ if (world.isClient) {
 
 // ---------- server: single source of truth for rig commands ----------
 if (world.isServer) {
+  // panel requests: the booth's own client panel (uiview buttons) fires
+  // app.send('booth:request') -> we forward to the rig request bus
+  app.on('booth:request', req => {
+    if (!req) return
+    debugLog('panel request:', req.action, req.crateId || '')
+    if (req.action === 'nextCrate' && req.dir === -1) {
+      app.emit(REQ_EVENT, { action: 'prevCrate' })
+    } else {
+      app.emit(REQ_EVENT, req)
+    }
+  })
+
+  // rig state relay: state bus -> our clients (panel display)
+  world.on(STATE_EVENT, state => {
+    if (!state) return
+    app.send(RENDER_EVENT, state)
+  })
+
   let tokenCounter = 0
   let isPlaying = false
   let rigT0 = null // world.getTime() anchor of the live track
@@ -434,6 +453,13 @@ if (world.isServer) {
         if (isPlaying) startRig()
         else broadcastState()
       }
+    } else if (req.action === 'prevCrate' && crateOrder.length > 0) {
+      const idx = crateOrder.findIndex(c => c.id === selectedCrateId)
+      const prev = crateOrder[(idx - 1 + crateOrder.length) % crateOrder.length]
+      selectedCrateId = prev.id
+      debugLog('crate prev ->', prev.name)
+      if (isPlaying) startRig()
+      else broadcastState()
     } else if (req.action === 'nextCrate' && crateOrder.length > 0) {
       const idx = crateOrder.findIndex(c => c.id === selectedCrateId)
       const next = crateOrder[(idx + 1) % crateOrder.length]
@@ -484,7 +510,10 @@ if (world.isClient && embedUrl) {
 
 // ---------- client: control panel + action ----------
 if (world.isClient) {
-  console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'NOT SET (add a Track in props)'}`)
+  console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}`)
+
+  // mirror of rig state (arrives via server relay from the state bus)
+  let view = { playing: false, volume: 1, hasTrack: false, playlist: [], selectedCrateId: null, nowPlaying: null }
 
   const playAction = app.create('action', {
     label: 'Drop the Beat',
@@ -499,13 +528,14 @@ if (world.isClient) {
 
   const ui = app.create('ui', {
     width: 300,
-    height: 190,
+    height: 250,
     size: 0.005,
     position: [0, 2.1, 0],
     pivot: 'center',
     space: 'world',
     backgroundColor: 'rgba(10, 10, 18, 0.82)',
     borderRadius: 12,
+    pointerEvents: true,
   })
 
   const title = app.create('uitext', {
@@ -513,38 +543,122 @@ if (world.isClient) {
     fontSize: 18,
     color: '#ff66ff',
     textAlign: 'center',
-    position: [0, 70, 0],
+    position: [0, 108, 0],
   })
   ui.add(title)
 
-  const statusText = app.create('uitext', {
-    value: embedUrl
-      ? 'embed mode — play on the screen'
-      : 'ready — action to start',
-    fontSize: 12,
-    color: '#aaaacc',
-    textAlign: 'center',
-    position: [0, 42, 0],
-  })
-  ui.add(statusText)
-
   const nowText = app.create('uitext', {
     value: '· · ·',
-    fontSize: 11,
+    fontSize: 13,
     color: '#66ffcc',
     textAlign: 'center',
-    position: [0, 14, 0],
+    position: [0, 78, 0],
   })
   ui.add(nowText)
 
-  // mount the panel (was missing — that's why nothing rendered)
+  const statusText = app.create('uitext', {
+    value: embedUrl ? 'embed mode — play on the screen' : 'ready',
+    fontSize: 11,
+    color: '#aaaacc',
+    textAlign: 'center',
+    position: [0, 52, 0],
+  })
+  ui.add(statusText)
+
+  // ----- transport buttons (uiview + onPointerDown — engine touch support) -----
+  function makeButton(label, x, color) {
+    const btn = app.create('uiview', {
+      width: 80,
+      height: 34,
+      position: [x, 10, 0],
+      pivot: 'center',
+      backgroundColor: color,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      cursor: 'pointer',
+    })
+    btn.add(app.create('uitext', { value: label, fontSize: 13, color: '#ffffff', textAlign: 'center' }))
+    ui.add(btn)
+    return btn
+  }
+
+  const prevBtn = makeButton('◀ prev', -105, 'rgba(60, 60, 90, 0.9)')
+  const playBtn = makeButton('▶ play', 0, 'rgba(40, 160, 90, 0.9)')
+  const nextBtn = makeButton('next ▶', 105, 'rgba(60, 60, 90, 0.9)')
+
+  prevBtn.onPointerDown = () => {
+    console.warn('[djbooth] next <- prev crate')
+    app.send('booth:request', { action: 'nextCrate', dir: -1 })
+  }
+  nextBtn.onPointerDown = () => {
+    console.warn('[djbooth] next crate ->')
+    app.send('booth:request', { action: 'nextCrate' })
+  }
+  playBtn.onPointerDown = () => {
+    app.send('booth:toggle', true)
+  }
+
+  // ----- playlist rows (up to 5, rebuilt whenever the playlist changes) -----
+  let listRoot = null
+  function rebuildList() {
+    if (listRoot) {
+      ui.remove(listRoot)
+      listRoot = null
+    }
+    const items = view.playlist || []
+    if (items.length === 0) return
+    listRoot = app.create('uiview', {
+      width: 280,
+      height: items.length * 22 + 8,
+      position: [0, -40, 0],
+      pivot: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.25)',
+      borderRadius: 8,
+    })
+    items.slice(0, 5).forEach((item, i) => {
+      const row = app.create('uiview', {
+        width: 272,
+        height: 20,
+        position: [0, 6 + i * 22, 0],
+        pivot: 'top-center',
+        backgroundColor: item.id === view.selectedCrateId ? 'rgba(102, 255, 204, 0.18)' : 'transparent',
+        borderRadius: 5,
+        cursor: 'pointer',
+      })
+      const label = app.create('uitext', {
+        value: `${item.id === view.selectedCrateId ? '▶' : ' '} ${item.name}${item.artist ? ' — ' + item.artist : ''}`,
+        fontSize: 11,
+        color: item.id === view.selectedCrateId ? '#66ffcc' : '#aaaacc',
+        textAlign: 'left',
+        position: [8, 2, 0],
+      })
+      row.add(label)
+      row.onPointerDown = () => {
+        console.warn('[djbooth] playlist select:', item.name)
+        app.send('booth:request', { action: 'selectCrate', crateId: item.id })
+      }
+      listRoot.add(row)
+    })
+    ui.add(listRoot)
+  }
+
+  // mount the panel
   app.add(ui)
 
-  app.on('booth:status', status => {
-    console.warn('[djbooth] status:', status.playing ? 'playing' : 'stopped')
-    playAction.label = status.playing ? 'Stop the Rig' : 'Drop the Beat'
-    statusText.value = status.playing
-      ? '▶ rig live — all speakers synced'
-      : 'ready — action to start'
+  // server relay delivers rig state (state bus -> our server -> app.send)
+  app.on(RENDER_EVENT, state => {
+    if (!state) return
+    view = state
+    const np = state.nowPlaying
+    nowText.value = state.playing && np
+      ? `▶ ${np.name}${np.artist ? ' — ' + np.artist : ''}`
+      : np
+        ? `■ ${np.name}`
+        : '· · ·'
+    statusText.value = state.playing ? 'rig live — all speakers synced' : embedUrl ? 'embed mode — play on the screen' : 'ready'
+    playAction.label = state.playing ? 'Stop the Rig' : 'Drop the Beat'
+    playBtn.children?.[0] && (playBtn.children[0].value = state.playing ? '■ stop' : '▶ play')
+    rebuildList()
   })
 }
