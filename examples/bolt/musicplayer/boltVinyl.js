@@ -86,8 +86,18 @@ function debugLog(...args) {
 // injected fetch.
 // Priority: explicit prop > embedded tags (title/artist) > filename > generic.
 const metaCache = new Map()
-// env keys are PUBLIC_*-prefixed (env.js whitelist) — env.apiUrl never exists
-const apiBase = env.PUBLIC_API_URL || env.apiUrl || ''
+// env access is defensive: on engines without the `env` endowment, reading it
+// throws (undefined global). Until the env endowment ships in a deploy, fall
+// back to relative API paths (works on same-origin deploys). Keys are
+// PUBLIC_*-prefixed (env.js whitelist) — PUBLIC_API_URL / ASSETS_BASE_URL.
+function getEnv(key) {
+  try {
+    return env?.[key]
+  } catch {
+    return undefined
+  }
+}
+const apiBase = getEnv('PUBLIC_API_URL') || ''
 async function resolveMetadata(url) {
   if (!url || metaCache.has(url)) return metaCache.get(url) || null
   try {

@@ -1,7 +1,6 @@
 import { System } from './System'
 
 import * as THREE from '../extras/three'
-import { DEG2RAD, RAD2DEG } from '../extras/general'
 import { clamp, num, uuid } from '../utils'
 import { LerpVector3 } from '../extras/LerpVector3'
 import { LerpQuaternion } from '../extras/LerpQuaternion'
@@ -32,6 +31,16 @@ export class Scripts extends System {
       Date: {
         now: () => Date.now(),
       },
+      // PUBLIC_* config (PUBLIC_API_URL, ASSETS_BASE_URL, ...) — loaded for
+      // the browser via /env.js onto the outer globalThis; app scripts are in
+      // a Compartment and don't see outer globals, so endow a read-only copy.
+      // Server-side scripts get a frozen snapshot of process.env PUBLIC_* too.
+      env: Object.freeze({
+        ...((typeof globalThis !== 'undefined' && globalThis.env) || {}),
+        ...Object.fromEntries(
+          Object.entries(process?.env || {}).filter(([k]) => k.startsWith('PUBLIC_')),
+        ),
+      }),
       URL: {
         createObjectURL: blob => URL.createObjectURL(blob),
       },
@@ -55,8 +64,8 @@ export class Scripts extends System {
       // Material: Material,
       Curve,
       // Gradient: Gradient,
-      DEG2RAD,
-      RAD2DEG,
+      DEG2RAD: Math.PI / 180,
+      RAD2DEG: 180 / Math.PI,
       uuid,
       // pause: () => this.world.pause(),
     })
