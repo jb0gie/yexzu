@@ -946,29 +946,56 @@ function ActionsBlock({ world, ui }) {
 
 function Actions({ world }) {
   const [actions, setActions] = useState(() => world.controls.actions)
+  const [shown, setShown] = useState(() => world.controls.actions)
+  const liveRef = useRef(actions)
+  liveRef.current = actions
   const listRef = useRef()
   useEffect(() => {
     world.on('actions', setActions)
     return () => world.off('actions', setActions)
   }, [])
+  useEffect(() => {
+    if (actions.length) setShown(actions)
+  }, [actions])
   useGSAP(
-    () => {
-      if (prefersReducedMotion()) return
+    (context, contextSafe) => {
       const items = gsap.utils.toArray(listRef.current?.querySelectorAll('.actions-item'))
-      if (!items.length) return
-      gsap.fromTo(
-        items,
-        { autoAlpha: 0, x: -14 },
-        {
-          autoAlpha: 1,
-          x: 0,
-          duration: dur(0.3),
-          stagger: { each: 0.06, from: 'start' },
-          ease: ease.soft,
-        }
-      )
+      if (prefersReducedMotion()) {
+        setShown(actions)
+        return
+      }
+      if (actions.length) {
+        if (!items.length) return
+        gsap.fromTo(
+          items,
+          { autoAlpha: 0, x: -14 },
+          {
+            autoAlpha: 1,
+            x: 0,
+            duration: dur(DUR.norm),
+            stagger: { each: 0.06, from: 'start' },
+            ease: ease.soft,
+            overwrite: 'auto',
+          }
+        )
+        return
+      }
+      if (!items.length) {
+        return
+      }
+      gsap.to(items, {
+        autoAlpha: 0,
+        x: -14,
+        duration: dur(DUR.norm),
+        stagger: { each: 0.06, from: 'end' },
+        ease: ease.out,
+        overwrite: 'auto',
+        onComplete: contextSafe(() => {
+          if (!liveRef.current?.length) setShown([])
+        }),
+      })
     },
-    { scope: listRef, dependencies: [actions] }
+    { scope: listRef, dependencies: [actions, shown] }
   )
   return (
     <div
@@ -994,7 +1021,7 @@ function Actions({ world }) {
         }
       `}
     >
-      {actions.map(action => (
+      {shown.map(action => (
         <div className='actions-item' key={action.id}>
           <div className='actions-item-icon'>{getActionIcon(action)}</div>
           <div className='actions-item-label'>{action.label}</div>
