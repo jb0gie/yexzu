@@ -219,6 +219,27 @@ export class ClientEnvironment extends System {
     }
   }
 
+  // Live-copy shader uniform VALUES without rebuilding the material.
+  // Keys must already be declared (same key set as the last compile).
+  setShaderUniforms(values) {
+    const mat = this.skyShaderMaterial
+    if (!mat?.uniforms || !values) return
+    for (const key in values) {
+      const u = mat.uniforms[key]
+      if (!u) continue
+      const v = values[key]
+      if (typeof v === 'number') {
+        u.value = v
+      } else if (v?.isVector2 || v?.isVector3 || v?.isVector4) {
+        u.value.copy(v)
+      } else if (Array.isArray(v)) {
+        if (v.length === 2) u.value.set(v[0], v[1])
+        else if (v.length === 3) u.value.set(v[0], v[1], v[2])
+        else if (v.length === 4) u.value.set(v[0], v[1], v[2], v[3])
+      }
+    }
+  }
+
   async updateSky() {
     if (!this.sky) {
       const geometry = new THREE.SphereGeometry(1000, 60, 40)

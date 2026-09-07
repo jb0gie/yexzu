@@ -15,6 +15,17 @@ function isValidUniforms(value) {
   return true
 }
 
+function sameUniformKeys(a, b) {
+  if (!a || !b) return false
+  const ka = Object.keys(a)
+  const kb = Object.keys(b)
+  if (ka.length !== kb.length) return false
+  for (let i = 0; i < ka.length; i++) {
+    if (!(ka[i] in b)) return false
+  }
+  return true
+}
+
 // NOTE: actual defaults bubble up to ClientEnvironment.js
 const defaults = {
   bg: null,
@@ -153,8 +164,15 @@ export class Sky extends Node {
     if (value !== null && !isValidUniforms(value)) {
       throw new Error('[sky] shaderUniforms must be an object of numbers or number arrays (vec2/vec3/vec4)')
     }
+    const prev = this._shaderUniforms
     this._shaderUniforms = value
-    this.needsRebuild = true
+    // Same key set = live-copy values (audio / tempo / uMode). New keys need
+    // a rebuild so buildCustomUniformDeclarations actually declares them.
+    if (value !== null && sameUniformKeys(prev, value)) {
+      this.ctx?.world?.environment?.setShaderUniforms?.(value)
+    } else {
+      this.needsRebuild = true
+    }
     this.setDirty()
   }
 
