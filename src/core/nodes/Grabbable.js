@@ -62,8 +62,8 @@ export class Grabbable extends Node {
 
     this.touchStartTime = 0
     this.touchStartPosition = new THREE.Vector2()
-    this.lastTouchTime = 0
-    this.touchCount = 0
+    this._holdTimer = null
+    this._holdHitPoint = null
 
     this._raycaster = new THREE.Raycaster()
     this._grabOffset = new THREE.Vector3()
@@ -143,7 +143,7 @@ export class Grabbable extends Node {
   }
 
   handlePointerDown(event) {
-    if (!this.enabled || event.button !== 0) return
+    if (!this.enabled || event.button !== 2) return
 
     if (this.isPinned()) return
 
@@ -179,14 +179,6 @@ export class Grabbable extends Node {
     this.touchStartTime = Date.now()
     this.touchStartPosition.set(touch.clientX, touch.clientY)
 
-    const now = Date.now()
-    if (now - this.lastTouchTime < 300) {
-      this.touchCount++
-    } else {
-      this.touchCount = 1
-    }
-    this.lastTouchTime = now
-
     const camera = this.ctx.world.camera
     if (!camera) return
 
@@ -199,40 +191,55 @@ export class Grabbable extends Node {
     )
 
     const intersects = this._raycaster.intersectObject(this, true)
-    if (intersects.length > 0) {
-      if (this.touchCount >= 2) {
-        this.grab(intersects[0].point)
+    if (intersects.length === 0) return
+
+    // long-press 500ms to grab (two-finger tap is crouch, don't touch it)
+    clearTimeout(this._holdTimer)
+    this._holdHitPoint = intersects[0].point
+    this._holdTimer = setTimeout(() => {
+      const t = event.touches[0]
+      if (!t) return
+      const moved = this.touchStartPosition.distanceTo(
+        new THREE.Vector2(t.clientX, t.clientY)
+      )
+      if (moved < 15 && !this.isGrabbed) {
+        this.grab(this._holdHitPoint)
       }
-    }
+    }, 500)
   }
 
   handleTouchEnd(event) {
-    const touchDuration = Date.now() - this.touchStartTime
-    const touchDistance = this.touchStartPosition.distanceTo(
-      new THREE.Vector2(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
-    )
+    clearTimeout(this._holdTimer)
+    this._holdTimer = null
 
-    if (this.isGrabbed && (touchDuration > 500 || touchDistance < 10)) {
-      this.release()
+    if (this.isGrabbed) {
+      const touchDuration = Date.now() - this.touchStartTime
+      const touchDistance = this.touchStartPosition.distanceTo(
+        new THREE.Vector2(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
+      )
+      // long-press grab = release on quick tap; if finger never left, hold-to-carry releases on next tap
+      if (touchDuration > 500 || touchDistance < 10) {
+        this.release()
+      }
     }
   }
 
   grab(hitPoint) {
     if (this.isGrabbed) return
 
-    const player = this.ctx.entity
+    const player = this.ctx.world.entities.player
     if (!player || !player.isPlayer) return
 
     const camera = this.ctx.world.camera
     if (!camera) return
 
-    const distance = this.position.distanceTo(camera.position)
+    const distance = this.getWorldPosition(_v2).distanceTo(camera.position)
     if (distance > this.grabDistance) return
 
     this.isGrabbed = true
     this.grabbedBy = player
 
-    this._grabOffset.copy(hitPoint).sub(this.position)
+    this._grabOffset.copy(hitPoint).sub(this.getWorldPosition(_v2))
 
     if (this.originalParent) {
       this.originalParent.remove(this)
@@ -463,6 +470,10 @@ export class Grabbable extends Node {
   }
 
   unmount() {
+    if (this._holdTimer) {
+      clearTimeout(this._holdTimer)
+      this._holdTimer = null
+    }
     if (this.isGrabbed) {
       this.release()
     }
