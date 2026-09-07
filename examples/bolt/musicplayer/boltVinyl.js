@@ -81,8 +81,9 @@ function debugLog(...args) {
 }
 
 // metadata resolver — server reads the ID3/Vorbis tags (music-metadata runs
-// on the SERVER; app scripts cannot import() — SES_IMPORT_REJECTED). This
-// just calls the /api/audio-meta endpoint with the injected fetch.
+// on the SERVER; app scripts cannot dynamically import packages —
+// SES_IMPORT_REJECTED). This calls the /api/audio-meta endpoint with the
+// injected fetch.
 // Priority: explicit prop > embedded tags (title/artist) > filename > generic.
 const metaCache = new Map()
 async function resolveMetadata(url) {
