@@ -233,10 +233,12 @@ export class ClientBuilder extends System {
       if (this.control.mouseLeft.pressed && this.control.pointer.locked) {
         if (!this.grabbableSelected) {
           const entity = this.getEntityAtBeam()
+          console.log('[playGrab] click beam entity:', entity?.isApp ? entity.blueprint?.name : entity?.constructor?.name || 'none', 'grabbable:', !!entity?.blueprint?.props?.grabbable)
           if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && entity.blueprint.props?.grabbable) {
             this.selectGrabbable(entity)
           }
         } else {
+          console.log('[playGrab] drop:', this.grabbableSelected.blueprint?.name)
           this.selectGrabbable(null)
         }
       }
