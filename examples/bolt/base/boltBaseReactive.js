@@ -793,8 +793,8 @@ app.configure([
       { label: 'On', value: 'enabled' },
       { label: 'Off', value: 'disabled' }
     ],
-    initial: 'enabled',
-    description: 'Toggle lights on/off'
+    initial: 'disabled',
+    description: 'Toggle lights on/off. Off by default — LightRig skeletal loop is expensive.'
   },
   {
     key: 'lightAnimation',
@@ -893,7 +893,6 @@ for (let i = 0; i <= 5; i++) {
   const fan = app.get(name)
   if (fan) {
     fanGroups.push(fan)
-    console.log(`[BoltBase] Found fan: ${name}`)
   }
 }
 
@@ -1001,7 +1000,9 @@ if (!src) {
   }
 }
 
-let lightsOn = props.lightsActive !== 'disabled'
+// ponytail: never auto-start the LightRig mixer. Looping skinned play() is the
+// CPU hog on live (mixer.update every frame). Proximity action opts in.
+let lightsOn = false
 
 function playLightAnimation() {
   if (!lightRig) return
@@ -1030,89 +1031,42 @@ const playAction = app.create('action', {
 })
 app.add(playAction)
 
-setLights(lightsOn)
-
-// Spin truss groups
-app.on('update', (dt) => {
-  if (lowerTruss && props.lowerTrussSpeed !== 0) {
-    lowerTruss.rotation.y += props.lowerTrussSpeed * dt
-  }
-  if (upperTruss && props.upperTrussSpeed !== 0) {
-    upperTruss.rotation.y += props.upperTrussSpeed * dt
-  }
-})
-
-// Thruster and engine rotation animation
-app.on('update', delta => {
+app.on('update', dt => {
+  if (lowerTruss && props.lowerTrussSpeed) lowerTruss.rotation.y += props.lowerTrussSpeed * dt
+  if (upperTruss && props.upperTrussSpeed) upperTruss.rotation.y += props.upperTrussSpeed * dt
   if (thruster) {
-    thruster.rotation.y += -0.1 * delta
-    if (thruster.material) {
-      thruster.material.textureY += 5 * delta
-    }
+    thruster.rotation.y += -0.1 * dt
+    if (thruster.material) thruster.material.textureY += 5 * dt
   }
-  // Spin the engine groups (not LOD meshes)
-  if (engineInner) {
-    engineInner.rotation.y += -0.1 * delta
+  if (engineInner) engineInner.rotation.y += -0.1 * dt
+  if (engineOuter) engineOuter.rotation.y += -0.1 * dt
+  if (tunnel && props.tunnelSpinSpeed) tunnel.rotation.y += props.tunnelSpinSpeed * dt
+  const fanSpeed = props.fanSpinSpeed || 0
+  if (fanSpeed) {
+    for (let i = 0; i < fanGroups.length; i++) fanGroups[i].rotation.x += -fanSpeed * dt
   }
-  if (engineOuter) {
-    engineOuter.rotation.y += -0.1 * delta
-  }
-})
-
-// Tunnel spinning
-app.on('update', delta => {
-  if (tunnel && props.tunnelSpinSpeed !== 0) {
-    tunnel.rotation.y += props.tunnelSpinSpeed * delta
-  }
-})
-
-// Fan spinning - spin all fan groups
-let fanSpinLogged = false
-app.on('update', delta => {
-  if (fanGroups.length === 0 && !fanSpinLogged) {
-    console.log('[BoltBase] No fan groups found to spin')
-    fanSpinLogged = true
-    return
-  }
-  for (const fan of fanGroups) {
-    if (fan) {
-      fan.rotation.x += -props.fanSpinSpeed * delta
-    }
-  }
-})
-
-// Wheel spinning
-app.on('update', delta => {
   if (wheelMesh) {
-    wheelMesh.rotation.x += (props.wheelSpeedX || 0) * delta
-    wheelMesh.rotation.y += (props.wheelSpeedY || 1) * delta
-    wheelMesh.rotation.z += (props.wheelSpeedZ || 0) * delta
+    const wx = props.wheelSpeedX || 0
+    const wy = props.wheelSpeedY || 1
+    const wz = props.wheelSpeedZ || 0
+    if (wx) wheelMesh.rotation.x += wx * dt
+    if (wy) wheelMesh.rotation.y += wy * dt
+    if (wz) wheelMesh.rotation.z += wz * dt
   }
-})
-
-// Ring groups spinning on all axes
-app.on('update', delta => {
   if (r1Group) {
-    r1Group.rotation.x += (props.r1SpeedX || 0.5) * delta
-    r1Group.rotation.y += (props.r1SpeedY || 0) * delta
-    r1Group.rotation.z += (props.r1SpeedZ || 0) * delta
+    r1Group.rotation.x += (props.r1SpeedX || 0.5) * dt
+    r1Group.rotation.y += (props.r1SpeedY || 0) * dt
+    r1Group.rotation.z += (props.r1SpeedZ || 0) * dt
   }
   if (r2Group) {
-    r2Group.rotation.x += (props.r2SpeedX || 0) * delta
-    r2Group.rotation.y += (props.r2SpeedY || 0.5) * delta
-    r2Group.rotation.z += (props.r2SpeedZ || 0) * delta
+    r2Group.rotation.x += (props.r2SpeedX || 0) * dt
+    r2Group.rotation.y += (props.r2SpeedY || 0.5) * dt
+    r2Group.rotation.z += (props.r2SpeedZ || 0) * dt
   }
   if (r3Group) {
-    r3Group.rotation.x += (props.r3SpeedX || 0) * delta
-    r3Group.rotation.y += (props.r3SpeedY || 0) * delta
-    r3Group.rotation.z += (props.r3SpeedZ || 0.5) * delta
-  }
-})
-
-// Lights bone spinning
-app.on('update', delta => {
-  if (lightsBone?.rotation) {
-    lightsBone.rotation.y += (props.lightsSpinY || 0.5) * delta
+    r3Group.rotation.x += (props.r3SpeedX || 0) * dt
+    r3Group.rotation.y += (props.r3SpeedY || 0) * dt
+    r3Group.rotation.z += (props.r3SpeedZ || 0.5) * dt
   }
 })
 
