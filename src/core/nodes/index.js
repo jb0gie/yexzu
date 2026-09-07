@@ -8,6 +8,7 @@ export { WebView as webview } from './WebView.js'
 export { Image as image } from './Image.js'
 export { Snap as snap } from './Snap.js'
 export { Prim as prim } from './Prim.js'
+export { Grabbable as grabbable } from './Grabbable.js'
 
 export { Avatar as avatar } from './Avatar.js'
 export { Action as action } from './Action.js'
