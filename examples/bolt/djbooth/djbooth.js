@@ -155,13 +155,17 @@ const RENDER_EVENT = `${CHANNEL}:rig:render`
 // re-evaluated on app rebuild (prop edits rebuild the app), so both server
 // and client contexts always see the current track
 const trackUrl = props.track?.url || props.trackLink || null
+// env keys are PUBLIC_*-prefixed (env.js whitelist) — env.apiUrl/env.assetsUrl
+// are undefined; the real names are PUBLIC_API_URL / ASSETS_BASE_URL
+const apiBase = env.PUBLIC_API_URL || env.apiUrl || ''
+const assetsBase = env.ASSETS_BASE_URL || env.assetsUrl || '~'
 // route direct audio through our server proxy so it becomes same-origin —
 // CORS is granted by the serving origin, and our proxy grants OURS. That
 // unlocks WebAudio (-> Audio node -> rig: spatial, synced, reactive) for any
 // direct stream URL, which cross-origin fetch could never do client-side.
 const proxiedTrackUrl =
-  trackUrl && /^https?:\/\//.test(trackUrl) && !trackUrl.startsWith(env.assetsUrl || '~')
-    ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(trackUrl)}`
+  trackUrl && /^https?:\/\//.test(trackUrl) && !trackUrl.startsWith(assetsBase)
+    ? `${apiBase}/api/audio-proxy?url=${encodeURIComponent(trackUrl)}`
     : trackUrl
 // embed mode: music-service links (SoundCloud/YT/YTM/Spotify) can't feed the
 // rig's WebAudio graph (DRM/CORS), so they render as a booth-screen embed and
@@ -313,7 +317,7 @@ if (world.isServer) {
     crates.set(crate.id, crate)
     if (!existed) {
       rebuildCrateOrder()
-      debugLog('crate added:', crate.name, `(${crateOrder.length} in playlist)`)
+      console.warn(`[djbooth] crate added: "${crate.name}" (${crateOrder.length} in playlist)`)
       // if nothing is playing, surface the new crate as selected
       if (!isPlaying && selectedCrateId === null) selectedCrateId = crate.id
       broadcastState()
@@ -332,8 +336,8 @@ if (world.isServer) {
   })
 
   function proxied(url) {
-    return url && /^https?:\/\//.test(url) && !(env.assetsUrl && url.startsWith(env.assetsUrl))
-      ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(url)}`
+    return url && /^https?:\/\//.test(url) && !(assetsBase !== '~' && url.startsWith(assetsBase))
+      ? `${apiBase}/api/audio-proxy?url=${encodeURIComponent(url)}`
       : url
   }
 

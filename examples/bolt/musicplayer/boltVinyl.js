@@ -86,10 +86,12 @@ function debugLog(...args) {
 // injected fetch.
 // Priority: explicit prop > embedded tags (title/artist) > filename > generic.
 const metaCache = new Map()
+// env keys are PUBLIC_*-prefixed (env.js whitelist) — env.apiUrl never exists
+const apiBase = env.PUBLIC_API_URL || env.apiUrl || ''
 async function resolveMetadata(url) {
   if (!url || metaCache.has(url)) return metaCache.get(url) || null
   try {
-    const target = `${env.apiUrl || ''}/api/audio-meta?url=${encodeURIComponent(url)}`
+    const target = `${apiBase}/api/audio-meta?url=${encodeURIComponent(url)}`
     const resp = await fetch(target)
     if (!resp.ok) throw new Error(`http ${resp.status}`)
     const out = await resp.json()
@@ -143,7 +145,7 @@ if (world.isServer) {
       name: d.name,
       artist: d.artist,
     })
-    debugLog('offered crate:', d.name)
+    console.warn(`[boltVinyl] offered crate: "${d.name}" (${songUrl.slice(0, 48)}...)`)
   }
 
   // crates ask the booth to identify itself when it (re)builds
@@ -153,7 +155,10 @@ if (world.isServer) {
   world.on(`${CHANNEL}:rescan`, () => offer())
 
   offer()
-  setTimeout(offer, 2000) // once more in case the booth built after us
+  // discovery retries: the booth may build after us, miss the heartbeat, or
+  // be stale — keep re-offering on a slow decay until the booth confirms by
+  // playing/broadcasting state with our url in it. Cheap: booth dedupes by id.
+  ;[4, 8, 15, 30, 60].forEach(s => setTimeout(offer, s * 1000))
 
   // ID3 tags: async read, then re-offer with the resolved title/artist
   if (songUrl) {
