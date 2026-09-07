@@ -9,7 +9,6 @@ import { hashFile } from '../utils-client'
 import { uuid } from '../utils'
 import { ControlPriorities } from '../extras/ControlPriorities'
 import { importApp } from '../extras/appTools'
-import { DEG2RAD, RAD2DEG } from '../extras/general'
 import { createNode } from '../extras/createNode'
 
 const FORWARD = new THREE.Vector3(0, 0, -1)
@@ -60,6 +59,12 @@ export class ClientBuilder extends System {
 
     this.dropTarget = null
     this.file = null
+
+    // play-mode grab (grabbable apps, clones build-mode grab path)
+    this.grabbableSelected = null
+    this.playTarget = new THREE.Object3D()
+    this.playTarget.rotation.reorder('YXZ')
+    this.playTarget.limit = 4
   }
 
   async init({ viewport }) {
@@ -168,6 +173,74 @@ export class ClientBuilder extends System {
     // deselect if stolen
     if (this.selected && this.selected?.data.mover !== this.world.network.id) {
       this.select(null)
+    }
+    // play-mode grab (non-builders only): left-click a grabbable app to hold it
+    if (!this.enabled && !this.selected && this.grabbableSelected && this.grabbableSelected.dead) {
+      this.selectGrabbable(null)
+    }
+    if (!this.enabled && !this.selected && this.grabbableSelected && this.grabbableSelected?.data.mover !== this.world.network.id) {
+      this.selectGrabbable(null)
+    }
+    // non-xr play-mode grab: needs beam active + left click while pointer locked
+    if (!this.enabled && !xr) {
+      // beam tracks camera when a grabbable is held OR pointer locked
+      if (this.control.pointer.locked || this.grabbableSelected) {
+        this.beam.xr = false
+        this.beam.kind = 'reticle'
+        this.beam.position.copy(this.world.rig.position)
+        this.beam.quaternion.copy(this.world.rig.quaternion)
+        this.beam.active = true
+      } else {
+        this.beam.active = false
+      }
+      // hold update: move the grabbed app with the reticle (clones build-mode grab)
+      if (this.grabbableSelected) {
+        const app = this.grabbableSelected
+        const hit = this.getHitAtBeam(app, true)
+        const beamPos = this.beam.position
+        const beamDir = v1.copy(FORWARD).applyQuaternion(this.beam.quaternion)
+        const hitDistance = hit ? hit.point.distanceTo(beamPos) : 0
+        if (hit && hitDistance < this.playTarget.limit) {
+          this.playTarget.position.copy(hit.point)
+        } else {
+          this.playTarget.position.copy(beamPos).add(beamDir.multiplyScalar(this.playTarget.limit))
+        }
+        // scroll to push/pull
+        let project = 0
+        if (this.control.keyF.down) project += this.control.shiftLeft.down ? 4 : 1
+        if (this.control.keyC.down) project -= this.control.shiftLeft.down ? 4 : 1
+        project += this.control.scrollDelta.value * 0.02
+        if (project) {
+          this.playTarget.limit += project * 10 * delta
+          if (this.playTarget.limit < 1.5) this.playTarget.limit = 1.5
+          if (hitDistance && this.playTarget.limit > hitDistance) this.playTarget.limit = hitDistance
+        }
+        app.root.position.copy(this.playTarget.position)
+        app.root.clean()
+        // network the move (same as build mode)
+        this.lastMoveSendTime += delta
+        if (this.lastMoveSendTime > this.world.networkRate) {
+          this.world.network.send('entityModified', {
+            id: app.data.id,
+            position: app.root.position.toArray(),
+            quaternion: app.root.quaternion.toArray(),
+            scale: app.root.scale.toArray(),
+          })
+          this.lastMoveSendTime = 0
+        }
+      }
+      // click logic
+      if (this.control.mouseLeft.pressed && this.control.pointer.locked) {
+        if (!this.grabbableSelected) {
+          const entity = this.getEntityAtBeam()
+          if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && entity.blueprint.props?.grabbable) {
+            this.selectGrabbable(entity)
+          }
+        } else {
+          this.selectGrabbable(null)
+        }
+      }
+      return
     }
     // non-xr if not in build mode, stop here
     if (!xr && !this.enabled) {
@@ -463,7 +536,7 @@ export class ClientBuilder extends System {
       this.gizmo.rotationSnap = null
     }
     if (this.selected && this.mode === 'rotate' && this.control.controlLeft.released) {
-      this.gizmo.rotationSnap = SNAP_DEGREES * DEG2RAD
+      this.gizmo.rotationSnap = SNAP_DEGREES * THREE.MathUtils.DEG2RAD
     }
     if (this.selected && this.mode === 'rotate' && this.gizmoActive) {
       const app = this.selected
@@ -544,9 +617,9 @@ export class ClientBuilder extends System {
       // snap rotation to degrees
       if (!this.control.controlLeft.down) {
         const newY = this.target.rotation.y
-        const degrees = newY / DEG2RAD
-        const snappedDegrees = Math.round(degrees / SNAP_DEGREES) * SNAP_DEGREES
-        app.root.rotation.y = snappedDegrees * DEG2RAD
+        const degrees = newY / THREE.MathUtils.DEG2RAD
+                const snappedDegrees = Math.round(degrees / SNAP_DEGREES) * SNAP_DEGREES
+                app.root.rotation.y = snappedDegrees * THREE.MathUtils.DEG2RAD
       }
       // update matrix
       app.root.clean()
@@ -661,6 +734,41 @@ export class ClientBuilder extends System {
     this.updateActions()
   }
 
+  // play-mode grab select: claims mover like build mode, gated on blueprint.props.grabbable
+  selectGrabbable(app) {
+    // release existing
+    if (this.grabbableSelected && this.grabbableSelected !== app) {
+      if (!this.grabbableSelected.dead && this.grabbableSelected.data.mover === this.world.network.id) {
+        const app2 = this.grabbableSelected
+        app2.data.mover = null
+        app2.data.position = app2.root.position.toArray()
+        app2.data.quaternion = app2.root.quaternion.toArray()
+        app2.data.scale = app2.root.scale.toArray()
+        app2.data.state = {}
+        this.world.network.send('entityModified', {
+          id: app2.data.id,
+          mover: null,
+          position: app2.data.position,
+          quaternion: app2.data.quaternion,
+          scale: app2.data.scale,
+          state: app2.data.state,
+        })
+        app2.build()
+      }
+      this.grabbableSelected = null
+    }
+    if (app) {
+      if (app.data.mover !== this.world.network.id) {
+        app.data.mover = this.world.network.id
+        app.build()
+        this.world.network.send('entityModified', { id: app.data.id, mover: app.data.mover })
+      }
+      this.grabbableSelected = app
+      this.playTarget.limit = 4
+      this.world.emit('toast', `Grabbed: ${app.blueprint.name}`)
+    }
+  }
+
   select(app) {
     // do nothing if unchanged
     if (this.selected === app) return
@@ -731,7 +839,7 @@ export class ClientBuilder extends System {
       size: 0.001,
       // backgroundColor: 'white',
       doubleside: true,
-      rotation: [-90 * DEG2RAD, 0, 0],
+      rotation: [-90 * THREE.MathUtils.DEG2RAD, 0, 0],
       position: [0, 0.01, 0.02],
     })
     $root.add($ui)
@@ -897,7 +1005,7 @@ export class ClientBuilder extends System {
     this.gizmoTarget.scale.copy(app.root.scale)
     this.world.stage.scene.add(this.gizmoTarget)
     this.world.stage.scene.add(this.gizmoHelper)
-    this.gizmo.rotationSnap = SNAP_DEGREES * DEG2RAD
+    this.gizmo.rotationSnap = SNAP_DEGREES * THREE.MathUtils.DEG2RAD
     this.gizmo.attach(this.gizmoTarget)
     this.gizmo.mode = mode
   }
@@ -1303,9 +1411,9 @@ export class ClientBuilder extends System {
       e1.copy(this.world.rig.rotation).reorder('YXZ')
       e1.x = 0
       e1.z = 0
-      const degrees = e1.y * RAD2DEG
-      const snappedDegrees = Math.round(degrees / SNAP_DEGREES) * SNAP_DEGREES
-      e1.y = snappedDegrees * DEG2RAD
+      const degrees = e1.y * THREE.MathUtils.RAD2DEG
+            const snappedDegrees = Math.round(degrees / SNAP_DEGREES) * SNAP_DEGREES
+            e1.y = snappedDegrees * THREE.MathUtils.DEG2RAD
       q1.setFromEuler(e1)
       quaternion = q1.toArray()
     } else {
