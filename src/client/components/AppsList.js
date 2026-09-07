@@ -2,6 +2,7 @@ import { css } from '@firebolt-dev/css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BoxIcon,
+  CpuIcon,
   BrickWallIcon,
   CrosshairIcon,
   EyeIcon,
@@ -37,30 +38,32 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
       if (!entity.isApp) continue
       const blueprint = world.blueprints.get(entity.data.blueprint)
       if (!blueprint) continue // still loading?
-      if (!blueprint.model) continue // corrupt app?
       let item = itemMap.get(blueprint.id)
       if (!item) {
-        const count = 0
-        const type = blueprint.model.endsWith('.vrm') ? 'avatar' : 'model'
-        const model = world.loader.get(type, blueprint.model)
+        const type = blueprint.model?.endsWith('.vrm') ? 'avatar' : 'model'
+        const model = blueprint.model ? world.loader.get(type, blueprint.model) : null
         const stats = model?.getStats() || defaultStats
+        const geo = stats.geometries?.size ?? stats.geometries ?? 0
         const name = blueprint.name || '-'
         item = {
           blueprint,
           keywords: name.toLowerCase(),
           name,
-          count,
-          geometries: stats.geometries.size,
-          triangles: stats.triangles,
-          textureBytes: stats.textureBytes,
-          textureSize: formatBytes(stats.textureBytes),
+          count: 0,
+          cpuMs: 0,
+          geometries: geo,
+          triangles: stats.triangles || 0,
+          textureBytes: stats.textureBytes || 0,
+          textureSize: formatBytes(stats.textureBytes || 0),
           code: blueprint.script ? 1 : 0,
-          fileBytes: stats.fileBytes,
-          fileSize: formatBytes(stats.fileBytes),
+          scriptBytes: blueprint.script ? blueprint.script.length : 0,
+          fileBytes: stats.fileBytes || 0,
+          fileSize: formatBytes(stats.fileBytes || 0),
         }
         itemMap.set(blueprint.id, item)
       }
       item.count++
+      item.cpuMs += entity.cpuMs || 0
     }
     for (const [_, item] of itemMap) {
       items.push(item)
@@ -87,6 +90,11 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
       world.entities.off('removed', onChange)
     }
   }, [])
+  useEffect(() => {
+    if (!perf) return
+    const id = setInterval(() => setRefresh(n => n + 1), 500)
+    return () => clearInterval(id)
+  }, [perf])
   const reorder = key => {
     if (sort === key) {
       setAsc(!asc)
@@ -166,6 +174,7 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
             text-align: right;
           }
           &.count,
+          &.cpuMs,
           &.geometries,
           &.triangles {
             width: 4rem;
@@ -217,6 +226,7 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
             text-align: right;
           }
           &.count,
+          &.cpuMs,
           &.geometries,
           &.triangles {
             width: 4rem;
@@ -249,6 +259,7 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
           }
           .appslist-rowitem {
             &.count,
+            &.cpuMs,
             &.code,
             &.geometries,
             &.triangles,
@@ -274,6 +285,13 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
           title='Instances'
         >
           <HashIcon size='1.125rem' />
+        </div>
+        <div
+          className={cls('appslist-headitem cpuMs', { active: sort === 'cpuMs' })}
+          onClick={() => reorder('cpuMs')}
+          title='Script CPU (ms / frame)'
+        >
+          <CpuIcon size='1.125rem' />
         </div>
         <div
           className={cls('appslist-headitem geometries', { active: sort === 'geometries' })}
@@ -321,6 +339,9 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
             <div className='appslist-rowitem count'>
               <span>{item.count}</span>
             </div>
+            <div className='appslist-rowitem cpuMs' title={`${item.cpuMs.toFixed(2)} ms/frame`}>
+              <span>{formatCpu(item.cpuMs)}</span>
+            </div>
             <div className='appslist-rowitem geometries'>
               <span>{item.geometries}</span>
             </div>
@@ -330,8 +351,8 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
             <div className='appslist-rowitem textureSize'>
               <span>{item.textureSize}</span>
             </div>
-            <div className='appslist-rowitem code'>
-              <span>{item.code ? 'Yes' : 'No'}</span>
+            <div className='appslist-rowitem code' title={item.scriptBytes ? `${item.scriptBytes} chars` : 'no script'}>
+              <span>{item.code ? formatBytes(item.scriptBytes) : '—'}</span>
             </div>
             <div className='appslist-rowitem fileSize'>
               <span>{item.fileSize}</span>
@@ -359,6 +380,12 @@ export function AppsList({ world, query, perf, refresh, setRefresh }) {
       </div>
     </div>
   )
+}
+
+function formatCpu(ms) {
+  if (!ms || ms < 0.05) return '0'
+  if (ms >= 10) return ms.toFixed(0)
+  return ms.toFixed(1)
 }
 
 function formatNumber(num) {

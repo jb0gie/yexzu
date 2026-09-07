@@ -48,6 +48,7 @@ export class App extends Entity {
     this.playerProxies = new Map()
     this.hitResultsPool = []
     this.hitResults = []
+    this.cpuMs = 0
     this.deadHook = { dead: false }
     this.build()
   }
@@ -233,10 +234,9 @@ export class App extends Entity {
     }
     // script update/animate
     if (this.script) {
+      const t0 = performance.now()
       try {
-        // update
         this.emit('update', delta)
-        // animate
         this.animateDelta += delta
         while (this.animateDelta >= this.animateRate) {
           this.emit('animate', this.animateDelta)
@@ -248,6 +248,8 @@ export class App extends Entity {
         console.error(err)
         this.crash()
         return
+      } finally {
+        this.cpuMs = this.cpuMs * 0.85 + (performance.now() - t0) * 0.15
       }
     }
   }
