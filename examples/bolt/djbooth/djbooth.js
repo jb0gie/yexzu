@@ -480,6 +480,26 @@ if (world.isServer) {
     broadcastState()
   })
 
+  // crates ask the booth to identify themselves when they build — but ALSO:
+  // periodic rescan heartbeat. Crates placed AFTER the booth booted (or apps
+  // that rebuilt silently) get discovered on the next tick without any
+  // manual action. Cheap: existing crates dedupe by url.
+  let rescanCount = 0
+  const rescan = () => {
+    rescanCount++
+    app.emit(CRATE_WHOIS, { channel: CHANNEL })
+    debugLog('rescan: asking crates to identify themselves (#' + rescanCount + ')')
+    // slow heartbeat: frequent at first (crates still building), then gentle
+    setTimeout(rescan, rescanCount <= 5 ? 4000 : 30000)
+  }
+  setTimeout(rescan, 3000)
+
+  // manual rescan (tablet/panel request) — discover crates on demand
+  world.on(`${CHANNEL}:rescan`, () => {
+    app.emit(CRATE_WHOIS, { channel: CHANNEL })
+    broadcastState()
+  })
+
   // speaker apps ask for rig state when they build mid-track (late join OR
   // move-rebuild). Re-emit with the ORIGINAL token: already-playing speakers
   // dedupe-skip it, only the rebuilt speaker applies and re-syncs. No global

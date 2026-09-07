@@ -80,33 +80,62 @@ function debugLog(...args) {
   }
 }
 
-const songUrl = props.song0?.url || null
-// name priority: explicit prop > filename from the URL (decoded, extension
-// and query stripped, hyphens/underscores spaced, hash-ids tolerated) > generic
-function nameFromUrl(url) {
+// metadata resolver — server-side ID3/Vorbis tag read via music-metadata.
+// Priority: explicit prop > embedded tags (title/artist) > filename > generic.
+// Cached per url so repeat offers don't re-parse. Returns null on any failure
+// (no tags, unreachable file, timeout) — caller falls back.
+const metaCache = new Map()
+async function resolveMetadata(url) {
+  if (!url || metaCache.has(url)) return metaCache.get(url) || null
+  try {
+    const target = /^https?:\/\//.test(url) && !url.startsWith(env.assetsUrl || '~')
+      ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(url)}`
+      : url
+    const resp = await fetch(target, { signal: AbortSignal.timeout(8000) })
+    if (!resp.ok) throw new Error(`http ${resp.status}`)
+    const mm = await import('music-metadata')
+    const meta = await mm.parseBuffer(await resp.arrayBuffer(), undefined, { duration: false })
+    const out = {
+      title: meta.common.title?.trim() || null,
+      artist: meta.common.artist?.trim() || null,
+      album: meta.common.album?.trim() || null,
+    }
+    metaCache.set(url, out)
+    debugLog('metadata:', out.title, '/', out.artist)
+    return out
+  } catch (err) {
+    debugLog('metadata read failed:', err.message)
+    metaCache.set(url, null)
+    return null
+  }
+}
+
+// filename fallback (decoded, extension stripped, -/_ spaced)
+function filenameName(url) {
   if (!url) return null
   let name = url.split('?')[0].split('#')[0]
   name = decodeURIComponent(name.slice(name.lastIndexOf('/') + 1))
   name = name.replace(/\.[a-z0-9]{2,5}$/i, '')
   name = name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-  if (!name) return null
-  // reject hash-like blob names (e.g. 9f8ac2d1 — uploaded asset filenames):
-  // long single token, mostly consonant-digits, no spaces
-  const compact = name.replace(/\s/g, '')
-  if (!name.includes(' ') && compact.length >= 8) {
-    const vowelish = (compact.match(/[aeiouy]/gi) || []).length
-    if (vowelish / compact.length < 0.25) return null
-  }
   return name || null
 }
-const songName = props.songName || nameFromUrl(songUrl) || 'Untitled'
-const songArtist = props.songArtist || ''
+
+// resolved display name (updated async once tags arrive; sync fallback first)
+let resolvedMeta = null
+function resolveDisplay() {
+  if (resolvedMeta?.title) return { name: resolvedMeta.title, artist: resolvedMeta.artist || '' }
+  return { name: props.songName || filenameName(songUrl) || 'Untitled', artist: props.songArtist || '' }
+}
 
 const vinyl = app.get('NoobVinyl')
 
 // ---------- server: offer the crate + track rig state ----------
 if (world.isServer) {
-  console.warn(`[boltVinyl] server booted — "${songName}" ${songUrl ? 'ready' : 'NO SONG'}`)
+  // display name resolves in stages: filename now, ID3 tags when the async
+  // metadata read lands (offer is re-emit on change so the booth/panels
+  // refresh without a rebuild)
+  const display = () => resolveDisplay()
+  console.warn(`[boltVinyl] server booted — "${display().name}" ${songUrl ? 'ready' : 'NO SONG'}`)
 
   // playlist shaping lives in the booth; we just announce what we have.
   // id = the audio URL only (stable across prop edits/moves/rebuilds):
@@ -114,34 +143,51 @@ if (world.isServer) {
   // crate) instead of duplicating it as a new song.
   function offer() {
     if (!songUrl) return
+    const d = display()
     app.emit(CRATE_EVENT, {
       id: songUrl,
       url: songUrl,
-      name: songName,
-      artist: songArtist,
+      name: d.name,
+      artist: d.artist,
     })
-    debugLog('offered crate:', songName)
+    debugLog('offered crate:', d.name)
   }
 
-  // the booth asks crates to identify themselves when it (re)builds
+  // crates ask the booth to identify itself when it (re)builds
   world.on(CRATE_WHOIS, () => offer())
+  // booth rescan: same event, crates just re-offer. Booth-driven heartbeat
+  // (see djbooth) discovers crates placed after the booth booted.
+  world.on(`${CHANNEL}:rescan`, () => offer())
 
   offer()
   setTimeout(offer, 2000) // once more in case the booth built after us
 
-  // mirror rig state down to our client (spin + now-playing display)
+  // ID3 tags: async read, then re-offer with the resolved title/artist
+  if (songUrl) {
+    resolveMetadata(songUrl).then(meta => {
+      if (!meta?.title) return
+      resolvedMeta = meta
+      const d = display()
+      console.warn(`[boltVinyl] metadata resolved — "${d.name}" by ${d.artist || '?'}; re-offering crate`)
+      offer()
+    })
+  }
+
+  // mirror rig state down to our client (spin + now-playing display),
+  // plus this crate's resolved display name for the world label
   world.on(STATE_EVENT, state => {
     if (!state) return
-    app.send(RENDER_EVENT, state)
+    app.send(RENDER_EVENT, { ...state, crateName: display().name, crateArtist: display().artist })
   })
 }
 
 // ---------- client: spin + label + status ----------
 if (world.isClient) {
-  console.warn(`[boltVinyl] client booted — "${songName}"`)
+  console.warn(`[boltVinyl] client booted — "title pending"`)
 
   let isLiveTrack = false
   let npName = null
+  let crateName = 'Untitled'
 
   // ----- world-space label (what is this crate / what's playing) -----
   // Yoga flexbox: root ui carries the 3D position, children flow.
@@ -166,7 +212,7 @@ if (world.isClient) {
   })
 
   const labelText = app.create('uitext', {
-    value: songName,
+    value: crateName,
     fontSize: 12,
     color: '#66ffcc',
     textAlign: 'center',
@@ -183,8 +229,12 @@ if (world.isClient) {
 
   labelUi.add(labelPanel)
 
-  app.on(RENDER_EVENT, state => {
-    if (!state) return
+  app.on(RENDER_EVENT, data => {
+    if (!data) return
+    if (data.crateName) {
+      crateName = data.crateName
+    }
+    const state = data
     const wasLive = isLiveTrack
     // the booth includes nowPlaying { url, name, artist } in state
     const np = state.nowPlaying
@@ -200,7 +250,7 @@ if (world.isClient) {
       stateLabel.value = 'now playing on the rig'
       stateLabel.color = '#66ffcc'
     } else {
-      labelText.value = songName
+      labelText.value = crateName
       labelText.color = '#aaaacc'
       stateLabel.value = songUrl ? 'crate ready' : 'no song'
       stateLabel.color = '#888899'
