@@ -280,6 +280,46 @@ fastify.get('/api/audio-proxy', async (req, reply) => {
   }
 })
 
+// audio metadata — ID3/Vorbis tags via music-metadata (server-side; app
+// scripts are SES and cannot import()). Pairs with /api/audio-proxy: this
+// grants the WORLD the track, this grants the RIG the tags.
+const metadataCache = new Map() // url -> { title, artist, album } | null
+
+fastify.get('/api/audio-meta', async (req, reply) => {
+  const target = req.query.url
+  if (!target) return reply.code(400).send({ error: 'missing ?url=' })
+  let parsed
+  try {
+    parsed = new URL(target)
+  } catch {
+    return reply.code(400).send({ error: 'invalid url' })
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return reply.code(400).send({ error: 'only http/https' })
+  }
+  if (metadataCache.has(target)) {
+    return reply.send(metadataCache.get(target))
+  }
+  try {
+    const mm = await import('music-metadata')
+    const resp = await fetch(parsed, { signal: AbortSignal.timeout(10000) })
+    if (!resp.ok) throw new Error(`upstream ${resp.status}`)
+    const buf = Buffer.from(await resp.arrayBuffer())
+    const meta = await mm.parseBuffer(buf, undefined, { duration: false })
+    const out = {
+      title: meta.common.title?.trim() || null,
+      artist: meta.common.artist?.trim() || null,
+      album: meta.common.album?.trim() || null,
+    }
+    metadataCache.set(target, out)
+    reply.send(out)
+  } catch (err) {
+    const out = { title: null, artist: null, album: null, error: err.message }
+    metadataCache.set(target, out)
+    reply.send(out)
+  }
+})
+
 fastify.get('/health', async (request, reply) => {
   try {
     // Basic health check

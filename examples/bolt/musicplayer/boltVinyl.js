@@ -80,29 +80,21 @@ function debugLog(...args) {
   }
 }
 
-// metadata resolver — server-side ID3/Vorbis tag read via music-metadata.
+// metadata resolver — server reads the ID3/Vorbis tags (music-metadata runs
+// on the SERVER; app scripts cannot import() — SES_IMPORT_REJECTED). This
+// just calls the /api/audio-meta endpoint with the injected fetch.
 // Priority: explicit prop > embedded tags (title/artist) > filename > generic.
-// Cached per url so repeat offers don't re-parse. Returns null on any failure
-// (no tags, unreachable file, timeout) — caller falls back.
 const metaCache = new Map()
 async function resolveMetadata(url) {
   if (!url || metaCache.has(url)) return metaCache.get(url) || null
   try {
-    const target = /^https?:\/\//.test(url) && !url.startsWith(env.assetsUrl || '~')
-      ? `${env.apiUrl || ''}/api/audio-proxy?url=${encodeURIComponent(url)}`
-      : url
-    const resp = await fetch(target, { signal: AbortSignal.timeout(8000) })
+    const target = `${env.apiUrl || ''}/api/audio-meta?url=${encodeURIComponent(url)}`
+    const resp = await fetch(target)
     if (!resp.ok) throw new Error(`http ${resp.status}`)
-    const mm = await import('music-metadata')
-    const meta = await mm.parseBuffer(await resp.arrayBuffer(), undefined, { duration: false })
-    const out = {
-      title: meta.common.title?.trim() || null,
-      artist: meta.common.artist?.trim() || null,
-      album: meta.common.album?.trim() || null,
-    }
-    metaCache.set(url, out)
-    debugLog('metadata:', out.title, '/', out.artist)
-    return out
+    const out = await resp.json()
+    metaCache.set(url, out?.title ? out : null)
+    debugLog('metadata:', out?.title, '/', out?.artist)
+    return out?.title ? out : null
   } catch (err) {
     debugLog('metadata read failed:', err.message)
     metaCache.set(url, null)
