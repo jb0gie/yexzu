@@ -526,125 +526,144 @@ if (world.isClient) {
   })
   app.add(playAction)
 
+  // Yoga flexbox layout (children are NOT positioned with 3D vectors —
+  // only the root ui node gets a position; everything inside flows)
   const ui = app.create('ui', {
-    width: 300,
-    height: 250,
-    size: 0.005,
-    position: [0, 2.1, 0],
+    width: 320,
+    height: 300,
+    position: [0, 2.2, 0],
     pivot: 'center',
     space: 'world',
-    backgroundColor: 'rgba(10, 10, 18, 0.82)',
-    borderRadius: 12,
+    billboard: 'y',
     pointerEvents: true,
+  })
+  app.add(ui)
+
+  const panel = app.create('uiview', {
+    width: 320,
+    height: 300,
+    backgroundColor: 'rgba(10, 10, 18, 0.85)',
+    borderRadius: 12,
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingTop: 14,
   })
 
   const title = app.create('uitext', {
     value: `🎧 BOLT RIG — ${CHANNEL}`,
-    fontSize: 18,
+    fontSize: 17,
     color: '#ff66ff',
-    textAlign: 'center',
-    position: [0, 108, 0],
+    fontWeight: 'bold',
+    marginBottom: 8,
   })
-  ui.add(title)
+  panel.add(title)
 
   const nowText = app.create('uitext', {
     value: '· · ·',
     fontSize: 13,
     color: '#66ffcc',
-    textAlign: 'center',
-    position: [0, 78, 0],
+    marginBottom: 2,
   })
-  ui.add(nowText)
+  panel.add(nowText)
 
   const statusText = app.create('uitext', {
     value: embedUrl ? 'embed mode — play on the screen' : 'ready',
     fontSize: 11,
     color: '#aaaacc',
-    textAlign: 'center',
-    position: [0, 52, 0],
+    marginBottom: 12,
   })
-  ui.add(statusText)
+  panel.add(statusText)
 
-  // ----- transport buttons (uiview + onPointerDown — engine touch support) -----
-  function makeButton(label, x, color) {
+  // ----- transport row -----
+  function makeButton(label, color, marginRight) {
     const btn = app.create('uiview', {
-      width: 80,
-      height: 34,
-      position: [x, 10, 0],
-      pivot: 'center',
+      width: 86,
+      height: 36,
       backgroundColor: color,
-      borderRadius: 8,
+      borderRadius: 9,
       justifyContent: 'center',
       alignItems: 'center',
       cursor: 'pointer',
+      marginRight: marginRight ?? 0,
     })
-    btn.add(app.create('uitext', { value: label, fontSize: 13, color: '#ffffff', textAlign: 'center' }))
-    ui.add(btn)
+    btn.add(app.create('uitext', { value: label, fontSize: 13, color: '#ffffff' }))
     return btn
   }
 
-  const prevBtn = makeButton('◀ prev', -105, 'rgba(60, 60, 90, 0.9)')
-  const playBtn = makeButton('▶ play', 0, 'rgba(40, 160, 90, 0.9)')
-  const nextBtn = makeButton('next ▶', 105, 'rgba(60, 60, 90, 0.9)')
+  const transportRow = app.create('uiview', { flexDirection: 'row' })
+  const prevBtn = makeButton('◀ prev', 'rgba(60, 60, 90, 0.95)', 10)
+  const playBtn = makeButton('▶ play', 'rgba(40, 160, 90, 0.95)', 10)
+  const nextBtn = makeButton('next ▶', 'rgba(60, 60, 90, 0.95)')
+  transportRow.add(prevBtn)
+  transportRow.add(playBtn)
+  transportRow.add(nextBtn)
+  panel.add(transportRow)
 
-  prevBtn.onPointerDown = () => {
-    console.warn('[djbooth] next <- prev crate')
-    app.send('booth:request', { action: 'nextCrate', dir: -1 })
-  }
-  nextBtn.onPointerDown = () => {
-    console.warn('[djbooth] next crate ->')
-    app.send('booth:request', { action: 'nextCrate' })
-  }
-  playBtn.onPointerDown = () => {
-    app.send('booth:toggle', true)
-  }
-
-  // ----- playlist rows (up to 5, rebuilt whenever the playlist changes) -----
+  // ----- playlist (top 5 rows, rebuilt on state change) -----
   let listRoot = null
   function rebuildList() {
     if (listRoot) {
-      ui.remove(listRoot)
+      panel.remove(listRoot)
       listRoot = null
     }
-    const items = view.playlist || []
+    const items = (view.playlist || []).slice(0, 5)
     if (items.length === 0) return
     listRoot = app.create('uiview', {
-      width: 280,
-      height: items.length * 22 + 8,
-      position: [0, -40, 0],
-      pivot: 'center',
-      backgroundColor: 'rgba(0, 0, 0, 0.25)',
+      width: 292,
+      marginTop: 12,
+      flexDirection: 'column',
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
       borderRadius: 8,
+      paddingTop: 4,
+      paddingBottom: 4,
     })
-    items.slice(0, 5).forEach((item, i) => {
+    items.forEach(item => {
+      const isSelected = item.id === view.selectedCrateId
       const row = app.create('uiview', {
-        width: 272,
-        height: 20,
-        position: [0, 6 + i * 22, 0],
-        pivot: 'top-center',
-        backgroundColor: item.id === view.selectedCrateId ? 'rgba(102, 255, 204, 0.18)' : 'transparent',
-        borderRadius: 5,
+        width: 284,
+        height: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 10,
+        backgroundColor: isSelected ? 'rgba(102, 255, 204, 0.16)' : 'transparent',
         cursor: 'pointer',
       })
-      const label = app.create('uitext', {
-        value: `${item.id === view.selectedCrateId ? '▶' : ' '} ${item.name}${item.artist ? ' — ' + item.artist : ''}`,
+      row.add(app.create('uitext', {
+        value: `${isSelected ? '▶ ' : '   '}${item.name}${item.artist ? ' — ' + item.artist : ''}`,
         fontSize: 11,
-        color: item.id === view.selectedCrateId ? '#66ffcc' : '#aaaacc',
-        textAlign: 'left',
-        position: [8, 2, 0],
-      })
-      row.add(label)
+        color: isSelected ? '#66ffcc' : '#aaaacc',
+      }))
       row.onPointerDown = () => {
         console.warn('[djbooth] playlist select:', item.name)
         app.send('booth:request', { action: 'selectCrate', crateId: item.id })
       }
       listRoot.add(row)
     })
-    ui.add(listRoot)
+    panel.add(listRoot)
   }
 
-  // mount the panel
-  app.add(ui)
+  const hint = app.create('uitext', {
+    value: 'click rows / press esc to free cursor',
+    fontSize: 9,
+    color: '#55556c',
+    marginTop: 10,
+  })
+  panel.add(hint)
+
+  ui.add(panel)
+
+  // ----- interactions -----
+  prevBtn.onPointerDown = () => {
+    console.warn('[djbooth] prev crate')
+    app.send('booth:request', { action: 'prevCrate' })
+  }
+  nextBtn.onPointerDown = () => {
+    console.warn('[djbooth] next crate')
+    app.send('booth:request', { action: 'nextCrate' })
+  }
+  playBtn.onPointerDown = () => {
+    app.send('booth:toggle', true)
+  }
 
   // server relay delivers rig state (state bus -> our server -> app.send)
   app.on(RENDER_EVENT, state => {
