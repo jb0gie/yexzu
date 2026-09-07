@@ -85,6 +85,8 @@ export function Sidebar({ world, ui }) {
   const player = world.entities.player
   const { isAdmin, isBuilder } = useRank(world, player)
   const [livekit, setLiveKit] = useState(() => world.livekit.status)
+  const [hudSide, setHudSide] = useState(() => world.prefs.hudSide || 'left')
+  const [buildMode, setBuildMode] = useState(() => !!world.builder?.enabled)
   useEffect(() => {
     const onLiveKitStatus = status => {
       setLiveKit({ ...status })
@@ -92,6 +94,18 @@ export function Sidebar({ world, ui }) {
     world.livekit.on('status', onLiveKitStatus)
     return () => {
       world.livekit.off('status', onLiveKitStatus)
+    }
+  }, [])
+  useEffect(() => {
+    const onPrefs = changes => {
+      if (changes.hudSide) setHudSide(changes.hudSide.value)
+    }
+    const onBuild = enabled => setBuildMode(!!enabled)
+    world.prefs.on('change', onPrefs)
+    world.on('build-mode', onBuild)
+    return () => {
+      world.prefs.off('change', onPrefs)
+      world.off('build-mode', onBuild)
     }
   }, [])
   const activePane = ui.active ? ui.pane : null
@@ -114,7 +128,7 @@ export function Sidebar({ world, ui }) {
     <HintProvider>
       <div
         ref={wrapRef}
-        className={cls('sidebar', { hidden: !shown })}
+        className={cls('sidebar', { hidden: !shown, left: hudSide === 'left', right: hudSide === 'right' })}
         css={css`
           position: absolute;
           font-size: 1rem;
@@ -123,7 +137,6 @@ export function Sidebar({ world, ui }) {
           bottom: calc(2rem + env(safe-area-inset-bottom));
           left: calc(2rem + env(safe-area-inset-left));
           display: flex;
-          justify-content: flex-end;
           gap: 0.625rem;
           z-index: 1; // above chat etc
           pointer-events: none;
@@ -138,7 +151,18 @@ export function Sidebar({ world, ui }) {
             flex-direction: column;
             flex-shrink: 0;
             gap: 0.625rem;
-            order: 2;
+          }
+          &.left {
+            justify-content: flex-start;
+            .sidebar-sections {
+              order: 0;
+            }
+          }
+          &.right {
+            justify-content: flex-end;
+            .sidebar-sections {
+              order: 2;
+            }
           }
           &.hidden .sidebar-sections,
           &.hidden .sidebar-content {
@@ -207,6 +231,13 @@ export function Sidebar({ world, ui }) {
           </Section>
           {isBuilder && (
             <Section active={activePane} top bottom>
+              <Btn
+                active={buildMode}
+                onClick={() => world.builder.toggle()}
+                title='Build Mode'
+              >
+                <HammerIcon size='1.25rem' />
+              </Btn>
               <Btn
                 active={activePane === 'world'}
                 suspended={ui.pane === 'world' && !activePane}
@@ -558,6 +589,7 @@ function Prefs({ world, hidden }) {
   const [ui, setUI] = useState(world.prefs.ui)
   const [canFullscreen, isFullscreen, toggleFullscreen] = useFullscreen()
   const [actions, setActions] = useState(world.prefs.actions)
+  const [hudSide, setHudSide] = useState(world.prefs.hudSide || 'left')
   const [stats, setStats] = useState(world.prefs.stats)
   const changeName = name => {
     if (!name) return setName(player.data.name)
@@ -593,6 +625,7 @@ function Prefs({ world, hidden }) {
       if (changes.voice) setVoice(changes.voice.value)
       if (changes.ui) setUI(changes.ui.value)
       if (changes.actions) setActions(changes.actions.value)
+      if (changes.hudSide) setHudSide(changes.hudSide.value)
       if (changes.stats) setStats(changes.stats.value)
     }
     world.prefs.on('change', onPrefsChange)
@@ -616,6 +649,16 @@ function Prefs({ world, hidden }) {
       >
         <FieldText label='Name' hint='Change your name' value={name} onChange={changeName} />
         <Group label='Interface' />
+        <FieldSwitch
+          label='HUD Side'
+          hint='Put the menu rail on the left or right'
+          options={[
+            { label: 'Left', value: 'left' },
+            { label: 'Right', value: 'right' },
+          ]}
+          value={hudSide}
+          onChange={side => world.prefs.setHudSide(side)}
+        />
         <FieldRange
           label='Scale'
           hint='Change the scale of the user interface'

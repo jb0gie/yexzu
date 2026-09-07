@@ -338,13 +338,19 @@ function Chat({ world }) {
   const inputRef = useRef()
   const [msg, setMsg] = useState('')
   const [active, setActive] = useState(false)
+  const [hudSide, setHudSide] = useState(() => world.prefs.hudSide || 'left')
   useEffect(() => {
     const onToggle = () => {
       setActive(value => !value)
     }
+    const onPrefs = changes => {
+      if (changes.hudSide) setHudSide(changes.hudSide.value)
+    }
     world.on('sidebar-chat-toggle', onToggle)
+    world.prefs.on('change', onPrefs)
     return () => {
       world.off('sidebar-chat-toggle', onToggle)
+      world.prefs.off('change', onPrefs)
     }
   }, [])
   useEffect(() => {
@@ -396,12 +402,12 @@ function Chat({ world }) {
       className={cls('mainchat', { active })}
       css={css`
         position: absolute;
-        left: calc(2rem + env(safe-area-inset-left));
+        left: ${hudSide === 'left' ? 'calc(5.5rem + env(safe-area-inset-left))' : 'calc(2rem + env(safe-area-inset-left))'};
         bottom: calc(2rem + env(safe-area-inset-bottom));
         width: 20rem;
         font-size: 1rem;
         @media all and (max-width: 1200px) {
-          left: calc(1rem + env(safe-area-inset-left));
+          left: ${hudSide === 'left' ? 'calc(4.5rem + env(safe-area-inset-left))' : 'calc(1rem + env(safe-area-inset-left))'};
           bottom: calc(1rem + env(safe-area-inset-bottom));
         }
         .mainchat-msgs {
@@ -887,11 +893,13 @@ function KickedOverlay({ code }) {
 
 function ActionsBlock({ world, ui }) {
   const [showActions, setShowActions] = useState(() => world.prefs.actions)
+  const [hudSide, setHudSide] = useState(() => world.prefs.hudSide || 'left')
   const ref = useRef()
   const hudOn = ui?.visible !== false
   useEffect(() => {
     const onPrefsChange = changes => {
       if (changes.actions) setShowActions(changes.actions.value)
+      if (changes.hudSide) setHudSide(changes.hudSide.value)
     }
     world.prefs.on('change', onPrefsChange)
     return () => {
@@ -918,17 +926,16 @@ function ActionsBlock({ world, ui }) {
       ref={ref}
       css={css`
         position: absolute;
-        top: calc(2rem + env(safe-area-inset-top));
-        left: calc(2rem + env(safe-area-inset-left));
-        bottom: calc(8rem + env(safe-area-inset-bottom));
+        left: ${hudSide === 'left' ? 'calc(5.5rem + env(safe-area-inset-left))' : 'calc(2rem + env(safe-area-inset-left))'};
+        bottom: calc(6.5rem + env(safe-area-inset-bottom));
         display: flex;
         flex-direction: column;
+        justify-content: flex-end;
         align-items: flex-start;
         pointer-events: none;
         @media all and (max-width: 1200px) {
-          top: calc(1rem + env(safe-area-inset-top));
-          left: calc(1rem + env(safe-area-inset-left));
-          bottom: calc(6rem + env(safe-area-inset-bottom));
+          left: ${hudSide === 'left' ? 'calc(4.5rem + env(safe-area-inset-left))' : 'calc(1rem + env(safe-area-inset-left))'};
+          bottom: calc(5.5rem + env(safe-area-inset-bottom));
         }
       `}
     >

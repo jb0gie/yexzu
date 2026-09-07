@@ -35,6 +35,7 @@ export class ClientPrefs extends System {
 
     this.ui = isNumber(data.ui) ? data.ui : isTouch ? 0.9 : 1
     this.actions = isBoolean(data.actions) ? data.actions : true
+    this.hudSide = data.hudSide === 'right' ? 'right' : 'left'
     this.stats = isBoolean(data.stats) ? data.stats : false
     this.dpr = isNumber(data.dpr) ? data.dpr : 1
     this.shadows = data.shadows ? data.shadows : isTouch ? 'low' : 'med' // none, low=1, med=2048cascade, high=4096cascade
@@ -115,7 +116,7 @@ export class ClientPrefs extends System {
 
     // Also add basic preference keys not in effects
     const basicPrefs = [
-      'ui', 'actions', 'stats', 'dpr', 'shadows',
+      'ui', 'actions', 'hudSide', 'stats', 'dpr', 'shadows',
       'postprocessing', 'bloom', 'ao', 'music', 'sfx', 'voice',
       'dofEnabled', 'focusSmoothing', 'focusSpeed', 'playerAutofocus',
       'reticleAutofocus', 'scrollZoomEnabled', 'showHelpers', 'zoomSpeed',
@@ -177,6 +178,7 @@ export class ClientPrefs extends System {
     storage.set('prefs', {
       ui: this.ui,
       actions: this.actions,
+      hudSide: this.hudSide,
       stats: this.stats,
       dpr: this.dpr,
       shadows: this.shadows,
