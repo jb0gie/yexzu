@@ -309,13 +309,18 @@ if (world.isServer) {
 
   world.on(CRATE_EVENT, crate => {
     if (!crate || !crate.url) return
-    const isNew = !crates.has(crate.id)
+    const existed = crates.has(crate.id)
     crates.set(crate.id, crate)
-    if (isNew) {
+    if (!existed) {
       rebuildCrateOrder()
       debugLog('crate added:', crate.name, `(${crateOrder.length} in playlist)`)
       // if nothing is playing, surface the new crate as selected
       if (!isPlaying && selectedCrateId === null) selectedCrateId = crate.id
+      broadcastState()
+    } else {
+      // same url, possibly updated metadata — refresh the order array and
+      // push new names to panels, but never duplicate or reselect
+      rebuildCrateOrder()
       broadcastState()
     }
   })

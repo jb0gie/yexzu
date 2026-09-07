@@ -109,11 +109,13 @@ if (world.isServer) {
   console.warn(`[boltVinyl] server booted — "${songName}" ${songUrl ? 'ready' : 'NO SONG'}`)
 
   // playlist shaping lives in the booth; we just announce what we have.
-  // token = identity of this crate (url+name), so the booth can dedupe.
+  // id = the audio URL only (stable across prop edits/moves/rebuilds):
+  // re-offers with the SAME url update the existing entry (e.g. renamed
+  // crate) instead of duplicating it as a new song.
   function offer() {
     if (!songUrl) return
     app.emit(CRATE_EVENT, {
-      id: `${songUrl}|${songName}`,
+      id: songUrl,
       url: songUrl,
       name: songName,
       artist: songArtist,
