@@ -89,11 +89,13 @@ function nameFromUrl(url) {
   name = decodeURIComponent(name.slice(name.lastIndexOf('/') + 1))
   name = name.replace(/\.[a-z0-9]{2,5}$/i, '')
   name = name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-  if (!name || /^[\w-]{8,}$/.test(name.replace(/\s/g, ''))) {
-    // hash-like blob names (e.g. 9f8ac2d1, uploaded assets) — not titles
-    const compact = name.replace(/\s/g, '')
+  if (!name) return null
+  // reject hash-like blob names (e.g. 9f8ac2d1 — uploaded asset filenames):
+  // long single token, mostly consonant-digits, no spaces
+  const compact = name.replace(/\s/g, '')
+  if (!name.includes(' ') && compact.length >= 8) {
     const vowelish = (compact.match(/[aeiouy]/gi) || []).length
-    if (compact.length >= 8 && vowelish / compact.length < 0.3) return null
+    if (vowelish / compact.length < 0.25) return null
   }
   return name || null
 }
