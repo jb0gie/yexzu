@@ -81,7 +81,23 @@ function debugLog(...args) {
 }
 
 const songUrl = props.song0?.url || null
-const songName = props.songName || 'Untitled'
+// name priority: explicit prop > filename from the URL (decoded, extension
+// and query stripped, hyphens/underscores spaced, hash-ids tolerated) > generic
+function nameFromUrl(url) {
+  if (!url) return null
+  let name = url.split('?')[0].split('#')[0]
+  name = decodeURIComponent(name.slice(name.lastIndexOf('/') + 1))
+  name = name.replace(/\.[a-z0-9]{2,5}$/i, '')
+  name = name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!name || /^[\w-]{8,}$/.test(name.replace(/\s/g, ''))) {
+    // hash-like blob names (e.g. 9f8ac2d1, uploaded assets) — not titles
+    const compact = name.replace(/\s/g, '')
+    const vowelish = (compact.match(/[aeiouy]/gi) || []).length
+    if (compact.length >= 8 && vowelish / compact.length < 0.3) return null
+  }
+  return name || null
+}
+const songName = props.songName || nameFromUrl(songUrl) || 'Untitled'
 const songArtist = props.songArtist || ''
 
 const vinyl = app.get('NoobVinyl')
