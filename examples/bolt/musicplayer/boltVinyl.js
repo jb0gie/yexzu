@@ -136,11 +136,52 @@ if (world.isServer) {
   })
 }
 
-// ---------- client: spin + status ----------
+// ---------- client: spin + label + status ----------
 if (world.isClient) {
   console.warn(`[boltVinyl] client booted — "${songName}"`)
 
   let isLiveTrack = false
+  let npName = null
+
+  // ----- world-space label (what is this crate / what's playing) -----
+  // Yoga flexbox: root ui carries the 3D position, children flow.
+  const labelUi = app.create('ui', {
+    width: 200,
+    height: 56,
+    position: [0, 0.55, 0],
+    pivot: 'center',
+    space: 'world',
+    billboard: 'y',
+  })
+  app.add(labelUi)
+
+  const labelPanel = app.create('uiview', {
+    width: 200,
+    height: 56,
+    backgroundColor: 'rgba(8, 10, 16, 0.75)',
+    borderRadius: 8,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  })
+
+  const labelText = app.create('uitext', {
+    value: songName,
+    fontSize: 12,
+    color: '#66ffcc',
+    textAlign: 'center',
+  })
+  labelPanel.add(labelText)
+
+  const stateLabel = app.create('uitext', {
+    value: '· idle ·',
+    fontSize: 9,
+    color: '#888899',
+    marginTop: 2,
+  })
+  labelPanel.add(stateLabel)
+
+  labelUi.add(labelPanel)
 
   app.on(RENDER_EVENT, state => {
     if (!state) return
@@ -148,8 +189,21 @@ if (world.isClient) {
     // the booth includes nowPlaying { url, name, artist } in state
     const np = state.nowPlaying
     isLiveTrack = !!(np && np.url === songUrl)
+    npName = np ? np.name : null
     if (isLiveTrack !== wasLive) {
       debugLog(isLiveTrack ? 'this crate is LIVE' : 'crate idle')
+    }
+    // live crate: show what the rig is playing; idle crate: its own name
+    if (isLiveTrack) {
+      labelText.value = `▶ ${npName}`
+      labelText.color = '#66ffcc'
+      stateLabel.value = 'now playing on the rig'
+      stateLabel.color = '#66ffcc'
+    } else {
+      labelText.value = songName
+      labelText.color = '#aaaacc'
+      stateLabel.value = songUrl ? 'crate ready' : 'no song'
+      stateLabel.color = '#888899'
     }
   })
 
