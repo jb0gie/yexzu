@@ -164,7 +164,10 @@ app.configure([
 const CHANNEL = props.channel || 'bolt'
 const CMD_EVENT = `${CHANNEL}:audio:command`
 const QUERY_EVENT = `${CHANNEL}:audio:query`
+const TRACKEND_EVENT = `${CHANNEL}:trackend`
 const RENDER_EVENT = `${CHANNEL}:speaker:render`
+const AUDIO_EVENT = `${CHANNEL}:speaker:audio`
+const WHOIS_EVENT = `${CHANNEL}:reactive:whois`
 
 function debugLog(...args) {
   if (props.debug === 'enabled') {
@@ -187,6 +190,10 @@ if (world.isServer) {
   }
 
   world.on(CMD_EVENT, relay)
+
+  app.on('speaker:trackend', data => {
+    app.emit(TRACKEND_EVENT, data)
+  })
 
   // late-joiner catch-up: ask the booth for rig state until it answers.
   // This also heals MOVE-REBUILDS: grabbing/releasing the app sets `mover`,
@@ -230,10 +237,13 @@ if (world.isClient) {
   let appliedToken = null
   let isPlaying = false
   let currentUrl = null
+  let endWatch = null
 
   function destroyAudio() {
+    if (endWatch) endWatch.dead = true
     if (audio) {
       audio.stop()
+      app.emit(AUDIO_EVENT, { role: props.role || '?', audioId: audio.id, url: currentUrl, playing: false })
       app.remove(audio)
       audio = null
     }
@@ -265,12 +275,16 @@ if (world.isClient) {
       return
     }
     const node = ensureAudio(cmd.url)
+    node.loop = !!cmd.standalone && props.loop !== false
     const elapsed = Math.max(0, world.getTime() - cmd.t0)
     node.volume = cmd.volume ?? props.volume ?? 1
     node.currentTime = elapsed
     node.play()
     isPlaying = true
     setSpeakerAnim(true)
+    app.emit(AUDIO_EVENT, { role: props.role || '?', audioId: node.id, url: cmd.url, playing: true })
+    if (endWatch) endWatch.dead = true
+    endWatch = { dead: false, startedAt: world.getTime(), url: cmd.url, role: props.role || '?' }
     console.warn(`[boltAnimSpeaker:${props.role || '?'}] PLAY from ${elapsed.toFixed(2)}s — url: ${cmd.url}`)
   }
 
@@ -294,6 +308,24 @@ if (world.isClient) {
 
   // relay from our own server context
   app.on(RENDER_EVENT, cmd => applyCommand(cmd))
+
+  app.on('update', () => {
+    if (!endWatch || endWatch.dead) return
+    if (audio?.isPlaying) return
+    if (world.getTime() - endWatch.startedAt > 2) {
+      endWatch.dead = true
+      isPlaying = false
+      setSpeakerAnim(false)
+      console.warn(`[boltAnimSpeaker:${endWatch.role}] track ended naturally -> booth`)
+      app.send('speaker:trackend', { role: endWatch.role, url: endWatch.url })
+    }
+  })
+
+  world.on(WHOIS_EVENT, () => {
+    if (isPlaying && audio) {
+      app.emit(AUDIO_EVENT, { role: props.role || '?', audioId: audio.id, url: currentUrl, playing: true })
+    }
+  })
 
   // standalone: play own file on load
   if (props.file?.url && props.autoPlay === 'enabled') {
