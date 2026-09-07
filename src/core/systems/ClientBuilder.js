@@ -232,9 +232,23 @@ export class ClientBuilder extends System {
       // click logic
       if (this.control.mouseLeft.pressed && this.control.pointer.locked) {
         if (!this.grabbableSelected) {
-          const entity = this.getEntityAtBeam()
-          console.log('[playGrab] click beam entity:', entity?.isApp ? entity.blueprint?.name : entity?.constructor?.name || 'none', 'grabbable:', !!entity?.blueprint?.props?.grabbable)
-          if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && entity.blueprint.props?.grabbable) {
+          const hit = this.getHitAtBeam()
+          // walk up from the hit node to the owning app (node.ctx.entity === app when activated under one)
+          let entity
+          let node = hit?.node
+          while (node) {
+            if (node.ctx?.entity?.isApp) {
+              entity = node.ctx.entity
+              break
+            }
+            node = node.parent
+          }
+          if (!entity) entity = hit?.getEntity?.()
+          // opt-in: blueprint prop OR a grabbable node anywhere under the hit
+          const grabNode = hit?.node?.findNode(n => n.name === 'grabbable') || (hit?.node?.name === 'grabbable' ? hit.node : null)
+          const isGrabbable = !!(entity?.blueprint?.props?.grabbable || grabNode)
+          console.log('[playGrab] click beam entity:', entity?.isApp ? entity.blueprint?.name : entity?.constructor?.name || 'none', 'grabbable:', isGrabbable, 'grabNode:', !!grabNode)
+          if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && isGrabbable) {
             this.selectGrabbable(entity)
           }
         } else {
