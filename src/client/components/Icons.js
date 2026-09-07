@@ -102,6 +102,17 @@ export function HandIcon({ size = 24 }) {
   )
 }
 
+export function QuestionIcon({ size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
+      <path
+        d='M11 18h2v2h-2v-2zm1-16C9.24 2 7 4.24 7 7h2c0-1.66 1.34-3 3-3s3 1.34 3 3c0 2.12-2.62 2.66-2.62 5.5h2.02C14.4 9.4 17 8.46 17 7c0-2.76-2.24-5-5-5z'
+        fill='currentColor'
+      />
+    </svg>
+  )
+}
+
 export function SettingsIcon({ size = 24 }) {
   return (
     <svg width={size} height={size} viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>

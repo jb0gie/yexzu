@@ -20,6 +20,7 @@ export class ClientPointer extends System {
     this.pointerState = new PointerState()
     this.isTouch = isTouch
     this.mobileReticleHit = null
+    this._inspectable = false
   }
 
   init({ ui }) {
@@ -58,16 +59,12 @@ export class ClientPointer extends System {
         released = this.control.mouseLeft.released
         this.mobileReticleHit = null
       } else {
-        // No screen UI hit, use reticle raycast for world UI
-        const reticleHits = this.world.stage.raycastReticle()
-        const uiHit = reticleHits.find(h => h.node?.isUI)
-
-        hit = uiHit || null
-        this.mobileReticleHit = uiHit || null
-
-        // Use touchB (action button) for pointer events on mobile
-        pressed = this.control.touchB.pressed
-        released = this.control.touchB.released
+        // Reticle: inspect button (touchC) clicks world UI / app onPointerDown
+        const inspectHit = findInspectHit(this.world.stage.raycastReticle())
+        hit = inspectHit
+        this.mobileReticleHit = inspectHit
+        pressed = this.control.touchC.pressed
+        released = this.control.touchC.released
       }
     } else {
       hit = this.screenHit
@@ -75,7 +72,14 @@ export class ClientPointer extends System {
       released = this.control.mouseLeft.released
       this.mobileReticleHit = null
     }
+    this.setInspectable(this.isTouch && !this.screenHit && !!this.mobileReticleHit)
     this.pointerState.update(hit, pressed, released)
+  }
+
+  setInspectable(value) {
+    if (this._inspectable === value) return
+    this._inspectable = value
+    this.emit('inspect', value)
   }
 
   setScreenHit(screenHit) {
@@ -87,7 +91,23 @@ export class ClientPointer extends System {
   destroy() {
     this.control?.release()
     this.control = null
+    this.setInspectable(false)
   }
+}
+
+function findInspectHit(hits) {
+  if (!hits?.length) return null
+  // ponytail: keep existing world-UI priority (UI can sit behind a mesh in the hit list)
+  const uiHit = hits.find(h => h.node?.isUI)
+  if (uiHit) return uiHit
+  const hit = hits[0]
+  if (!hit?.node) return null
+  let node = hit.node.resolveHit?.(hit) || hit.node
+  while (node) {
+    if (node.onPointerDown) return hit
+    node = node.parent
+  }
+  return null
 }
 
 const PointerEvents = {

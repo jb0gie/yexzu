@@ -15,7 +15,7 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 // import { AppsPane } from './AppsPane'
 // import { MenuMain } from './MenuMain'
 // import { MenuApp } from './MenuApp'
-import { ChevronDoubleUpIcon, HandIcon } from './Icons'
+import { ChevronDoubleUpIcon, HandIcon, QuestionIcon } from './Icons'
 import { Sidebar } from './Sidebar'
 import { EVM } from './EVM'
 import { QUAI } from './QUAI'
@@ -984,7 +984,7 @@ function Reticle({ world }) {
     if (!isTouch) return
     let rafId
     const checkWorldUI = () => {
-      setOverWorldUI(!!world.pointer?.mobileReticleHit?.node?.isUI)
+      setOverWorldUI(!!world.pointer?.mobileReticleHit)
       rafId = requestAnimationFrame(checkWorldUI)
     }
     rafId = requestAnimationFrame(checkWorldUI)
@@ -1087,13 +1087,19 @@ function ToastMsg({ text }) {
 
 function TouchBtns({ world }) {
   const [action, setAction] = useState(world.actions.current.node)
+  const [inspect, setInspect] = useState(!!world.pointer?.mobileReticleHit)
   useEffect(() => {
-    function onChange(isAction) {
+    function onAction(isAction) {
       setAction(isAction)
     }
-    world.actions.on('change', onChange)
+    function onInspect(isInspect) {
+      setInspect(isInspect)
+    }
+    world.actions.on('change', onAction)
+    world.pointer.on('inspect', onInspect)
     return () => {
-      world.actions.off('change', onChange)
+      world.actions.off('change', onAction)
+      world.pointer.off('inspect', onInspect)
     }
   }, [])
   return (
@@ -1126,9 +1132,30 @@ function TouchBtns({ world }) {
             bottom: 6rem;
             right: 4rem;
           }
+          &.inspect {
+            width: 2.5rem;
+            height: 2.5rem;
+            bottom: 8.25rem;
+            right: 1.25rem;
+          }
         }
       `}
     >
+      {inspect && (
+        <div
+          className='touchbtns-btn inspect'
+          onPointerDown={e => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            world.controls.setTouchBtn('touchC', true)
+          }}
+          onPointerLeave={e => {
+            world.controls.setTouchBtn('touchC', false)
+            e.currentTarget.releasePointerCapture(e.pointerId)
+          }}
+        >
+          <QuestionIcon size='1.5rem' />
+        </div>
+      )}
       {action && (
         <div
           className='touchbtns-btn action'

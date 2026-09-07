@@ -59,6 +59,7 @@ const controlTypes = {
   xrRightBtn2: createButton,
   touchA: createButton,
   touchB: createButton,
+  touchC: createButton,
 }
 
 export class ClientControls extends System {
