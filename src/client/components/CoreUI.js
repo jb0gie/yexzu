@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronUpIcon, LoaderIcon, MessageSquareTextIcon, RefreshCwIcon, SendHorizonalIcon } from 'lucide-react'
 import moment from 'moment'
 
-import { gsap, useGSAP, ease, dur, DUR, prefersReducedMotion } from './anim'
+import { gsap, useGSAP, ease, dur, DUR, prefersReducedMotion, clamp01 } from './anim'
 
 import { AvatarPane } from './AvatarPane'
 import { useElemSize } from './useElemSize'
@@ -622,9 +622,9 @@ function Message({ msg, now }) {
       if (prefersReducedMotion()) return
       gsap.fromTo(
         ref.current,
-        { opacity: 0, x: -10 },
+        { autoAlpha: 0, x: -10 },
         {
-          opacity: 1,
+          autoAlpha: 1,
           x: 0,
           duration: dur(0.25),
           ease: ease.out,
@@ -758,7 +758,12 @@ function LoadingOverlay({ world }) {
   }, [])
   useGSAP(
     () => {
-      gsap.to(barRef.current, { width: `${progress}%`, duration: dur(0.4), ease: ease.out })
+      gsap.to(barRef.current, {
+        scaleX: clamp01(progress / 100),
+        duration: dur(0.4),
+        ease: ease.out,
+        overwrite: 'auto',
+      })
     },
     { scope: barRef, dependencies: [progress] }
   )
@@ -825,7 +830,9 @@ function LoadingOverlay({ world }) {
           top: 0;
           left: 0;
           bottom: 0;
-          width: 0%;
+          width: 100%;
+          transform: scaleX(0);
+          transform-origin: left center;
           background: white;
           border-radius: 3px;
         }
@@ -896,7 +903,7 @@ function ActionsBlock({ world, ui }) {
       const el = ref.current
       if (!el) return
       gsap.to(el, {
-        opacity: hudOn ? 1 : 0,
+        autoAlpha: hudOn ? 1 : 0,
         duration: dur(DUR.norm),
         ease: ease.soft,
         overwrite: 'auto',
@@ -940,16 +947,16 @@ function Actions({ world }) {
   useGSAP(
     () => {
       if (prefersReducedMotion()) return
-      const items = listRef.current?.querySelectorAll('.actions-item')
-      if (!items?.length) return
+      const items = gsap.utils.toArray(listRef.current?.querySelectorAll('.actions-item'))
+      if (!items.length) return
       gsap.fromTo(
         items,
-        { opacity: 0, x: -14 },
+        { autoAlpha: 0, x: -14 },
         {
-          opacity: 1,
+          autoAlpha: 1,
           x: 0,
           duration: dur(0.3),
-          stagger: 0.06,
+          stagger: { each: 0.06, from: 'start' },
           ease: ease.soft,
         }
       )
@@ -1189,24 +1196,12 @@ function ToastMsg({ text }) {
   useGSAP(
     () => {
       if (prefersReducedMotion()) return
-      gsap.fromTo(
+      const tl = gsap.timeline({ defaults: { ease: ease.out } })
+      tl.fromTo(
         ref.current,
-        { opacity: 0, y: 12, scale: 0.85 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: dur(0.35),
-          ease: ease.pop,
-        }
-      )
-      gsap.to(ref.current, {
-        opacity: 0,
-        y: -8,
-        delay: 1.1,
-        duration: dur(0.3),
-        ease: ease.out,
-      })
+        { autoAlpha: 0, y: 12, scale: 0.85 },
+        { autoAlpha: 1, y: 0, scale: 1, duration: dur(0.35), ease: ease.pop }
+      ).to(ref.current, { autoAlpha: 0, y: -8, duration: dur(0.3) }, '+=0.8')
     },
     { scope: ref }
   )

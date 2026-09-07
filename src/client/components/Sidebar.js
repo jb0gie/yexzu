@@ -103,10 +103,10 @@ export function Sidebar({ world, ui }) {
       if (!el) return
       const to = shown ? 1 : 0
       if (prefersReducedMotion()) {
-        gsap.set(el, { opacity: to })
+        gsap.set(el, { autoAlpha: to })
         return
       }
-      gsap.to(el, { opacity: to, duration: dur(DUR.norm), ease: ease.soft, overwrite: 'auto' })
+      gsap.to(el, { autoAlpha: to, duration: dur(DUR.norm), ease: ease.soft, overwrite: 'auto' })
     },
     { dependencies: [shown] }
   )
@@ -394,8 +394,8 @@ function PaneSlider({ pane, hidden, world, app }) {
     () => {
       const el = ref.current
       const axis = isTouch ? 'y' : 'x'
-      const enterFrom = isTouch ? { y: 28, opacity: 0 } : { x: 28, opacity: 0 }
-      const shownPos = isTouch ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }
+      const enterFrom = isTouch ? { y: 28, autoAlpha: 0 } : { x: 28, autoAlpha: 0 }
+      const shownPos = isTouch ? { y: 0, autoAlpha: 1 } : { x: 0, autoAlpha: 1 }
       if (pane) {
         if (pane !== shown) setShown(pane)
         if (!el) return
@@ -418,7 +418,7 @@ function PaneSlider({ pane, hidden, world, app }) {
       }
       gsap.to(el, {
         [axis]: 28,
-        opacity: 0,
+        autoAlpha: 0,
         duration: dur(DUR.fast),
         ease: ease.out,
         overwrite: 'auto',
@@ -434,7 +434,17 @@ function PaneSlider({ pane, hidden, world, app }) {
   if (!id) return null
   const props = { world, hidden }
   return (
-    <div ref={ref}>
+    <div
+      ref={ref}
+      css={css`
+        height: 100%;
+        min-height: 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      `}
+    >
       {id === 'prefs' && <Prefs {...props} />}
       {id === 'world' && <World {...props} />}
       {id === 'apps' && <Apps {...props} />}
@@ -455,13 +465,17 @@ function Pane({ width = '20rem', hidden, children }) {
       css={css`
         width: ${width};
         max-width: 100%;
+        height: 100%;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         .sidebarpane-content {
           pointer-events: auto;
-          max-height: 100%;
+          flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
+          overflow: hidden;
         }
         &.hidden {
           opacity: 0;
@@ -591,6 +605,8 @@ function Prefs({ world, hidden }) {
       <div
         className='prefs noscrollbar'
         css={css`
+          flex: 1;
+          min-height: 0;
           overflow-y: auto;
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -766,9 +782,10 @@ function World({ world, hidden }) {
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
+          flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          min-height: 12rem;
           .world-head {
             height: 3.125rem;
             padding: 0 1rem;
@@ -783,6 +800,7 @@ function World({ world, hidden }) {
           }
           .world-content {
             flex: 1;
+            min-height: 0;
             padding: 0.5rem 0;
             overflow-y: auto;
           }
@@ -917,9 +935,9 @@ function Apps({ world, hidden }) {
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
           flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          min-height: 17rem;
           .apps-head {
             height: 3.125rem;
             padding: 0 0.6rem 0 1rem;
@@ -966,6 +984,7 @@ function Apps({ world, hidden }) {
           }
           .apps-content {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
           }
         `}
@@ -1037,9 +1056,10 @@ function Add({ world, hidden }) {
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
+          flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          min-height: 17rem;
           .add-head {
             height: 3.125rem;
             padding: 0 1rem;
@@ -1054,6 +1074,7 @@ function Add({ world, hidden }) {
           }
           .add-content {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 1rem;
           }
@@ -1182,9 +1203,10 @@ function App({ world, hidden }) {
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
+          flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          min-height: 1rem;
           .app-head {
             height: 3.125rem;
             padding: 0 1rem;
@@ -1251,6 +1273,7 @@ function App({ world, hidden }) {
           }
           .app-content {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
           }
         `}
@@ -1820,10 +1843,10 @@ function Nodes({ world, hidden }) {
         className='nodes'
         css={css`
           flex: 1;
+          min-height: 0;
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
-          min-height: 23.7rem;
           display: flex;
           flex-direction: column;
           .nodes-head {
@@ -1873,12 +1896,12 @@ function Meta({ world, hidden }) {
         className='meta'
         css={css`
           flex: 1;
+          min-height: 0;
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
           display: flex;
           flex-direction: column;
-          min-height: 1rem;
           .meta-head {
             height: 3.125rem;
             padding: 0 1rem;
@@ -1893,6 +1916,7 @@ function Meta({ world, hidden }) {
           }
           .meta-content {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 0.5rem 0;
           }
@@ -2003,9 +2027,10 @@ function Players({ world, hidden }) {
           background: rgba(11, 10, 21, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 1.375rem;
+          flex: 1;
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          min-height: 1rem;
           .players-head {
             height: 3.125rem;
             padding: 0 1rem;
@@ -2024,6 +2049,7 @@ function Players({ world, hidden }) {
           }
           .players-content {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 0.5rem 0;
           }

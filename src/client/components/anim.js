@@ -27,4 +27,10 @@ export function dur(d) {
   return prefersReducedMotion() ? 0 : d
 }
 
+// gsap.utils — omit-value form so callers reuse the same range
+export const clamp01 = gsap.utils.clamp(0, 1)
+export const clamp = gsap.utils.clamp
+export const mapRange = gsap.utils.mapRange
+export const interpolate = gsap.utils.interpolate
+
 export { gsap, useGSAP }
