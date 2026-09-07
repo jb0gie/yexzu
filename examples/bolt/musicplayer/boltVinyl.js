@@ -80,6 +80,9 @@ function debugLog(...args) {
   }
 }
 
+const songUrl = props.song0?.url || null
+const songNameStatic = props.songName || filenameName(songUrl) || 'Untitled'
+
 // metadata resolver — server reads the ID3/Vorbis tags (music-metadata runs
 // on the SERVER; app scripts cannot dynamically import packages —
 // SES_IMPORT_REJECTED). This calls the /api/audio-meta endpoint with the
@@ -129,7 +132,7 @@ function filenameName(url) {
 let resolvedMeta = null
 function resolveDisplay() {
   if (resolvedMeta?.title) return { name: resolvedMeta.title, artist: resolvedMeta.artist || '' }
-  return { name: props.songName || filenameName(songUrl) || 'Untitled', artist: props.songArtist || '' }
+  return { name: props.songName || songNameStatic, artist: props.songArtist || '' }
 }
 
 const vinyl = app.get('NoobVinyl')

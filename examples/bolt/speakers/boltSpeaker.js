@@ -133,6 +133,7 @@ app.configure([
 const CHANNEL = props.channel || 'bolt'
 const CMD_EVENT = `${CHANNEL}:audio:command`
 const QUERY_EVENT = `${CHANNEL}:audio:query`
+const TRACKEND_EVENT = `${CHANNEL}:trackend`
 const RENDER_EVENT = `${CHANNEL}:speaker:render`
 const AUDIO_EVENT = `${CHANNEL}:speaker:audio`
 const WHOIS_EVENT = `${CHANNEL}:reactive:whois`
@@ -221,6 +222,9 @@ if (world.isClient) {
       return
     }
     const node = ensureAudio(cmd.url)
+    // rig tracks must END naturally so the booth can advance the playlist —
+    // loop only applies to standalone mode
+    node.loop = !!cmd.standalone && props.loop !== false
     const elapsed = Math.max(0, world.getTime() - cmd.t0)
     node.volume = cmd.volume ?? props.volume ?? 1
     node.currentTime = elapsed
@@ -229,6 +233,12 @@ if (world.isClient) {
     // announce our audio node id on the client bus — visual apps
     // (boltBaseReactive) link their material reactivity to this node
     app.emit(AUDIO_EVENT, { role: props.role || '?', audioId: node.id, url: cmd.url, playing: true })
+    // natural-end watch: when the engine stops this source on its own
+    // (onended) WITHOUT a booth stop command, report track end once.
+    // Poll cheaply in the update loop; 1s grace so seeks don't false-trip.
+    if (endWatch) endWatch.dead = true
+    endWatch = { dead: false, startedAt: world.getTime(), url: cmd.url, role: props.role || '?' }
+    const myWatch = endWatch
     console.warn(`[boltSpeaker:${props.role || '?'}] PLAY from ${elapsed.toFixed(2)}s — url: ${cmd.url}`)
   }
 
@@ -251,6 +261,19 @@ if (world.isClient) {
 
   // relay from our own server context
   app.on(RENDER_EVENT, cmd => applyCommand(cmd))
+
+  // natural-end detection loop (client)
+  let endWatch = null
+  app.on('update', () => {
+    if (!endWatch || endWatch.dead) return
+    if (isPlaying) return // still going
+    // source stopped on its own (engine onended) and no newer play started
+    if (world.getTime() - endWatch.startedAt > 2) {
+      endWatch.dead = true
+      console.warn(`[boltSpeaker:${endWatch.role}] track ended naturally -> booth`)
+      app.emit(TRACKEND_EVENT, { role: endWatch.role, url: endWatch.url })
+    }
+  })
 
   // visual apps ask who is playing (in-process, same client) — answer if live
   world.on(WHOIS_EVENT, () => {

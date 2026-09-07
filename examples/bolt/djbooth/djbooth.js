@@ -151,6 +151,7 @@ const STATE_EVENT = `${CHANNEL}:rig:state`
 const QUERYSTATE_EVENT = `${CHANNEL}:rig:querystate`
 const CRATE_EVENT = `${CHANNEL}:crate:offer`
 const CRATE_WHOIS = `${CHANNEL}:crate:whois`
+const TRACKEND_EVENT = `${CHANNEL}:trackend`
 const RENDER_EVENT = `${CHANNEL}:rig:render`
 // env access is defensive: on engines without the `env` endowment, reading
 // it throws (undefined global). Until the env endowment ships in a deploy,
@@ -507,10 +508,32 @@ if (world.isServer) {
 	setTimeout(rescan, 3000)
 
 	// manual rescan (tablet/panel request) — discover crates on demand
-	world.on(`${CHANNEL}:rescan`, () => {
-		app.emit(CRATE_WHOIS, { channel: CHANNEL })
-		broadcastState()
-	})
+		world.on(`${CHANNEL}:rescan`, () => {
+			app.emit(CRATE_WHOIS, { channel: CHANNEL })
+			broadcastState()
+		})
+
+		// track advancement: the LIVE speaker reports natural end (Audio node
+		// onended; rig plays loop=false). Booth advances to the next crate, or
+		// restarts/stops per the On Track End prop.
+		world.on(TRACKEND_EVENT, () => {
+			debugLog('track ended naturally')
+			if (props.loopPlaylist === 'stop') {
+				stopRig()
+				return
+			}
+			if (props.loopPlaylist === 'restart') {
+				startRig() // fresh token, same track, from 0
+				return
+			}
+			if (crateOrder.length > 1) {
+				const idx = crateOrder.findIndex(c => c.id === selectedCrateId)
+				const next = crateOrder[(idx + 1) % crateOrder.length]
+				selectedCrateId = next.id
+				debugLog('auto-advance ->', next.name)
+			}
+			startRig() // advance (or replay single track) — continuity
+		})
 
 	// speaker apps ask for rig state when they build mid-track (late join OR
 	// move-rebuild). Re-emit with the ORIGINAL token: already-playing speakers
