@@ -95,10 +95,26 @@ export function Sidebar({ world, ui }) {
     }
   }, [])
   const activePane = ui.active ? ui.pane : null
+  const wrapRef = useRef()
+  const shown = ui.visible !== false && (isTouch || ui.active)
+  useGSAP(
+    () => {
+      const el = wrapRef.current
+      if (!el) return
+      const to = shown ? 1 : 0
+      if (prefersReducedMotion()) {
+        gsap.set(el, { opacity: to })
+        return
+      }
+      gsap.to(el, { opacity: to, duration: dur(DUR.norm), ease: ease.soft, overwrite: 'auto' })
+    },
+    { dependencies: [shown] }
+  )
   return (
     <HintProvider>
       <div
-        className='sidebar'
+        ref={wrapRef}
+        className={cls('sidebar', { hidden: !shown })}
         css={css`
           position: absolute;
           font-size: 1rem;
@@ -107,8 +123,10 @@ export function Sidebar({ world, ui }) {
           bottom: calc(2rem + env(safe-area-inset-bottom));
           left: calc(2rem + env(safe-area-inset-left));
           display: flex;
+          justify-content: flex-end;
           gap: 0.625rem;
           z-index: 1; // above chat etc
+          pointer-events: none;
           @media all and (max-width: 1200px) {
             top: calc(1rem + env(safe-area-inset-top));
             right: calc(1rem + env(safe-area-inset-right));
@@ -120,6 +138,11 @@ export function Sidebar({ world, ui }) {
             flex-direction: column;
             flex-shrink: 0;
             gap: 0.625rem;
+            order: 2;
+          }
+          &.hidden .sidebar-sections,
+          &.hidden .sidebar-content {
+            pointer-events: none;
           }
         `}
       >
@@ -459,7 +482,7 @@ function Hint() {
     <div
       className='hint'
       css={css`
-        margin-top: 0.25rem;
+        margin-top: 0.75rem;
         background: rgba(11, 10, 21, 0.85);
         border: 0.0625rem solid #2a2b39;
         backdrop-filter: blur(5px);

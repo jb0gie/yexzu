@@ -55,13 +55,19 @@ export class Light extends Node {
 
     this.light.castShadow = this._castShadow
 
+    const attach = this._attachObject3D
     if (this._type === 'directional' || this._type === 'spot') {
-      this.add(this.light.target)
+      this.light.target.position.set(0, -1, 0)
+      this.light.add(this.light.target)
     }
-
-    this.ctx.world.stage.scene.add(this.light)
-
-    this.updateLightPosition()
+    if (attach) {
+      this.light.position.set(0, 0, 0)
+      this.light.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI)
+      attach.add(this.light)
+    } else {
+      this.ctx.world.stage.scene.add(this.light)
+      this.updateLightPosition()
+    }
   }
 
   commit(didMove) {
@@ -70,7 +76,7 @@ export class Light extends Node {
       this.mount()
       return
     }
-    if (didMove && this.light) {
+    if (didMove && this.light && !this._attachObject3D) {
       this.updateLightPosition()
     }
   }
@@ -95,6 +101,7 @@ export class Light extends Node {
 
   unmount() {
     if (this.light) {
+      this.light.parent?.remove(this.light)
       this.ctx.world.stage.scene.remove(this.light)
       this.light.dispose()
       this.light = null

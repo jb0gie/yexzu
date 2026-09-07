@@ -1,6 +1,6 @@
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 
-import { Node } from './Node'
+import { Node, getRef } from './Node'
 import * as THREE from '../extras/three'
 import { isBoolean } from 'lodash-es'
 
@@ -50,6 +50,8 @@ export class SkinnedMesh extends Node {
       if (n.isMesh) {
         n.castShadow = this._castShadow
         n.receiveShadow = this._receiveShadow
+        // bind-pose bounds don't cover posed bones — lights/beams vanish at some angles
+        n.frustumCulled = false
       }
     })
     this.ctx.world.stage.scene.add(this.obj)
@@ -238,6 +240,21 @@ export class SkinnedMesh extends Node {
           bone.matrixAutoUpdate = false
           bone.matrixWorldAutoUpdate = false
           bone.matrixWorld.copy(mat)
+        },
+        add(pNode) {
+          const node = getRef(pNode)
+          const bone = self.readBone(name)
+          if (!node || !bone) return this
+          node._attachObject3D = bone
+          self.add(node)
+          return this
+        },
+        remove(pNode) {
+          const node = getRef(pNode)
+          if (!node) return this
+          node._attachObject3D = null
+          self.remove(node)
+          return this
         },
       }
       this.boneHandles[name] = handle

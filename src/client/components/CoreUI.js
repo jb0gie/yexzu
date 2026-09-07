@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronUpIcon, LoaderIcon, MessageSquareTextIcon, RefreshCwIcon, SendHorizonalIcon } from 'lucide-react'
 import moment from 'moment'
 
-import { gsap, useGSAP, ease, dur, prefersReducedMotion } from './anim'
+import { gsap, useGSAP, ease, dur, DUR, prefersReducedMotion } from './anim'
 
 import { AvatarPane } from './AvatarPane'
 import { useElemSize } from './useElemSize'
@@ -98,7 +98,7 @@ export function CoreUI({ world }) {
       {disconnected && <Disconnected />}
       {!ui.reticleSuppressors && <Reticle world={world} />}
       {<Toast world={world} />}
-      {ready && <ActionsBlock world={world} />}
+      {ready && <ActionsBlock world={world} ui={ui} />}
       {ready && <Sidebar world={world} ui={ui} />}
       {ready && <Chat world={world} />}
       {/* {ready && <Side world={world} player={player} menu={menu} />} */}
@@ -731,7 +731,7 @@ function LoadingGate({ world }) {
         opacity: 0,
         duration: 0.6,
         ease: ease.soft,
-        delay: 0.15,
+        delay: 1.0,
         onComplete: () => setGone(true),
       })
     }
@@ -878,8 +878,10 @@ function KickedOverlay({ code }) {
   )
 }
 
-function ActionsBlock({ world }) {
+function ActionsBlock({ world, ui }) {
   const [showActions, setShowActions] = useState(() => world.prefs.actions)
+  const ref = useRef()
+  const hudOn = ui?.visible !== false
   useEffect(() => {
     const onPrefsChange = changes => {
       if (changes.actions) setShowActions(changes.actions.value)
@@ -889,22 +891,37 @@ function ActionsBlock({ world }) {
       world.prefs.off('change', onPrefsChange)
     }
   }, [])
+  useGSAP(
+    () => {
+      const el = ref.current
+      if (!el) return
+      gsap.to(el, {
+        opacity: hudOn ? 1 : 0,
+        duration: dur(DUR.norm),
+        ease: ease.soft,
+        overwrite: 'auto',
+      })
+    },
+    { dependencies: [hudOn] }
+  )
   if (isTouch) return null
   if (!showActions) return null
   return (
     <div
+      ref={ref}
       css={css`
         position: absolute;
         top: calc(2rem + env(safe-area-inset-top));
         left: calc(2rem + env(safe-area-inset-left));
-        bottom: calc(2rem + env(safe-area-inset-bottom));
+        bottom: calc(8rem + env(safe-area-inset-bottom));
         display: flex;
         flex-direction: column;
-        align-items: center;
+        align-items: flex-start;
+        pointer-events: none;
         @media all and (max-width: 1200px) {
           top: calc(1rem + env(safe-area-inset-top));
           left: calc(1rem + env(safe-area-inset-left));
-          bottom: calc(1rem + env(safe-area-inset-bottom));
+          bottom: calc(6rem + env(safe-area-inset-bottom));
         }
       `}
     >
@@ -951,7 +968,7 @@ function Actions({ world }) {
         .actions-item {
           display: flex;
           align-items: center;
-          margin: 0 0 0.5rem;
+          margin: 0 0 0.75rem;
           &-icon {
             // ...
           }
