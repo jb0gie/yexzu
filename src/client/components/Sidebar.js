@@ -58,12 +58,12 @@ import { storage } from '../../core/storage'
 import { ScriptEditor } from './ScriptEditor'
 import { NodeHierarchy } from './NodeHierarchy'
 import { AppsList } from './AppsList'
-import { DEG2RAD, RAD2DEG } from '../../core/extras/general'
 import * as THREE from '../../core/extras/three'
 import { isTouch } from '../utils'
 import { uuid } from '../../core/utils'
 import { useRank } from './useRank'
 import { Ranks } from '../../core/extras/ranks'
+import { gsap, useGSAP, ease, dur, DUR, prefersReducedMotion } from './anim'
 
 const mainSectionPanes = ['prefs']
 const worldSectionPanes = ['world', 'docs', 'apps', 'add']
@@ -254,15 +254,7 @@ export function Sidebar({ world, ui }) {
             </Section>
           )}
         </div>
-        {ui.pane === 'prefs' && <Prefs world={world} hidden={!ui.active} />}
-        {ui.pane === 'world' && <World world={world} hidden={!ui.active} />}
-        {ui.pane === 'apps' && <Apps world={world} hidden={!ui.active} />}
-        {ui.pane === 'add' && <Add world={world} hidden={!ui.active} />}
-        {ui.pane === 'app' && <App key={ui.app.data.id} world={world} hidden={!ui.active} />}
-        {ui.pane === 'script' && <Script key={ui.app.data.id} world={world} hidden={!ui.active} />}
-        {ui.pane === 'nodes' && <Nodes key={ui.app.data.id} world={world} hidden={!ui.active} />}
-        {ui.pane === 'meta' && <Meta key={ui.app.data.id} world={world} hidden={!ui.active} />}
-        {ui.pane === 'players' && <Players world={world} hidden={!ui.active} />}
+        <PaneSlider pane={ui.pane} hidden={!ui.active} world={world} app={ui.app} />
       </div>
     </HintProvider>
   )
@@ -365,6 +357,70 @@ function Content({ width = '20rem', hidden, children }) {
     >
       <div className='sidebar-content-main'>{children}</div>
       <Hint />
+    </div>
+  )
+}
+
+function PaneSlider({ pane, hidden, world, app }) {
+  const ref = useRef()
+  const paneRef = useRef(pane)
+  paneRef.current = pane
+  const [shown, setShown] = useState(pane)
+
+  useGSAP(
+    () => {
+      const el = ref.current
+      const axis = isTouch ? 'y' : 'x'
+      const enterFrom = isTouch ? { y: 28, opacity: 0 } : { x: 28, opacity: 0 }
+      const shownPos = isTouch ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }
+      if (pane) {
+        if (pane !== shown) setShown(pane)
+        if (!el) return
+        if (prefersReducedMotion()) {
+          gsap.set(el, shownPos)
+          return
+        }
+        gsap.fromTo(el, enterFrom, {
+          ...shownPos,
+          duration: dur(DUR.norm),
+          ease: ease.soft,
+          overwrite: 'auto',
+        })
+        return
+      }
+      if (!el || !shown) return
+      if (prefersReducedMotion()) {
+        setShown(null)
+        return
+      }
+      gsap.to(el, {
+        [axis]: 28,
+        opacity: 0,
+        duration: dur(DUR.fast),
+        ease: ease.out,
+        overwrite: 'auto',
+        onComplete: () => {
+          if (!paneRef.current) setShown(null)
+        },
+      })
+    },
+    { dependencies: [pane] }
+  )
+
+  const id = shown || pane
+  if (!id) return null
+  const props = { world, hidden }
+  return (
+    <div ref={ref}>
+      {id === 'prefs' && <Prefs {...props} />}
+      {id === 'world' && <World {...props} />}
+      {id === 'apps' && <Apps {...props} />}
+      {id === 'add' && <Add {...props} />}
+      {id === 'app' && app && <App key={app.data.id} {...props} />}
+      {id === 'script' && app && <Script key={app.data.id} {...props} />}
+      {id === 'nodes' && app && <Nodes key={app.data.id} {...props} />}
+      {id === 'meta' && app && <Meta key={app.data.id} {...props} />}
+      {id === 'players' && <Players {...props} />}
     </div>
   )
 }
@@ -1312,7 +1368,7 @@ function AppMenuItems({ app }) {
 
 function AppTransformFields({ app }) {
   const [position, setPosition] = useState(app.root.position.toArray())
-  const [rotation, setRotation] = useState(app.root.rotation.toArray().map(n => n * RAD2DEG))
+  const [rotation, setRotation] = useState(app.root.rotation.toArray().map(n => n * THREE.MathUtils.RAD2DEG))
   const [scale, setScale] = useState(app.root.scale.toArray())
   return (
     <>
@@ -1344,7 +1400,7 @@ function AppTransformFields({ app }) {
         value={rotation}
         onChange={value => {
           setRotation(value)
-          value = q1.setFromEuler(e1.fromArray(value.map(n => n * DEG2RAD))).toArray()
+          value = q1.setFromEuler(e1.fromArray(value.map(n => n * THREE.MathUtils.DEG2RAD))).toArray()
           app.modify({ quaternion: value })
           app.world.network.send('entityModified', {
             id: app.data.id,

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronUpIcon, LoaderIcon, MessageSquareTextIcon, RefreshCwIcon, SendHorizonalIcon } from 'lucide-react'
 import moment from 'moment'
 
+import { gsap, useGSAP, ease, dur, prefersReducedMotion } from './anim'
+
 import { AvatarPane } from './AvatarPane'
 import { useElemSize } from './useElemSize'
 import { MouseLeftIcon } from './MouseLeftIcon'
@@ -17,7 +19,7 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 // import { MenuApp } from './MenuApp'
 import { ChevronDoubleUpIcon, HandIcon, QuestionIcon } from './Icons'
 import { Sidebar } from './Sidebar'
-import { EVM } from './EVM'
+import { EVM, Providers } from './EVM'
 import { QUAI } from './QUAI'
 
 export function CoreUI({ world }) {
@@ -102,13 +104,17 @@ export function CoreUI({ world }) {
       {/* {ready && <Side world={world} player={player} menu={menu} />} */}
       {avatar && <AvatarPane key={avatar.hash} world={world} info={avatar} />}
       {/* {apps && <AppsPane world={world} close={() => world.ui.toggleApps()} />} */}
-      {!ready && <LoadingOverlay world={world} />}
+      <LoadingGate world={world} />
       {kicked && <KickedOverlay code={kicked} />}
       {ready && isTouch && <TouchBtns world={world} />}
       {ready && isTouch && <TouchStick world={world} />}
       {confirm && <Confirm options={confirm} />}
-      {ready && <QUAI world={world} />}
-      {ready && <EVM world={world} />}
+      {ready && (
+              <Providers>
+                <QUAI world={world} />
+                <EVM world={world} />
+              </Providers>
+            )}
       <div id='core-ui-portal' />
     </div>
   )
@@ -610,22 +616,26 @@ function Messages({ world, active }) {
 }
 
 function Message({ msg, now }) {
-  // const timeAgo = useMemo(() => {
-  //   const createdAt = moment(msg.createdAt)
-  //   const age = now.diff(createdAt, 'seconds')
-  //   // up to 10s ago show now
-  //   if (age < 10) return 'now'
-  //   // under a minute show seconds
-  //   if (age < 60) return `${age}s ago`
-  //   // under an hour show minutes
-  //   if (age < 3600) return Math.floor(age / 60) + 'm ago'
-  //   // under a day show hours
-  //   if (age < 86400) return Math.floor(age / 3600) + 'h ago'
-  //   // otherwise show days
-  //   return Math.floor(age / 86400) + 'd ago'
-  // }, [now])
+  const ref = useRef()
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return
+      gsap.fromTo(
+        ref.current,
+        { opacity: 0, x: -10 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: dur(0.25),
+          ease: ease.out,
+        }
+      )
+    },
+    { scope: ref }
+  )
   return (
     <div
+      ref={ref}
       className='message'
       css={css`
         padding: 0.25rem 0;
@@ -707,8 +717,38 @@ function Disconnected() {
   )
 }
 
+function LoadingGate({ world }) {
+  // stays mounted through the fade so the loading screen can exit gracefully
+  const ref = useRef()
+  const [gone, setGone] = useState(false)
+  useEffect(() => {
+    const onReady = () => {
+      if (prefersReducedMotion()) {
+        setGone(true)
+        return
+      }
+      gsap.to(ref.current, {
+        opacity: 0,
+        duration: 0.6,
+        ease: ease.soft,
+        delay: 0.15,
+        onComplete: () => setGone(true),
+      })
+    }
+    world.on('ready', onReady)
+    return () => world.off('ready', onReady)
+  }, [])
+  if (gone) return null
+  return (
+    <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
+      <LoadingOverlay world={world} />
+    </div>
+  )
+}
+
 function LoadingOverlay({ world }) {
   const [progress, setProgress] = useState(0)
+  const barRef = useRef()
   const { title, desc, image } = world.settings
   useEffect(() => {
     world.on('progress', setProgress)
@@ -716,6 +756,12 @@ function LoadingOverlay({ world }) {
       world.off('progress', setProgress)
     }
   }, [])
+  useGSAP(
+    () => {
+      gsap.to(barRef.current, { width: `${progress}%`, duration: dur(0.4), ease: ease.out })
+    },
+    { scope: barRef, dependencies: [progress] }
+  )
   return (
     <div
       css={css`
@@ -779,10 +825,9 @@ function LoadingOverlay({ world }) {
           top: 0;
           left: 0;
           bottom: 0;
-          width: ${progress}%;
+          width: 0%;
           background: white;
           border-radius: 3px;
-          transition: width 0.2s ease-out;
         }
       `}
     >
@@ -792,7 +837,7 @@ function LoadingOverlay({ world }) {
         {title && <div className='loading-title'>{title}</div>}
         {desc && <div className='loading-desc'>{desc}</div>}
         <div className='loading-track'>
-          <div className='loading-bar' />
+          <div className='loading-bar' ref={barRef} />
         </div>
       </div>
     </div>
@@ -870,12 +915,33 @@ function ActionsBlock({ world }) {
 
 function Actions({ world }) {
   const [actions, setActions] = useState(() => world.controls.actions)
+  const listRef = useRef()
   useEffect(() => {
     world.on('actions', setActions)
     return () => world.off('actions', setActions)
   }, [])
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return
+      const items = listRef.current?.querySelectorAll('.actions-item')
+      if (!items?.length) return
+      gsap.fromTo(
+        items,
+        { opacity: 0, x: -14 },
+        {
+          opacity: 1,
+          x: 0,
+          duration: dur(0.3),
+          stagger: 0.06,
+          ease: ease.soft,
+        }
+      )
+    },
+    { scope: listRef, dependencies: [actions] }
+  )
   return (
     <div
+      ref={listRef}
       className='actions'
       css={css`
         flex: 1;
@@ -1005,17 +1071,59 @@ function Reticle({ world }) {
         justify-content: center;
         font-size: 1rem;
         .reticle-item {
-          width: ${overWorldUI ? '0.5rem' : '0.25rem'};
-          height: ${overWorldUI ? '0.5rem' : '0.25rem'};
+          width: 0.25rem;
+          height: 0.25rem;
           border-radius: 0.625rem;
-          background: ${buildMode ? '#ff4d4d' : overWorldUI ? '#836ef1' : 'white'};
+          background: white;
           border: 0.5px solid rgba(0, 0, 0, 0.3);
-          box-shadow: ${overWorldUI ? '0 0 8px #836ef1' : 'none'};
-          transition: width 0.1s, height 0.1s, box-shadow 0.1s;
         }
       `}
     >
-      <div className='reticle-item' />
+      <ReticleDot buildMode={buildMode} overWorldUI={overWorldUI} />
+    </div>
+  )
+}
+
+function ReticleDot({ buildMode, overWorldUI }) {
+  const beatRef = useRef()
+  const dotRef = useRef()
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return
+      // idle heartbeat on the WRAPPER so it never fights the state tween on the dot
+      gsap.to(beatRef.current, {
+        scale: 1.3,
+        duration: 1.6,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      })
+    },
+    { scope: beatRef }
+  )
+  useGSAP(
+    () => {
+      const target = buildMode
+        ? { scale: 2, background: '#ff4d4d', boxShadow: 'none' }
+        : overWorldUI
+          ? { scale: 2, background: '#836ef1', boxShadow: '0 0 8px #836ef1' }
+          : { scale: 1, background: 'white', boxShadow: 'none' }
+      gsap.to(dotRef.current, {
+        ...target,
+        duration: dur(0.18),
+        ease: ease.out,
+        overwrite: 'auto',
+      })
+    },
+    { scope: dotRef, dependencies: [buildMode, overWorldUI] }
+  )
+  return (
+    <div ref={beatRef} style={{ lineHeight: 0 }}>
+      <div
+        ref={dotRef}
+        className='reticle-item'
+        style={{ width: '0.25rem', height: '0.25rem', borderRadius: '0.625rem', border: '0.5px solid rgba(0,0,0,0.3)' }}
+      />
     </div>
   )
 }
@@ -1041,16 +1149,6 @@ function Toast({ world }) {
         right: 0;
         display: flex;
         justify-content: center;
-        @keyframes toastIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px) scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
         .toast-msg {
           height: 2.875rem;
           display: flex;
@@ -1061,14 +1159,6 @@ function Toast({ world }) {
           border: 0.0625rem solid #2a2b39;
           backdrop-filter: blur(5px);
           border-radius: 1.4375rem;
-          opacity: 0;
-          transform: translateY(0.625rem) scale(0.9);
-          transition: all 0.1s ease-in-out;
-          &.visible {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            animation: toastIn 0.1s ease-in-out;
-          }
         }
       `}
     >
@@ -1078,11 +1168,36 @@ function Toast({ world }) {
 }
 
 function ToastMsg({ text }) {
-  const [visible, setVisible] = useState(true)
-  useEffect(() => {
-    setTimeout(() => setVisible(false), 1000)
-  }, [])
-  return <div className={cls('toast-msg', { visible })}>{text}</div>
+  const ref = useRef()
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return
+      gsap.fromTo(
+        ref.current,
+        { opacity: 0, y: 12, scale: 0.85 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: dur(0.35),
+          ease: ease.pop,
+        }
+      )
+      gsap.to(ref.current, {
+        opacity: 0,
+        y: -8,
+        delay: 1.1,
+        duration: dur(0.3),
+        ease: ease.out,
+      })
+    },
+    { scope: ref }
+  )
+  return (
+    <div ref={ref} className='toast-msg'>
+      {text}
+    </div>
+  )
 }
 
 function TouchBtns({ world }) {
@@ -1356,18 +1471,42 @@ function Confirm({ options }) {
         }
       `}
     >
-      <div className='confirm-dialog'>
-        <div className='confirm-content'>
-          <div className='confirm-title'>{options.title}</div>
-          <div className='confirm-message'>{options.message}</div>
+      <ConfirmDialog options={options} />
+    </div>
+  )
+}
+
+function ConfirmDialog({ options }) {
+  const ref = useRef()
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return
+      gsap.fromTo(
+        ref.current,
+        { opacity: 0, scale: 0.9, y: 10 },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: dur(0.28),
+          ease: ease.pop,
+        }
+      )
+    },
+    { scope: ref }
+  )
+  return (
+    <div ref={ref} className='confirm-dialog'>
+      <div className='confirm-content'>
+        <div className='confirm-title'>{options.title}</div>
+        <div className='confirm-message'>{options.message}</div>
+      </div>
+      <div className='confirm-actions'>
+        <div className='confirm-action left' onClick={options.confirm}>
+          <span>{options.confirmText || 'Okay'}</span>
         </div>
-        <div className='confirm-actions'>
-          <div className='confirm-action left' onClick={options.confirm}>
-            <span>{options.confirmText || 'Okay'}</span>
-          </div>
-          <div className='confirm-action' onClick={options.cancel}>
-            <span>{options.cancelText || 'Cancel'}</span>
-          </div>
+        <div className='confirm-action' onClick={options.cancel}>
+          <span>{options.cancelText || 'Cancel'}</span>
         </div>
       </div>
     </div>
