@@ -828,37 +828,6 @@ app.configure([
     step: 0.1
   },
   {
-    key: 'beamBones',
-    type: 'text',
-    label: 'Beam Bone Names',
-    initial: '',
-    description: 'Comma-separated LightRig bones to hang spotlights on. Empty tries Beam, Beam_1..6.',
-  },
-  {
-    key: 'beamColor',
-    type: 'text',
-    label: 'Beam Light Color',
-    initial: '#ffe9c4',
-  },
-  {
-    key: 'beamIntensity',
-    type: 'range',
-    label: 'Beam Light Intensity',
-    initial: 8,
-    min: 0,
-    max: 40,
-    step: 0.5,
-  },
-  {
-    key: 'beamDistance',
-    type: 'range',
-    label: 'Beam Light Distance',
-    initial: 12,
-    min: 1,
-    max: 40,
-    step: 0.5,
-  },
-  {
     key: 'speakerRig',
     type: 'text',
     label: 'Speaker Rig Name',
@@ -1032,47 +1001,6 @@ if (!src) {
   }
 }
 
-const DEFAULT_BEAM_BONES = ['Beam', 'Beam_1', 'Beam_2', 'Beam_3', 'Beam_4']
-
-function resolveBeamBones() {
-  if (!lightRig?.getBone) return []
-  const named = String(props.beamBones || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-  const tryNames = named.length ? named : DEFAULT_BEAM_BONES
-  const found = []
-  for (const name of tryNames) {
-    const bone = lightRig.getBone(name)
-    if (bone?.matrixWorld) found.push({ name, bone })
-  }
-  return found
-}
-
-const beamLights = []
-function spawnBeamLights() {
-  const bones = resolveBeamBones()
-  console.warn('[BoltBase] beam bones:', bones.map(b => b.name).join(', ') || '(none — set Beam Bone Names)')
-  for (const { name, bone } of bones) {
-    const light = app.create('light', {
-      type: 'spot',
-      color: props.beamColor || '#ffe9c4',
-      intensity: 0,
-      distance: props.beamDistance || 12,
-      angle: 0.35,
-      penumbra: 0.4,
-      castShadow: false,
-    })
-    bone.add(light)
-    beamLights.push({ light, bone, name })
-  }
-}
-
-function setBeamLightsOn(on) {
-  const intensity = on ? (Number(props.beamIntensity) || 8) : 0
-  for (const b of beamLights) b.light.intensity = intensity
-}
-
 let lightsOn = props.lightsActive !== 'disabled'
 
 function playLightAnimation() {
@@ -1091,7 +1019,6 @@ function setLights(on) {
   lightsOn = !!on
   if (playAction) playAction.label = lightsOn ? 'Stop Lights' : 'Start Lights'
   playLightAnimation()
-  setBeamLightsOn(lightsOn)
   console.warn('[BoltBase] lights', lightsOn ? 'ON' : 'OFF')
 }
 
@@ -1103,7 +1030,6 @@ const playAction = app.create('action', {
 })
 app.add(playAction)
 
-spawnBeamLights()
 setLights(lightsOn)
 
 // Spin truss groups
