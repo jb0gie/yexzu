@@ -828,6 +828,37 @@ app.configure([
     step: 0.1
   },
   {
+    key: 'beamBones',
+    type: 'text',
+    label: 'Beam Bone Names',
+    initial: '',
+    description: 'Comma-separated LightRig bones to hang spotlights on. Empty tries Beam, Beam_1..6.',
+  },
+  {
+    key: 'beamColor',
+    type: 'text',
+    label: 'Beam Light Color',
+    initial: '#ffe9c4',
+  },
+  {
+    key: 'beamIntensity',
+    type: 'range',
+    label: 'Beam Light Intensity',
+    initial: 8,
+    min: 0,
+    max: 40,
+    step: 0.5,
+  },
+  {
+    key: 'beamDistance',
+    type: 'range',
+    label: 'Beam Light Distance',
+    initial: 12,
+    min: 1,
+    max: 40,
+    step: 0.5,
+  },
+  {
     key: 'speakerRig',
     type: 'text',
     label: 'Speaker Rig Name',
@@ -910,8 +941,20 @@ const r1Mesh = app.get(props.r1Mesh || 'r1_2')
 const r2Mesh = app.get(props.r2Mesh || 'r2_2')
 const r3Mesh = app.get(props.r3Mesh || 'r3_3')
 
+function findSkinned(node) {
+  if (!node) return null
+  if (typeof node.getBone === 'function') return node
+  const kids = node.children || []
+  for (let i = 0; i < kids.length; i++) {
+    const found = findSkinned(kids[i])
+    if (found) return found
+  }
+  return null
+}
+
 // Get light and speaker rigs
-const lightRig = app.get(props.lightRig || 'LightRig')
+const lightRigRoot = app.get(props.lightRig || 'LightRig')
+const lightRig = findSkinned(lightRigRoot) || lightRigRoot
 const speakerRig = app.get(props.speakerRig || 'SpeakerRig')
 
 // Get the lights bone for spinning
@@ -946,8 +989,6 @@ debugLog('Found nodes:', {
 })
 
 const src = props.video?.url || props.videoLink;
-
-let isPlaying = false
 
 // Set up video player state
 const player = {
@@ -991,76 +1032,79 @@ if (!src) {
   }
 }
 
-// Play light animation based on configuration
+const DEFAULT_BEAM_BONES = ['Beam', 'Beam_1', 'Beam_2', 'Beam_3', 'Beam_4']
+
+function resolveBeamBones() {
+  if (!lightRig?.getBone) return []
+  const named = String(props.beamBones || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+  const tryNames = named.length ? named : DEFAULT_BEAM_BONES
+  const found = []
+  for (const name of tryNames) {
+    const bone = lightRig.getBone(name)
+    if (bone?.matrixWorld) found.push({ name, bone })
+  }
+  return found
+}
+
+const beamLights = []
+function spawnBeamLights() {
+  const bones = resolveBeamBones()
+  console.warn('[BoltBase] beam bones:', bones.map(b => b.name).join(', ') || '(none — set Beam Bone Names)')
+  for (const { name, bone } of bones) {
+    const light = app.create('light', {
+      type: 'spot',
+      color: props.beamColor || '#ffe9c4',
+      intensity: 0,
+      distance: props.beamDistance || 12,
+      angle: 0.35,
+      penumbra: 0.4,
+      castShadow: false,
+    })
+    bone.add(light)
+    beamLights.push({ light, bone, name })
+  }
+}
+
+function setBeamLightsOn(on) {
+  const intensity = on ? (Number(props.beamIntensity) || 8) : 0
+  for (const b of beamLights) b.light.intensity = intensity
+}
+
+let lightsOn = props.lightsActive !== 'disabled'
+
 function playLightAnimation() {
   if (!lightRig) return
-
-  if (props.lightsActive === 'disabled') {
-    // Play LightsOff once, no looping
+  if (!lightsOn) {
     lightRig.play({ name: 'LightsOff', loop: false, fade: 0.5 })
     debugLog('Playing light animation: LightsOff (once)')
     return
   }
-
-  // Lights are on - play the selected animation with looping
   const animName = props.lightAnimation || 'LightsOn'
   lightRig.play({ name: animName, loop: true, fade: 0.5 })
   debugLog('Playing light animation:', animName, '(looping)')
 }
 
-// Play speaker animation
-function playSpeakerAnimation(playing) {
-  if (!speakerRig) return
-
-  const animName = playing ? 'SpeakersOn' : 'SpeakersOff'
-  speakerRig.play({ name: animName, loop: playing, fade: 0.5 })
-  debugLog('Playing speaker animation:', animName)
-}
-
-function startAudio() {
-  if (isPlaying) return
-
-  isPlaying = true
-  if (playAction) {
-    playAction.label = 'Stop Lights'
-  }
-
-  // Play speaker animation (speakers bouncing)
-  playSpeakerAnimation(true)
-
-  // Play light animation
+function setLights(on) {
+  lightsOn = !!on
+  if (playAction) playAction.label = lightsOn ? 'Stop Lights' : 'Start Lights'
   playLightAnimation()
-}
-
-function stopAudio() {
-  if (!isPlaying) return
-
-  isPlaying = false
-
-  if (playAction) {
-    playAction.label = 'Start Lights'
-  }
-
-  // Stop speaker animation (speakers idle)
-  playSpeakerAnimation(false)
+  setBeamLightsOn(lightsOn)
+  console.warn('[BoltBase] lights', lightsOn ? 'ON' : 'OFF')
 }
 
 const playAction = app.create('action', {
-  label: 'Start Lights',
+  label: lightsOn ? 'Stop Lights' : 'Start Lights',
   distance: 5,
-  duration: 1,
-  onTrigger: () => {
-    if (isPlaying) {
-      stopAudio()
-    } else {
-      startAudio()
-    }
-  },
+  duration: 0.5,
+  onTrigger: () => setLights(!lightsOn),
 })
 app.add(playAction)
 
-// Initialize lights on startup
-setTimeout(() => playLightAnimation(), 200)
+spawnBeamLights()
+setLights(lightsOn)
 
 // Spin truss groups
 app.on('update', (dt) => {
@@ -1147,7 +1191,7 @@ app.on('update', delta => {
 })
 
 app.on('destroy', () => {
-  stopAudio()
+  setLights(false)
 })
 
 // ---------- v2: rig-driven audio reactivity ----------

@@ -160,6 +160,13 @@ if (world.isServer) {
 
   world.on(CMD_EVENT, relay)
 
+  // client detects natural end and app.send's here — relay onto the world
+  // bus so the booth server (world.on trackend) actually hears it.
+  // app.emit from the CLIENT is in-process only and never reaches the booth.
+  app.on('speaker:trackend', data => {
+    app.emit(TRACKEND_EVENT, data)
+  })
+
   // late-joiner catch-up: ask the booth for rig state until it answers.
   // This also heals MOVE-REBUILDS: grabbing/releasing the app sets `mover`,
   // which rebuilds the app and wipes listeners (there is no keepActive API).
@@ -185,8 +192,10 @@ if (world.isClient) {
   let appliedToken = null
   let isPlaying = false
   let currentUrl = null
+  let endWatch = null
 
   function destroyAudio() {
+    if (endWatch) endWatch.dead = true
     if (audio) {
       audio.stop()
       // tell visual apps this reactive source is gone
@@ -263,15 +272,17 @@ if (world.isClient) {
   app.on(RENDER_EVENT, cmd => applyCommand(cmd))
 
   // natural-end detection loop (client)
-  let endWatch = null
+  // audio.isPlaying is the NODE (source gone after onended). The local
+  // isPlaying flag stays true until destroyAudio, so it cannot be the signal.
+  // app.send (not app.emit) so our server relays onto the world bus.
   app.on('update', () => {
     if (!endWatch || endWatch.dead) return
-    if (isPlaying) return // still going
-    // source stopped on its own (engine onended) and no newer play started
+    if (audio?.isPlaying) return
     if (world.getTime() - endWatch.startedAt > 2) {
       endWatch.dead = true
+      isPlaying = false
       console.warn(`[boltSpeaker:${endWatch.role}] track ended naturally -> booth`)
-      app.emit(TRACKEND_EVENT, { role: endWatch.role, url: endWatch.url })
+      app.send('speaker:trackend', { role: endWatch.role, url: endWatch.url })
     }
   })
 

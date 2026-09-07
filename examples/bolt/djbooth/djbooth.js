@@ -307,6 +307,7 @@ if (world.isServer) {
 	let isPlaying = false
 	let rigT0 = null // world.getTime() anchor of the live track
 	let rigToken = null // token of the live play command (reused for query answers)
+	let endedToken = null // last rigToken that already advanced — N speakers would skip N tracks
 	let selectedCrateId = null // which crate (or null = static props track)
 
 	// ----- crate playlist (collected from boltVinyl apps over the bus) -----
@@ -517,6 +518,9 @@ if (world.isServer) {
 		// onended; rig plays loop=false). Booth advances to the next crate, or
 		// restarts/stops per the On Track End prop.
 		world.on(TRACKEND_EVENT, () => {
+			if (!isPlaying) return
+			if (endedToken === rigToken) return
+			endedToken = rigToken
 			debugLog('track ended naturally')
 			if (props.loopPlaylist === 'stop') {
 				stopRig()
@@ -530,7 +534,7 @@ if (world.isServer) {
 				const idx = crateOrder.findIndex(c => c.id === selectedCrateId)
 				const next = crateOrder[(idx + 1) % crateOrder.length]
 				selectedCrateId = next.id
-				debugLog('auto-advance ->', next.name)
+				console.warn('[djbooth] auto-advance ->', next.name)
 			}
 			startRig() // advance (or replay single track) — continuity
 		})
