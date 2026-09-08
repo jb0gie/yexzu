@@ -70,14 +70,26 @@ if (!model) {
     }
 
     // while held, pin model to rightHand bone (sword lateUpdate pattern)
+    let boneWarned = false
     app.on('lateUpdate', () => {
       if (!holding) return
       try {
         const player = world.getPlayer()
         const matrix = player?.getBoneTransform?.('rightHand')
         if (matrix) {
+          if (!boneWarned) { console.log('[grabbable-item] rightHand bone OK — pinning'); boneWarned = true }
           model.position.setFromMatrixPosition(matrix)
           model.quaternion.setFromRotationMatrix(matrix)
+        } else {
+          if (!boneWarned) {
+            console.log('[grabbable-item] rightHand bone null — falling back to camera-front carry')
+            boneWarned = true
+          }
+          // fallback: carry in front of the camera
+          const pos = getLocalPosition()
+          if (pos) {
+            model.position.set(pos.x, pos.y + 1.4, pos.z)
+          }
         }
       } catch (err) {
         // bone not ready yet; keep last transform
