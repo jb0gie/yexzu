@@ -81,10 +81,13 @@ if (!model) {
     if (localPlayer.local) {
       control = app.control()
       control.keyE.onPress = () => {
+        console.log('[grabbable-item] keydown: E')
         if (holding) return
         app.emit(`grabbable-item:request:${app.instanceId}`, localPlayer.id)
+        console.log('[grabbable-item] activate sent')
       }
       control.keyG.onPress = () => {
+        console.log('[grabbable-item] keydown: G')
         if (!holding) return
         app.emit(`grabbable-item:drop:${app.instanceId}`, localPlayer.id)
       }
