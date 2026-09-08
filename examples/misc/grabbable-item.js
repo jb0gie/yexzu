@@ -17,20 +17,17 @@ if (!model) {
   if (world.isClient) {
     let control = null
     let holding = false
-    let worldMatrix = null // remember where it came from so drop puts it back
-    let originalParent = null
 
     function claim() {
       const player = world.getPlayer()
+      if (!player || !player.position) {
+        return console.log('[grabbable-item] no local player position — cannot grab')
+      }
       const dist = player.position.distanceTo(app.root.position)
       console.log('[grabbable-item] grab attempt, distance:', dist.toFixed(2))
       if (dist > MIN_HOLD_DISTANCE) return console.log('[grabbable-item] too far, walk closer')
       holding = true
       control = app.control()
-      // remember original spot
-      worldMatrix = model.getWorldMatrix ? model.getWorldMatrix().clone() : null
-      originalParent = model.parent
-      // detach and track the hand bone in lateUpdate
     }
 
     function release() {
