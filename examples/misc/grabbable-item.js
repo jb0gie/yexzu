@@ -17,6 +17,7 @@ if (!model) {
   console.error('[grabbable-item] no model child found — app has no children')
 } else {
   if (world.isClient) {
+    const myApp = app // SES: capture app proxy for closures
     let control = null
     let holding = false
 
@@ -37,11 +38,11 @@ if (!model) {
     function claim() {
       const pos = getLocalPosition()
       if (!pos) return console.log('[grabbable-item] no local player position — cannot grab')
-      const dist = pos.distanceTo(app.position)
+      const dist = pos.distanceTo(myApp.position)
       console.log('[grabbable-item] grab attempt, distance:', dist.toFixed(2))
       if (dist > MIN_HOLD_DISTANCE) return console.log('[grabbable-item] too far, walk closer')
       holding = true
-      control = app.control()
+      control = myApp.control()
     }
 
     function release() {
@@ -50,13 +51,13 @@ if (!model) {
       control = null
       const pos = getLocalPosition()
       if (pos) {
-        app.position.set(pos.x, pos.y, pos.z)
+        myApp.position.set(pos.x, pos.y, pos.z)
       }
       console.log('[grabbable-item] dropped')
     }
 
     // bind keys on app control (APP priority)
-    control = app.control()
+    control = myApp.control()
     control.keyE.onPress = () => {
       if (holding) return
       console.log('[grabbable-item] keydown: E')
