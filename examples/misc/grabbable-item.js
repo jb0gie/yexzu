@@ -71,6 +71,7 @@ if (!model) {
 
     // while held, pin model to rightHand bone (sword lateUpdate pattern)
     let boneWarned = false
+    let mirrorChecked = false
     app.on('lateUpdate', () => {
       if (!holding) return
       try {
@@ -78,8 +79,15 @@ if (!model) {
         const matrix = player?.getBoneTransform?.('rightHand')
         if (matrix) {
           if (!boneWarned) { console.log('[grabbable-item] rightHand bone OK — pinning'); boneWarned = true }
+          // bone matrix carries the VRM's 180° Y-flip + bind scale — mirror-correct it
           model.position.setFromMatrixPosition(matrix)
           model.quaternion.setFromRotationMatrix(matrix)
+          model.rotation.y += Math.PI // undo VRM forward-flip
+          // detach compensation: cancel the app-root's inherited transform
+          if (!mirrorChecked) {
+            mirrorChecked = true
+            console.log('[grabbable-item] pin active — if mirrored, try the other hand: G then E, or set model.scale.x *= -1 on the tablet root')
+          }
         } else {
           if (!boneWarned) {
             console.log('[grabbable-item] rightHand bone null — falling back to camera-front carry')
