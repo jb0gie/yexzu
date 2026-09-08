@@ -1,6 +1,6 @@
-// grabbable-item — pick up an app and hold it in your hand, sword-style
-// Clone of elemental-item-sword's equip path: server claims, client attaches to rightHand bone.
-// Drop this script on the tablet app. E = pick up, G = drop.
+// grabbable-item — pick up an app and hold it in your hand (client-authoritative for now)
+// E = pick up, G = drop. No server round-trip: grab happens locally so it works solo.
+// Server sync (other players seeing the held item) goes back in once the feel is right.
 
 const MIN_HOLD_DISTANCE = 3 // how close you must be to pick it up
 
@@ -14,101 +14,51 @@ const model =
 if (!model) {
   console.error('[grabbable-item] no model child found — app has no children')
 } else {
-  console.log('[grabbable-item] model found:', model.id, '| E to grab, G to drop')
-
-  // state: who is holding it (server-authoritative)
-
-  if (world.isServer) {
-    app.state.holder = app.state.holder || null
-
-    world.on(`grabbable-item:request:${app.instanceId}`, playerId => {
-      console.log('[grabbable-item] server: request from', playerId, '| current holder:', app.state.holder)
-      if (app.state.holder) return // already held
-      const player = world.getPlayer(playerId)
-      if (!player) return console.log('[grabbable-item] server: player not found')
-      const dist = player.position.distanceTo(app.root.position)
-      console.log('[grabbable-item] server: distance', dist.toFixed(2), '(limit', MIN_HOLD_DISTANCE + ')', '| app pos', app.root.position.toArray().map(n => n.toFixed(1)))
-      if (dist > MIN_HOLD_DISTANCE) return
-      app.state.holder = playerId
-      app.send('held', playerId)
-      console.log('[grabbable-item] server: CLAIMED by', playerId)
-    })
-
-    world.on(`grabbable-item:drop:${app.instanceId}`, playerId => {
-      if (app.state.holder !== playerId) return
-      const player = world.getPlayer(playerId)
-      if (player) {
-        app.state.position = [player.position.x, player.position.y, player.position.z]
-      }
-      app.state.holder = null
-      app.send('dropped', app.state.position)
-    })
-
-    world.on('leave', e => {
-      if (app.state.holder === e.playerId) {
-        app.state.holder = null
-        app.send('dropped', app.state.position || [0, 0, 0])
-      }
-    })
-  }
-
   if (world.isClient) {
     let control = null
     let holding = false
+    let worldMatrix = null // remember where it came from so drop puts it back
+    let originalParent = null
 
-    function attach(player) {
+    function claim() {
+      const player = world.getPlayer()
+      const dist = player.position.distanceTo(app.root.position)
+      console.log('[grabbable-item] grab attempt, distance:', dist.toFixed(2))
+      if (dist > MIN_HOLD_DISTANCE) return console.log('[grabbable-item] too far, walk closer')
       holding = true
       control = app.control()
-      // hide the world copy; we render it on the hand instead
-      model.active = false
+      // remember original spot
+      worldMatrix = model.getWorldMatrix ? model.getWorldMatrix().clone() : null
+      originalParent = model.parent
+      // detach and track the hand bone in lateUpdate
     }
 
-    function detach() {
+    function release() {
       holding = false
       control?.release()
       control = null
-      model.active = true
-      if (app.state.position) app.root.position.fromArray(app.state.position)
+      const player = world.getPlayer()
+      if (player) {
+        // drop at the player's feet
+        app.root.position.set(player.position.x, player.position.y, player.position.z)
+      }
+      console.log('[grabbable-item] dropped')
     }
 
-    const holderId = app.state.holder
     const localPlayer = world.getPlayer()
-
-    if (holderId && holderId === localPlayer.id) {
-      attach(localPlayer)
-    } else if (holderId) {
-      model.active = false // someone else holds it
-    }
-
-    // pickup/drop keys
     if (localPlayer.local) {
       control = app.control()
       control.keyE.onPress = () => {
-        console.log('[grabbable-item] keydown: E')
         if (holding) return
-        app.emit(`grabbable-item:request:${app.instanceId}`, localPlayer.id)
-        console.log('[grabbable-item] activate sent')
+        console.log('[grabbable-item] keydown: E')
+        claim()
       }
       control.keyG.onPress = () => {
-        console.log('[grabbable-item] keydown: G')
         if (!holding) return
-        app.emit(`grabbable-item:drop:${app.instanceId}`, localPlayer.id)
+        console.log('[grabbable-item] keydown: G')
+        release()
       }
     }
-
-    app.on('held', playerId => {
-      const localPlayer = world.getPlayer()
-      if (playerId === localPlayer.id) {
-        attach(localPlayer)
-      } else {
-        model.active = false
-      }
-    })
-
-    app.on('dropped', position => {
-      detach()
-      if (position) app.root.position.fromArray(position)
-    })
 
     // while held, pin model to rightHand bone (sword lateUpdate pattern)
     app.on('lateUpdate', () => {
