@@ -1,12 +1,14 @@
-// grabbable-item v4 — pick up an app and hold it in your hand (client-authoritative)
+// grabbable-item v5 — pick up an app and hold it in your hand (client-authoritative)
 // E = pick up, G = drop. Works solo; server sync comes later.
-// If your console doesn't print "[grabbable-item] v4 loaded" on world join, the script is stale.
+// If your console doesn't print "[grabbable-item] v5 loaded" on world join, the script is stale.
 
 const MIN_HOLD_DISTANCE = 3
 // fine-tune where the tablet sits relative to the hand (in hand space, meters)
 const GRAB_OFFSET = { x: 0, y: 0.02, z: -0.05 }
+// how far in front of the player the tablet drops (meters)
+const DROP_DISTANCE = 1
 
-console.log('[grabbable-item] v4 loaded')
+console.log('[grabbable-item] v5 loaded')
 
 // find the model node: GLB nodes are matched by id (the node name in the glb), not .name
 // NOTE: app.root is undefined in app scripts — use app.get(id) / app.children
@@ -21,10 +23,8 @@ if (!model) {
 } else {
   if (world.isClient) {
     const myApp = app // SES: capture app proxy for closures
-    let control = null
     let holding = false
     let handModel = null // the clone that rides the hand
-    let homePosition = null // where the app was before grab
 
     function getLocalPosition() {
       // proxy .position can blow up if the player entity isn't fully built — read defensively
@@ -47,7 +47,6 @@ if (!model) {
       console.log('[grabbable-item] grab attempt, distance:', dist.toFixed(2))
       if (dist > MIN_HOLD_DISTANCE) return console.log('[grabbable-item] too far, walk closer')
       // pistol pattern: clone the model into the world, hide the original
-      homePosition = myApp.position.clone()
       handModel = model.clone(true)
       handModel.position.setFromMatrixPosition(model.matrixWorld || model.matrix)
       handModel.quaternion.copy(model.quaternion)
@@ -59,22 +58,31 @@ if (!model) {
 
     function release() {
       holding = false
-      control?.release()
-      control = null
       if (handModel) {
         world.remove(handModel)
         handModel = null
       }
       model.active = true
+      // drop 1m in front of the player, at foot level — never under the capsule
       const pos = getLocalPosition()
       if (pos) {
-        myApp.position.set(pos.x, pos.y, pos.z)
+        try {
+          const player = world.getPlayer()
+          const forward = new Vector3(0, 0, -1).applyQuaternion(player.quaternion)
+          forward.y = 0
+          if (forward.lengthSq() < 0.001) forward.set(0, 0, -1)
+          forward.normalize().multiplyScalar(DROP_DISTANCE)
+          myApp.position.set(pos.x + forward.x, pos.y + 0.02, pos.z + forward.z)
+        } catch (err) {
+          myApp.position.set(pos.x + 1, pos.y + 0.02, pos.z)
+        }
       }
-      console.log('[grabbable-item] dropped')
+      console.log('[grabbable-item] dropped in front of player')
     }
 
-    // bind keys on app control (APP priority)
-    control = myApp.control()
+    // bind keys ONCE at init (APP priority) — never re-bind in claim/release,
+    // re-binding breaks the camera-write handoff and kills player movement
+    const control = myApp.control()
     control.keyE.onPress = () => {
       if (holding) return
       console.log('[grabbable-item] keydown: E')
