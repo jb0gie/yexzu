@@ -6,10 +6,11 @@ const MIN_HOLD_DISTANCE = 3
 console.log('[grabbable-item] v3 loaded')
 
 // find the model node: GLB nodes are matched by id (the node name in the glb), not .name
+// NOTE: app.root is undefined in app scripts — use app.get(id) / app.children
 const model =
   app.get('Tablet') ||
-  (app.root?.children || []).find(c => c.id && c.id !== 'node') ||
-  app.root?.children?.[0] ||
+  (app.children || []).find(c => c.id && c.id !== 'node') ||
+  app.children?.[0] ||
   null
 
 if (!model) {
@@ -36,7 +37,7 @@ if (!model) {
     function claim() {
       const pos = getLocalPosition()
       if (!pos) return console.log('[grabbable-item] no local player position — cannot grab')
-      const dist = pos.distanceTo(app.root.position)
+      const dist = pos.distanceTo(app.position)
       console.log('[grabbable-item] grab attempt, distance:', dist.toFixed(2))
       if (dist > MIN_HOLD_DISTANCE) return console.log('[grabbable-item] too far, walk closer')
       holding = true
@@ -49,7 +50,7 @@ if (!model) {
       control = null
       const pos = getLocalPosition()
       if (pos) {
-        app.root.position.set(pos.x, pos.y, pos.z)
+        app.position.set(pos.x, pos.y, pos.z)
       }
       console.log('[grabbable-item] dropped')
     }
