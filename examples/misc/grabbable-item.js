@@ -22,13 +22,16 @@ if (!model) {
     app.state.holder = app.state.holder || null
 
     world.on(`grabbable-item:request:${app.instanceId}`, playerId => {
+      console.log('[grabbable-item] server: request from', playerId, '| current holder:', app.state.holder)
       if (app.state.holder) return // already held
       const player = world.getPlayer(playerId)
-      if (!player) return
+      if (!player) return console.log('[grabbable-item] server: player not found')
       const dist = player.position.distanceTo(app.root.position)
+      console.log('[grabbable-item] server: distance', dist.toFixed(2), '(limit', MIN_HOLD_DISTANCE + ')', '| app pos', app.root.position.toArray().map(n => n.toFixed(1)))
       if (dist > MIN_HOLD_DISTANCE) return
       app.state.holder = playerId
       app.send('held', playerId)
+      console.log('[grabbable-item] server: CLAIMED by', playerId)
     })
 
     world.on(`grabbable-item:drop:${app.instanceId}`, playerId => {
