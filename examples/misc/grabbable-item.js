@@ -9,8 +9,8 @@ const CARRY_DISTANCE = 1.5
 const CARRY_HEIGHT = 1.4
 // how far in front of the player the tablet drops (meters)
 const DROP_DISTANCE = 1
-// how high above ground the tablet drops (meters)
-const DROP_HEIGHT = 0.5
+// how high above the player's feet the tablet drops (meters)
+const DROP_HEIGHT = 0.1
 
 console.log('[grabbable-item] v6 loaded')
 
@@ -80,7 +80,7 @@ if (!model) {
             forward.normalize()
             const dropPos = handModel.position.clone()
               .add(forward.multiplyScalar(DROP_DISTANCE))
-              .add(new Vector3(0, DROP_HEIGHT, 0))
+            dropPos.y = pos.y + DROP_HEIGHT // land near the ground, not at held height
             myApp.position.copy(dropPos)
           } catch (err) {
             // fallback: drop 1m in front on X axis, 0.5m up
