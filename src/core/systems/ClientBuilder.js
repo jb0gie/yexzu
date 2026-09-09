@@ -176,7 +176,7 @@ export class ClientBuilder extends System {
       this.select(null)
     }
     // play-mode grab (non-builders only): left-click a grabbable app to hold it
-    if (!this.enabled && !this.selected && this.grabbableSelected && this.grabbableSelected.dead) {
+    if (!this.enabled && !this.selected && this.grabbableSelected && this.grabbableSelected.destroyed) {
       this.selectGrabbable(null)
     }
     if (!this.enabled && !this.selected && this.grabbableSelected && this.grabbableSelected?.data.mover !== this.world.network.id) {
@@ -755,7 +755,7 @@ export class ClientBuilder extends System {
   selectGrabbable(app) {
     // release existing
     if (this.grabbableSelected && this.grabbableSelected !== app) {
-      if (!this.grabbableSelected.dead && this.grabbableSelected.data.mover === this.world.network.id) {
+      if (!this.grabbableSelected.destroyed && this.grabbableSelected.data.mover === this.world.network.id) {
         const app2 = this.grabbableSelected
         this.restoreGrabbableBody()
         app2.data.mover = null
@@ -794,14 +794,14 @@ export class ClientBuilder extends System {
     // ponytail: first rigidbody only; multi-body grab later if needed
     const body = app.root?.findNode?.(node => node.name === 'rigidbody')
     if (!body || body.type !== 'dynamic') return
-    this.grabbableBody = { node: body, prev: body.type }
+    this.grabbableBody = { node: body, app, prev: body.type }
     body.type = 'kinematic'
   }
 
   restoreGrabbableBody() {
     const stored = this.grabbableBody
     this.grabbableBody = null
-    if (!stored || stored.node.dead) return
+    if (!stored || stored.app?.destroyed) return
     stored.node.type = stored.prev
   }
 
@@ -810,7 +810,7 @@ export class ClientBuilder extends System {
     if (this.selected === app) return
     // deselect existing
     if (this.selected && this.selected !== app) {
-      if (!this.selected.dead && this.selected.data.mover === this.world.network.id) {
+      if (!this.selected.destroyed && this.selected.data.mover === this.world.network.id) {
         const app = this.selected
         app.data.mover = null
         app.data.position = app.root.position.toArray()
