@@ -241,8 +241,8 @@ export class ClientBuilder extends System {
           this.lastMoveSendTime = 0
         }
       }
-      // click logic
-      if (this.control.mouseLeft.pressed && this.control.pointer.locked) {
+      // grab logic: left-click OR E to grab/drop (gmod-style)
+      if (this.control.pointer.locked && (this.control.mouseLeft.pressed || this.control.keyE.pressed)) {
         if (!this.grabbableSelected) {
           const hit = this.getHitAtBeam()
           // walk up from the hit node to the owning app (node.ctx.entity === app when activated under one)
@@ -262,7 +262,7 @@ export class ClientBuilder extends System {
           if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && isGrabbable) {
             this.selectGrabbable(entity)
           }
-        } else {
+        } else if (this.control.mouseLeft.pressed || this.control.keyE.pressed) {
           this.selectGrabbable(null)
         }
       }
