@@ -9,6 +9,16 @@ const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
 
+// ponytail: screenshare preset — env knob PUBLIC_SCREENSHARE_PRESET (h360fps3..h1080fps30, original), overridable per-user via prefs
+const PRESETS = ScreenSharePresets
+function resolveScreenSharePreset() {
+  const name =
+    globalThis.env?.PUBLIC_SCREENSHARE_PRESET ||
+    process?.env?.PUBLIC_SCREENSHARE_PRESET ||
+    'h720fps15'
+  return PRESETS[name] || PRESETS.h720fps15
+}
+
 export class ClientLiveKit extends System {
   constructor(world) {
     super(world)
@@ -55,13 +65,17 @@ export class ClientLiveKit extends System {
     this.status.muted = opts.muted.has(this.world.network.id)
     this.levels = opts.levels
     this.muted = opts.muted
+    // preset = env knob PUBLIC_SCREENSHARE_PRESET, overridden by user pref (world.prefs.screensharePreset)
+    const preset =
+      (this.world.prefs?.screensharePreset && PRESETS[this.world.prefs.screensharePreset]) ||
+      resolveScreenSharePreset()
     this.room = new Room({
       webAudioMix: {
         audioContext: this.world.audio.ctx,
       },
       publishDefaults: {
-        screenShareEncoding: ScreenSharePresets.h1080fps30.encoding,
-        screenShareSimulcastLayers: [ScreenSharePresets.h1080fps30],
+        screenShareEncoding: preset.encoding,
+        screenShareSimulcastLayers: [preset],
       },
     })
     this.room.on(RoomEvent.TrackMuted, this.onTrackMuted)
@@ -139,9 +153,12 @@ export class ClientLiveKit extends System {
       screenTargetId: targetId,
     })
     this.room.localParticipant.setMetadata(metadata)
+    // capture at the active preset resolution (env knob or user pref)
+    const preset =
+      (this.world.prefs?.screensharePreset && PRESETS[this.world.prefs.screensharePreset]) ||
+      resolveScreenSharePreset()
     this.room.localParticipant.setScreenShareEnabled(!!targetId, {
-      // audio: true,
-      // systemAudio: 'include',
+      resolution: preset.resolution,
     })
   }
 

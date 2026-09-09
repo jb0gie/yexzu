@@ -586,6 +586,7 @@ function Prefs({ world, hidden }) {
   const [music, setMusic] = useState(world.prefs.music)
   const [sfx, setSFX] = useState(world.prefs.sfx)
   const [voice, setVoice] = useState(world.prefs.voice)
+  const [screensharePreset, setScreensharePreset] = useState(world.prefs.screensharePreset)
   const [ui, setUI] = useState(world.prefs.ui)
   const [canFullscreen, isFullscreen, toggleFullscreen] = useFullscreen()
   const [actions, setActions] = useState(world.prefs.actions)
@@ -623,6 +624,7 @@ function Prefs({ world, hidden }) {
       if (changes.music) setMusic(changes.music.value)
       if (changes.sfx) setSFX(changes.sfx.value)
       if (changes.voice) setVoice(changes.voice.value)
+      if (changes.screensharePreset) setScreensharePreset(changes.screensharePreset.value)
       if (changes.ui) setUI(changes.ui.value)
       if (changes.actions) setActions(changes.actions.value)
       if (changes.hudSide) setHudSide(changes.hudSide.value)
@@ -771,10 +773,25 @@ function Prefs({ world, hidden }) {
           value={voice}
           onChange={voice => world.prefs.setVoice(voice)}
         />
+        <FieldSwitch
+          label='Screen Share'
+          hint='Quality when sharing your screen. Server sets the default; you can override it here.'
+          options={screenshareOptions}
+          value={screensharePreset}
+          onChange={value => world.prefs.setScreensharePreset(value)}
+        />
       </div>
     </Pane>
   )
 }
+
+const screenshareOptions = [
+  { label: 'Server Default', value: null },
+  { label: '720p · 15fps', value: 'h720fps15' },
+  { label: '720p · 30fps', value: 'h720fps30' },
+  { label: '1080p · 15fps', value: 'h1080fps15' },
+  { label: '1080p · 30fps', value: 'h1080fps30' },
+]
 
 const voiceChatOptions = [
   { label: 'Disabled', value: 'disabled' },
