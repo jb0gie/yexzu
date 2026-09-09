@@ -62,6 +62,7 @@ export class ClientBuilder extends System {
 
     // play-mode grab (grabbable apps, clones build-mode grab path)
     this.grabbableSelected = null
+    this.grabbableBody = null
     this.playTarget = new THREE.Object3D()
     this.playTarget.rotation.reorder('YXZ')
     this.playTarget.limit = 4
@@ -756,6 +757,7 @@ export class ClientBuilder extends System {
     if (this.grabbableSelected && this.grabbableSelected !== app) {
       if (!this.grabbableSelected.dead && this.grabbableSelected.data.mover === this.world.network.id) {
         const app2 = this.grabbableSelected
+        this.restoreGrabbableBody()
         app2.data.mover = null
         app2.data.position = app2.root.position.toArray()
         app2.data.quaternion = app2.root.quaternion.toArray()
@@ -782,7 +784,25 @@ export class ClientBuilder extends System {
       this.grabbableSelected = app
       this.playTarget.limit = 4
       this.world.emit('toast', `Grabbed: ${app.blueprint.name}`)
+      this.holdGrabbableBody(app)
     }
+  }
+
+  // gmod-style hold: held apps go kinematic so physics pushes players/props (b0gie)
+  holdGrabbableBody(app) {
+    this.grabbableBody = null
+    // ponytail: first rigidbody only; multi-body grab later if needed
+    const body = app.root?.findNode?.(node => node.name === 'rigidbody')
+    if (!body || body.type !== 'dynamic') return
+    this.grabbableBody = { node: body, prev: body.type }
+    body.type = 'kinematic'
+  }
+
+  restoreGrabbableBody() {
+    const stored = this.grabbableBody
+    this.grabbableBody = null
+    if (!stored || stored.node.dead) return
+    stored.node.type = stored.prev
   }
 
   select(app) {
