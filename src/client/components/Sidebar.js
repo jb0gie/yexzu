@@ -31,6 +31,7 @@ import {
   ShieldBanIcon,
   Volume2Icon,
   HammerIcon,
+  GrabIcon,
   CircleArrowRightIcon,
 } from 'lucide-react'
 import { cls } from './cls'
@@ -1414,7 +1415,7 @@ function App({ world, hidden }) {
               onPointerEnter={() => setHint('Make this app grabbable — players can pick it up and carry it (E to grab, G to drop).')}
               onPointerLeave={() => setHint(null)}
             >
-              <HammerIcon size='1.125rem' />
+              <GrabIcon size='1.125rem' />
             </div>
           </div>
         )}
