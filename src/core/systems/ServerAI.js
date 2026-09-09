@@ -170,6 +170,13 @@ export class ServerAI extends System {
     this.world.network.send('blueprintModified', change)
     this.world.network.dirtyBlueprints.add(change.id)
   }
+
+  async prompt(query) {
+    if (!this.client?.prompt) {
+      throw new Error('[ai] prompt not available')
+    }
+    return this.client.prompt(String(query))
+  }
 }
 
 class OpenAIClient {
@@ -185,6 +192,15 @@ class OpenAIClient {
     this.client = new OpenAI(config)
     this.model = model
     this.effort = effort
+
+    // ponytail: split endpoint for app.prompt (NPC brains) — /create stays on this.client
+    const promptBaseURL = process.env.AI_PROMPT_BASE_URL
+    if (promptBaseURL) {
+      this.promptClient = new OpenAI({
+        apiKey: process.env.AI_PROMPT_API_KEY || apiKey,
+        baseURL: promptBaseURL,
+      })
+    }
   }
 
   async create(prompt) {
@@ -270,6 +286,16 @@ class OpenAIClient {
           content: `Please classify the following prompt:\n\n"${prompt}"`,
         },
       ],
+    })
+    return resp.choices[0]?.message?.content || ''
+  }
+
+  async prompt(query) {
+    const client = this.promptClient || this.client
+    const resp = await client.chat.completions.create({
+      model: this.model,
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: String(query) }],
     })
     return resp.choices[0]?.message?.content || ''
   }

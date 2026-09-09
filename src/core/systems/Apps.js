@@ -375,6 +375,20 @@ export class Apps extends System {
         }
         entity.onMenuItems?.(entity.menuItems)
       },
+      prompt(entity, queryOrOpts) {
+        if (!world.network.isServer) {
+          throw new Error('[app.prompt] server only')
+        }
+        const query = typeof queryOrOpts === 'string' ? queryOrOpts : queryOrOpts?.query
+        if (!query || typeof query !== 'string') {
+          throw new Error('[app.prompt] query required')
+        }
+        // ponytail: reuse ServerAI; no MCP/registerTool
+        if (!world.ai?.prompt) {
+          throw new Error('[app.prompt] AI not configured')
+        }
+        return world.ai.prompt(query)
+      },
     }
   }
 
