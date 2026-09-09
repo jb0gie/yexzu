@@ -216,6 +216,16 @@ export class ClientBuilder extends System {
           if (this.playTarget.limit < 1.5) this.playTarget.limit = 1.5
           if (hitDistance && this.playTarget.limit > hitDistance) this.playTarget.limit = hitDistance
         }
+        // track pointer motion for throw velocity (before snapping root)
+        if (!this._lastThrowPos) {
+          this._lastThrowPos = this.playTarget.position.clone()
+          this._throwVelocity.set(0, 0, 0)
+        } else {
+          // exponential-smoothed velocity: responsive but no jitter spikes
+          const inst = v2.copy(this.playTarget.position).sub(this._lastThrowPos).divideScalar(Math.max(delta, 0.001))
+          this._throwVelocity.lerp(inst, 0.35)
+          this._lastThrowPos.copy(this.playTarget.position)
+        }
         app.root.position.copy(this.playTarget.position)
         app.root.clean()
         // network the move (same as build mode)
@@ -783,6 +793,8 @@ export class ClientBuilder extends System {
       this.playTarget.limit = 4
       this.world.emit('toast', `Grabbed: ${app.blueprint.name}`)
       this.holdGrabbableBody(app)
+      this._lastThrowPos = null
+      this._throwVelocity = v2.set(0, 0, 0)
     }
   }
 
@@ -801,6 +813,15 @@ export class ClientBuilder extends System {
     this.grabbableBody = null
     if (!stored || stored.app?.destroyed) return
     stored.node.type = stored.prev
+    // gmod throw: hand momentum to the now-dynamic body
+    if (stored.prev === 'dynamic' && this._throwVelocity) {
+      // ponytail: flat 18 m/s cap; tune if throws feel weak/mental
+      const vel = this._throwVelocity.clone()
+      if (vel.length() > 18) vel.setLength(18)
+      if (vel.lengthSq() > 0.04) stored.node.setLinearVelocity(vel)
+    }
+    this._throwVelocity = null
+    this._lastThrowPos = null
   }
 
   select(app) {
