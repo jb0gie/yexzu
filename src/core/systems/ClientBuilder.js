@@ -248,12 +248,10 @@ export class ClientBuilder extends System {
           // opt-in: blueprint prop OR a grabbable node anywhere under the hit
           const grabNode = hit?.node?.findNode(n => n.name === 'grabbable') || (hit?.node?.name === 'grabbable' ? hit.node : null)
           const isGrabbable = !!(entity?.blueprint?.props?.grabbable || grabNode)
-          console.log('[playGrab] click beam entity:', entity?.isApp ? entity.blueprint?.name : entity?.constructor?.name || 'none', 'grabbable:', isGrabbable, 'grabNode:', !!grabNode)
           if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && isGrabbable) {
             this.selectGrabbable(entity)
           }
         } else {
-          console.log('[playGrab] drop:', this.grabbableSelected.blueprint?.name)
           this.selectGrabbable(null)
         }
       }
@@ -755,9 +753,9 @@ export class ClientBuilder extends System {
   selectGrabbable(app) {
     // release existing
     if (this.grabbableSelected && this.grabbableSelected !== app) {
+      this.restoreGrabbableBody()
       if (!this.grabbableSelected.destroyed && this.grabbableSelected.data.mover === this.world.network.id) {
         const app2 = this.grabbableSelected
-        this.restoreGrabbableBody()
         app2.data.mover = null
         app2.data.position = app2.root.position.toArray()
         app2.data.quaternion = app2.root.quaternion.toArray()
