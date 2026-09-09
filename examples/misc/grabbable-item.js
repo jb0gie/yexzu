@@ -1,14 +1,18 @@
-// grabbable-item v5 — pick up an app and hold it in your hand (client-authoritative)
+// grabbable-item v6 — pick up an app and hold it in front of you (telekinesis style)
 // E = pick up, G = drop. Works solo; server sync comes later.
-// If your console doesn't print "[grabbable-item] v5 loaded" on world join, the script is stale.
+// If your console doesn't print "[grabbable-item] v6 loaded" on world join, the script is stale.
 
 const MIN_HOLD_DISTANCE = 3
-// fine-tune where the tablet sits relative to the hand (in hand space, meters)
-const GRAB_OFFSET = { x: 0, y: 0.02, z: -0.05 }
+// how far in front of the player the tablet floats (meters)
+const CARRY_DISTANCE = 1.5
+// how high above eye level the tablet floats (meters)
+const CARRY_HEIGHT = 1.4
 // how far in front of the player the tablet drops (meters)
 const DROP_DISTANCE = 1
+// how high above ground the tablet drops (meters)
+const DROP_HEIGHT = 0.5
 
-console.log('[grabbable-item] v5 loaded')
+console.log('[grabbable-item] v6 loaded')
 
 // find the model node: GLB nodes are matched by id (the node name in the glb), not .name
 // NOTE: app.root is undefined in app scripts — use app.get(id) / app.children
@@ -24,7 +28,7 @@ if (!model) {
   if (world.isClient) {
     const myApp = app // SES: capture app proxy for closures
     let holding = false
-    let handModel = null // the clone that rides the hand
+    let handModel = null // the clone that rides in front of player
 
     function getLocalPosition() {
       // proxy .position can blow up if the player entity isn't fully built — read defensively
@@ -59,30 +63,39 @@ if (!model) {
     function release() {
       holding = false
       if (handModel) {
+        // compute drop position: forward from camera (or player) + up
+        const pos = getLocalPosition()
+        if (pos) {
+          try {
+            const player = world.getPlayer()
+            // prefer camera forward if available
+            let forward
+            if (world.camera) {
+              forward = new Vector3(0, 0, -1).applyQuaternion(world.camera.quaternion)
+            } else {
+              forward = new Vector3(0, 0, -1).applyQuaternion(player.quaternion)
+            }
+            forward.y = 0
+            if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1)
+            forward.normalize()
+            const dropPos = handModel.position.clone()
+              .add(forward.multiplyScalar(DROP_DISTANCE))
+              .add(new Vector3(0, DROP_HEIGHT, 0))
+            myApp.position.copy(dropPos)
+          } catch (err) {
+            // fallback: drop 1m in front on X axis, 0.5m up
+            myApp.position.set(pos.x + 1, pos.y + DROP_HEIGHT, pos.z)
+          }
+        }
         world.remove(handModel)
         handModel = null
       }
       model.active = true
-      // drop 1m in front of the player, at foot level — never under the capsule
-      const pos = getLocalPosition()
-      if (pos) {
-        try {
-          const player = world.getPlayer()
-          const forward = new Vector3(0, 0, -1).applyQuaternion(player.quaternion)
-          forward.y = 0
-          if (forward.lengthSq() < 0.001) forward.set(0, 0, -1)
-          forward.normalize().multiplyScalar(DROP_DISTANCE)
-          myApp.position.set(pos.x + forward.x, pos.y + 0.02, pos.z + forward.z)
-        } catch (err) {
-          myApp.position.set(pos.x + 1, pos.y + 0.02, pos.z)
-        }
-      }
       console.log('[grabbable-item] dropped in front of player')
     }
 
-    // bind keys ONCE at init (APP priority) — never re-bind in claim/release,
-    // re-binding breaks the camera-write handoff and kills player movement
-    const control = myApp.control()
+    // bind keys ONCE at init with PLAYER priority (0) to avoid stealing movement/write
+    const control = myApp.control({ priority: 0 }) // PLAYER priority
     control.keyE.onPress = () => {
       if (holding) return
       console.log('[grabbable-item] keydown: E')
@@ -94,35 +107,32 @@ if (!model) {
       release()
     }
 
-    // while held, pin the clone to the rightHand bone (pistol lateUpdate pattern)
-    let boneWarned = false
+    // while held, position the clone in front of the player at eye height, facing camera yaw
     myApp.on('lateUpdate', () => {
       if (!holding || !handModel) return
       try {
         const player = world.getPlayer()
-        const matrix = player?.getBoneTransform?.('rightHand')
-        if (matrix) {
-          if (!boneWarned) { console.log('[grabbable-item] rightHand bone OK — pinning clone'); boneWarned = true }
-          handModel.position.setFromMatrixPosition(matrix)
-          handModel.quaternion.setFromRotationMatrix(matrix)
-          // apply grab offset in hand space
-          if (GRAB_OFFSET.x || GRAB_OFFSET.y || GRAB_OFFSET.z) {
-            const off = new Vector3(GRAB_OFFSET.x, GRAB_OFFSET.y, GRAB_OFFSET.z)
-            off.applyQuaternion(handModel.quaternion)
-            handModel.position.add(off)
-          }
+        if (!player) return
+        // get forward vector from camera if available, else from player yaw only
+        let forward
+        if (world.camera) {
+          forward = new Vector3(0, 0, -1).applyQuaternion(world.camera.quaternion)
         } else {
-          if (!boneWarned) {
-            console.log('[grabbable-item] rightHand bone null — falling back to shoulder-height carry')
-            boneWarned = true
-          }
-          const pos = getLocalPosition()
-          if (pos) {
-            handModel.position.set(pos.x, pos.y + 1.4, pos.z)
-          }
+          forward = new Vector3(0, 0, -1).applyQuaternion(player.quaternion)
         }
+        // zero out pitch/roll for level carry
+        forward.y = 0
+        if (forward.lengthSq() < 0.0001) forward.set(0, 0, -1)
+        forward.normalize()
+        const targetPos = player.position.clone()
+          .add(forward.multiplyScalar(CARRY_DISTANCE))
+          .add(new Vector3(0, CARRY_HEIGHT, 0))
+        handModel.position.copy(targetPos)
+        // orientation: keep upright, face same yaw as camera/player (no tilt)
+        const yaw = Math.atan2(forward.x, forward.z)
+        handModel.rotation.set(0, yaw, 0)
       } catch (err) {
-        // bone not ready yet; keep last transform
+        // keep last transform
       }
     })
 
