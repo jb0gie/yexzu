@@ -45,6 +45,7 @@ export class ClientPrefs extends System {
     this.music = isNumber(data.music) ? data.music : 1
     this.sfx = isNumber(data.sfx) ? data.sfx : 1
     this.voice = isNumber(data.voice) ? data.voice : 1
+    this.screensharePreset = data.screensharePreset || null // null = follow PUBLIC_SCREENSHARE_PRESET env knob
     this.v = data.v
 
     // DOF preferences - DISABLED BY DEFAULT due to excessive blur issues
@@ -118,6 +119,7 @@ export class ClientPrefs extends System {
     const basicPrefs = [
       'ui', 'actions', 'hudSide', 'stats', 'dpr', 'shadows',
       'postprocessing', 'bloom', 'ao', 'music', 'sfx', 'voice',
+      'screensharePreset',
       'dofEnabled', 'focusSmoothing', 'focusSpeed', 'playerAutofocus',
       'reticleAutofocus', 'scrollZoomEnabled', 'showHelpers', 'zoomSpeed',
       'focalLength', 'fStop', 'maxBlur', 'luminanceThreshold',
@@ -188,6 +190,7 @@ export class ClientPrefs extends System {
       music: this.music,
       sfx: this.sfx,
       voice: this.voice,
+      screensharePreset: this.screensharePreset,
       v: this.v,
       // DOF preferences
       dofEnabled: this.dofEnabled,
