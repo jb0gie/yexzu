@@ -256,9 +256,9 @@ export class ClientBuilder extends System {
             node = node.parent
           }
           if (!entity) entity = hit?.getEntity?.()
-          // opt-in: blueprint prop OR a grabbable node anywhere under the hit
+          // opt-in: blueprint flag OR a grabbable node anywhere under the hit
           const grabNode = hit?.node?.findNode(n => n.name === 'grabbable') || (hit?.node?.name === 'grabbable' ? hit.node : null)
-          const isGrabbable = !!(entity?.blueprint?.props?.grabbable || grabNode)
+          const isGrabbable = !!(entity?.blueprint?.props?.grabbable || entity?.blueprint?.grabbable || grabNode)
           if (entity?.isApp && !entity.data.pinned && !entity.blueprint.scene && isGrabbable) {
             this.selectGrabbable(entity)
           }

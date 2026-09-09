@@ -1391,6 +1391,14 @@ function App({ world, hidden }) {
             >
               <SparkleIcon size='1.125rem' />
             </div>
+            <div
+              className={cls('app-toggle', { active: blueprint.grabbable })}
+              onClick={() => toggleKey('grabbable')}
+              onPointerEnter={() => setHint('Make this app grabbable — players can pick it up and carry it (E to grab, G to drop).')}
+              onPointerLeave={() => setHint(null)}
+            >
+              <HammerIcon size='1.125rem' />
+            </div>
           </div>
         )}
         <div className='app-content noscrollbar'>
