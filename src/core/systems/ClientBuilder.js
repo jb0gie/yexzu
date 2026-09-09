@@ -21,6 +21,7 @@ const PROJECT_MAX = 50
 
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
+const vThrow = new THREE.Vector3()
 const q1 = new THREE.Quaternion()
 const e1 = new THREE.Euler()
 
@@ -222,7 +223,7 @@ export class ClientBuilder extends System {
           this._throwVelocity.set(0, 0, 0)
         } else {
           // exponential-smoothed velocity: responsive but no jitter spikes
-          const inst = v2.copy(this.playTarget.position).sub(this._lastThrowPos).divideScalar(Math.max(delta, 0.001))
+          const inst = vThrow.copy(this.playTarget.position).sub(this._lastThrowPos).divideScalar(Math.max(delta, 0.001))
           this._throwVelocity.lerp(inst, 0.35)
           this._lastThrowPos.copy(this.playTarget.position)
         }
@@ -794,7 +795,7 @@ export class ClientBuilder extends System {
       this.world.emit('toast', `Grabbed: ${app.blueprint.name}`)
       this.holdGrabbableBody(app)
       this._lastThrowPos = null
-      this._throwVelocity = v2.set(0, 0, 0)
+      this._throwVelocity = new THREE.Vector3()
     }
   }
 
