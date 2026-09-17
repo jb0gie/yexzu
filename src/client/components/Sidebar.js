@@ -804,13 +804,6 @@ const aiProviderOptions = [
   { label: 'Hermes', value: 'hermes' },
 ]
 
-// debounce for api-key fields — a keystroke should not reconfigure the world ai
-let aiKeyTimer = null
-const sendKeyDebounced = fn => {
-  clearTimeout(aiKeyTimer)
-  aiKeyTimer = setTimeout(fn, 600)
-}
-
 const voiceChatOptions = [
   { label: 'Disabled', value: 'disabled' },
   { label: 'Spatial', value: 'spatial' },
@@ -1003,12 +996,13 @@ function World({ world, hidden }) {
               />
               <FieldText
                 label='AI API Key'
+                secret
                 hint={aiHasKey ? 'A key is set. Type a new one to replace it.' : 'No key set yet. Paste the provider API key here.'}
                 placeholder={aiHasKey ? '•••••• (leave empty to keep)' : 'not set'}
                 value={aiKey}
                 onChange={value => {
                   setAiKey(value)
-                  if (value) sendKeyDebounced(() => world.network.send('aiModified', { apiKey: value }))
+                  if (value) world.network.send('aiModified', { apiKey: value })
                 }}
               />
               <FieldText
@@ -1023,12 +1017,13 @@ function World({ world, hidden }) {
           <Group label='My AI' />
           <FieldText
             label='My AI Key'
+            secret
             hint='Optional — bring your own key for this session. Used instead of the world key for your /create, /edit and /fix. Not saved.'
             placeholder={aiMyKeySet ? '•••••• (set for this session)' : 'not set'}
             value={myAiKey}
             onChange={value => {
               setMyAiKey(value)
-              if (value) sendKeyDebounced(() => world.network.send('aiKey', { key: value }))
+              if (value) world.network.send('aiKey', { key: value })
             }}
           />
           {/* <FieldBtn

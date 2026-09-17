@@ -13,7 +13,7 @@ import { isArray } from 'lodash-es'
 import { downloadFile } from '../../core/extras/downloadFile'
 import { HexColorPicker } from 'react-colorful'
 
-export function FieldText({ label, hint, placeholder, value, onChange }) {
+export function FieldText({ label, hint, placeholder, value, onChange, secret }) {
   const { setHint } = useContext(HintContext)
   const [localValue, setLocalValue] = useState(value)
   useEffect(() => {
@@ -59,7 +59,7 @@ export function FieldText({ label, hint, placeholder, value, onChange }) {
       <div className='fieldtext-label'>{label}</div>
       <div className='fieldtext-field'>
         <input
-          type='text'
+          type={secret ? 'password' : 'text'}
           value={localValue || ''}
           placeholder={placeholder}
           onFocus={e => e.target.select()}
