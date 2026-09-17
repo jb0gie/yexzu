@@ -29,7 +29,20 @@ export class ServerAI extends System {
       effort: process.env.AI_EFFORT || 'minimal',
       apiKey: process.env.AI_API_KEY || null,
       baseUrl: process.env.OPENAI_BASE_URL || null,
+      source: 'env',
     })
+  }
+
+  // server env defaults — used when no stored override exists
+  envConfig() {
+    return {
+      provider: process.env.AI_PROVIDER || null,
+      model: process.env.AI_MODEL || null,
+      effort: process.env.AI_EFFORT || 'minimal',
+      apiKey: process.env.AI_API_KEY || null,
+      baseUrl: process.env.OPENAI_BASE_URL || null,
+      source: 'env',
+    }
   }
 
   configure(cfg = {}) {
@@ -38,22 +51,32 @@ export class ServerAI extends System {
     this.effort = cfg.effort || 'minimal'
     this.apiKey = cfg.apiKey || null
     this.baseUrl = cfg.baseUrl || null
-    this.client = null
-    if (this.provider && this.model && this.apiKey) {
-      if (this.provider === 'openai') {
-        this.client = new OpenAIClient(this.apiKey, this.model, this.effort, this.baseUrl)
-      }
-      if (this.provider === 'anthropic') {
-        this.client = new AnthropicClient(this.apiKey, this.model)
-      }
-      if (this.provider === 'xai') {
-        this.client = new XAIClient(this.apiKey, this.model)
-      }
-      if (this.provider === 'google') {
-        this.client = new GoogleClient(this.apiKey, this.model)
-      }
-    }
+    this.source = cfg.source || 'config'
+    this.userClients = new Map()
+    this.client = this.buildClient(this.provider, this.model, this.effort, this.apiKey, this.baseUrl)
     this.enabled = !!this.client
+  }
+
+  buildClient(provider, model, effort, apiKey, baseUrl) {
+    if (!provider || !model) return null
+    if (provider === 'openai') return apiKey ? new OpenAIClient(apiKey, model, effort, baseUrl) : null
+    if (provider === 'anthropic') return apiKey ? new AnthropicClient(apiKey, model) : null
+    if (provider === 'xai') return apiKey ? new XAIClient(apiKey, model) : null
+    if (provider === 'google') return apiKey ? new GoogleClient(apiKey, model) : null
+    // Hermes API server speaks the OpenAI protocol
+    if (provider === 'hermes') return new OpenAIClient(apiKey || 'hermes', model, effort, baseUrl || 'http://localhost:8642/v1')
+    return null
+  }
+
+  // per-player key override (bring your own key), otherwise the world client
+  clientFor(userKey) {
+    if (!userKey || !this.provider || !this.model) return this.client
+    const cacheKey = `${this.provider}:${this.model}:${this.effort}:${this.baseUrl || ''}:${userKey}`
+    if (!this.userClients) this.userClients = new Map()
+    if (!this.userClients.has(cacheKey)) {
+      this.userClients.set(cacheKey, this.buildClient(this.provider, this.model, this.effort, userKey, this.baseUrl))
+    }
+    return this.userClients.get(cacheKey)
   }
 
   serialize() {
@@ -65,6 +88,7 @@ export class ServerAI extends System {
       effort: this.effort,
       baseUrl: this.baseUrl,
       hasKey: !!this.apiKey,
+      source: this.source || 'config',
     }
   }
 
@@ -83,24 +107,25 @@ export class ServerAI extends System {
     this.assets = assets
   }
 
-  async onAction(action) {
-    if (!this.enabled) {
+  async onAction(action, userKey) {
+    const client = this.clientFor(userKey)
+    if (!client) {
       return
     }
     if (action.name === 'create') {
-      this.create(action)
+      this.create(action, client)
     } else if (action.name === 'edit') {
-      this.edit(action)
+      this.edit(action, client)
     } else if (action.name === 'fix') {
-      this.fix(action)
+      this.fix(action, client)
     }
   }
 
-  async create({ blueprintId, appId, prompt }) {
+  async create({ blueprintId, appId, prompt }, client = this.client) {
     // classify prompt to a short descriptive name for the app
-    this.classify({ blueprintId, prompt })
+    this.classify({ blueprintId, prompt }, client)
     // send prompt to ai to generate code
-    let output = await this.client.create(prompt)
+    let output = await client.create(prompt)
     output = stripCodeFences(output)
     const changelog = [`create: ${prompt}`]
     const code = prefix + writeChangelog(output, changelog)
@@ -122,7 +147,7 @@ export class ServerAI extends System {
     this.world.network.dirtyBlueprints.add(change.id)
   }
 
-  async edit({ blueprintId, appId, prompt }) {
+  async edit({ blueprintId, appId, prompt }, client = this.client) {
     // get existing blueprint
     let blueprint = this.world.blueprints.get(blueprintId)
     if (!blueprint) return console.error('[ai] edit blueprint but blueprint not found')
@@ -133,7 +158,7 @@ export class ServerAI extends System {
     const code = script.code.replace(prefix, '')
     const changelog = readChangelog(code)
     changelog.push(`edit: ${prompt}`)
-    let output = await this.client.edit(code, prompt)
+    let output = await client.edit(code, prompt)
     output = stripCodeFences(output)
     const newCode = prefix + writeChangelog(output, changelog)
     // convert new code to asset
@@ -154,7 +179,7 @@ export class ServerAI extends System {
     this.world.network.dirtyBlueprints.add(change.id)
   }
 
-  async fix({ blueprintId, appId, error }) {
+  async fix({ blueprintId, appId, error }, client = this.client) {
     // get existing blueprint
     let blueprint = this.world.blueprints.get(blueprintId)
     if (!blueprint) return console.error('[ai] fix blueprint but blueprint not found')
@@ -164,7 +189,7 @@ export class ServerAI extends System {
     // send prompt to ai to generate code
     const code = script.code.replace(prefix, '')
     const changelog = readChangelog(code)
-    let output = await this.client.fix(code, error)
+    let output = await client.fix(code, error)
     output = stripCodeFences(output)
     const newCode = prefix + writeChangelog(output, changelog)
     // convert new code to asset
@@ -185,9 +210,9 @@ export class ServerAI extends System {
     this.world.network.dirtyBlueprints.add(change.id)
   }
 
-  async classify({ blueprintId, prompt }) {
+  async classify({ blueprintId, prompt }, client = this.client) {
     // get a name for the object
-    const name = await this.client.classify(prompt)
+    const name = await client.classify(prompt)
     // update name
     const blueprint = this.world.blueprints.get(blueprintId)
     const version = blueprint.version + 1

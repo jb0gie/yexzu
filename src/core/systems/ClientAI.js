@@ -21,6 +21,19 @@ export class ClientAI extends System {
     this.world.chat.bindCommand('fix', this.fix)
   }
 
+  state() {
+    return {
+      enabled: this.enabled,
+      provider: this.provider,
+      model: this.model,
+      effort: this.effort,
+      baseUrl: this.baseUrl || null,
+      hasKey: !!this.hasKey,
+      source: this.source || 'config',
+      myKeySet: !!this.myKeySet,
+    }
+  }
+
   deserialize(data) {
     this.enabled = data.enabled
     this.provider = data.provider
@@ -28,18 +41,17 @@ export class ClientAI extends System {
     this.effort = data.effort
     this.baseUrl = data.baseUrl || null
     this.hasKey = !!data.hasKey
-    this.emit('change', {
-      enabled: this.enabled,
-      provider: this.provider,
-      model: this.model,
-      effort: this.effort,
-      baseUrl: this.baseUrl,
-      hasKey: this.hasKey,
-    })
+    this.source = data.source || 'config'
+    this.emit('change', this.state())
+  }
+
+  setKeySet(set) {
+    this.myKeySet = !!set
+    this.emit('change', this.state())
   }
 
   create = async ({ value: prompt }) => {
-    if (!this.enabled) {
+    if (!this.enabled && !this.myKeySet) {
       return console.error('[ai] not enabled')
     }
     if (!this.world.builder.canBuild()) return
@@ -98,7 +110,7 @@ export class ClientAI extends System {
   }
 
   edit = async ({ value: prompt }) => {
-    if (!this.enabled) {
+    if (!this.enabled && !this.myKeySet) {
       return console.error('[ai] not enabled')
     }
     if (!this.world.builder.canBuild()) {
@@ -120,7 +132,7 @@ export class ClientAI extends System {
   }
 
   fix = async () => {
-    if (!this.enabled) {
+    if (!this.enabled && !this.myKeySet) {
       return console.error('[ai] not enabled')
     }
     if (!this.world.builder.canBuild()) {

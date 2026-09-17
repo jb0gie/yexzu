@@ -159,6 +159,10 @@ export class ClientNetwork extends System {
     this.world.ai.deserialize(data)
   }
 
+  onAiKeySet = data => {
+    this.world.ai.setKeySet(data.set)
+  }
+
   onChatAdded = msg => {
     this.world.chat.add(msg, false)
   }

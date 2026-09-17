@@ -441,4 +441,10 @@ const migrations = [
       await trx.schema.renameTable('_config_new', 'config')
     })
   },
+  // add per-user ai key (bring your own key)
+  async db => {
+    await db.schema.alterTable('users', table => {
+      table.text('aiKey')
+    })
+  },
 ]

@@ -795,12 +795,21 @@ const screenshareOptions = [
 ]
 
 const aiProviderOptions = [
+  { label: 'Server Default (env)', value: 'env' },
   { label: 'Disabled', value: null },
   { label: 'OpenAI', value: 'openai' },
   { label: 'Anthropic', value: 'anthropic' },
   { label: 'xAI', value: 'xai' },
   { label: 'Google', value: 'google' },
+  { label: 'Hermes', value: 'hermes' },
 ]
+
+// debounce for api-key fields — a keystroke should not reconfigure the world ai
+let aiKeyTimer = null
+const sendKeyDebounced = fn => {
+  clearTimeout(aiKeyTimer)
+  aiKeyTimer = setTimeout(fn, 600)
+}
 
 const voiceChatOptions = [
   { label: 'Disabled', value: 'disabled' },
@@ -829,7 +838,10 @@ function World({ world, hidden }) {
   const [aiModel, setAiModel] = useState(world.ai.model)
   const [aiBaseUrl, setAiBaseUrl] = useState(world.ai.baseUrl)
   const [aiHasKey, setAiHasKey] = useState(world.ai.hasKey)
+  const [aiSource, setAiSource] = useState(world.ai.source)
   const [aiKey, setAiKey] = useState('')
+  const [myAiKey, setMyAiKey] = useState('')
+  const [aiMyKeySet, setAiMyKeySet] = useState(world.ai.myKeySet)
   useEffect(() => {
     const onChange = changes => {
       if (changes.title) setTitle(changes.title.value)
@@ -848,6 +860,8 @@ function World({ world, hidden }) {
       setAiModel(ai.model)
       setAiBaseUrl(ai.baseUrl)
       setAiHasKey(ai.hasKey)
+      setAiSource(ai.source)
+      setAiMyKeySet(ai.myKeySet)
     }
     world.settings.on('change', onChange)
     world.ai.on('change', onAiChange)
@@ -975,9 +989,9 @@ function World({ world, hidden }) {
               <Group label='World AI' />
               <FieldSwitch
                 label='AI Provider'
-                hint='Provider used by /create, /edit, /fix and app.prompt. Set via env or live here — saved changes persist in the world.'
+                hint='Provider used by /create, /edit, /fix and app.prompt. "Server Default (env)" clears the saved override; "Disabled" turns AI off in this world.'
                 options={aiProviderOptions}
-                value={aiProvider}
+                value={aiSource === 'env' ? 'env' : aiProvider}
                 onChange={value => world.network.send('aiModified', { provider: value })}
               />
               <FieldText
@@ -994,7 +1008,7 @@ function World({ world, hidden }) {
                 value={aiKey}
                 onChange={value => {
                   setAiKey(value)
-                  if (value) world.network.send('aiModified', { apiKey: value })
+                  if (value) sendKeyDebounced(() => world.network.send('aiModified', { apiKey: value }))
                 }}
               />
               <FieldText
@@ -1006,6 +1020,17 @@ function World({ world, hidden }) {
               />
             </>
           )}
+          <Group label='My AI' />
+          <FieldText
+            label='My AI Key'
+            hint='Optional — bring your own key. When set, your /create, /edit and /fix commands use your key instead of the world key.'
+            placeholder={aiMyKeySet ? '•••••• (personal key set)' : 'not set'}
+            value={myAiKey}
+            onChange={value => {
+              setMyAiKey(value)
+              if (value) sendKeyDebounced(() => world.network.send('aiKey', { key: value }))
+            }}
+          />
           {/* <FieldBtn
           label='Set Spawn'
           hint='Sets the location players spawn to the location you are currently standing'

@@ -69,7 +69,7 @@ export class ServerNetwork extends System {
     // hydrate ai config (live-editable from world settings; no row = env defaults apply)
     try {
       const aiRow = await this.db('config').where('key', 'ai').first()
-      if (aiRow?.value) this.world.ai.configure(JSON.parse(aiRow.value))
+      if (aiRow?.value) this.world.ai.configure({ ...JSON.parse(aiRow.value), source: 'config' })
     } catch (err) {
       console.error(err)
     }
@@ -284,6 +284,8 @@ export class ServerNetwork extends System {
         },
         true
       )
+      // per-user ai key (bring your own key) — kept on the socket, never in player data (broadcast)
+      socket.aiKey = user.aiKey || null
 
       // send snapshot
       const blueprints = this.world.blueprints.serialize()
@@ -611,7 +613,15 @@ export class ServerNetwork extends System {
     if (!socket.player.isBuilder()) {
       return console.error('player attempted to use ai but they are not a builder')
     }
-    this.world.ai.onAction(action)
+    this.world.ai.onAction(action, socket.aiKey)
+  }
+
+  // per-user ai key — any player may set their own (used instead of the world key)
+  onAiKey = async (socket, data) => {
+    const key = data?.key ? String(data.key).trim() : null
+    socket.aiKey = key || null
+    await this.db('users').where('id', socket.id).update({ aiKey: socket.aiKey })
+    socket.send('aiKeySet', { set: !!socket.aiKey })
   }
 
   onAiModified = async (socket, data) => {
@@ -619,6 +629,13 @@ export class ServerNetwork extends System {
       return console.error('player attempted to modify ai settings without builder permission')
     }
     const ai = this.world.ai
+    // 'env' = drop the stored override and fall back to the server env
+    if (data.provider === 'env') {
+      await this.db('config').where('key', 'ai').delete()
+      ai.configure(ai.envConfig())
+      this.send('aiModified', ai.serialize())
+      return
+    }
     const cfg = {
       provider: data.provider !== undefined ? data.provider : ai.provider,
       model: data.model !== undefined ? data.model : ai.model,
@@ -626,6 +643,7 @@ export class ServerNetwork extends System {
       baseUrl: data.baseUrl !== undefined ? data.baseUrl : ai.baseUrl,
       // empty apiKey keeps the existing key
       apiKey: data.apiKey ? data.apiKey : ai.apiKey,
+      source: 'config',
     }
     ai.configure(cfg)
     // persist (includes the key — this row is server-only)

@@ -21,6 +21,8 @@ const names = [
   'mute',
   'settingsModified',
   'aiModified',
+  'aiKey',
+  'aiKeySet',
   'spawnModified',
   'modifyRank',
   'kick',
