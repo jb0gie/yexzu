@@ -1284,6 +1284,7 @@ export function FieldColor({ label, hint, value, onChange }) {
             }}
             css={css`
               position: fixed;
+              pointer-events: auto;
               z-index: 10000;
               background: rgba(11, 10, 21, 0.95);
               border: 1px solid rgba(255, 255, 255, 0.1);
