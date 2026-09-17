@@ -794,6 +794,14 @@ const screenshareOptions = [
   { label: '1080p · 30fps', value: 'h1080fps30' },
 ]
 
+const aiProviderOptions = [
+  { label: 'Disabled', value: null },
+  { label: 'OpenAI', value: 'openai' },
+  { label: 'Anthropic', value: 'anthropic' },
+  { label: 'xAI', value: 'xai' },
+  { label: 'Google', value: 'google' },
+]
+
 const voiceChatOptions = [
   { label: 'Disabled', value: 'disabled' },
   { label: 'Spatial', value: 'spatial' },
@@ -817,6 +825,11 @@ function World({ world, hidden }) {
   const [playerLimit, setPlayerLimit] = useState(world.settings.playerLimit)
   const [ao, setAO] = useState(world.settings.ao)
   const [rank, setRank] = useState(world.settings.rank)
+  const [aiProvider, setAiProvider] = useState(world.ai.provider)
+  const [aiModel, setAiModel] = useState(world.ai.model)
+  const [aiBaseUrl, setAiBaseUrl] = useState(world.ai.baseUrl)
+  const [aiHasKey, setAiHasKey] = useState(world.ai.hasKey)
+  const [aiKey, setAiKey] = useState('')
   useEffect(() => {
     const onChange = changes => {
       if (changes.title) setTitle(changes.title.value)
@@ -830,9 +843,17 @@ function World({ world, hidden }) {
       if (changes.ao) setAO(changes.ao.value)
       if (changes.rank) setRank(changes.rank.value)
     }
+    const onAiChange = ai => {
+      setAiProvider(ai.provider)
+      setAiModel(ai.model)
+      setAiBaseUrl(ai.baseUrl)
+      setAiHasKey(ai.hasKey)
+    }
     world.settings.on('change', onChange)
+    world.ai.on('change', onAiChange)
     return () => {
       world.settings.off('change', onChange)
+      world.ai.off('change', onAiChange)
     }
   }, [])
   return (
@@ -948,6 +969,42 @@ function World({ world, hidden }) {
               value={rank >= Ranks.BUILDER}
               onChange={value => world.settings.set('rank', value ? Ranks.BUILDER : Ranks.VISITOR, true)}
             />
+          )}
+          {isAdmin && (
+            <>
+              <Group label='World AI' />
+              <FieldSwitch
+                label='AI Provider'
+                hint='Provider used by /create, /edit, /fix and app.prompt. Set via env or live here — saved changes persist in the world.'
+                options={aiProviderOptions}
+                value={aiProvider}
+                onChange={value => world.network.send('aiModified', { provider: value })}
+              />
+              <FieldText
+                label='AI Model'
+                hint='Model name for the selected provider, eg gpt-5, claude-sonnet-4-5, grok-4, gemini-2.5-pro.'
+                placeholder='model name'
+                value={aiModel}
+                onChange={value => world.network.send('aiModified', { model: value })}
+              />
+              <FieldText
+                label='AI API Key'
+                hint={aiHasKey ? 'A key is set. Type a new one to replace it.' : 'No key set yet. Paste the provider API key here.'}
+                placeholder={aiHasKey ? '•••••• (leave empty to keep)' : 'not set'}
+                value={aiKey}
+                onChange={value => {
+                  setAiKey(value)
+                  if (value) world.network.send('aiModified', { apiKey: value })
+                }}
+              />
+              <FieldText
+                label='AI Base URL'
+                hint='Optional OpenAI-compatible endpoint (OpenRouter, local LLM server, Hermes, etc). Leave empty for the provider default.'
+                placeholder='https://openrouter.ai/api/v1'
+                value={aiBaseUrl}
+                onChange={value => world.network.send('aiModified', { baseUrl: value })}
+              />
+            </>
           )}
           {/* <FieldBtn
           label='Set Spawn'

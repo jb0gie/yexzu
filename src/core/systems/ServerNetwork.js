@@ -66,6 +66,13 @@ export class ServerNetwork extends System {
     } catch (err) {
       console.error(err)
     }
+    // hydrate ai config (live-editable from world settings; no row = env defaults apply)
+    try {
+      const aiRow = await this.db('config').where('key', 'ai').first()
+      if (aiRow?.value) this.world.ai.configure(JSON.parse(aiRow.value))
+    } catch (err) {
+      console.error(err)
+    }
     // watch settings changes
     this.world.settings.on('change', this.saveSettings)
     // queue first save
@@ -605,6 +612,27 @@ export class ServerNetwork extends System {
       return console.error('player attempted to use ai but they are not a builder')
     }
     this.world.ai.onAction(action)
+  }
+
+  onAiModified = async (socket, data) => {
+    if (!socket.player.isBuilder()) {
+      return console.error('player attempted to modify ai settings without builder permission')
+    }
+    const ai = this.world.ai
+    const cfg = {
+      provider: data.provider !== undefined ? data.provider : ai.provider,
+      model: data.model !== undefined ? data.model : ai.model,
+      effort: data.effort !== undefined ? data.effort : ai.effort,
+      baseUrl: data.baseUrl !== undefined ? data.baseUrl : ai.baseUrl,
+      // empty apiKey keeps the existing key
+      apiKey: data.apiKey ? data.apiKey : ai.apiKey,
+    }
+    ai.configure(cfg)
+    // persist (includes the key — this row is server-only)
+    const value = JSON.stringify(ai.getConfig())
+    await this.db('config').insert({ key: 'ai', value }).onConflict('key').merge({ value })
+    // broadcast the sanitized config to all clients
+    this.send('aiModified', ai.serialize())
   }
 
   onPing = (socket, time) => {

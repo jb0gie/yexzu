@@ -26,7 +26,16 @@ export class ClientAI extends System {
     this.provider = data.provider
     this.model = data.model
     this.effort = data.effort
-
+    this.baseUrl = data.baseUrl || null
+    this.hasKey = !!data.hasKey
+    this.emit('change', {
+      enabled: this.enabled,
+      provider: this.provider,
+      model: this.model,
+      effort: this.effort,
+      baseUrl: this.baseUrl,
+      hasKey: this.hasKey,
+    })
   }
 
   create = async ({ value: prompt }) => {

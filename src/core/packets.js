@@ -20,6 +20,7 @@ const names = [
   'liveKitLevel',
   'mute',
   'settingsModified',
+  'aiModified',
   'spawnModified',
   'modifyRank',
   'kick',

@@ -22,13 +22,26 @@ export class ServerAI extends System {
   constructor(world) {
     super(world)
     this.assets = null
-    this.provider = process.env.AI_PROVIDER || null
-    this.model = process.env.AI_MODEL || null
-    this.effort = process.env.AI_EFFORT || 'minimal'
-    this.apiKey = process.env.AI_API_KEY || null
+    // env provides defaults; the world settings UI can override live (persisted in the 'ai' config row)
+    this.configure({
+      provider: process.env.AI_PROVIDER || null,
+      model: process.env.AI_MODEL || null,
+      effort: process.env.AI_EFFORT || 'minimal',
+      apiKey: process.env.AI_API_KEY || null,
+      baseUrl: process.env.OPENAI_BASE_URL || null,
+    })
+  }
+
+  configure(cfg = {}) {
+    this.provider = cfg.provider || null
+    this.model = cfg.model || null
+    this.effort = cfg.effort || 'minimal'
+    this.apiKey = cfg.apiKey || null
+    this.baseUrl = cfg.baseUrl || null
+    this.client = null
     if (this.provider && this.model && this.apiKey) {
       if (this.provider === 'openai') {
-        this.client = new OpenAIClient(this.apiKey, this.model, this.effort)
+        this.client = new OpenAIClient(this.apiKey, this.model, this.effort, this.baseUrl)
       }
       if (this.provider === 'anthropic') {
         this.client = new AnthropicClient(this.apiKey, this.model)
@@ -44,11 +57,25 @@ export class ServerAI extends System {
   }
 
   serialize() {
+    // public view sent to clients — never includes the api key
     return {
       enabled: this.enabled,
       provider: this.provider,
       model: this.model,
       effort: this.effort,
+      baseUrl: this.baseUrl,
+      hasKey: !!this.apiKey,
+    }
+  }
+
+  getConfig() {
+    // full config for persistence (includes api key)
+    return {
+      provider: this.provider,
+      model: this.model,
+      effort: this.effort,
+      apiKey: this.apiKey,
+      baseUrl: this.baseUrl,
     }
   }
 
@@ -180,13 +207,14 @@ export class ServerAI extends System {
 }
 
 class OpenAIClient {
-  constructor(apiKey, model, effort) {
+  constructor(apiKey, model, effort, baseUrl) {
     const config = { apiKey }
 
-    // Check for custom base URL override (for OpenRouter and other proxies)
-    const baseURL = process.env.OPENAI_BASE_URL
-    if (baseURL) {
-      config.baseURL = baseURL
+    // Custom base URL for OpenRouter and other OpenAI-compatible endpoints
+    // (configurable from world settings, falling back to the env default)
+    baseUrl = baseUrl || process.env.OPENAI_BASE_URL
+    if (baseUrl) {
+      config.baseURL = baseUrl
     }
 
     this.client = new OpenAI(config)
