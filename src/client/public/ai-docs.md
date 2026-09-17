@@ -341,6 +341,30 @@ if (world.isServer) {
 }
 ```
 
+## Server AI
+
+When requested, an app on the server can ask a language model using `app.prompt`.
+The client sends an event, the server asks the model and sends the answer back:
+
+```jsx
+if (world.isServer) {
+  app.on('ask', async data => {
+    const answer = await app.prompt(data.query)
+    app.send('answer', answer)
+  })
+}
+
+if (world.isClient) {
+  app.send('ask', { query: 'greet the player in one sentence' })
+  app.on('answer', answer => {
+    console.log(answer)
+  })
+}
+```
+
+`app.prompt` returns a promise that resolves with the model's reply text.
+Only add AI behaviour when requested, and never call it in a loop or on every frame.
+
 ## Golden Rules
 
 1. Objects should match real world dimensions
