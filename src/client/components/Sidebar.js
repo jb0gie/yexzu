@@ -1013,7 +1013,7 @@ function World({ world, hidden }) {
               />
               <FieldText
                 label='AI Base URL'
-                hint='Optional OpenAI-compatible endpoint (OpenRouter, local LLM server, Hermes, etc). Leave empty for the provider default.'
+                hint='Optional OpenAI-compatible endpoint (OpenRouter, local LLM, etc). Provider default when empty. Ignored by the Hermes provider.'
                 placeholder='https://openrouter.ai/api/v1'
                 value={aiBaseUrl}
                 onChange={value => world.network.send('aiModified', { baseUrl: value })}
@@ -1023,8 +1023,8 @@ function World({ world, hidden }) {
           <Group label='My AI' />
           <FieldText
             label='My AI Key'
-            hint='Optional — bring your own key. When set, your /create, /edit and /fix commands use your key instead of the world key.'
-            placeholder={aiMyKeySet ? '•••••• (personal key set)' : 'not set'}
+            hint='Optional — bring your own key for this session. Used instead of the world key for your /create, /edit and /fix. Not saved.'
+            placeholder={aiMyKeySet ? '•••••• (set for this session)' : 'not set'}
             value={myAiKey}
             onChange={value => {
               setMyAiKey(value)

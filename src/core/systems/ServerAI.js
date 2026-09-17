@@ -63,8 +63,8 @@ export class ServerAI extends System {
     if (provider === 'anthropic') return apiKey ? new AnthropicClient(apiKey, model) : null
     if (provider === 'xai') return apiKey ? new XAIClient(apiKey, model) : null
     if (provider === 'google') return apiKey ? new GoogleClient(apiKey, model) : null
-    // Hermes API server speaks the OpenAI protocol
-    if (provider === 'hermes') return new OpenAIClient(apiKey || 'hermes', model, effort, baseUrl || 'http://localhost:8642/v1')
+    // Hermes always talks to its own API server — the base URL field is ignored (HERMES_BASE_URL env overrides the host)
+    if (provider === 'hermes') return new OpenAIClient(apiKey || 'hermes', model, effort, process.env.HERMES_BASE_URL || 'http://localhost:8642/v1')
     return null
   }
 

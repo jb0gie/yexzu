@@ -284,8 +284,6 @@ export class ServerNetwork extends System {
         },
         true
       )
-      // per-user ai key (bring your own key) — kept on the socket, never in player data (broadcast)
-      socket.aiKey = user.aiKey || null
 
       // send snapshot
       const blueprints = this.world.blueprints.serialize()
@@ -616,11 +614,10 @@ export class ServerNetwork extends System {
     this.world.ai.onAction(action, socket.aiKey)
   }
 
-  // per-user ai key — any player may set their own (used instead of the world key)
-  onAiKey = async (socket, data) => {
+  // per-user ai key — session only (kept on the socket, never persisted or broadcast)
+  onAiKey = (socket, data) => {
     const key = data?.key ? String(data.key).trim() : null
     socket.aiKey = key || null
-    await this.db('users').where('id', socket.id).update({ aiKey: socket.aiKey })
     socket.send('aiKeySet', { set: !!socket.aiKey })
   }
 
