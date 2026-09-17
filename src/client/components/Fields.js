@@ -1,5 +1,5 @@
 import { css } from '@firebolt-dev/css'
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HintContext } from './Hint'
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons'
 import { useUpdate } from './useUpdate'
@@ -1112,7 +1112,12 @@ export function FieldColor({ label, hint, value, onChange }) {
     if (!showPicker) return
 
     function handleClickOutside(e) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target) &&
+        controlRef.current &&
+        !controlRef.current.contains(e.target)
+      ) {
         setShowPicker(false)
       }
     }
@@ -1120,6 +1125,33 @@ export function FieldColor({ label, hint, value, onChange }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showPicker, localValue])
+
+  // Once rendered, correct the position with the real measured size
+  useLayoutEffect(() => {
+    if (!showPicker) return
+    const el = pickerRef.current
+    if (!el) return
+    const pickerWidth = el.offsetWidth || 182
+    const pickerHeight = el.offsetHeight || 360
+    const rect = controlRef.current && controlRef.current.getBoundingClientRect()
+    let left = pickerPosition.left
+    let top = pickerPosition.top
+    if (left + pickerWidth > window.innerWidth - 8) {
+      left = window.innerWidth - pickerWidth - 8
+    }
+    if (left < 8) {
+      left = 8
+    }
+    if (top + pickerHeight > window.innerHeight - 8) {
+      top = rect ? rect.top - pickerHeight - 8 : window.innerHeight - pickerHeight - 8
+    }
+    if (top < 8) {
+      top = 8
+    }
+    if (left !== pickerPosition.left || top !== pickerPosition.top) {
+      setPickerPosition({ top, left })
+    }
+  }, [showPicker, pickerPosition])
 
   const handleColorChange = color => {
     setLocalValue(color)
@@ -1158,20 +1190,25 @@ export function FieldColor({ label, hint, value, onChange }) {
     if (!showPicker && controlRef.current) {
       const rect = controlRef.current.getBoundingClientRect()
       const pickerWidth = 182 // 150px picker + 32px padding
-      const pickerHeight = 250 // approximate height with presets
+      const pickerHeight = 360 // approximate height with presets
 
-      // Calculate position to keep picker on screen
+      // Anchor right edges, then clamp within the viewport (both axes)
       let left = rect.right - pickerWidth
       let top = rect.bottom + 8
 
-      // Check if picker would go off right edge
-      if (left < 0) {
-        left = rect.left
+      if (left + pickerWidth > window.innerWidth - 8) {
+        left = window.innerWidth - pickerWidth - 8
+      }
+      if (left < 8) {
+        left = 8
       }
 
-      // Check if picker would go off bottom
-      if (top + pickerHeight > window.innerHeight) {
+      // Flip above the control when it would overflow the bottom edge
+      if (top + pickerHeight > window.innerHeight - 8) {
         top = rect.top - pickerHeight - 8
+      }
+      if (top < 8) {
+        top = 8
       }
 
       setPickerPosition({ top, left })
@@ -1224,86 +1261,6 @@ export function FieldColor({ label, hint, value, onChange }) {
         .fieldcolor-control:hover {
           background-color: rgba(255, 255, 255, 0.03);
         }
-        .fieldcolor-picker {
-          position: fixed;
-          z-index: 10000;
-          background: rgba(11, 10, 21, 0.95);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 1rem;
-          padding: 1rem;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-        }
-        /* Custom styles for react-colorful */
-        .react-colorful {
-          width: 100%;
-          height: 150px;
-        }
-        .react-colorful__saturation {
-          border-radius: 0.5rem 0.5rem 0 0;
-        }
-        .react-colorful__hue {
-          margin-top: 0.75rem;
-          height: 0.75rem;
-          border-radius: 0.375rem;
-        }
-        .react-colorful__saturation-pointer,
-        .react-colorful__hue-pointer {
-          width: 1rem;
-          height: 1rem;
-          border-width: 2px;
-        }
-        .fieldcolor-hexinput {
-          margin-top: 0.75rem;
-          input {
-            width: 100%;
-            padding: 0.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.375rem;
-            color: #ffffff;
-            font-family: monospace;
-            font-size: 0.875rem;
-            text-align: center;
-            text-transform: uppercase;
-            transition: all 0.2s;
-            &:focus {
-              outline: none;
-              border-color: rgba(255, 255, 255, 0.3);
-              background: rgba(255, 255, 255, 0.08);
-            }
-            &::placeholder {
-              color: rgba(255, 255, 255, 0.3);
-            }
-          }
-        }
-        .fieldcolor-presets {
-          display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 0.375rem;
-          margin-top: 0.75rem;
-          padding-top: 0.75rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .fieldcolor-preset {
-          width: 1.25rem;
-          height: 1.25rem;
-          border-radius: 0.25rem;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          cursor: pointer;
-          transition: all 0.1s;
-          position: relative;
-        }
-        .fieldcolor-preset:hover {
-          transform: scale(1.1);
-          border-color: rgba(255, 255, 255, 0.4);
-        }
-        .fieldcolor-preset.active {
-          border-color: #ffffff;
-          box-shadow:
-            0 0 0 2px #ffffff,
-            0 0 0 3px rgba(0, 0, 0, 0.5);
-        }
       `}
       onPointerEnter={() => setHint(hint)}
       onPointerLeave={() => setHint(null)}
@@ -1317,36 +1274,118 @@ export function FieldColor({ label, hint, value, onChange }) {
       </div>
 
       {showPicker && (
-        <div
-          className='fieldcolor-picker'
-          ref={pickerRef}
-          style={{
-            top: `${pickerPosition.top}px`,
-            left: `${pickerPosition.left}px`,
-          }}
-        >
-          <HexColorPicker color={localValue} onChange={handleColorChange} />
-          <div className='fieldcolor-hexinput'>
-            <input
-              type='text'
-              value={hexInput}
-              onChange={handleHexInputChange}
-              onBlur={handleHexInputBlur}
-              placeholder='#FFFFFF'
-              maxLength={7}
-            />
-          </div>
-          <div className='fieldcolor-presets'>
-            {presetColors.map(color => (
-              <div
-                key={color}
-                className={`fieldcolor-preset ${localValue === color ? 'active' : ''}`}
-                style={{ backgroundColor: color }}
-                onClick={() => handlePresetClick(color)}
+        <Portal>
+          <div
+            className='fieldcolor-picker'
+            ref={pickerRef}
+            style={{
+              top: `${pickerPosition.top}px`,
+              left: `${pickerPosition.left}px`,
+            }}
+            css={css`
+              position: fixed;
+              z-index: 10000;
+              background: rgba(11, 10, 21, 0.95);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 1rem;
+              padding: 1rem;
+              backdrop-filter: blur(10px);
+              box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+              /* Custom styles for react-colorful */
+              .react-colorful {
+                width: 100%;
+                height: 150px;
+              }
+              .react-colorful__saturation {
+                border-radius: 0.5rem 0.5rem 0 0;
+              }
+              .react-colorful__hue {
+                margin-top: 0.75rem;
+                height: 0.75rem;
+                border-radius: 0.375rem;
+              }
+              .react-colorful__saturation-pointer,
+              .react-colorful__hue-pointer {
+                width: 1rem;
+                height: 1rem;
+                border-width: 2px;
+              }
+              .fieldcolor-hexinput {
+                margin-top: 0.75rem;
+                input {
+                  width: 100%;
+                  padding: 0.5rem;
+                  background: rgba(255, 255, 255, 0.05);
+                  border: 1px solid rgba(255, 255, 255, 0.1);
+                  border-radius: 0.375rem;
+                  color: #ffffff;
+                  font-family: monospace;
+                  font-size: 0.875rem;
+                  text-align: center;
+                  text-transform: uppercase;
+                  transition: all 0.2s;
+                  &:focus {
+                    outline: none;
+                    border-color: rgba(255, 255, 255, 0.3);
+                    background: rgba(255, 255, 255, 0.08);
+                  }
+                  &::placeholder {
+                    color: rgba(255, 255, 255, 0.3);
+                  }
+                }
+              }
+              .fieldcolor-presets {
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 0.375rem;
+                margin-top: 0.75rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+              }
+              .fieldcolor-preset {
+                width: 1.25rem;
+                height: 1.25rem;
+                border-radius: 0.25rem;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                cursor: pointer;
+                transition: all 0.1s;
+                position: relative;
+              }
+              .fieldcolor-preset:hover {
+                transform: scale(1.1);
+                border-color: rgba(255, 255, 255, 0.4);
+              }
+              .fieldcolor-preset.active {
+                border-color: #ffffff;
+                box-shadow:
+                  0 0 0 2px #ffffff,
+                  0 0 0 3px rgba(0, 0, 0, 0.5);
+              }
+            `}
+          >
+            <HexColorPicker color={localValue} onChange={handleColorChange} />
+            <div className='fieldcolor-hexinput'>
+              <input
+                type='text'
+                value={hexInput}
+                onChange={handleHexInputChange}
+                onBlur={handleHexInputBlur}
+                placeholder='#FFFFFF'
+                maxLength={7}
               />
-            ))}
+            </div>
+            <div className='fieldcolor-presets'>
+              {presetColors.map(color => (
+                <div
+                  key={color}
+                  className={`fieldcolor-preset ${localValue === color ? 'active' : ''}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => handlePresetClick(color)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   )
