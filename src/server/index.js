@@ -290,7 +290,15 @@ fastify.get('/api/audio-meta', async (req, reply) => {
   if (!target) return reply.code(400).send({ error: 'missing ?url=' })
   let parsed
   try {
-    parsed = new URL(target)
+    if (target.startsWith('asset://')) {
+      const filename = target.slice(8).split('?')[0]
+      if (!/^[a-zA-Z0-9._-]+$/.test(filename)) return reply.code(400).send({ error: 'invalid asset' })
+      const base = (process.env.ASSETS_BASE_URL || '').replace(/\/$/, '')
+      if (!base) return reply.code(400).send({ error: 'ASSETS_BASE_URL missing' })
+      parsed = new URL(`${base}/${filename}`)
+    } else {
+      parsed = new URL(target)
+    }
   } catch {
     return reply.code(400).send({ error: 'invalid url' })
   }

@@ -144,6 +144,9 @@ export class UI extends Node {
       this.mesh.matrixAutoUpdate = false
       this.mesh.matrixWorldAutoUpdate = false
       this.mesh.matrixWorld.copy(this.matrixWorld)
+      // world transparents (glass etc) are renderOrder 0 + depthWrite false, so they
+      // composite over this quad unless we draw later. nametags sit at 9999.
+      this.mesh.renderOrder = 1000
       this.ctx.world.stage.scene.add(this.mesh)
       if (this._pointerEvents) {
         this.sItem = {
