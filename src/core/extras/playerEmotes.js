@@ -31,7 +31,7 @@ export const Emotes = {
   CLIMB_DOWN: 'asset://mp-climb-down.glb?s=1.2',
   LEDGE_HANGING_IDLE: 'asset://mp-ledge-hanging-idle.glb?s=1.0',
   LEDGE_HANGING_MOVING: 'asset://mp-ledge-hanging-moving.glb?s=1.2',
-  AIR_DIVE: 'asset://mp-air-dive.glb?s=1.0',
+  AIR_DIVE: 'asset://mp-platformer/mp-air-dive.glb',
   WALL_SLIDE: 'asset://mp-wallslide.glb?s=1.0',
 }
 

@@ -27,6 +27,9 @@ const DEFAULT_CAM_HEIGHT = 1.2
 
 const COYOTE_TIME = 0.1   // seconds of jump grace after leaving ground (50Hz = 5 frames)
 const BUFFER_TIME = 0.15  // seconds a jump press remains valid before landing (50Hz = ~7 frames)
+const GLIDE_FALL_SPEED = 2.5 // hold-jump descent cap (m/s)
+const DIVE_ENTER_SPEED = 12 // m/s down → air-dive pose (above jump ~7.7)
+const DIVE_EXIT_SPEED = 9 // hysteresis so the pose doesn't flicker
 
 const v1 = new THREE.Vector3()
 const v2 = new THREE.Vector3()
@@ -89,6 +92,8 @@ export class PlayerLocal extends Entity {
 
     this.fallTimer = 0
     this.falling = false
+    this.gliding = false
+    this.airDiving = false
 
     this.moveDir = new THREE.Vector3()
     this.moving = false
@@ -680,13 +685,28 @@ export class PlayerLocal extends Entity {
       }
       // when walking off an edge or over the top of a ramp, attempt to snap down to a surface
       // ponytail: only snap if we've actually been falling; prevents landing stutter when a frame misses ground
-      if (this.justLeftGround && !this.jumping && this.fallTimer > 0.05) {
+      if (this.justLeftGround && !this.jumping && this.fallTimer > 0.05 && !this.jumpDown) {
         velocity.y = -5
       }
       // if slipping ensure we can't gain upward velocity
       if (this.slipping) {
         // increase downward velocity to prevent sliding upward when walking at a slope
         velocity.y -= 0.5
+      }
+      // ponytail: hold jump while falling = glide. look up (cam.x+) slows the cap, never 0 so you still land.
+      this.gliding = !this.grounded && this.jumpDown && velocity.y < 0 && !this.world.builder?.enabled
+      if (this.gliding) {
+        const lift = clamp(this.cam.rotation.x / (45 * DEG2RAD), -1, 1)
+        const cap = Math.max(0.4, GLIDE_FALL_SPEED * (1 - lift * 0.85))
+        if (velocity.y < -cap) velocity.y = -cap
+      }
+      // ponytail: fast fall → existing AIR_DIVING pose. hysteresis so it doesn't chatter.
+      if (this.grounded || this.gliding) {
+        this.airDiving = false
+      } else if (velocity.y < -DIVE_ENTER_SPEED) {
+        this.airDiving = true
+      } else if (velocity.y > -DIVE_EXIT_SPEED) {
+        this.airDiving = false
       }
 
       // apply additional push force
@@ -1065,6 +1085,8 @@ export class PlayerLocal extends Entity {
       // emote = this.data.effect.emote
     } else if (this.flying) {
       mode = Modes.FLY
+    } else if (this.gliding || this.airDiving) {
+      mode = Modes.AIR_DIVING
     } else if (this.airJumping) {
       // Smart flip mode detection - based on movement direction
       const flipMode = this.detectSmartFlipMode()
