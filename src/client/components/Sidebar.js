@@ -35,6 +35,7 @@ import {
   CircleArrowRightIcon,
 } from 'lucide-react'
 import { cls } from './cls'
+import { YAW_DEG, PERSPECTIVE_PX, isEnvelopePane, ENVELOPE_W } from './uiScale'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FieldBtn,
@@ -121,6 +122,8 @@ export function Sidebar({ world, ui }) {
         gsap.set(el, { autoAlpha: to })
         return
       }
+      // opacity only — no transform, so there is nothing here for a back ease to
+      // overshoot. Bounce belongs to the pane slide below, not this fade.
       gsap.to(el, { autoAlpha: to, duration: dur(DUR.norm), ease: ease.soft, overwrite: 'auto' })
     },
     { dependencies: [shown] }
@@ -309,7 +312,13 @@ export function Sidebar({ world, ui }) {
             </Section>
           )}
         </div>
-        <PaneSlider pane={ui.pane} hidden={!ui.active} world={world} app={ui.app} />
+        <PaneSlider
+          pane={ui.pane}
+          hidden={!ui.active}
+          world={world}
+          app={ui.app}
+          side={hudSide === 'right' ? 'right' : 'left'}
+        />
       </div>
     </HintProvider>
   )
@@ -395,6 +404,7 @@ function Content({ width = '20rem', hidden, children }) {
       className={cls('sidebar-content', { hidden })}
       css={css`
         width: ${width};
+        position: relative; // anchors the hint overlay
         pointer-events: auto;
         .sidebar-content-main {
           background: rgba(11, 10, 21, 0.85);
@@ -416,7 +426,7 @@ function Content({ width = '20rem', hidden, children }) {
   )
 }
 
-function PaneSlider({ pane, hidden, world, app }) {
+function PaneSlider({ pane, hidden, world, app, side }) {
   const ref = useRef()
   const paneRef = useRef(pane)
   paneRef.current = pane
@@ -435,10 +445,13 @@ function PaneSlider({ pane, hidden, world, app }) {
           gsap.set(el, shownPos)
           return
         }
+        // back.out(1.7) — overshoots ~11% of the 28px travel (~3px past rest)
+        // then settles, so the pane lands with a little bounce instead of just
+        // stopping. Same travel, same duration; only the curve changed.
         gsap.fromTo(el, enterFrom, {
           ...shownPos,
           duration: dur(DUR.norm),
-          ease: ease.soft,
+          ease: ease.drop,
           overwrite: 'auto',
         })
         return
@@ -464,7 +477,7 @@ function PaneSlider({ pane, hidden, world, app }) {
 
   const id = shown || pane
   if (!id) return null
-  const props = { world, hidden }
+  const props = { world, hidden, envelope: isEnvelopePane(id) }
   return (
     <div
       ref={ref}
@@ -477,33 +490,52 @@ function PaneSlider({ pane, hidden, world, app }) {
         overflow: hidden;
       `}
     >
-      {id === 'prefs' && <Prefs {...props} />}
-      {id === 'world' && <World {...props} />}
-      {id === 'apps' && <Apps {...props} />}
-      {id === 'add' && <Add {...props} />}
-      {id === 'app' && app && <App key={app.data.id} {...props} />}
+      {id === 'prefs' && <Prefs {...props} side={side} />}
+      {id === 'world' && <World {...props} side={side} />}
+      {id === 'apps' && <Apps {...props} side={side} />}
+      {id === 'add' && <Add {...props} side={side} />}
+      {id === 'app' && app && <App key={app.data.id} {...props} side={side} />}
       {id === 'script' && app && <Script key={app.data.id} {...props} />}
-      {id === 'nodes' && app && <Nodes key={app.data.id} {...props} />}
-      {id === 'meta' && app && <Meta key={app.data.id} {...props} />}
-      {id === 'players' && <Players {...props} />}
+      {id === 'nodes' && app && <Nodes key={app.data.id} {...props} side={side} />}
+      {id === 'meta' && app && <Meta key={app.data.id} {...props} side={side} />}
+      {id === 'players' && <Players {...props} side={side} />}
     </div>
   )
 }
 
-function Pane({ width = '20rem', hidden, children }) {
+function Pane({ width, hidden, children, side, envelope }) {
+  // COLD LIGHT's cockpit read, in CSS: everything toes in toward the centre of
+  // the frame. A left-docked pane takes +yaw, a right-docked one -yaw, so both
+  // face the middle and the set reads as a shallow wrap rather than as stickers
+  // on the glass. `transform-origin` is pulled to the docked edge so the pane
+  // swings from where it is anchored instead of drifting off the side.
+  const yaw = side === 'right' ? -YAW_DEG : YAW_DEG
+  const origin = side === 'right' ? 'right center' : 'left center'
+  // explicit width wins (the Apps pane asks for 40rem in perf mode); otherwise
+  // an envelope pane takes the wider surface and a rail pane hugs at 20rem
+  const w = width || (envelope ? ENVELOPE_W : '20rem')
   return (
     <div
       className={cls('sidebarpane', { hidden })}
       css={css`
-        width: ${width};
+        width: ${w};
         max-width: 100%;
         height: 100%;
         min-height: 0;
+        position: relative; // anchors the hint overlay
+        transform: perspective(${PERSPECTIVE_PX}px) rotateY(${yaw}deg);
+        transform-origin: ${origin};
         display: flex;
         flex-direction: column;
         .sidebarpane-content {
           pointer-events: auto;
-          flex: 1;
+          /* Rail panes hug their content and cap at the pane box, then let the
+             inner scroller do the work. f986556 -> flex:1 made EVERY pane fill
+             the viewport even when the list was short. An ENVELOPE pane is the
+             exception on purpose: those are the ones you are working IN, so
+             they take the height they are given. */
+          flex: ${envelope ? 1 : '0 1 auto'};
+          max-height: 100%;
           min-height: 0;
           display: flex;
           flex-direction: column;
@@ -528,7 +560,16 @@ function Hint() {
     <div
       className='hint'
       css={css`
-        margin-top: 0.75rem;
+        /* Out of flow on purpose. As a flex sibling of the scroller this stole
+           its height, so the list jumped every time a hint appeared on a
+           hinted field (the "props list is at its maximum" report).
+           Overlay the card's bottom edge instead. */
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+        pointer-events: none; // informational only — never intercept a click
         background: rgba(11, 10, 21, 0.85);
         border: 0.0625rem solid #2a2b39;
         backdrop-filter: blur(5px);
@@ -575,7 +616,7 @@ const shadowOptions = [
   { label: 'Med', value: 'med' },
   { label: 'High', value: 'high' },
 ]
-function Prefs({ world, hidden }) {
+function Prefs({ world, hidden, side, envelope }) {
   const player = world.entities.player
   const { isAdmin, isBuilder } = useRank(world, player)
   const [name, setName] = useState(() => player.data.name)
@@ -637,7 +678,7 @@ function Prefs({ world, hidden }) {
     }
   }, [])
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='prefs noscrollbar'
         css={css`
@@ -814,7 +855,7 @@ const rankOptions = [
   { label: 'Builders', value: 1 },
   { label: 'Visitors', value: 0 },
 ]
-function World({ world, hidden }) {
+function World({ world, hidden, side, envelope }) {
   const player = world.entities.player
   const { isAdmin } = useRank(world, player)
   const [title, setTitle] = useState(world.settings.title)
@@ -864,7 +905,7 @@ function World({ world, hidden }) {
     }
   }, [])
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='world'
         css={css`
@@ -1051,7 +1092,7 @@ const appsState = {
   perf: false,
   scrollTop: 0,
 }
-function Apps({ world, hidden }) {
+function Apps({ world, hidden, side, envelope }) {
   const { setHint } = useContext(HintContext)
   const contentRef = useRef()
   const [query, setQuery] = useState(appsState.query)
@@ -1065,7 +1106,7 @@ function Apps({ world, hidden }) {
     appsState.perf = perf
   }, [query, perf])
   return (
-    <Pane width={perf ? '40rem' : '20rem'} hidden={hidden}>
+    <Pane width={perf ? '40rem' : '20rem'} hidden={hidden} side={side} envelope={envelope}>
       <div
         className='apps'
         css={css`
@@ -1156,7 +1197,7 @@ function Apps({ world, hidden }) {
   )
 }
 
-function Add({ world, hidden }) {
+function Add({ world, hidden, side, envelope }) {
   // note: multiple collections are supported by the engine but for now we just use the 'default' collection.
   const collection = world.collections.get('default')
   const span = 4
@@ -1187,7 +1228,7 @@ function Add({ world, hidden }) {
     }, 100)
   }
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='add'
         css={css`
@@ -1271,7 +1312,7 @@ const extToType = {
 const allowedModels = ['glb', 'vrm']
 let showTransforms = false
 
-function App({ world, hidden }) {
+function App({ world, hidden, side, envelope }) {
   const { setHint } = useContext(HintContext)
   const app = world.ui.state.app
   const [pinned, setPinned] = useState(app.data.pinned)
@@ -1334,7 +1375,7 @@ function App({ world, hidden }) {
     setPinned(pinned)
   }
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='app'
         css={css`
@@ -1809,6 +1850,9 @@ function AppField({ world, props, field, value, modify }) {
   return null
 }
 
+// NOTE: no <Pane> here — the script editor owns its own resizable container,
+// so it takes neither `side` nor `envelope`. If it ever moves onto <Pane>, add
+// them back and forward them through.
 function Script({ world, hidden }) {
   const app = world.ui.state.app
   const containerRef = useRef()
@@ -1981,10 +2025,10 @@ function Script({ world, hidden }) {
   )
 }
 
-function Nodes({ world, hidden }) {
+function Nodes({ world, hidden, side, envelope }) {
   const app = world.ui.state.app
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='nodes'
         css={css`
@@ -2018,7 +2062,7 @@ function Nodes({ world, hidden }) {
   )
 }
 
-function Meta({ world, hidden }) {
+function Meta({ world, hidden, side, envelope }) {
   const app = world.ui.state.app
   const [blueprint, setBlueprint] = useState(app.blueprint)
   useEffect(() => {
@@ -2037,7 +2081,7 @@ function Meta({ world, hidden }) {
     world.network.send('blueprintModified', { id: blueprint.id, version, [key]: value })
   }
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='meta'
         css={css`
@@ -2118,7 +2162,7 @@ function getPlayers(world) {
   players = sortBy(players, player => player.enteredAt)
   return players
 }
-function Players({ world, hidden }) {
+function Players({ world, hidden, side, envelope }) {
   const { setHint } = useContext(HintContext)
   const localPlayer = world.entities.player
   const isAdmin = localPlayer.isAdmin()
@@ -2166,7 +2210,7 @@ function Players({ world, hidden }) {
     })
   }
   return (
-    <Pane hidden={hidden}>
+    <Pane hidden={hidden} side={side} envelope={envelope}>
       <div
         className='players'
         css={css`

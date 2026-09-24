@@ -13,3 +13,5 @@ build/
 .claude/
 tmp/
 .gm-stop-verified
+.hermes/
+dev/

@@ -19,6 +19,7 @@ import { ControlPriorities } from '../../core/extras/ControlPriorities'
 // import { MenuApp } from './MenuApp'
 import { ChevronDoubleUpIcon, HandIcon, QuestionIcon } from './Icons'
 import { Sidebar } from './Sidebar'
+import { uiScale } from './uiScale'
 import { EVM, Providers } from './EVM'
 import { QUAI } from './QUAI'
 
@@ -73,16 +74,24 @@ export function CoreUI({ world }) {
     // elem.addEventListener('touchmove', onEvent)
     // elem.addEventListener('touchend', onEvent)
   }, [])
+  // The whole editor is sized in rem, so the root font-size IS the UI scale.
+  // `prefs.ui` stays the user's own multiplier (it was the only knob before);
+  // the viewport law from dead's COLD LIGHT rides on top of it, so a big
+  // display gets a generous interface and a short one gets FULL-SIZE type and
+  // fewer rows rather than tiny type. See uiScale.js for why the floor is 1.
   useEffect(() => {
-    document.documentElement.style.fontSize = `${16 * world.prefs.ui}px`
+    const apply = () => {
+      document.documentElement.style.fontSize = `${16 * uiScale(innerHeight) * world.prefs.ui}px`
+    }
+    apply()
     function onChange(changes) {
-      if (changes.ui) {
-        document.documentElement.style.fontSize = `${16 * world.prefs.ui}px`
-      }
+      if (changes.ui) apply()
     }
     world.prefs.on('change', onChange)
+    window.addEventListener('resize', apply)
     return () => {
       world.prefs.off('change', onChange)
+      window.removeEventListener('resize', apply)
     }
   }, [])
   return (
@@ -974,7 +983,10 @@ function Actions({ world }) {
             x: 0,
             duration: dur(DUR.norm),
             stagger: { each: 0.06, from: 'start' },
-            ease: ease.soft,
+            // back.out — same little overshoot as the pane. Entries bounce;
+            // the exit below deliberately does NOT (a bounce on the way out
+            // reads as tacky and delays the removal).
+            ease: ease.drop,
             overwrite: 'auto',
           }
         )

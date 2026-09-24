@@ -25,8 +25,20 @@ export class XR extends System {
   async enter() {
     this.world.graphics.renderer.xr.setReferenceSpaceType('local-floor')
     this.world.graphics.renderer.xr.setFoveation(1)
+    // `dom-overlay` is what makes the ENTIRE React UI visible in a headset.
+    // Without it the UI is not merely hard to read, it is absent: an
+    // immersive-vr session composites the WebGL layer and nothing else, so every
+    // pane, button and the sidebar simply do not exist for the wearer.
+    //
+    // Optional, never required: a headset/browser that refuses the grant must
+    // still get a session (you lose the UI, not VR). `root` is the element WebXR
+    // paints into the overlay — CoreUI's host, so its theme and pointer events
+    // come along.
+    const overlayRoot = document.getElementById('root')
     const session = await navigator.xr?.requestSession('immersive-vr', {
       requiredFeatures: ['local-floor'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: overlayRoot ? { root: overlayRoot } : undefined,
     })
     try {
       session.updateTargetFrameRate(72)
