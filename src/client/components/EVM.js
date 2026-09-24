@@ -130,49 +130,54 @@ const wagmiAdapter = new WagmiAdapter({
   storage: null,
 })
 
-// Initialize AppKit if project ID is available
-// Note: Add featuredWalletIds to prioritize specific wallets on the main view
-// Find wallet IDs at: https://walletguide.walletconnect.network/
-if (projectId && projectId.length >= 32) {
-  console.log('[EVM] Initializing AppKit with projectId:', projectId.substring(0, 8) + '...')
-  try {
-    createAppKit({
-    adapters: [wagmiAdapter],
-    networks,
-    projectId,
-    metadata: {
-      name: 'Hyperfy',
-      description: 'Hyperfy Virtual World',
-      url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
-      icons: ['https://avatars.githubusercontent.com/u/12345678'],
-    },
-    themeMode: 'dark',
-    features: {
-      analytics: false,
-      swaps: false,
-      onramp: false,
-      email: false,
-      // Disable auto-connect on page load
-      connectMethodsOrder: ['wallet', 'email', 'social'],
-    },
-    // Prevent auto-opening the modal
-    defaultAccountTypes: {
-      eip155: 'EOA',
-    },
-    })
-    console.log('[EVM] AppKit initialized successfully')
-  } catch (err) {
-    console.error('[EVM] Failed to initialize AppKit:', err)
-  }
-} else {
-  console.warn('[EVM] No valid projectId found, AppKit disabled')
-}
+// AppKit must exist before children mount — Logic() calls useAppKit()
+// before any effect runs — so this initializes during render, not in an effect.
+let appKitInitialized = false
+let appKitWarned = false
 
-export const Providers = ({ children }) => (
-  <WagmiProvider config={wagmiAdapter.wagmiConfig}>
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  </WagmiProvider>
-)
+export const Providers = ({ children }) => {
+  // Initialize AppKit once during render, before children mount
+  if (!appKitInitialized && projectId && projectId.length >= 32) {
+    console.log('[EVM] Initializing AppKit with projectId:', projectId.substring(0, 8) + '...')
+    try {
+      createAppKit({
+        adapters: [wagmiAdapter],
+        networks,
+        projectId,
+        metadata: {
+          name: 'Hyperfy',
+          description: 'Hyperfy Virtual World',
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://hyperfy.xyz',
+          icons: ['https://avatars.githubusercontent.com/u/12345678'],
+        },
+        themeMode: 'dark',
+        features: {
+          analytics: false,
+          swaps: false,
+          onramp: false,
+          email: false,
+          connectMethodsOrder: ['wallet', 'email', 'social'],
+        },
+        defaultAccountTypes: {
+          eip155: 'EOA',
+        },
+      })
+      console.log('[EVM] AppKit initialized successfully')
+      appKitInitialized = true
+    } catch (err) {
+      console.error('[EVM] Failed to initialize AppKit:', err)
+    }
+  } else if (!appKitWarned && (!projectId || projectId.length < 32)) {
+    appKitWarned = true
+    console.warn('[EVM] No valid projectId found, AppKit disabled')
+  }
+
+  return (
+    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </WagmiProvider>
+  )
+}
 
 export function EVM({ world }) {
   // Store the latest connection data for EVMClient to access
@@ -204,7 +209,6 @@ function Logic({ world }) {
   useEffect(() => {
     if (!initialized) {
       setInitialized(true)
-      // If there's any reconnect happening, close it immediately
       if (isReconnecting || isConnecting) {
         console.log('[EVM] Preventing auto-connect...')
         close()
