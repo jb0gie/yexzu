@@ -1,0 +1,3 @@
+# Shell scripts are always executed on Linux (docker entrypoints etc).
+# Windows checkouts must not turn their LF into CRLF.
+*.sh text eol=lf

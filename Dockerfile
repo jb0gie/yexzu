@@ -17,8 +17,8 @@ RUN npm run build
 FROM node:22.11.0-alpine AS production
 WORKDIR /app
 
-# Add curl for healthcheck, and bash/libc6-compat for Dojo
-RUN apk add --no-cache curl bash libc6-compat && \
+# Add curl for healthcheck, and bash/libc6-compat for Dojo, zip/unzip for world backup
+RUN apk add --no-cache curl bash libc6-compat zip unzip && \
     adduser -S nodeuser -u 1001
 
 # Install Dojo toolchain (disabled until Dojo integration is complete)
@@ -33,6 +33,13 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/scripts ./scripts
+# World restore entrypoint: applies a staged restore zip (written by
+# /api/world/restore) before the server boots. sed guards against CRLF from
+# Windows checkouts even though .gitattributes forces LF for *.sh.
+COPY --from=builder /app/scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN test -f /usr/local/bin/docker-entrypoint.sh && \
+    sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 # Copy Dojo scripts (disabled until Dojo integration is complete)
 # COPY --from=builder /app/examples/dojo-integration/*.sh ./dojo-scripts/
 # RUN chmod +x ./dojo-scripts/*.sh
@@ -49,5 +56,6 @@ EXPOSE 3000 5050 8080
 HEALTHCHECK --interval=2s --timeout=10s --start-period=5s --retries=5 \
   CMD curl -f http://localhost:3000/status || exit 1
 
-# Start the application
-CMD ["npm", "run", "start"]
+# Start the application (entrypoint applies a staged world restore first)
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/docker-entrypoint.sh"]
+CMD ["node", "build/index.js"]

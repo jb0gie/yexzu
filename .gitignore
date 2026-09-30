@@ -15,3 +15,6 @@ tmp/
 .gm-stop-verified
 .hermes/
 dev/
+/world-backups/
+/restore-pending.zip
+/restore-pending.failed.zip
