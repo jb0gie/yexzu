@@ -1098,6 +1098,7 @@ function World({ world, hidden, side, envelope }) {
               />
             </>
           )}
+          {isAdmin && <Backup world={world} />}
           <Group label='My AI' />
           <FieldText
             label='My AI Key'
@@ -1127,6 +1128,161 @@ function World({ world, hidden, side, envelope }) {
         </div>
       </div>
     </Pane>
+  )
+}
+
+const BACKUP_CODE_KEY = 'worldBackupAdminCode'
+
+// Admin-only world snapshot/restore pair. Talks to the /api/world/* routes
+// (admin code via X-Admin-Code); see src/server/index.js for the backend and
+// scripts/docker-entrypoint.sh for how a staged restore is applied on boot.
+function Backup({ world }) {
+  const [code, setCode] = useState(() => storage.get(BACKUP_CODE_KEY) || '')
+  const [busy, setBusy] = useState(null) // null | 'building' | 'downloading' | 'uploading' | 'waiting'
+  const fileRef = useRef()
+  const apiUrl = world.network.apiUrl || `${location.origin}/api`
+  const apiBase = apiUrl.replace(/\/api\/?$/, '')
+  const setAdminCode = value => {
+    setCode(value)
+    storage.set(BACKUP_CODE_KEY, value || null)
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms))
+  const headers = () => ({ 'X-Admin-Code': code })
+  const requireCode = () => {
+    if (code) return true
+    world.emit('toast', 'Enter the admin code first')
+    return false
+  }
+  const handle401 = resp => {
+    if (resp.status === 401) {
+      setAdminCode('')
+      world.emit('toast', 'Invalid admin code — cleared')
+      return true
+    }
+    return false
+  }
+
+  const download = async () => {
+    if (busy || !requireCode()) return
+    try {
+      setBusy('building')
+      let resp = await fetch(`${apiBase}/api/world/backup/start`, { method: 'POST', headers: headers() })
+      if (handle401(resp)) return
+      if (!resp.ok) throw new Error(`start failed (${resp.status})`)
+      world.emit('toast', 'Building world backup…')
+      for (;;) {
+        await sleep(2000)
+        resp = await fetch(`${apiBase}/api/world/backup/status`, { headers: headers() })
+        if (handle401(resp)) return
+        if (!resp.ok) throw new Error(`status failed (${resp.status})`)
+        const status = await resp.json()
+        if (status.status === 'done') break
+        if (status.status === 'failed') throw new Error(status.error || 'zip failed')
+      }
+      setBusy('downloading')
+      resp = await fetch(`${apiBase}/api/world/backup/download`, { headers: headers() })
+      if (handle401(resp)) return
+      if (!resp.ok) throw new Error(`download failed (${resp.status})`)
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      a.href = url
+      a.download = `world-backup-${stamp}.zip`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      world.emit('toast', 'World backup downloaded')
+    } catch (err) {
+      world.emit('toast', `Backup failed: ${err.message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const runRestore = async file => {
+    if (busy || !requireCode()) return
+    const ok = await world.ui.confirm({
+      title: 'Restore world?',
+      message: `Replace the entire world with "${file.name}"? The world restarts, everyone is disconnected, and current data is overwritten. Download a fresh backup first if unsure.`,
+      confirmText: 'Restore',
+      cancelText: 'Cancel',
+    })
+    if (!ok) return
+    try {
+      setBusy('uploading')
+      const form = new FormData()
+      form.append('file', file)
+      const resp = await fetch(`${apiBase}/api/world/restore`, { method: 'POST', headers: headers(), body: form })
+      if (handle401(resp)) return
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}))
+        throw new Error(body.error || `restore failed (${resp.status})`)
+      }
+      setBusy('waiting')
+      world.emit('toast', 'Restore staged — waiting for world to restart…')
+      // The server exits to apply the restore (docker restarts the container).
+      // Reload once it has clearly come back: either we saw it go down, or its
+      // reported uptime is tiny.
+      let sawDown = false
+      for (let i = 0; i < 100; i++) {
+        await sleep(3000)
+        try {
+          const r = await fetch(`${apiBase}/status`)
+          if (!r.ok) throw new Error('not ready')
+          const status = await r.json()
+          if (sawDown || (status.uptime != null && status.uptime < 90)) {
+            location.reload()
+            return
+          }
+        } catch (err) {
+          sawDown = true
+        }
+      }
+      setBusy(null)
+      world.emit('toast', 'World did not restart — reload manually once it does')
+    } catch (err) {
+      setBusy(null)
+      world.emit('toast', `Restore failed: ${err.message}`)
+    }
+  }
+
+  return (
+    <>
+      <Group label='Backup' />
+      <FieldText
+        label='Admin Code'
+        secret
+        hint='The world admin code (the same one you use with /admin <code>). Stored only in this browser.'
+        placeholder='not set'
+        value={code}
+        onChange={setAdminCode}
+      />
+      <FieldBtn
+        label='Download World'
+        note={busy === 'building' ? 'building…' : busy === 'downloading' ? 'downloading…' : 'zip'}
+        hint='Snapshot the whole world folder (database + assets + apps) and download it as a zip.'
+        onClick={download}
+      />
+      <FieldBtn
+        label='Restore World'
+        note={busy === 'uploading' ? 'uploading…' : busy === 'waiting' ? 'restarting…' : 'zip'}
+        hint='Upload a world-backup zip. The world restarts and comes back with the uploaded data.'
+        onClick={() => {
+          if (!busy) fileRef.current?.click()
+        }}
+      />
+      <input
+        ref={fileRef}
+        type='file'
+        accept='.zip,application/zip'
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) runRestore(file)
+        }}
+      />
+    </>
   )
 }
 

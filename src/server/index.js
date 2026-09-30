@@ -6,6 +6,8 @@ import fs from 'fs-extra'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { pipeline } from 'stream/promises'
+import { open as openFileHandle } from 'fs/promises'
 import Fastify from 'fastify'
 import ws from '@fastify/websocket'
 import cors from '@fastify/cors'
@@ -178,42 +180,181 @@ fastify.get('/api/upload-check', async (req, reply) => {
   return { exists }
 })
 
-fastify.get('/api/backup', async (req, reply) => {
-  if (!process.env.ADMIN_CODE || req.query.adminCode !== process.env.ADMIN_CODE) {
-    return reply.code(401).send({ error: 'Invalid admin code' })
+// ── World backup / restore ─────────────────────────────────────────────────
+// Admin-only snapshot + restore of the entire world folder (db + assets +
+// collections). Design notes:
+// - The zip is built in rootDir/world-backups, OUTSIDE the world folder, so it
+//   can never recurse into itself.
+// - db.sqlite is snapshotted separately (consistent online copy via VACUUM
+//   INTO; checkpoint + file copy as fallback) and appended to the zip, so a
+//   backup never captures a half-written database.
+// - Restore only STAGES the uploaded zip at rootDir/restore-pending.zip, then
+//   exits the process. The docker entrypoint (scripts/docker-entrypoint.sh)
+//   applies it on the next boot — restoring inline would clobber the live
+//   sqlite file out from under the running server, so never do that.
+// - Zip validation runs in-process (central directory parse) so the server has
+//   no dependency on an `unzip` binary being on PATH; `zip` is only needed to
+//   CREATE backups.
+const WORLD_BACKUP_DIR = path.join(rootDir, 'world-backups')
+const RESTORE_STAGING_ZIP = path.join(rootDir, 'restore-pending.zip')
+let worldBackup = { status: 'idle', startedAt: null, size: null, error: null, zipPath: null }
+
+function isAdminRequest(req) {
+  const code = req.headers['x-admin-code'] || req.query.adminCode
+  return !!process.env.ADMIN_CODE && code === process.env.ADMIN_CODE
+}
+
+async function snapshotDb(snapshotPath) {
+  const liveDb = path.join(worldDir, 'db.sqlite')
+  if (!(await fs.pathExists(liveDb))) return false
+  await fs.remove(snapshotPath).catch(() => {})
+  try {
+    // consistent online snapshot (SQLite >= 3.27); path is single-quoted in SQL
+    await db.raw(`VACUUM INTO '${snapshotPath}'`)
+    return true
+  } catch (err) {
+    console.warn('[backup] VACUUM INTO failed, falling back to file copy:', err.message)
   }
-  const zipPath = path.join(rootDir, 'world-backup.zip')
-  // remove old zip if exists
-  await fs.remove(zipPath)
-  // create zip from world directory and wait for it to finish
-  await execAsync(`zip -r "${zipPath}" .`, { cwd: worldDir })
-  // read the completed file
-  const buffer = await fs.readFile(zipPath)
-  // clean up
-  await fs.remove(zipPath)
-  // send it
-  reply.type('application/zip')
-  reply.header('Content-Disposition', 'attachment; filename="world-backup.zip"')
-  return reply.send(buffer)
+  try {
+    await db.raw('PRAGMA wal_checkpoint(TRUNCATE)')
+  } catch (err) {
+    // best effort — a plain copy of the db is still taken below
+  }
+  await fs.copyFile(liveDb, snapshotPath)
+  return true
+}
+
+// Parse the zip central directory straight from the file: verifies the upload
+// is a structurally valid zip AND that every entry path stays inside the
+// extraction root (no absolute paths, no `..` segments). No subprocess needed.
+async function validateZip(filePath) {
+  const stat = await fs.stat(filePath)
+  if (stat.size < 22) return { ok: false, error: 'file too small to be a zip' }
+  const tailLen = Math.min(stat.size, 65557) // 22-byte EOCD + max 64k comment
+  const tail = Buffer.alloc(tailLen)
+  // native fs/promises handle (fs-extra's open resolves to a numeric fd)
+  const tailFh = await openFileHandle(filePath, 'r')
+  try {
+    await tailFh.read(tail, 0, tailLen, stat.size - tailLen)
+  } finally {
+    await tailFh.close()
+  }
+  let eocd = -1
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (tail.readUInt32LE(i) === 0x06054b50) {
+      eocd = i
+      break
+    }
+  }
+  if (eocd === -1) return { ok: false, error: 'no zip end-of-central-directory record' }
+  const entryCount = tail.readUInt16LE(eocd + 10)
+  if (entryCount === 0) return { ok: false, error: 'zip contains no entries' }
+  const cdSize = tail.readUInt32LE(eocd + 12)
+  const cdOffset = tail.readUInt32LE(eocd + 16)
+  if (cdOffset + cdSize > stat.size) return { ok: false, error: 'central directory is truncated' }
+  const cd = Buffer.alloc(cdSize)
+  const cdFh = await openFileHandle(filePath, 'r')
+  try {
+    await cdFh.read(cd, 0, cdSize, cdOffset)
+  } finally {
+    await cdFh.close()
+  }
+  let p = 0
+  for (let i = 0; i < entryCount; i++) {
+    if (p + 46 > cd.length || cd.readUInt32LE(p) !== 0x02014b50) {
+      return { ok: false, error: 'malformed central directory entry' }
+    }
+    const nameLen = cd.readUInt16LE(p + 28)
+    const extraLen = cd.readUInt16LE(p + 30)
+    const commentLen = cd.readUInt16LE(p + 32)
+    const name = cd.toString('utf8', p + 46, p + 46 + nameLen)
+    const normalized = name.replace(/\\/g, '/')
+    if (normalized.startsWith('/') || /^[a-zA-Z]:/.test(normalized) || normalized.split('/').includes('..')) {
+      return { ok: false, error: `unsafe zip entry: ${name}` }
+    }
+    p += 46 + nameLen + extraLen + commentLen
+  }
+  return { ok: true, entries: entryCount }
+}
+
+fastify.post('/api/world/backup/start', async (req, reply) => {
+  if (!isAdminRequest(req)) return reply.code(401).send({ error: 'Invalid admin code' })
+  if (worldBackup.status === 'running') return { ok: true, status: 'running' }
+  await fs.ensureDir(WORLD_BACKUP_DIR)
+  // keep only the latest snapshot in the folder
+  for (const name of await fs.readdir(WORLD_BACKUP_DIR)) {
+    if (name.endsWith('.zip') || name === 'db.sqlite') await fs.remove(path.join(WORLD_BACKUP_DIR, name))
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const zipPath = path.join(WORLD_BACKUP_DIR, `world-backup-${stamp}.zip`)
+  const dbSnapshot = path.join(WORLD_BACKUP_DIR, 'db.sqlite')
+  worldBackup = { status: 'running', startedAt: Date.now(), size: null, error: null, zipPath }
+  const hadDb = await snapshotDb(dbSnapshot)
+  // -x patterns must be relative to the zip working directory (the worldDir)
+  const args = ['-q', '-r', `"${zipPath}"`, '.', '-x', '"backups/*"']
+  if (hadDb) args.push('-x', '"db.sqlite"') // live db excluded; the consistent snapshot is appended below
+  try {
+    await execAsync(`zip ${args.join(' ')}`, { cwd: worldDir, maxBuffer: 16 * 1024 * 1024 })
+    if (hadDb) {
+      await execAsync(`zip -q -g "${zipPath}" db.sqlite`, { cwd: WORLD_BACKUP_DIR, maxBuffer: 16 * 1024 * 1024 })
+    }
+    const stat = await fs.stat(zipPath)
+    worldBackup = { ...worldBackup, status: 'done', size: stat.size }
+  } catch (err) {
+    worldBackup = { ...worldBackup, status: 'failed', error: err.message }
+  }
+  return { ok: true, status: 'running' }
 })
 
-fastify.post('/api/restore', async (req, reply) => {
-  if (!process.env.ADMIN_CODE || req.query.adminCode !== process.env.ADMIN_CODE) {
-    return reply.code(401).send({ error: 'Invalid admin code' })
+fastify.get('/api/world/backup/status', async (req, reply) => {
+  if (!isAdminRequest(req)) return reply.code(401).send({ error: 'Invalid admin code' })
+  return {
+    status: worldBackup.status,
+    size: worldBackup.size,
+    error: worldBackup.error,
+    startedAt: worldBackup.startedAt,
+    file: worldBackup.zipPath ? path.basename(worldBackup.zipPath) : null,
   }
-  const mp = await req.file()
-  const zipPath = path.join(rootDir, 'restore-upload.zip')
-  // save uploaded file
-  const chunks = []
-  for await (const chunk of mp.file) {
-    chunks.push(chunk)
+})
+
+fastify.get('/api/world/backup/download', async (req, reply) => {
+  if (!isAdminRequest(req)) return reply.code(401).send({ error: 'Invalid admin code' })
+  if (worldBackup.status !== 'done' || !worldBackup.zipPath) {
+    return reply.code(409).send({ error: 'no backup ready' })
   }
-  await fs.writeFile(zipPath, Buffer.concat(chunks))
-  // clear and restore
-  await fs.emptyDir(worldDir)
-  await execAsync(`unzip -o "${zipPath}" -d "${worldDir}"`)
-  await fs.remove(zipPath)
-  return { success: true, message: 'World restored. Restart server to apply changes.' }
+  const stat = await fs.stat(worldBackup.zipPath)
+  reply.header('Content-Type', 'application/zip')
+  reply.header('Content-Length', String(stat.size))
+  reply.header('Content-Disposition', `attachment; filename="${path.basename(worldBackup.zipPath)}"`)
+  return reply.send(fs.createReadStream(worldBackup.zipPath))
+})
+
+fastify.post('/api/world/restore', async (req, reply) => {
+  if (!isAdminRequest(req)) return reply.code(401).send({ error: 'Invalid admin code' })
+  let mp
+  try {
+    // per-route limit override (4GB) — world zips can be 600MB+
+    mp = await req.file({ limits: { fileSize: 4 * 1024 * 1024 * 1024 } })
+  } catch (err) {
+    return reply.code(400).send({ error: `upload rejected: ${err.message}` })
+  }
+  if (!mp) return reply.code(400).send({ error: 'missing file part' })
+  await pipeline(mp.file, fs.createWriteStream(RESTORE_STAGING_ZIP))
+  const cleanup = () => fs.remove(RESTORE_STAGING_ZIP).catch(() => {})
+  const result = await validateZip(RESTORE_STAGING_ZIP)
+  if (!result.ok) {
+    await cleanup()
+    return reply.code(400).send({ error: result.error })
+  }
+  // Apply on next boot (docker entrypoint) — exit so the container restarts.
+  // WORLD_RESTORE_AUTO=true is set on the deployed services; without it the
+  // zip stays staged and the operator restarts the server manually.
+  if (process.env.WORLD_RESTORE_AUTO === 'true') {
+    reply.send({ ok: true, note: 'staged — restarting to apply' })
+    setTimeout(() => process.exit(0), 1500)
+    return
+  }
+  return { ok: true, note: 'staged — restart the server to apply (WORLD_RESTORE_AUTO is not set)' }
 })
 
 // audio proxy — re-serve remote audio with OUR origin so the client can pipe
