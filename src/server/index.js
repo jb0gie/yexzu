@@ -21,6 +21,7 @@ import { Storage } from './Storage'
 import { assets } from './assets'
 import { collections } from './collections'
 import { cleaner } from './cleaner'
+import { writeWorldZip } from './zipwriter'
 
 const execAsync = promisify(exec)
 
@@ -200,8 +201,11 @@ const RESTORE_STAGING_ZIP = path.join(rootDir, 'restore-pending.zip')
 let worldBackup = { status: 'idle', startedAt: null, size: null, error: null, zipPath: null }
 
 function isAdminRequest(req) {
+  // No ADMIN_CODE on the server = everyone is admin (the engine grants ADMIN
+  // rank in that state), so admin routes must accept codeless requests too.
+  if (!process.env.ADMIN_CODE) return true
   const code = req.headers['x-admin-code'] || req.query.adminCode
-  return !!process.env.ADMIN_CODE && code === process.env.ADMIN_CODE
+  return code === process.env.ADMIN_CODE
 }
 
 async function snapshotDb(snapshotPath) {
@@ -294,9 +298,19 @@ fastify.post('/api/world/backup/start', async (req, reply) => {
   const args = ['-q', '-r', `"${zipPath}"`, '.', '-x', '"backups/*"']
   if (hadDb) args.push('-x', '"db.sqlite"') // live db excluded; the consistent snapshot is appended below
   try {
-    await execAsync(`zip ${args.join(' ')}`, { cwd: worldDir, maxBuffer: 16 * 1024 * 1024 })
-    if (hadDb) {
-      await execAsync(`zip -q -g "${zipPath}" db.sqlite`, { cwd: WORLD_BACKUP_DIR, maxBuffer: 16 * 1024 * 1024 })
+    try {
+      await execAsync(`zip ${args.join(' ')}`, { cwd: worldDir, maxBuffer: 16 * 1024 * 1024 })
+      if (hadDb) {
+        await execAsync(`zip -q -g "${zipPath}" db.sqlite`, { cwd: WORLD_BACKUP_DIR, maxBuffer: 16 * 1024 * 1024 })
+      }
+    } catch (err) {
+      // No system `zip` (Windows dev boxes ship without one) or it failed:
+      // fall back to the built-in writer with the same archive layout.
+      console.warn('[backup] system zip failed, using built-in writer:', String(err.message).split('\n')[0])
+      await writeWorldZip(zipPath, worldDir, {
+        skip: rel => rel === 'db.sqlite' || rel.startsWith('backups/'),
+        extraFiles: hadDb ? [{ abs: dbSnapshot, name: 'db.sqlite' }] : [],
+      })
     }
     const stat = await fs.stat(zipPath)
     worldBackup = { ...worldBackup, status: 'done', size: stat.size }
@@ -492,7 +506,7 @@ fastify.get('/status', async (request, reply) => {
   try {
     const status = {
       uptime: Math.round(world.time),
-      protected: process.env.ADMIN_CODE !== undefined ? true : false,
+      protected: !!process.env.ADMIN_CODE,
       connectedUsers: [],
       commitHash: process.env.COMMIT_HASH,
     }

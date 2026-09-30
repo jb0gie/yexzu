@@ -1137,6 +1137,10 @@ const BACKUP_CODE_KEY = 'worldBackupAdminCode'
 // (admin code via X-Admin-Code); see src/server/index.js for the backend and
 // scripts/docker-entrypoint.sh for how a staged restore is applied on boot.
 function Backup({ world }) {
+  // No ADMIN_CODE on the server means everyone is admin (the engine grants
+  // ADMIN rank in that state), so the code field is only required when a code
+  // is actually set — `hasAdminCode` arrives in the network snapshot.
+  const needsCode = world.settings.hasAdminCode
   const [code, setCode] = useState(() => storage.get(BACKUP_CODE_KEY) || '')
   const [busy, setBusy] = useState(null) // null | 'building' | 'downloading' | 'uploading' | 'waiting'
   const fileRef = useRef()
@@ -1149,14 +1153,14 @@ function Backup({ world }) {
   const sleep = ms => new Promise(r => setTimeout(r, ms))
   const headers = () => ({ 'X-Admin-Code': code })
   const requireCode = () => {
-    if (code) return true
+    if (code || !needsCode) return true
     world.emit('toast', 'Enter the admin code first')
     return false
   }
   const handle401 = resp => {
     if (resp.status === 401) {
       setAdminCode('')
-      world.emit('toast', 'Invalid admin code — cleared')
+      world.emit('toast', needsCode ? 'Invalid admin code — cleared' : 'Server rejected the request')
       return true
     }
     return false
@@ -1249,14 +1253,16 @@ function Backup({ world }) {
   return (
     <>
       <Group label='Backup' />
-      <FieldText
-        label='Admin Code'
-        secret
-        hint='The world admin code (the same one you use with /admin <code>). Stored only in this browser.'
-        placeholder='not set'
-        value={code}
-        onChange={setAdminCode}
-      />
+      {needsCode && (
+        <FieldText
+          label='Admin Code'
+          secret
+          hint='The world admin code (the same one you use with /admin <code>). Stored only in this browser.'
+          placeholder='not set'
+          value={code}
+          onChange={setAdminCode}
+        />
+      )}
       <FieldBtn
         label='Download World'
         note={busy === 'building' ? 'building…' : busy === 'downloading' ? 'downloading…' : 'zip'}

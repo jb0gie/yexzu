@@ -100,6 +100,14 @@ API (admin code via `X-Admin-Code` header or `?adminCode=`):
 | GET | `/api/world/backup/download` | Stream the finished zip (409 if not ready) |
 | POST | `/api/world/restore` | Stage an uploaded zip (validated), then restart |
 
+When the server has no `ADMIN_CODE` set, all requests are accepted (the engine's
+own rule is "no code = everyone is admin"); the UI hides the Admin Code field in
+that case. With a code set, requests need it via `X-Admin-Code` or `?adminCode=`.
+
+Backups use the system `zip` where available; when it is missing (local Windows
+dev boxes), the server falls back to a built-in streaming zip writer
+(`src/server/zipwriter.js`) producing the same archive layout.
+
 Design notes:
 
 - `db.sqlite` is snapshotted with a consistent online copy (`VACUUM INTO`,
