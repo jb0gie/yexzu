@@ -36,7 +36,7 @@ import {
 } from 'lucide-react'
 import { cls } from './cls'
 import { YAW_DEG, PERSPECTIVE_PX, isEnvelopePane, ENVELOPE_W } from './uiScale'
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   FieldBtn,
   FieldCurve,
@@ -64,6 +64,7 @@ import * as THREE from '../../core/extras/three'
 import { isTouch } from '../utils'
 import { uuid } from '../../core/utils'
 import { useRank } from './useRank'
+import { Portal } from './Portal'
 import { Ranks } from '../../core/extras/ranks'
 import { gsap, useGSAP, ease, dur, DUR, prefersReducedMotion } from './anim'
 
@@ -235,11 +236,7 @@ export function Sidebar({ world, ui }) {
           </Section>
           {isBuilder && (
             <Section active={activePane} top bottom>
-              <Btn
-                active={buildMode}
-                onClick={() => world.builder.toggle()}
-                title='Build Mode'
-              >
+              <Btn active={buildMode} onClick={() => world.builder.toggle()} title='Build Mode'>
                 <HammerIcon size='1.25rem' />
               </Btn>
               <Btn
@@ -555,32 +552,74 @@ function Pane({ width, hidden, children, side, envelope }) {
 
 function Hint() {
   const { hint } = useContext(HintContext)
-  if (!hint) return null
+  const [pos, setPos] = useState(null)
+  useLayoutEffect(() => {
+    if (!hint) {
+      setPos(null)
+      return
+    }
+    if (!hint.anchor) {
+      console.warn('[hint] no anchor element — tooltip stays hidden:', hint.text)
+      setPos(null)
+      return
+    }
+    const measure = () => {
+      try {
+        const r = hint.anchor.getBoundingClientRect()
+        if (r.width === 0 && r.height === 0) {
+          setPos(null)
+          return
+        }
+        // Dock beside the row, flipped to the row's left when the right edge
+        // has no room. Clamp vertically so edge rows stay on screen.
+        const gap = 14
+        const flip = r.right + gap + 288 > innerWidth
+        const top = Math.max(30, Math.min(r.top + r.height / 2, innerHeight - 30))
+        setPos({ top, left: flip ? r.left - gap : r.right + gap, flip })
+      } catch (err) {
+        setPos(null)
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [hint])
+  if (!hint || !pos) return null
   return (
-    <div
-      className='hint'
-      css={css`
-        /* Out of flow on purpose. As a flex sibling of the scroller this stole
-           its height, so the list jumped every time a hint appeared on a
-           hinted field (the "props list is at its maximum" report).
-           Overlay the card's bottom edge instead. */
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1;
-        pointer-events: none; // informational only — never intercept a click
-        background: rgba(11, 10, 21, 0.85);
-        border: 0.0625rem solid #2a2b39;
-        backdrop-filter: blur(5px);
-        border-radius: 1rem;
-        min-width: 0;
-        padding: 1rem;
-        font-size: 0.9375rem;
-      `}
-    >
-      <span>{hint}</span>
-    </div>
+    <Portal>
+      <div
+        className='hint'
+        css={css`
+          position: fixed;
+          top: ${pos.top}px;
+          left: ${pos.left}px;
+          transform: translate(${pos.flip ? '-100%,' : '0,'} -50%);
+          z-index: 60;
+          pointer-events: none; // informational only — never intercept a click
+          max-width: 18rem;
+          padding: 0.6rem 0.75rem;
+          font-size: 0.875rem;
+          line-height: 1.4;
+          background: rgba(11, 10, 21, 0.92);
+          border: 0.0625rem solid #2a2b39;
+          backdrop-filter: blur(5px);
+          border-radius: 0.75rem;
+          box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+          @keyframes hintin {
+            from {
+              opacity: 0;
+            }
+          }
+          animation: hintin 0.14s ease-out;
+        `}
+      >
+        <span>{hint.text}</span>
+      </div>
+    </Portal>
   )
 }
 
@@ -1038,7 +1077,11 @@ function World({ world, hidden, side, envelope }) {
               <FieldText
                 label='AI API Key'
                 secret
-                hint={aiHasKey ? 'A key is set. Type a new one to replace it.' : 'No key set yet. Paste the provider API key here.'}
+                hint={
+                  aiHasKey
+                    ? 'A key is set. Type a new one to replace it.'
+                    : 'No key set yet. Paste the provider API key here.'
+                }
                 placeholder={aiHasKey ? '•••••• (leave empty to keep)' : 'not set'}
                 value={aiKey}
                 onChange={value => {
@@ -1177,7 +1220,7 @@ function Apps({ world, hidden, side, envelope }) {
           <div
             className={cls('apps-toggle', { active: perf })}
             onClick={() => setPerf(!perf)}
-            onPointerEnter={() => setHint('Toggle performance stats view')}
+            onPointerEnter={e => setHint('Toggle performance stats view', e.currentTarget)}
             onPointerLeave={() => setHint(null)}
           >
             <RocketIcon size='1.125rem' />
@@ -1462,7 +1505,7 @@ function App({ world, hidden, side, envelope }) {
           <div
             className='app-btn'
             onClick={download}
-            onPointerEnter={() => setHint('Download this app')}
+            onPointerEnter={e => setHint('Download this app', e.currentTarget)}
             onPointerLeave={() => setHint(null)}
           >
             <DownloadIcon size='1.125rem' />
@@ -1471,7 +1514,7 @@ function App({ world, hidden, side, envelope }) {
             <AppModelBtn value={blueprint.model} onChange={changeModel}>
               <div
                 className='app-btn'
-                onPointerEnter={() => setHint('Change this apps base model')}
+                onPointerEnter={e => setHint('Change this apps base model', e.currentTarget)}
                 onPointerLeave={() => setHint(null)}
               >
                 <BoxIcon size='1.125rem' />
@@ -1485,7 +1528,7 @@ function App({ world, hidden, side, envelope }) {
                 world.ui.setApp(null)
                 app.destroy(true)
               }}
-              onPointerEnter={() => setHint('Delete this app')}
+              onPointerEnter={e => setHint('Delete this app', e.currentTarget)}
               onPointerLeave={() => setHint(null)}
             >
               <Trash2Icon size='1.125rem' />
@@ -1497,7 +1540,9 @@ function App({ world, hidden, side, envelope }) {
             <div
               className={cls('app-toggle', { active: blueprint.disabled })}
               onClick={() => toggleKey('disabled')}
-              onPointerEnter={() => setHint('Disable this app so that it is no longer active in the world.')}
+              onPointerEnter={e =>
+                setHint('Disable this app so that it is no longer active in the world.', e.currentTarget)
+              }
               onPointerLeave={() => setHint(null)}
             >
               <OctagonXIcon size='1.125rem' />
@@ -1506,7 +1551,7 @@ function App({ world, hidden, side, envelope }) {
             <div
               className={cls('app-toggle', { active: pinned })}
               onClick={() => togglePinned()}
-              onPointerEnter={() => setHint("Pin this app so it can't accidentally be moved.")}
+              onPointerEnter={e => setHint("Pin this app so it can't accidentally be moved.", e.currentTarget)}
               onPointerLeave={() => setHint(null)}
             >
               <PinIcon size='1.125rem' />
@@ -1514,7 +1559,7 @@ function App({ world, hidden, side, envelope }) {
             <div
               className={cls('app-toggle', { active: blueprint.preload })}
               onClick={() => toggleKey('preload')}
-              onPointerEnter={() => setHint('Preload this app before entering the world.')}
+              onPointerEnter={e => setHint('Preload this app before entering the world.', e.currentTarget)}
               onPointerLeave={() => setHint(null)}
             >
               <LoaderPinwheelIcon size='1.125rem' />
@@ -1522,7 +1567,9 @@ function App({ world, hidden, side, envelope }) {
             <div
               className={cls('app-toggle', { active: blueprint.unique })}
               onClick={() => toggleKey('unique')}
-              onPointerEnter={() => setHint('Make this app unique so that new duplicates are not linked to this one.')}
+              onPointerEnter={e =>
+                setHint('Make this app unique so that new duplicates are not linked to this one.', e.currentTarget)
+              }
               onPointerLeave={() => setHint(null)}
             >
               <SparkleIcon size='1.125rem' />
@@ -1530,7 +1577,12 @@ function App({ world, hidden, side, envelope }) {
             <div
               className={cls('app-toggle', { active: blueprint.grabbable })}
               onClick={() => toggleKey('grabbable')}
-              onPointerEnter={() => setHint('Make this app grabbable — players can pick it up and carry it (E to grab, G to drop).')}
+              onPointerEnter={e =>
+                setHint(
+                  'Make this app grabbable — players can pick it up and carry it (E to grab, G to drop).',
+                  e.currentTarget
+                )
+              }
               onPointerLeave={() => setHint(null)}
             >
               <GrabIcon size='1.125rem' />
@@ -1543,7 +1595,7 @@ function App({ world, hidden, side, envelope }) {
               <div
                 className='app-transforms-btn'
                 onClick={() => setTransforms(!transforms)}
-                onPointerEnter={() => setHint('Toggle transform controls')}
+                onPointerEnter={e => setHint('Toggle transform controls', e.currentTarget)}
                 onPointerLeave={() => setHint(null)}
               >
                 <ChevronsUpDownIcon size='1rem' />
@@ -2294,11 +2346,12 @@ function Players({ world, hidden, side, envelope }) {
               {isAdmin && player.isRemote && !player.isAdmin() && world.settings.rank < Ranks.BUILDER && (
                 <div
                   className={cls('players-btn', { dim: !player.isBuilder() })}
-                  onPointerEnter={() =>
+                  onPointerEnter={e =>
                     setHint(
                       player.isBuilder()
                         ? 'Player is not a builder. Click to allow building.'
-                        : 'Player is a builder. Click to revoke.'
+                        : 'Player is a builder. Click to revoke.',
+                      e.currentTarget
                     )
                   }
                   onPointerLeave={() => setHint(null)}
@@ -2310,7 +2363,7 @@ function Players({ world, hidden, side, envelope }) {
               {player.isRemote && localPlayer.outranks(player) && (
                 <div
                   className='players-btn'
-                  onPointerEnter={() => setHint('Teleport to player.')}
+                  onPointerEnter={e => setHint('Teleport to player.', e.currentTarget)}
                   onPointerLeave={() => setHint(null)}
                   onClick={() => teleportTo(player)}
                 >
@@ -2320,9 +2373,10 @@ function Players({ world, hidden, side, envelope }) {
               {player.isRemote && localPlayer.outranks(player) && (
                 <div
                   className='players-btn'
-                  onPointerEnter={() =>
+                  onPointerEnter={e =>
                     setHint(
-                      player.isMuted() ? 'Player is muted. Click to unmute.' : 'Player is not muted. Click to mute.'
+                      player.isMuted() ? 'Player is muted. Click to unmute.' : 'Player is not muted. Click to mute.',
+                      e.currentTarget
                     )
                   }
                   onPointerLeave={() => setHint(null)}
@@ -2334,7 +2388,7 @@ function Players({ world, hidden, side, envelope }) {
               {player.isRemote && localPlayer.outranks(player) && (
                 <div
                   className='players-btn'
-                  onPointerEnter={() => setHint('Kick this player.')}
+                  onPointerEnter={e => setHint('Kick this player.', e.currentTarget)}
                   onPointerLeave={() => setHint(null)}
                   onClick={() => kick(player)}
                 >

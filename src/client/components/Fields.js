@@ -53,7 +53,7 @@ export function FieldText({ label, hint, placeholder, value, onChange, secret })
           background-color: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldtext-label'>{label}</div>
@@ -140,7 +140,7 @@ export function FieldTextarea({ label, hint, placeholder, value, onChange }) {
           background-color: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldtextarea-label'>{label}</div>
@@ -223,7 +223,7 @@ export function FieldSwitch({ label, hint, options, value, onChange }) {
           }
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldswitch-label'>{label}</div>
@@ -265,7 +265,7 @@ export function FieldToggle({ label, hint, trueLabel = 'Yes', falseLabel = 'No',
           background: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
       onClick={() => onChange(!value)}
     >
@@ -387,7 +387,7 @@ export function FieldRange({ label, hint, min = 0, max = 1, step = 0.05, instant
           }
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldrange-label'>{label}</div>
@@ -584,7 +584,7 @@ export function FieldFile({ world, label, hint, kind: kindName, value, onChange 
           background: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
       onClick={handleDownload}
     >
@@ -681,7 +681,7 @@ export function FieldNumber({
           background: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldnumber-label'>{label}</div>
@@ -821,7 +821,7 @@ export function FieldVec3({
           background: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div className='fieldvec3-label'>{label}</div>
@@ -1000,7 +1000,7 @@ export function FieldCurve({ label, hint, x, xRange, y, yMin, yMax, value, onCha
             setEdit(curve.clone())
           }
         }}
-        onPointerEnter={() => setHint(hint)}
+        onPointerEnter={e => setHint(hint, e.currentTarget)}
         onPointerLeave={() => setHint(null)}
       >
         <div className='fieldcurve-label'>{label}</div>
@@ -1059,7 +1059,7 @@ export function FieldBtn({ label, note, hint, nav, onClick }) {
           background: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
       onClick={onClick}
     >
@@ -1262,7 +1262,7 @@ export function FieldColor({ label, hint, value, onChange }) {
           background-color: rgba(255, 255, 255, 0.03);
         }
       `}
-      onPointerEnter={() => setHint(hint)}
+      onPointerEnter={e => setHint(hint, e.currentTarget)}
       onPointerLeave={() => setHint(null)}
     >
       <div ref={controlRef} className='fieldcolor-control' onClick={handleControlClick}>
