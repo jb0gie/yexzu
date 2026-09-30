@@ -1,6 +1,11 @@
 node_modules
 npm-debug.log
 world
+world-restore-check
+world-backups
+restore-pending.zip
+restore-pending.failed.zip
+dev
 .git
 .gitignore
 .env.*
@@ -8,4 +13,4 @@ world
 *.md
 .eslintrc
 .prettierrc
-.eslintignore 
+.eslintignore
