@@ -80,19 +80,133 @@ checkCustomEmote(4)
 checkCustomEmote(5)
 console.log(emotes)
 
-let vrmUrl = app.config.vrm?.url
-let name = `Ashxn`
+// npc avatars live on Cloudflare R2 (custom domain) - the old copies in
+// src/world/assets/vrms are no longer referenced by this app
+const VRM_BASE_URL = 'https://vrms.67420247.xyz'
 
-// vrm randomizer
-const n = num(1, 60)
-// vrmUrl = `asset://fumo-${n}.vrm`
-vrmUrl = `asset://wizard_${n}.vrm`
-name = `Wizard ${n}`
+// the 100 base avatar names in the bucket - half the picks add the _Voxel variant
+const VRM_NAMES = [
+  'Aesthetica',
+  'AlwaysWatching',
+  'Amazonas',
+  'Anchor',
+  'Angry',
+  'Astrodisco',
+  'Astronaut',
+  'Avocado',
+  'Bacondude',
+  'Baldman',
+  'BigBro',
+  'Bloody',
+  'Bullidan',
+  'Butter',
+  'CactusBoy',
+  'CandyCane',
+  'Cappy',
+  'CaptainLobster',
+  'Carrot',
+  'Chad',
+  'Chill',
+  'Chilli',
+  'Clown',
+  'Coffee',
+  'Confirmed',
+  'Cookieman',
+  'CoolAlien',
+  'CoolBanana',
+  'CoolChoco',
+  'Crimsom',
+  'Cubiq',
+  'Cucumber',
+  'David',
+  'Devil',
+  'DinoKid',
+  'DisturbingEyes',
+  'Dracula',
+  'Eggplant',
+  'Erika',
+  'Expol',
+  'Eyelids',
+  'Ferk',
+  'Franky',
+  'Froggy',
+  'Fungus',
+  'Ghost',
+  'GoodTomato',
+  'HorrorNurse',
+  'Hotdog',
+  'Hugo',
+  'IceCream',
+  'Jennifer',
+  'Jimmy',
+  'Kate',
+  'Kyle',
+  'LilBro',
+  'Lydia',
+  'Mafiossini',
+  'Mikel',
+  'Milk',
+  'Mint',
+  'Mummy',
+  'Muscary',
+  'Mushy',
+  'Nightmare',
+  'Observer',
+  'OldMoustache',
+  'Olivia',
+  'Pepo',
+  'Pipe',
+  'Polybot',
+  'Polydancer',
+  'Present',
+  'Pumpkin',
+  'Rabbit',
+  'Retroman',
+  'Ro',
+  'Robert',
+  'Rose',
+  'SaintClaus',
+  'Samuela',
+  'Scarecrow',
+  'Shiro',
+  'Skelly',
+  'Skull',
+  'Snowy',
+  'Sticker',
+  'Teddy',
+  'ToiletPaper',
+  'Toothpaste',
+  'Udom',
+  'Wambo',
+  'Watermelon',
+  'WeirdFlexButOk',
+  'WireFriend',
+  'Witch',
+  'Wizzir',
+  'Wolfman',
+  'XmasTree',
+  'Zombie',
+]
 
-if (!vrmUrl) return
+// resolve the npc avatar - a configured file wins, otherwise roll a random name + variant
+function pickVrm() {
+  const configured = app.config.vrm?.url
+  if (configured) {
+    const filename = (app.config.vrm.name || 'npc').replace(/\.vrm$/i, '')
+    return { name: filename, url: configured }
+  }
+  const name = VRM_NAMES[num(0, VRM_NAMES.length - 1)]
+  const variant = num(0, 1) === 1 ? '_Voxel' : ''
+  return { name, url: `${VRM_BASE_URL}/${name}${variant}.vrm` }
+}
 
 if (world.isServer) {
   const state = app.state
+  // pick the avatar once on the server - state syncs to every client so the npc looks the same for everyone
+  const vrm = pickVrm()
+  state.vrm = vrm.url
+  state.name = vrm.name
+  console.warn('[npc] avatar:', vrm.name, vrm.url)
   const ctrl = app.create('controller')
   ctrl.position.copy(app.position)
   world.add(ctrl)
@@ -165,13 +279,15 @@ if (world.isClient) {
     app.on('init', init)
   }
   function init(state) {
+    // breadcrumb: which avatar this client is about to render
+    console.warn('[npc] render:', state.name, state.vrm)
     const root = app.create('group')
     root.position.set(state.px, state.py, state.pz)
     const avatar = app.create('avatar', {
-      src: vrmUrl,
+      src: state.vrm,
     })
     const nametag = app.create('nametag', {
-      label: name,
+      label: state.name,
     })
     avatar.rotation.y = state.ry
     avatar.onLoad = () => {
