@@ -5,6 +5,8 @@ world-restore-check
 world-backups
 restore-pending.zip
 restore-pending.failed.zip
+# avatars are served from Cloudflare R2 (vrms.67420247.xyz) - keep the local copies out of image builds
+src/world/assets/vrms
 dev
 .git
 .gitignore
