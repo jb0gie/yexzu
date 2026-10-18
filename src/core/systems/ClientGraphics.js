@@ -17,6 +17,7 @@ import {
   Pass,
   DepthEffect,
 } from 'postprocessing'
+import { GradeEffect } from './effects/GradeEffect'
 
 import { System } from './System'
 
@@ -115,6 +116,18 @@ export class ClientGraphics extends System {
     this.tonemapping = new ToneMappingEffect({
       mode: ToneMappingMode.ACES_FILMIC,
     })
+    // Floor grade. amount 0 is a no-op, so this ships invisible: it only does something when a
+    // world or a floor calls setGrade() - which is how the Spire gives each tier its own mood.
+    this.grade = new GradeEffect({
+      amount: this.world.prefs.gradeAmount ?? 0,
+      saturation: this.world.prefs.gradeSaturation ?? 1,
+      contrast: this.world.prefs.gradeContrast ?? 1,
+      lift: this.world.prefs.gradeLift ?? 0,
+      vignette: this.world.prefs.gradeVignette ?? 0,
+      grain: this.world.prefs.gradeGrain ?? 0,
+      tint: this.world.prefs.gradeTint ?? [1, 1, 1],
+    })
+    this.gradeEnabled = this.world.prefs.gradeEnabled !== false
     this.effectPass = new EffectPass(this.world.camera)
     this.updatePostProcessingEffects()
     this.composer.addPass(this.effectPass)
@@ -246,10 +259,41 @@ export class ClientGraphics extends System {
     }
   }
 
+  /**
+   * Set the floor grade at runtime. Every key is one dial; anything omitted is left as it is.
+   * amount is the master mix - 0 leaves the frame untouched, 1 is the full grade.
+   *   graphics.setGrade({ amount: 1, saturation: 0.6, contrast: 1.1, vignette: 0.4, tint: [1, 0.98, 0.94] })
+   * Called with no arguments it clears the grade back to neutral.
+   */
+  setGrade(values = null) {
+    if (!this.grade) return
+    if (values === null) values = { amount: 0 }
+    const uniforms = {
+      amount: 'uAmount',
+      saturation: 'uSaturation',
+      contrast: 'uContrast',
+      lift: 'uLift',
+      vignette: 'uVignette',
+      grain: 'uGrain',
+      tint: 'uTint',
+    }
+    for (const [key, uniformName] of Object.entries(uniforms)) {
+      if (values[key] === undefined) continue
+      const u = this.grade.uniforms.get(uniformName)
+      if (!u) continue
+      if (key === 'tint') u.value.set(values[key][0], values[key][1], values[key][2])
+      else u.value = values[key]
+    }
+    this.updatePostProcessingEffects()
+  }
+
   updatePostProcessingEffects() {
     const effects = []
     if (this.bloomEnabled) {
       effects.push(this.bloom)
+    }
+    if (this.gradeEnabled && this.grade) {
+      effects.push(this.grade)
     }
     effects.push(this.smaa)
     effects.push(this.tonemapping)
