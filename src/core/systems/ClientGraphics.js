@@ -17,6 +17,7 @@ import {
   Pass,
   DepthEffect,
 } from 'postprocessing'
+import { DistortEffect } from './effects/DistortEffect'
 import { GradeEffect } from './effects/GradeEffect'
 
 import { System } from './System'
@@ -363,6 +364,60 @@ export class ClientGraphics extends System {
     console.log('[ClientGraphics] Emissive bloom off')
   }
 
+  /**
+   * Screen-space atmosphere, on demand. Nothing is constructed until a floor asks for it.
+   *
+   *   setDistortion({ mode: 'heat',  amount: 1, strength: 0.005 })   // cinder floors
+   *   setDistortion({ mode: 'water', amount: 1, strength: 0.006 })   // drowned floors
+   *   setDistortion({ mode: 'frost', amount: 0.7, strength: 0.003 }) // the Frostwake
+   *   setDistortion(null)                                            // off
+   *
+   * strength is in uv units - 0.002 to 0.008 is the useful range, above that it reads as a broken lens.
+   */
+  setDistortion(values = null) {
+    if (values === null /*
+      clearing: take it out of the pass
+    */) {
+      if (this.distortion) {
+        this.distortion.dispose()
+        this.distortion = null
+        this.updatePostProcessingEffects()
+        console.log('[ClientGraphics] Distortion off')
+      }
+      return null
+    }
+
+    if (!this.distortion) {
+      this.distortion = new DistortEffect({ amount: 0 })
+    }
+
+    const modes = { heat: 0, water: 1, frost: 2 }
+    const uniforms = {
+      amount: 'uAmount',
+      strength: 'uStrength',
+      speed: 'uSpeed',
+      band: 'uBand',
+    }
+    for (const [key, uniformName] of Object.entries(uniforms)) {
+      if (values[key] === undefined) continue
+      const u = this.distortion.uniforms.get(uniformName)
+      if (u) u.value = values[key]
+    }
+    if (values.mode !== undefined) {
+      const mode = typeof values.mode === 'string' ? modes[values.mode] : values.mode
+      const u = this.distortion.uniforms.get('uMode')
+      if (u && mode !== undefined) u.value = mode
+    }
+    if (values.amount === undefined) {
+      const u = this.distortion.uniforms.get('uAmount')
+      if (u) u.value = 1
+    }
+
+    this.updatePostProcessingEffects()
+    console.log('[ClientGraphics] Distortion:', values.mode, 'strength', values.strength ?? this.distortion.uniforms.get('uStrength').value)
+    return this.distortion
+  }
+
   updatePostProcessingEffects() {
     const effects = []
     if (this.bloomEnabled) {
@@ -374,6 +429,9 @@ export class ClientGraphics extends System {
     if (this.emissiveBloom) {
       this.emissiveBloom.blendMode.opacity.value = 1
       effects.push(this.emissiveBloom)
+    }
+    if (this.distortion) {
+      effects.push(this.distortion)
     }
     effects.push(this.smaa)
     effects.push(this.tonemapping)
