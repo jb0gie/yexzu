@@ -18,6 +18,7 @@ import {
   DepthEffect,
 } from 'postprocessing'
 import { DistortEffect } from './effects/DistortEffect'
+import { RadialBlurEffect } from './effects/RadialBlurEffect'
 import { GradeEffect } from './effects/GradeEffect'
 
 import { System } from './System'
@@ -375,9 +376,7 @@ export class ClientGraphics extends System {
    * strength is in uv units - 0.002 to 0.008 is the useful range, above that it reads as a broken lens.
    */
   setDistortion(values = null) {
-    if (values === null /*
-      clearing: take it out of the pass
-    */) {
+    if (values === null) {
       if (this.distortion) {
         this.distortion.dispose()
         this.distortion = null
@@ -418,6 +417,54 @@ export class ClientGraphics extends System {
     return this.distortion
   }
 
+  /**
+   * Radial blur - the slow-motion punch.
+   *
+   *   graphics.punchRadialBlur({ strength: 0.07, seconds: 1.4 })   // one call, decays itself
+   *   graphics.setRadialBlur({ amount: 1, strength: 0.05, center: [0.5, 0.45] })   // held
+   *   graphics.setRadialBlur(null)   // off
+   *
+   * strength is in uv units - 0.04 to 0.09 reads as a slow-mo punch, above that it is a smear.
+   */
+  setRadialBlur(values = null) {
+    if (values === null) {
+      if (this.radialBlur) {
+        this.radialBlur.dispose()
+        this.radialBlur = null
+        this.updatePostProcessingEffects()
+        console.log('[ClientGraphics] Radial blur off')
+      }
+      return null
+    }
+
+    if (!this.radialBlur) this.radialBlur = new RadialBlurEffect({ amount: 0 })
+
+    if (values.amount !== undefined) {
+      const u = this.radialBlur.uniforms.get('uAmount')
+      if (u) u.value = values.amount
+    }
+    if (values.strength !== undefined) {
+      const u = this.radialBlur.uniforms.get('uStrength')
+      if (u) u.value = values.strength
+    }
+    if (values.center) {
+      const u = this.radialBlur.uniforms.get('uCenter')
+      if (u) u.value.set(values.center[0], values.center[1])
+    }
+
+    this.updatePostProcessingEffects()
+    return this.radialBlur
+  }
+
+  punchRadialBlur({ strength = 0.06, seconds = 1.2 } = {}) {
+    if (!this.radialBlur) {
+      this.radialBlur = new RadialBlurEffect({ amount: 0 })
+      this.updatePostProcessingEffects()
+    }
+    console.log('[ClientGraphics] Slow-mo punch:', strength, 'over', seconds, 's')
+    return this.radialBlur.punch({ strength, seconds })
+  }
+
   updatePostProcessingEffects() {
     const effects = []
     if (this.bloomEnabled) {
@@ -432,6 +479,9 @@ export class ClientGraphics extends System {
     }
     if (this.distortion) {
       effects.push(this.distortion)
+    }
+    if (this.radialBlur) {
+      effects.push(this.radialBlur)
     }
     effects.push(this.smaa)
     effects.push(this.tonemapping)
