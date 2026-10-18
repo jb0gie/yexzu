@@ -287,6 +287,82 @@ export class ClientGraphics extends System {
     this.updatePostProcessingEffects()
   }
 
+  /**
+   * Emissive bloom - bloom that plays on what GLOWS, and only on that.
+   *
+   * Built lazily, on purpose: nothing is constructed until a world asks for it, so a world that
+   * never calls this can never be broken by it. Same door as the grade - it joins the effect pass.
+   *
+   * Selection is by material, not by name, so authors get it by making something emissive:
+   *   const e = world.graphics.enableEmissiveBloom()
+   *   world.graphics.selectEmissiveObjects(scene)          // everything already glowing
+   *   world.graphics.addToEmissiveBloom(myLavaMesh)        // or one at a time
+   */
+  enableEmissiveBloom({ intensity = 1.6, luminanceThreshold = 0.55, luminanceSmoothing = 0.2, radius = 0.85, mipmapBlur = true } = {}) {
+    if (this.emissiveBloom) return this.emissiveBloom
+    try {
+      this.emissiveBloom = new SelectiveBloomEffect(this.world.stage.scene, this.world.camera, {
+        blendFunction: BlendFunction.ADD,
+        mipmapBlur,
+        luminanceThreshold,
+        luminanceSmoothing,
+        intensity,
+        radius,
+        selection: new Selection(),
+      })
+      this.emissiveBloom.selection = this.emissiveBloom.selection || new Selection()
+      this.updatePostProcessingEffects()
+      console.log('[ClientGraphics] Emissive bloom on:', intensity)
+    } catch (error) {
+      console.error('[ClientGraphics] Emissive bloom failed to create:', error)
+      this.emissiveBloom = null
+    }
+    return this.emissiveBloom
+  }
+
+  /** Add one object (and its children) to the emissive bloom selection. */
+  addToEmissiveBloom(object) {
+    const effect = this.emissiveBloom || this.enableEmissiveBloom()
+    if (!effect || !object) return 0
+    let added = 0
+    object.traverse(node => {
+      if (node.isMesh || node.isPoints || node.isSprite) {
+        effect.selection.add(node)
+        added++
+      }
+    })
+    return added
+  }
+
+  /** Select everything already glowing: any mesh whose material has an emissive colour set. */
+  selectEmissiveObjects(root = null) {
+    const scene = root || this.world.stage.scene
+    const effect = this.emissiveBloom || this.enableEmissiveBloom()
+    if (!effect || !scene) return 0
+    let added = 0
+    scene.traverse(node => {
+      const material = node.material
+      if (!material || !(node.isMesh || node.isPoints || node.isSprite)) return
+      const emissive = Array.isArray(material) ? material[0].emissive : material.emissive
+      const strength = Array.isArray(material) ? material[0].emissiveIntensity : material.emissiveIntensity
+      const hasGlow = emissive && (emissive.r > 0.05 || emissive.g > 0.05 || emissive.b > 0.05)
+      if (hasGlow && (strength === undefined || strength > 0)) {
+        effect.selection.add(node)
+        added++
+      }
+    })
+    console.log('[ClientGraphics] Emissive bloom selected', added, 'objects')
+    return added
+  }
+
+  disableEmissiveBloom() {
+    if (!this.emissiveBloom) return
+    this.emissiveBloom.dispose()
+    this.emissiveBloom = null
+    this.updatePostProcessingEffects()
+    console.log('[ClientGraphics] Emissive bloom off')
+  }
+
   updatePostProcessingEffects() {
     const effects = []
     if (this.bloomEnabled) {
@@ -294,6 +370,10 @@ export class ClientGraphics extends System {
     }
     if (this.gradeEnabled && this.grade) {
       effects.push(this.grade)
+    }
+    if (this.emissiveBloom) {
+      this.emissiveBloom.blendMode.opacity.value = 1
+      effects.push(this.emissiveBloom)
     }
     effects.push(this.smaa)
     effects.push(this.tonemapping)
