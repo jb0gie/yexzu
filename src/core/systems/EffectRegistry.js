@@ -18,6 +18,7 @@ import {
   DepthEffect,
   DepthOfFieldEffect,
 } from 'postprocessing'
+import { GradeEffect } from './effects/GradeEffect'
 
 /**
  * EffectRegistry - Config-driven Postprocessing Effect Management
@@ -219,6 +220,33 @@ export class EffectRegistry {
         uniforms: {},
       },
 
+      grade: {
+        name: 'grade',
+        class: GradeEffect,
+        enabled: 'gradeEnabled',
+        category: 'postprocessing',
+        dependencies: null,
+        params: {
+          blendFunction: BlendFunction.NORMAL,
+          amount: 0,
+          saturation: 1,
+          contrast: 1,
+          lift: 0,
+          vignette: 0,
+          grain: 0,
+          tint: [1, 1, 1],
+        },
+        uniforms: {
+          amount: 'gradeAmount',
+          saturation: 'gradeSaturation',
+          contrast: 'gradeContrast',
+          lift: 'gradeLift',
+          vignette: 'gradeVignette',
+          grain: 'gradeGrain',
+          tint: 'gradeTint',
+        },
+      },
+
       shadowMapping: {
         name: 'shadowMapping',
         class: null,
@@ -240,6 +268,22 @@ export class EffectRegistry {
    */
   getEffectPresets() {
     return {
+      // Tier grades - a floor's mood, driven from data rather than from code.
+      // drowned: cold, blue lift.  cinder: warm, hot.  frost: blue-shift, darker edges.
+      // scar: what a floor keeps after its warden falls - colour gone, contrast up.
+      drowned: {
+        grade: { enabled: true, amount: 1, saturation: 0.92, contrast: 1.06, lift: 0.004, vignette: 0.34, grain: 0.015, tint: [0.94, 0.99, 1.06] },
+      },
+      cinder: {
+        grade: { enabled: true, amount: 1, saturation: 1.08, contrast: 1.05, lift: 0.006, vignette: 0.3, grain: 0.02, tint: [1.07, 0.99, 0.9] },
+      },
+      frost: {
+        grade: { enabled: true, amount: 1, saturation: 0.96, contrast: 1.02, lift: 0.008, vignette: 0.4, grain: 0.01, tint: [0.95, 0.98, 1.08] },
+      },
+      scar: {
+        grade: { enabled: true, amount: 1, saturation: 0.55, contrast: 1.1, lift: -0.01, vignette: 0.45, grain: 0.025, tint: [1.0, 0.99, 0.97] },
+      },
+
       // High quality preset - maximum visual fidelity
       high: {
         bloom: {
