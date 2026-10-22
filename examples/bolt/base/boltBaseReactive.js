@@ -189,20 +189,24 @@ app.configure([
     hint: 'comma list of domains allowed to iframe twitch players',
   },
   {
-    key: 'flipX',
+    // key renamed from flipX: the blueprint had an old saved 'off' (from the
+    // previous default) and a stored value always beats an `initial`, so the
+    // mirror fix could never turn itself on. A new key has no saved value →
+    // the default finally applies.
+    key: 'mirrorX',
     type: 'switch',
-    label: 'Flip Image Horizontally',
+    label: 'Fix Mirrored Image (X)',
     options: [
       { label: 'Off', value: 'off' },
       { label: 'On (fixes mirroring)', value: 'on' },
     ],
     initial: 'on',
-    hint: 'defaults ON — the boltbase Screens mesh renders streams back-to-front (mirrored). Set Off if a fresh paste reads mirrored the other way; use Flip Y for upside-down',
+    hint: 'the boltbase Screens mesh renders content back-to-front — keep ON unless the screen is rebuilt un-mirrored',
   },
   {
-    key: 'flipY',
+    key: 'mirrorY',
     type: 'switch',
-    label: 'Flip Image Vertically',
+    label: 'Flip Image Vertically (Y)',
     options: [
       { label: 'Off', value: 'off' },
       { label: 'On (fixes upside-down)', value: 'on' },
@@ -1126,8 +1130,11 @@ let panel = null
 // winding; doubleside keeps it visible either way).
 function flipFix(node) {
   // X defaults ON: this mesh renders mirrored. An explicit 'off' disables.
-  const wantX = props.flipX !== 'off'
-  const wantY = props.flipY === 'on'
+  // NOTE the props are mirrorX/mirrorY (not flipX/flipY): the blueprint still
+  // carries a flipX:'off' saved under the old default, and a saved value beats
+  // `initial`, so a stale key would silently cancel the fix forever.
+  const wantX = props.mirrorX !== 'off'
+  const wantY = props.mirrorY === 'on'
   if (!wantX && !wantY) return
   const nativeFlip = typeof node.flipX === 'boolean'
   if (nativeFlip) {
@@ -1139,7 +1146,7 @@ function flipFix(node) {
     node.doubleside = true
   }
   console.warn(
-    `[BoltBase] flips — X=${wantX} Y=${wantY} via ${nativeFlip ? 'engine texture flip' : 'plane scale fallback'} | raw props flipX=${String(props.flipX)} flipY=${String(props.flipY)}`,
+    `[BoltBase] flips — X=${wantX} Y=${wantY} via ${nativeFlip ? 'engine texture flip' : 'plane scale fallback'} | raw props mirrorX=${String(props.mirrorX)} mirrorY=${String(props.mirrorY)}`,
   )
 }
 
