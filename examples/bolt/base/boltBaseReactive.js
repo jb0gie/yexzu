@@ -9,7 +9,7 @@ app.configure([
     type: 'text',
     label: 'Playback',
     initial: 'owned by rig',
-    description: 'Audio playback is owned by the rig (djbooth + speakers). This app is visual-reactive only.',
+    hint: 'Audio playback is owned by the rig (djbooth + speakers). This app is visual-reactive only.',
   },
   {
     key: 'debugMode',
@@ -20,14 +20,14 @@ app.configure([
       { label: 'Disabled', value: 'disabled' },
     ],
     initial: 'disabled',
-    description: 'Enable console logs for debugging',
+    hint: 'Enable console logs for debugging',
   },
   {
     key: 'mesh1',
     type: 'text',
     label: 'Mesh 1 Name',
     initial: 'MeshLOD0_2',
-    description: 'Name of first mesh in GLB to apply audio reactivity',
+    hint: 'Name of first mesh in GLB to apply audio reactivity',
   },
   {
     key: 'mesh1Band',
@@ -40,6 +40,7 @@ app.configure([
       { label: 'Treble', value: 'treble' },
     ],
     initial: 'volume',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'mesh1Scale',
@@ -49,6 +50,7 @@ app.configure([
     min: 0.1,
     max: 50,
     step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'mesh1Intensity',
@@ -58,20 +60,21 @@ app.configure([
     min: 0.1,
     max: 10,
     step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'mesh1Color',
     type: 'color',
     label: 'Mesh 1 Color',
     initial: '#ff0000',
-    description: 'Color for audio reactivity',
+    hint: 'Color for audio reactivity',
   },
   {
     key: 'mesh2',
     type: 'text',
     label: 'Mesh 2 Name',
     initial: 'Coolant',
-    description: 'Name of second mesh in GLB (leave empty to disable)',
+    hint: 'Name of second mesh in GLB (leave empty to disable)',
   },
   {
     key: 'mesh2Band',
@@ -84,6 +87,7 @@ app.configure([
       { label: 'Treble', value: 'treble' },
     ],
     initial: 'bass',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'mesh2Scale',
@@ -93,6 +97,7 @@ app.configure([
     min: 0.1,
     max: 50,
     step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'mesh2Intensity',
@@ -102,13 +107,14 @@ app.configure([
     min: 0.1,
     max: 10,
     step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'mesh2Color',
     type: 'color',
     label: 'Mesh 2 Color',
     initial: '#0000ff',
-    description: 'Color for audio reactivity',
+    hint: 'Color for audio reactivity',
   },
   {
     key: 'screen',
@@ -120,11 +126,89 @@ app.configure([
     type: 'file',
     kind: 'video',
     label: 'Upload Video',
+    hint: 'local loop for this panel — the rig normally drives the screen',
   },
   {
     key: 'videoLink',
     type: 'text',
     label: 'Video Link (paste URL here)',
+    hint: 'direct mp4/m3u8 url, same local mode; the djbooth owns rig playback',
+  },
+  {
+    key: 'streamSection',
+    type: 'section',
+    label: 'Livestream / Embed',
+  },
+  {
+    key: 'embedWidth',
+    type: 'range',
+    label: 'Embed Width (m)',
+    initial: 6,
+    min: 0.5,
+    max: 30,
+    step: 0.1,
+    hint: 'physical size of THIS panel for twitch/youtube webviews — match the Screens mesh',
+  },
+  {
+    key: 'embedHeight',
+    type: 'range',
+    label: 'Embed Height (m)',
+    initial: 3.375,
+    min: 0.5,
+    max: 20,
+    step: 0.1,
+    hint: 'embed plane height — match the Screens mesh',
+  },
+  {
+    key: 'embedFactor',
+    type: 'range',
+    label: 'Embed Sharpness',
+    initial: 150,
+    min: 50,
+    max: 300,
+    step: 10,
+    hint: 'iframe pixels per meter — higher is sharper and heavier',
+  },
+  {
+    key: 'embedAudio',
+    type: 'switch',
+    label: 'Embed Audio',
+    options: [
+      { label: 'Auto (one screen wins)', value: 'auto' },
+      { label: 'Always On (this screen)', value: 'on' },
+      { label: 'Always Off', value: 'off' },
+    ],
+    initial: 'auto',
+    hint: 'iframe audio is not spatial — when several surfaces show the same embed they elect ONE unmuted player',
+  },
+  {
+    key: 'embedParents',
+    type: 'text',
+    label: 'Twitch Parents',
+    initial: 'boltevm.com,localhost,127.0.0.1,255242621.xyz',
+    hint: 'comma list of domains allowed to iframe twitch players',
+  },
+  {
+    key: 'flipX',
+    type: 'switch',
+    label: 'Flip Image Horizontally',
+    options: [
+      { label: 'Off', value: 'off' },
+      { label: 'On (fixes mirroring)', value: 'on' },
+    ],
+    initial: 'on',
+    hint: 'defaults ON — the boltbase Screens mesh renders streams back-to-front (mirrored). Set Off if a fresh paste reads mirrored the other way; use Flip Y for upside-down',
+  },
+  {
+    key: 'flipY',
+    type: 'switch',
+    label: 'Flip Image Vertically',
+    options: [
+      { label: 'Off', value: 'off' },
+      { label: 'On (fixes upside-down)', value: 'on' },
+    ],
+    initial: 'off',
+    hint: 'if the picture is upside down, flip this',
   },
   {
     key: 'defaultVolume',
@@ -136,6 +220,7 @@ app.configure([
       { label: 'High', value: 10 }
     ],
     initial: 0,
+    hint: 'local panel audio only — rig volume comes from the booth',
   },
   {
     key: 'isSpatial',
@@ -145,7 +230,8 @@ app.configure([
       { label: 'Spatial (3D)', value: true },
       { label: 'Global', value: false }
     ],
-    initial: true
+    initial: true,
+    hint: 'local audio only — 3D falloff vs global',
   },
   {
     key: 'minDistance',
@@ -154,7 +240,7 @@ app.configure([
     initial: 5,
     min: 1,
     max: 50,
-    description: 'Distance where audio starts to fade (in meters)'
+    hint: 'Distance where audio starts to fade (in meters)'
   },
   {
     key: 'maxDistance',
@@ -163,7 +249,7 @@ app.configure([
     initial: 20,
     min: 1,
     max: 100,
-    description: 'Distance where audio becomes inaudible (in meters)'
+    hint: 'Distance where audio becomes inaudible (in meters)'
   },
   {
     key: 'rolloffFactor',
@@ -174,7 +260,8 @@ app.configure([
       { label: 'Medium', value: 2 },
       { label: 'Steep', value: 4 }
     ],
-    initial: 2
+    initial: 2,
+    hint: 'local audio only — falloff curve',
   },
   {
     key: 'truss',
@@ -186,7 +273,7 @@ app.configure([
     type: 'text',
     label: 'Lower Truss Group',
     initial: 'LowerTruss',
-    description: 'Name of group to spin (leave empty to disable)'
+    hint: 'Name of group to spin (leave empty to disable)'
   },
   {
     key: 'lowerTrussSpeed',
@@ -195,14 +282,15 @@ app.configure([
     initial: 0.5,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'upperTruss',
     type: 'text',
     label: 'Upper Truss Group',
     initial: 'UpperTruss',
-    description: 'Name of group to spin (leave empty to disable)'
+    hint: 'Name of group to spin (leave empty to disable)'
   },
   {
     key: 'upperTrussSpeed',
@@ -211,7 +299,8 @@ app.configure([
     initial: -0.3,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'engineSection',
@@ -223,6 +312,7 @@ app.configure([
     type: 'color',
     label: 'Thruster Color',
     initial: '#ff4400',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'thrusterBand',
@@ -234,7 +324,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'bass'
+    initial: 'bass',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'thrusterScale',
@@ -243,7 +334,8 @@ app.configure([
     initial: 8,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'thrusterIntensity',
@@ -252,13 +344,15 @@ app.configure([
     initial: 2,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'engineInnerColor',
     type: 'color',
     label: 'Engine Inner Color',
     initial: '#00aaff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'engineInnerBand',
@@ -270,7 +364,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'mid'
+    initial: 'mid',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'engineInnerScale',
@@ -279,7 +374,8 @@ app.configure([
     initial: 5,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'engineInnerIntensity',
@@ -288,13 +384,15 @@ app.configure([
     initial: 1.5,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'engineOuterColor',
     type: 'color',
     label: 'Engine Outer Color',
     initial: '#ffffff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'engineOuterBand',
@@ -306,7 +404,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'volume'
+    initial: 'volume',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'engineOuterScale',
@@ -315,7 +414,8 @@ app.configure([
     initial: 3,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'engineOuterIntensity',
@@ -324,7 +424,8 @@ app.configure([
     initial: 1,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'tunnelSection',
@@ -336,13 +437,14 @@ app.configure([
     type: 'text',
     label: 'Tunnel Piece Mesh Name',
     initial: 'tunnelPieceMeshLOD0004_1',
-    description: 'Name of the tunnel piece mesh in the GLB (for rig audio reactivity)'
+    hint: 'Name of the tunnel piece mesh in the GLB (for rig audio reactivity)'
   },
   {
     key: 'tunnelColor',
     type: 'color',
     label: 'Tunnel Color',
     initial: '#aa00ff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'tunnelBand',
@@ -354,7 +456,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'bass'
+    initial: 'bass',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'tunnelScale',
@@ -363,7 +466,8 @@ app.configure([
     initial: 6,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'tunnelIntensity',
@@ -372,7 +476,8 @@ app.configure([
     initial: 1.5,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'tunnelSpinSpeed',
@@ -381,7 +486,8 @@ app.configure([
     initial: 0.2,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'tableSection',
@@ -393,13 +499,14 @@ app.configure([
     type: 'text',
     label: 'Table Mesh Name',
     initial: 'TableMeshLOD0_8',
-    description: 'Name of mesh for audio reactivity'
+    hint: 'Name of mesh for audio reactivity'
   },
   {
     key: 'tableColor',
     type: 'color',
     label: 'Table Color',
     initial: '#ff00ff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'tableBand',
@@ -411,7 +518,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'mid'
+    initial: 'mid',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'tableScale',
@@ -420,7 +528,8 @@ app.configure([
     initial: 4,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'tableIntensity',
@@ -429,7 +538,8 @@ app.configure([
     initial: 1.2,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'fanSection',
@@ -441,13 +551,14 @@ app.configure([
     type: 'text',
     label: 'Fan Mesh Name',
     initial: 'Cylinder007',
-    description: 'Name of mesh for audio reactivity'
+    hint: 'Name of mesh for audio reactivity'
   },
   {
     key: 'fanColor',
     type: 'color',
     label: 'Fan Color',
     initial: '#00ff00',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'fanBand',
@@ -459,7 +570,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'treble'
+    initial: 'treble',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'fanScale',
@@ -468,7 +580,8 @@ app.configure([
     initial: 5,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'fanIntensity',
@@ -477,7 +590,8 @@ app.configure([
     initial: 1,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'fanSpinSpeed',
@@ -486,7 +600,8 @@ app.configure([
     initial: 2,
     min: 0,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'wheelSection',
@@ -498,7 +613,7 @@ app.configure([
     type: 'text',
     label: 'Wheel Mesh Name',
     initial: 'w',
-    description: 'Name of wheel mesh to spin'
+    hint: 'Name of wheel mesh to spin'
   },
   {
     key: 'wheelSpeedX',
@@ -507,7 +622,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'wheelSpeedY',
@@ -516,7 +632,8 @@ app.configure([
     initial: 1,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'wheelSpeedZ',
@@ -525,7 +642,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r1Section',
@@ -537,20 +655,21 @@ app.configure([
     type: 'text',
     label: 'Ring 1 Group Name',
     initial: 'r1',
-    description: 'Name of ring 1 group to spin'
+    hint: 'Name of ring 1 group to spin'
   },
   {
     key: 'r1Mesh',
     type: 'text',
     label: 'Ring 1 Mesh Name',
     initial: 'r1_2',
-    description: 'Name of mesh for audio reactivity'
+    hint: 'Name of mesh for audio reactivity'
   },
   {
     key: 'r1Color',
     type: 'color',
     label: 'Ring 1 Color',
     initial: '#ff00ff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'r1Band',
@@ -562,7 +681,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'volume'
+    initial: 'volume',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'r1Scale',
@@ -571,7 +691,8 @@ app.configure([
     initial: 3,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'r1Intensity',
@@ -580,7 +701,8 @@ app.configure([
     initial: 1.5,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'r1SpeedX',
@@ -589,7 +711,8 @@ app.configure([
     initial: 0.5,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r1SpeedY',
@@ -598,7 +721,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r1SpeedZ',
@@ -607,7 +731,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r2Section',
@@ -619,20 +744,21 @@ app.configure([
     type: 'text',
     label: 'Ring 2 Group Name',
     initial: 'r2',
-    description: 'Name of ring 2 group to spin'
+    hint: 'Name of ring 2 group to spin'
   },
   {
     key: 'r2Mesh',
     type: 'text',
     label: 'Ring 2 Mesh Name',
     initial: 'r2_2',
-    description: 'Name of mesh for audio reactivity'
+    hint: 'Name of mesh for audio reactivity'
   },
   {
     key: 'r2Color',
     type: 'color',
     label: 'Ring 2 Color',
     initial: '#00ffff',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'r2Band',
@@ -644,7 +770,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'bass'
+    initial: 'bass',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'r2Scale',
@@ -653,7 +780,8 @@ app.configure([
     initial: 3,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'r2Intensity',
@@ -662,7 +790,8 @@ app.configure([
     initial: 1.5,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'r2SpeedX',
@@ -671,7 +800,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r2SpeedY',
@@ -680,7 +810,8 @@ app.configure([
     initial: 0.5,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r2SpeedZ',
@@ -689,7 +820,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r3Section',
@@ -701,20 +833,21 @@ app.configure([
     type: 'text',
     label: 'Ring 3 Group Name',
     initial: 'r3',
-    description: 'Name of ring 3 group to spin'
+    hint: 'Name of ring 3 group to spin'
   },
   {
     key: 'r3Mesh',
     type: 'text',
     label: 'Ring 3 Mesh Name',
     initial: 'r3_3',
-    description: 'Name of mesh for audio reactivity'
+    hint: 'Name of mesh for audio reactivity'
   },
   {
     key: 'r3Color',
     type: 'color',
     label: 'Ring 3 Color',
     initial: '#ff6600',
+    hint: 'reactive tint while the rig is linked',
   },
   {
     key: 'r3Band',
@@ -726,7 +859,8 @@ app.configure([
       { label: 'Mid', value: 'mid' },
       { label: 'Treble', value: 'treble' }
     ],
-    initial: 'treble'
+    initial: 'treble',
+    hint: 'spectrum slice that drives this surface',
   },
   {
     key: 'r3Scale',
@@ -735,7 +869,8 @@ app.configure([
     initial: 3,
     min: 0.1,
     max: 50,
-    step: 0.1
+    step: 0.1,
+    hint: 'reactive depth (how far the pulse travels)',
   },
   {
     key: 'r3Intensity',
@@ -744,7 +879,8 @@ app.configure([
     initial: 1.5,
     min: 0.1,
     max: 10,
-    step: 0.1
+    step: 0.1,
+    hint: 'gain on the band energy (how hot it flashes)',
   },
   {
     key: 'r3SpeedX',
@@ -753,7 +889,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r3SpeedY',
@@ -762,7 +899,8 @@ app.configure([
     initial: 0,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'r3SpeedZ',
@@ -771,7 +909,8 @@ app.configure([
     initial: 0.5,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'lightsSection',
@@ -783,7 +922,7 @@ app.configure([
     type: 'text',
     label: 'Light Rig Name',
     initial: 'LightRig',
-    description: 'Name of the light rig node'
+    hint: 'Name of the light rig node'
   },
   {
     key: 'lightsActive',
@@ -794,7 +933,7 @@ app.configure([
       { label: 'Off', value: 'disabled' }
     ],
     initial: 'disabled',
-    description: 'Toggle lights on/off. Off by default — LightRig skeletal loop is expensive.'
+    hint: 'Toggle lights on/off. Off by default — LightRig skeletal loop is expensive.'
   },
   {
     key: 'lightAnimation',
@@ -809,14 +948,14 @@ app.configure([
       { label: 'Five', value: 'LightsFive' }
     ],
     initial: 'LightsOn',
-    description: 'Select light animation pattern (when lights are on)'
+    hint: 'Select light animation pattern (when lights are on)'
   },
   {
     key: 'lightsBone',
     type: 'text',
     label: 'Lights Bone Name',
     initial: 'rootLights',
-    description: 'Name of bone to spin'
+    hint: 'Name of bone to spin'
   },
   {
     key: 'lightsSpinY',
@@ -825,14 +964,15 @@ app.configure([
     initial: 0.5,
     min: -5,
     max: 5,
-    step: 0.1
+    step: 0.1,
+    hint: 'rad/s — negative reverses',
   },
   {
     key: 'speakerRig',
     type: 'text',
     label: 'Speaker Rig Name',
     initial: 'SpeakerRig',
-    description: 'Name of the speaker rig node'
+    hint: 'Name of the speaker rig node'
   },
   {
     key: 'rigSection',
@@ -848,7 +988,7 @@ app.configure([
       { label: 'Disabled (own audio only)', value: 'disabled' },
     ],
     initial: 'rig',
-    description: 'rig = materials react to the surround rig\'s track (via boltSpeaker announcements). disabled = legacy own-audio behavior only.'
+    hint: 'rig = materials react to the surround rig\'s track (via boltSpeaker announcements). disabled = legacy own-audio behavior only.'
   }
 ])
 
@@ -966,38 +1106,356 @@ const player = {
   duration: 0
 }
 
-if (!src) {
-  console.error("No video source provided. Please upload a video or paste a video link.");
-} else if (world.isClient) {
-  const mesh = app.get('Screens');
+// ---------- the Screens panel ----------
+// One node, two drivers: the local `video`/`videoLink` props (legacy own mode,
+// plays on load) and the rig — the djbooth owns the video in rig mode and
+// anchors it to the same t0 as the rig audio. bolt-screen apps relay the
+// booth's command onto this client's bus (they hold the server context that
+// hears the booth), so this panel and every bolt-screen screen show the SAME
+// element: `linked: true` keys the player per url, so one decode feeds any
+// number of screens — frame-locked by construction, not by a sync timer.
+// Lazily created: with no local src and a silent rig there is no video node
+// (a Video with a null src builds a mesh with no texture).
+let panel = null
+
+// The boltbase Screens mesh renders streams mirrored (its authored UVs /
+// transform flip content; the standalone screen GLB does not). This engine's
+// Video node can flip its own TEXTURE sampling (flipX/flipY) — a shader-space
+// flip that no authored transform or winding can fight. Old engines lack the
+// props, so fall back to mirroring the plane itself (three compensates the
+// winding; doubleside keeps it visible either way).
+function flipFix(node) {
+  // X defaults ON: this mesh renders mirrored. An explicit 'off' disables.
+  const wantX = props.flipX !== 'off'
+  const wantY = props.flipY === 'on'
+  if (!wantX && !wantY) return
+  const nativeFlip = typeof node.flipX === 'boolean'
+  if (nativeFlip) {
+    node.flipX = wantX
+    node.flipY = wantY
+  } else {
+    if (wantX) node.scale.x *= -1
+    if (wantY) node.scale.y *= -1
+    node.doubleside = true
+  }
+  console.warn(
+    `[BoltBase] flips — X=${wantX} Y=${wantY} via ${nativeFlip ? 'engine texture flip' : 'plane scale fallback'} | raw props flipX=${String(props.flipX)} flipY=${String(props.flipY)}`,
+  )
+}
+
+function ensurePanel(url) {
+  if (panel) {
+    if (url && panel.src !== url) panel.src = url
+    return panel
+  }
+  const mesh = app.get('Screens')
   if (!mesh) {
     // GLB edits can drop/rename the Screens node — never crash the whole
     // script over a missing screen (that killed rig reactivity below)
-    console.error('[BoltBase] video source set but "Screens" mesh not found in GLB — skipping video panel')
-  } else {
-    const video = app.create('video', {
-      src,
-      linked: true,
-      loop: true,
-      aspect: 16 / 9, // geometry is 16:9
-      geometry: mesh.geometry,
-      cover: true,
-      volume: player.volume / 15, // Convert to 0-1 range for the video element
-      spatial: props.isSpatial !== false, // Spatial audio by default
-      minDistance: props.minDistance || 5,
-      maxDistance: props.maxDistance || 20,
-      rolloffFactor: props.rolloffFactor || 2
-    });
-    // Move video to the same place as mesh and adjust its position slightly
-    video.position.copy(mesh.position);
-    video.quaternion.copy(mesh.quaternion);
-    video.scale.copy(mesh.scale);
-    video.position.z += 0.001;
-    mesh.active = false
-    // Add the video to the scene and play it
-    app.add(video);
-    video.play();
+    console.error('[BoltBase] "Screens" mesh not found in GLB — skipping video panel')
+    return null
   }
+  panel = app.create('video', {
+    src: url || null,
+    linked: true,
+    loop: true,
+    aspect: 16 / 9, // geometry is 16:9
+    geometry: mesh.geometry,
+    volume: player.volume / 15, // Convert to 0-1 range for the video element
+    spatial: props.isSpatial !== false, // Spatial audio by default
+    minDistance: props.minDistance || 5,
+    maxDistance: props.maxDistance || 20,
+    rolloffFactor: props.rolloffFactor || 2
+  });
+  // Move video to the same place as mesh and adjust its position slightly
+  panel.position.copy(mesh.position);
+  panel.quaternion.copy(mesh.quaternion);
+  panel.scale.copy(mesh.scale);
+  panel.position.z += 0.001;
+  flipFix(panel);
+  mesh.active = false
+  app.add(panel);
+  return panel
+}
+
+if (src) {
+  const local = ensurePanel(src)
+  local?.play()
+}
+
+{
+  const RIG_VIDEO_EVENT = `${props.channel || 'bolt'}:video:command`
+  const RIG_VIDEO_WHOIS = `${props.channel || 'bolt'}:video:whois`
+  const EMBED_EVENT = `${props.channel || 'bolt'}:embed:audio`
+  const DEFAULT_PARENTS = 'boltevm.com,localhost,127.0.0.1,255242621.xyz'
+  const SCREEN_ID = app.instanceId
+  const DRIFT = 0.25 // seconds off the shared clock before a screen re-seeks
+  let t0 = 0 // world.getTime() the rig video started at (0 = not rig-driven)
+  let lastPlayAsk = 0
+  let streamSrc = false // current rig video is a livestream (m3u8) — never clock-seek it
+
+  // ---- link helpers (same contract as bolt-screen; the booth's `kind` wins) ----
+
+  // hls.js resolves the urls inside a playlist against the PLAYLIST's own url,
+  // so a stream that got re-served from our own origin (the audio proxy) would
+  // send every segment fetch to boltevm.com and 404. Unwrap it and let hls.js
+  // see the original origin again.
+  function unwrapStreamUrl(url) {
+    if (typeof url !== 'string') return url
+    if (!isStreamUrl(url)) return url
+    const at = url.indexOf('/api/audio-proxy?url=')
+    if (at === -1) return url
+    try {
+      return decodeURIComponent(url.slice(at + '/api/audio-proxy?url='.length))
+    } catch (err) {
+      return url
+    }
+  }
+
+  function isStreamUrl(url) {
+    return /\.m3u8/i.test(url || '')
+  }
+
+  function youtubeId(url) {
+    // youtu\.?be covers both youtube.com and youtu.be — a bare /youtube/ guard
+    // silently skips every youtu.be share link (it has no 'youtube')
+    if (!/youtu\.?be/.test(url || '')) return null
+    let m = url.match(/[?&]v=([\w-]{6,})/)
+    if (!m) m = url.match(/\/(?:embed|live|shorts)\/([\w-]{6,})/)
+    if (!m) m = url.match(/youtu\.be\/([\w-]{6,})/)
+    return m ? m[1] : null
+  }
+
+  function twitchEmbed(url, parents) {
+    if (!/twitch\.tv/.test(url || '')) return null
+    let q = null
+    let m = url.match(/twitch\.tv\/videos?\/(\d+)/)
+    if (m) q = 'video=' + m[1]
+    if (!q) {
+      m = url.match(/[?&]channel=([\w-]+)/)
+      if (m) q = 'channel=' + m[1]
+    }
+    if (!q) {
+      m = url.match(/twitch\.tv\/(?!videos?\/|directory|downloads|clips|settings|subscriptions|jobs|turbo|inventory|wallet|p\/)([\w-]+)/)
+      if (m) q = 'channel=' + m[1]
+    }
+    if (!q) return null
+    // autoplay=true: ask the twitch player to start on load; mature-flagged
+    // channels still gate behind a Start Watching click — twitch policy
+    let out = 'https://player.twitch.tv/?' + q + '&autoplay=true'
+    const list = (parents || DEFAULT_PARENTS).split(',')
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i].trim()
+      if (p) out += '&parent=' + p
+    }
+    return out
+  }
+
+  function normalizeEmbed(url, parents) {
+    const yt = youtubeId(url)
+    if (yt) return 'https://www.youtube-nocookie.com/embed/' + yt + '?autoplay=1&playsinline=1'
+    return twitchEmbed(url, parents)
+  }
+
+  // an iframe's audio cannot be scripted from outside — the embed's own
+  // start-muted parameter is the only lever
+  function withEmbedMute(url, muted) {
+    if (/youtube(-nocookie)?\.com\/embed/.test(url)) return url + (muted ? '&mute=1' : '&mute=0')
+    if (/player\.twitch\.tv/.test(url)) return url + (muted ? '&muted=true' : '&muted=false')
+    return url
+  }
+
+  function sniffKind(url) {
+    if (normalizeEmbed(url, props.embedParents || DEFAULT_PARENTS)) return 'embed'
+    return 'video'
+  }
+
+  // ---------- embed screen (twitch / youtube webviews) ----------
+  // Twitch/YouTube pages can never feed a video texture, so those urls are
+  // drawn as an in-world webview pinned to the Screens mesh transform. The rig
+  // video panel is paused underneath while an embed owns the screen.
+  let embedView = null
+  let embedSrc = null // the normalized embed url currently shown (null = none)
+
+  // ---------- embed audio election ----------
+  // Every surface loads its OWN iframe for an embed, and iframe audio is
+  // browser-tab audio — not spatial, not touchable via the engine. Without a
+  // rule, N screens = N copies of the same stream playing on top of each
+  // other. One surface per (channel, url) wins the audio; everyone else loads
+  // the start-muted variant. The winner is the lowest instanceId among
+  // announced screens: every screen computes the same answer from the same
+  // in-process bus (app.emit IS world.events.emit), and a screen that rebuilds
+  // mid-stream re-announces — the sitting winner re-emits on first sight of a
+  // new id — so late arrivals converge instead of double-playing.
+  const embedKnown = {} // url -> { ids: { id: true } }
+
+  function recordEmbedId(url, id) {
+    const rec = embedKnown[url] || (embedKnown[url] = { ids: {} })
+    if (rec.ids[id]) return false
+    rec.ids[id] = true
+    return true
+  }
+
+  function embedWinner(url) {
+    const rec = embedKnown[url]
+    if (!rec) return null
+    let best = null
+    for (const id in rec.ids) {
+      if (best === null || id < best) best = id
+    }
+    return best
+  }
+
+  function announceEmbed(url) {
+    recordEmbedId(url, SCREEN_ID)
+    app.emit(EMBED_EVENT, { url, id: SCREEN_ID })
+  }
+
+  function applyEmbedAudio(url) {
+    const mode = props.embedAudio || 'auto'
+    let live = false
+    if (mode === 'on') live = true
+    else if (mode === 'auto') live = embedWinner(url) === SCREEN_ID
+    const next = withEmbedMute(url, !live)
+    if (embedView.src !== next) embedView.src = next
+    console.warn(`[BoltBase] embed audio ${live ? 'LIVE' : 'MUTED'} — ${url.slice(0, 64)} (${mode})`)
+  }
+
+  world.on(EMBED_EVENT, ann => {
+    if (!ann || !ann.url || !ann.id) return
+    if (!recordEmbedId(ann.url, ann.id)) return
+    // a rebuilt screen just announced: the sitting winner answers so the
+    // newcomer's idea of the set is complete (and cannot double-play)
+    if (embedWinner(ann.url) === SCREEN_ID) app.emit(EMBED_EVENT, { url: ann.url, id: SCREEN_ID })
+    if (embedSrc === ann.url) applyEmbedAudio(ann.url)
+  })
+
+  function ensureEmbedView() {
+    if (embedView) return embedView
+    const mesh = app.get('Screens')
+    if (!mesh) {
+      console.error('[BoltBase] "Screens" mesh not found — embed disabled')
+      return null
+    }
+    embedView = app.create('webview', {
+      src: null,
+      width: props.embedWidth || 6,
+      height: props.embedHeight || 3.375,
+      factor: props.embedFactor || 150,
+      space: 'world',
+    })
+    embedView.position.copy(mesh.position)
+    embedView.quaternion.copy(mesh.quaternion)
+    embedView.scale.copy(mesh.scale)
+    embedView.position.z += 0.02
+    flipFix(embedView)
+    app.add(embedView)
+    console.warn(`[BoltBase] embed webview armed — ${props.embedWidth || 6}x${props.embedHeight || 3.375}m @ ${props.embedFactor || 150}px/m (tune to the Screens mesh if it does not line up)`)
+    return embedView
+  }
+
+  function setEmbed(raw) {
+    const normalized = normalizeEmbed(raw, props.embedParents || DEFAULT_PARENTS)
+    const url = normalized || raw // unknown host: show the page as-is
+    if (!ensureEmbedView()) return
+    embedSrc = url
+    panel?.pause() // the iframe owns the screen now — silence the rig video
+    t0 = 0
+    if ((props.embedAudio || 'auto') !== 'off') announceEmbed(url)
+    applyEmbedAudio(url)
+    console.warn(`[BoltBase] embed on screen: ${url.slice(0, 80)}`)
+  }
+
+  function clearEmbed() {
+    if (!embedSrc) return
+    embedSrc = null
+    if (embedView) embedView.src = null
+    console.warn('[BoltBase] embed cleared')
+  }
+
+  // a screen drifts (tab throttle, a cold load, a long frame). Correct past
+  // DRIFT — small enough to read as locked, large enough not to fight the
+  // element every frame.
+  // NOTE: no screenshare guard needed here (unlike bolt-screen) — this panel is
+  // created without a screenId, so the engine never registers it as a share
+  // target and it can only ever show the rig video.
+  app.on('update', () => {
+    if (!panel || !t0 || panel.loading || embedSrc) return
+    const want = world.getTime() - t0
+    if (!panel.playing) {
+      // not started yet, or a pause to recover from — one ask every 2s, so a
+      // slow load never stacks play() calls
+      if (world.getTime() - lastPlayAsk < 2) return
+      lastPlayAsk = world.getTime()
+      panel.play()
+      return
+    }
+    const duration = panel.duration
+    // a livestream (and a vod that has not loaded its duration yet) has no
+    // finite duration: the live edge moves and any seek lands on a stale
+    // segment, so the rig clock must never seek it — just keep it playing
+    // (above) and leave it at the edge
+    if (!(isFinite(duration) && duration > 0)) return
+    // past one cycle the element's own loop carries it; re-anchoring here
+    // would fight the loop (and every screen loops on the same beat anyway)
+    if (want > duration - 0.5) return
+    if (Math.abs(panel.time - want) > DRIFT) panel.time = want
+  })
+
+  world.on(RIG_VIDEO_EVENT, cmd => {
+    if (!cmd) return
+    if (cmd.action === 'stop') {
+      t0 = 0
+      clearEmbed()
+      panel?.pause()
+      streamSrc = false
+      return
+    }
+    if (cmd.action === 'volume') {
+      if (embedSrc) {
+        // iframe audio is tab audio; the embed player carries its own volume
+        console.warn('[BoltBase] rig volume ignored while an embed is on screen')
+        return
+      }
+      if (panel) panel.volume = cmd.value ?? 0
+      return
+    }
+    if (cmd.action !== 'play' || !cmd.url) return
+    const url = unwrapStreamUrl(cmd.url)
+    const kind = cmd.kind === 'embed' || cmd.kind === 'video' ? cmd.kind : sniffKind(url)
+    if (kind === 'embed') {
+      setEmbed(url)
+      return
+    }
+    clearEmbed()
+    streamSrc = isStreamUrl(url)
+    const node = ensurePanel(url)
+    if (!node) return
+    node.loop = true // the booth re-anchors this on every track change
+    node.volume = cmd.volume ?? 0 // 0 by default — the rig track IS the music
+    t0 = cmd.t0 ?? world.getTime()
+    // a livestream lives at its edge — only file/vod playback joins the
+    // shared clock mid-track
+    if (!streamSrc) node.time = Math.max(0, world.getTime() - t0)
+    node.play()
+    debugLog('rig video:', url)
+    console.warn(
+      `[BoltBase] rig video: ${url.slice(0, 64)}${streamSrc ? ' (live stream)' : ''} vol=${node.volume}` +
+        (node.volume === 0 ? ' — silent; raise Screen Volume on the booth to hear it' : ''),
+    )
+  })
+
+  // move-rebuild healing: a rebuild wipes the listener above (no keepActive
+  // API). Ask whoever holds the live command — the booth's client answers on
+  // this same bus — until one does.
+  let attempts = 0
+  const whoisVideo = () => {
+    if (t0 || attempts >= 8) return
+    attempts++
+    app.emit(RIG_VIDEO_WHOIS, { channel: props.channel || 'bolt' })
+    setTimeout(whoisVideo, attempts === 1 ? 800 : 2000)
+  }
+  setTimeout(whoisVideo, 800)
 }
 
 // ponytail: never auto-start the LightRig mixer. Looping skinned play() is the

@@ -435,6 +435,107 @@ fastify.get('/api/audio-proxy', async (req, reply) => {
   }
 })
 
+// hls proxy — re-serve an HLS playlist (and everything it references) from
+// OUR origin. A CDN without CORS answers hls.js with an unreadable playlist
+// (black screen, clean console); this route makes the playlist, its segment
+// keys (EXT-X-KEY), init segments (EXT-X-MAP) and media segments same-origin
+// so hls.js can always read them. Opt-in per rig (djbooth Stream Fetch =
+// Proxy) because every segment then flows through this server.
+const HLS_PROXY_MAX_PLAYLIST = 5 * 1024 * 1024
+
+function hlsProxiedUrl(target, base) {
+  let abs
+  try {
+    abs = new URL(target.trim(), base).toString()
+  } catch {
+    return target
+  }
+  return `/api/hls-proxy?url=${encodeURIComponent(abs)}`
+}
+
+function rewriteHlsPlaylist(text, base) {
+  return text
+    .split('\n')
+    .map(line => {
+      const t = line.trim()
+      if (!t) return line
+      if (t.startsWith('#')) {
+        // EXT-X-KEY / EXT-X-MAP / EXT-X-MEDIA / EXT-X-SESSION-KEY carry URIs
+        return line.replace(/URI="([^"]+)"/g, (_, u) => `URI="${hlsProxiedUrl(u, base)}"`)
+      }
+      // a bare line is a variant playlist or a media segment
+      return hlsProxiedUrl(t, base)
+    })
+    .join('\n')
+}
+
+fastify.get('/api/hls-proxy', async (req, reply) => {
+  const target = req.query.url
+  if (!target) return reply.code(400).send({ error: 'missing ?url=' })
+  let parsed
+  try {
+    parsed = new URL(target)
+  } catch {
+    return reply.code(400).send({ error: 'invalid url' })
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return reply.code(400).send({ error: 'only http/https' })
+  }
+  // same SSRF guard as /api/audio-proxy
+  const host = parsed.hostname.toLowerCase()
+  if (
+    host === 'localhost' ||
+    host.endsWith('.local') ||
+    /^127\./.test(host) ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  ) {
+    return reply.code(403).send({ error: 'private hosts not allowed' })
+  }
+  try {
+    const upstream = await fetch(parsed, {
+      headers: { Range: req.headers.range || 'bytes=0-' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!upstream.ok && upstream.status !== 206) {
+      return reply.code(upstream.status).send({ error: `upstream ${upstream.status}` })
+    }
+    const ctype = (upstream.headers.get('content-type') || '').toLowerCase()
+    const looksPlaylist = ctype.includes('mpegurl') || ctype.includes('m3u') || /\.m3u8?$/i.test(parsed.pathname)
+    if (looksPlaylist) {
+      const text = await upstream.text()
+      if (text.length > HLS_PROXY_MAX_PLAYLIST) {
+        return reply.code(502).send({ error: 'playlist too large' })
+      }
+      if (!text.includes('#EXTM3U')) {
+        return reply.code(502).send({ error: 'not an hls playlist' })
+      }
+      return reply
+        .header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*')
+        .header('Content-Type', 'application/vnd.apple.mpegurl')
+        .header('Cache-Control', 'no-cache')
+        .send(rewriteHlsPlaylist(text, parsed))
+    }
+    const headers = {
+      'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
+      'Accept-Ranges': upstream.headers.get('accept-ranges') || 'bytes',
+      'Content-Type': ctype || 'video/mp2t',
+      'Cache-Control': 'no-cache',
+    }
+    const cr = upstream.headers.get('content-range')
+    if (cr) headers['Content-Range'] = cr
+    const cl = upstream.headers.get('content-length')
+    if (cl && Number(cl) <= AUDIO_PROXY_MAX) headers['Content-Length'] = cl
+    reply.code(upstream.status).headers(headers)
+    return reply.send(upstream.body)
+  } catch (err) {
+    return reply.code(502).send({ error: `upstream failed: ${err.message}` })
+  }
+})
+
 // audio metadata — ID3/Vorbis tags via music-metadata (server-side; app
 // scripts are SES and cannot import()). Pairs with /api/audio-proxy: this
 // grants the WORLD the track, this grants the RIG the tags.

@@ -42,7 +42,7 @@ app.configure([
 		min: 0,
 		max: 2,
 		step: 0.1,
-		description: 'global volume sent with every play command',
+		hint: 'global volume sent with every play command',
 	},
 	{
 		key: 'debug',
@@ -111,7 +111,7 @@ app.configure([
 			{ label: 'No', value: 'disabled' },
 		],
 		initial: 'disabled',
-		description: 'start the rig automatically when the booth loads/rebuilds (server-side, synced clock)',
+		hint: 'starts the rig when the booth loads/rebuilds AND when a player enters an already-running world (server-side, synced clock)',
 	},
 	{
 		key: 'sourcesSection',
@@ -141,6 +141,63 @@ app.configure([
 		max: 6,
 		step: 0.1,
 	},
+	{
+		key: 'panelSize',
+		type: 'range',
+		label: 'Panel Size',
+		initial: 0.004,
+		min: 0.001,
+		max: 0.02,
+		step: 0.001,
+		hint: 'world meters-per-pixel for the booth control panel (tablet default is 0.004)',
+	},
+	{
+		key: 'screenSection',
+		type: 'section',
+		label: 'Rig Screen',
+	},
+	{
+		key: 'screenVideo',
+		type: 'file',
+		kind: 'video',
+		label: 'Screen Video',
+		hint: 'the one video the whole rig shows — every screen app seeks it off the same t0 as the audio',
+	},
+	{
+		key: 'screenLink',
+		type: 'text',
+		label: 'Direct Video URL',
+		initial: '',
+		hint: 'mp4/m3u8 stream or a twitch/youtube link — streams and embeds are sent RAW (hls.js resolves playlist segments against the original origin; the screens draw twitch/youtube with a webview), files route through the same-origin proxy',
+	},
+	{
+		key: 'screenVolume',
+		type: 'range',
+		label: 'Screen Volume',
+		initial: 0,
+		min: 0,
+		max: 1,
+		step: 0.1,
+		hint: '0 = silent screen (the rig track IS the music). Raise only if the video has its own mix',
+	},
+	{
+		key: 'streamFetch',
+		type: 'switch',
+		label: 'Stream Fetch',
+		options: [
+			{ label: 'Direct (CDN — needs CORS)', value: 'direct' },
+			{ label: 'Proxy (via this server — plays any host)', value: 'proxy' },
+		],
+		initial: 'direct',
+		hint: 'm3u8 only. Direct plays straight from the CDN (free bandwidth; some hosts answer without the CORS headers hls.js needs → black screen). Proxy re-serves the playlist + every segment through this server so ANY stream plays — flip it when a stream shows black',
+	},
+	{
+		key: 'embedParents',
+		type: 'text',
+		label: 'Embed Parents',
+		initial: 'boltevm.com,localhost,127.0.0.1,255242621.xyz',
+		hint: 'comma list of domains allowed to iframe twitch players (the live domain, local dev, etc.)',
+	},
 ])
 
 const CHANNEL = props.channel || 'bolt'
@@ -153,6 +210,9 @@ const CRATE_EVENT = `${CHANNEL}:crate:offer`
 const CRATE_WHOIS = `${CHANNEL}:crate:whois`
 const TRACKEND_EVENT = `${CHANNEL}:trackend`
 const RENDER_EVENT = `${CHANNEL}:rig:render`
+const VIDEO_EVENT = `${CHANNEL}:video:command`
+const VIDEO_RENDER_EVENT = `${CHANNEL}:rig:vrender`
+const VIDEO_WHOIS = `${CHANNEL}:video:whois`
 // env access is defensive: on engines without the `env` endowment, reading
 // it throws (undefined global). Until the env endowment ships in a deploy,
 // fall back to relative API paths (works on same-origin deploys).
@@ -269,6 +329,27 @@ if (world.isClient) {
 		else unlinkBoothAudio()
 	})
 
+	// ----- rig video fan-out -----
+	// The booth's client holds the one video command that came down from its
+	// server, and it is the only place that can put it on THIS client's bus
+	// where every screen (and the base panel) hears it. app.emit here is
+	// in-process and client-wide — that IS the fan-out. Re-emitted with the
+	// original token, so a screen already showing the video dedupes.
+	let rigVideo = null
+
+	app.on(VIDEO_RENDER_EVENT, cmd => {
+		if (!cmd) return
+		rigVideo = cmd
+		app.emit(VIDEO_EVENT, cmd)
+		debugLog('rig video -> bus:', cmd.action, cmd.url || '-')
+	})
+
+	// a screen that built late (or rebuilt after a move) asks on this bus; the
+	// booth's client is the only holder of the live command
+	world.on(VIDEO_WHOIS, () => {
+		if (rigVideo) app.emit(VIDEO_EVENT, rigVideo)
+	})
+
 	// rebuild/move healing: whois the speakers until one answers
 	let attempts = 0
 	const whois = () => {
@@ -296,6 +377,12 @@ if (world.isServer) {
 			app.emit(REQ_EVENT, req)
 		}
 	})
+	app.on('booth:hello', () => {
+		broadcastState()
+		// a client that just booted (or rebuilt) has no video command in hand —
+		// hand it the live one so its screens seek straight into the track
+		if (isPlaying && rigVideo) app.send(VIDEO_RENDER_EVENT, rigVideo)
+	})
 
 	// rig state relay: state bus -> our clients (panel display)
 	world.on(STATE_EVENT, state => {
@@ -307,8 +394,19 @@ if (world.isServer) {
 	let isPlaying = false
 	let rigT0 = null // world.getTime() anchor of the live track
 	let rigToken = null // token of the live play command (reused for query answers)
-	let endedToken = null // last rigToken that already advanced — N speakers would skip N tracks
+	let rigVideo = null // the live video command, replayed to (re)building screens
+	let autoStopped = false // a human pressed stop — auto play must never restart behind them
 	let selectedCrateId = null // which crate (or null = static props track)
+
+	// rig video relay, server leg: the booth decides the video (its clock and
+	// track selection live here), then hands the ONE command to its own client
+	// on every client. app.send only reaches this app's own client — the
+	// client-side fan-out to the screens is the client block further down.
+	world.on(VIDEO_EVENT, cmd => {
+		if (!cmd) return
+		rigVideo = cmd
+		app.send(VIDEO_RENDER_EVENT, cmd)
+	})
 
 	// ----- crate playlist (collected from boltVinyl apps over the bus) -----
 	// crates: Map<id, { id, url, name, artist }>. Selection by index is what
@@ -331,6 +429,7 @@ if (world.isServer) {
 			// if nothing is playing, surface the new crate as selected
 			if (!isPlaying && selectedCrateId === null) selectedCrateId = crate.id
 			broadcastState()
+			autoStart('crate arrived')
 		} else {
 			// same url, possibly updated metadata — refresh the order array and
 			// push new names to panels, but never duplicate or reselect
@@ -351,6 +450,84 @@ if (world.isServer) {
 			: url
 	}
 
+	// ---- screen link routing ----
+	// A twitch/youtube page becomes its embeddable player url (the screens draw
+	// those with a webview — those sites can never feed a video texture). A
+	// direct file/stream is a video: mp4 through the same-origin proxy (a
+	// cross-origin element cannot feed the audio graph), m3u8 RAW — hls.js
+	// resolves the urls inside a playlist against the playlist's own url, so a
+	// proxy round-trip would 404 every segment (and the engine only takes its
+	// HLS path while the url still looks like a stream).
+	function youtubeId(url) {
+		// youtu\.?be covers both youtube.com and youtu.be — a bare /youtube/
+		// guard silently skips every youtu.be share link (it has no 'youtube')
+		if (!/youtu\.?be/.test(url || '')) return null
+		let m = url.match(/[?&]v=([\w-]{6,})/)
+		if (!m) m = url.match(/\/(?:embed|live|shorts)\/([\w-]{6,})/)
+		if (!m) m = url.match(/youtu\.be\/([\w-]{6,})/)
+		return m ? m[1] : null
+	}
+
+	function twitchEmbed(url) {
+		if (!/twitch\.tv/.test(url || '')) return null
+		let q = null
+		let m = url.match(/twitch\.tv\/videos?\/(\d+)/)
+		if (m) q = 'video=' + m[1]
+		if (!q) {
+			m = url.match(/[?&]channel=([\w-]+)/)
+			if (m) q = 'channel=' + m[1]
+		}
+		if (!q) {
+			m = url.match(/twitch\.tv\/(?!videos?\/|directory|downloads|clips|settings|subscriptions|jobs|turbo|inventory|wallet|p\/)([\w-]+)/)
+			if (m) q = 'channel=' + m[1]
+		}
+		if (!q) return null
+		// autoplay=true: ask the twitch player to start on load (the screens
+		// re-normalize this url and keep the param; mature-flagged channels
+		// still gate behind a Start Watching click — twitch policy)
+		let out = 'https://player.twitch.tv/?' + q + '&autoplay=true'
+		const list = String(props.embedParents || 'boltevm.com,localhost,127.0.0.1,255242621.xyz').split(',')
+		for (let i = 0; i < list.length; i++) {
+			const p = list[i].trim()
+			if (p) out += '&parent=' + p
+		}
+		return out
+	}
+
+	function normalizeScreenEmbed(url) {
+		const yt = youtubeId(url)
+		if (yt) return 'https://www.youtube-nocookie.com/embed/' + yt + '?autoplay=1&playsinline=1'
+		return twitchEmbed(url)
+	}
+
+	function screenCommandUrl(raw) {
+		const embed = normalizeScreenEmbed(raw)
+		if (embed) return { kind: 'embed', url: embed }
+		if (/\.m3u8/i.test(raw)) {
+			// Direct: hls.js fetches from the CDN (no bandwidth here) but a host
+			// without CORS leaves it with an unreadable playlist — a black
+			// screen, clean console. Proxy: the playlist AND every url inside
+			// it get re-served from this origin, which hls.js always accepts
+			// (the inner '.m3u8' survives encoding, so the engine still takes
+			// its HLS path). Segments then flow through this server — opt-in.
+			const url =
+				props.streamFetch === 'proxy'
+					? `${apiBase}/api/hls-proxy?url=${encodeURIComponent(raw)}`
+					: raw
+			return { kind: 'video', url }
+		}
+		return { kind: 'video', url: proxied(raw) }
+	}
+
+	// the rig screen shows ONE video; its url is whatever the Screen props
+	// resolve to. Same proxy rule as the audio track — the engine's video
+	// element sets crossOrigin=anonymous (ClientLoader:createVideoFactory), so
+	// a plain cross-origin url would not even load, let alone feed the graph.
+	// `asset://` urls fall through unchanged, exactly like the rig's audio.
+	function screenUrl() {
+		return props.screenVideo?.url || props.screenLink || null
+	}
+
 	function getSelectedTrack() {
 		// priority: explicit crate selection > static Track/trackLink props
 		if (selectedCrateId && crates.has(selectedCrateId)) {
@@ -363,10 +540,10 @@ if (world.isServer) {
 		return null
 	}
 
-	function emitCommand(cmd) {
+	function emitCommand(cmd, event = CMD_EVENT) {
 		if (!cmd.token) cmd.token = `${Date.now()}-${++tokenCounter}`
-		app.emit(CMD_EVENT, cmd)
-		debugLog('emit', cmd.action, 'token', cmd.token)
+		app.emit(event, cmd)
+		debugLog('emit', event, cmd.action, 'token', cmd.token)
 	}
 
 	function startRig() {
@@ -376,42 +553,92 @@ if (world.isServer) {
 			return
 		}
 		console.warn('[djbooth] starting rig with', track.name, proxied(track.url))
+		// one clock for the whole rig: the screens anchor to the SAME t0 as the
+		// speakers, so the video and the music start on the same beat.
+		const t0 = world.getTime()
 		rigToken = `play-${Date.now()}-${++tokenCounter}`
 		emitCommand({
 			action: 'play',
 			token: rigToken,
 			url: proxied(track.url),
-			t0: world.getTime(),
+			t0,
 			volume: props.volume ?? 1,
 		})
-		rigT0 = world.getTime()
+		const screen = screenUrl()
+		if (screen) {
+			const sv = screenCommandUrl(screen)
+			emitCommand(
+				{
+					action: 'play',
+					token: rigToken,
+					kind: sv.kind,
+					url: sv.url,
+					t0,
+					volume: props.screenVolume ?? 0,
+				},
+				VIDEO_EVENT,
+			)
+		}
+		rigT0 = t0
 		isPlaying = true
+		autoStopped = false
 		app.send('booth:status', { playing: true, url: track.url })
 		broadcastState()
 		debugLog('rig started')
 	}
 
-	// auto play: server-side start shortly after boot/rebuild. Fires on world
-	// load AND on every prop edit/rebuild (heals itself); if the rig is already
-	// playing a stop came first, so re-anchoring the track is correct, and if
-	// the user stopped it manually the last stop is newer than this timer and
-	// wins. Delay lets speaker apps build + join the bus first. A second late
-	// window covers crates that offer after the first attempt.
-	if (props.autoPlay === 'enabled') {
-		const tryAutoStart = delay => {
-			setTimeout(() => {
-				if (!isPlaying && getSelectedTrack()) {
-					console.warn('[djbooth] auto play — starting rig')
-					startRig()
-				}
-			}, delay)
+	// ---- autoplay: "music whenever someone is here" ----
+	// One guard for every trigger, and every trigger is the same question: is
+	// there music, and is there someone to hear it? Boot timers cover a world
+	// that restarts with people already in it; the enter signal covers a world
+	// that has been up for hours; the crate hook covers crates that offer late.
+	const autoStart = why => {
+		if (props.autoPlay !== 'enabled' || isPlaying || autoStopped) return
+		// never start on an empty world — a server holding a silent rig is
+		// cheaper than one streaming audio into an empty room.
+		// NOTE: the server adds the player to entities.players BEFORE emitting
+		// 'enter' (ServerNetwork.js onConnection), so the joining player is
+		// already counted here — the first person in does start the rig.
+		if (world.getPlayers().length === 0) {
+			debugLog('auto play skipped — nobody in the world', `(${why})`)
+			return
 		}
-		tryAutoStart(1500)
-		tryAutoStart(5000)
+		if (!getSelectedTrack()) return // crates still offering — a later trigger catches up
+		console.warn(`[djbooth] auto play (${why}) — starting rig`)
+		startRig()
 	}
+	if (props.autoPlay === 'enabled') {
+		// world may still have players from before a rebuild — delays let the
+		// speaker apps build and join the bus first
+		setTimeout(() => autoStart('boot'), 1500)
+		setTimeout(() => autoStart('boot'), 5000)
+	}
+	// A player entering is the trigger for an already-running world, and the
+	// ONLY trigger that matters for "the first person in starts the music".
+	// autoStart is idempotent, so a burst of enters (or enters for a rig that is
+	// already live) is a no-op — the rig token is not re-minted, so no speaker
+	// re-seeks and no song is skipped.
+	world.on('enter', () => {
+		autoStopped = false // a new session re-arms autoplay
+		autoStart('player entered')
+	})
+	// Everyone left: drop the rig so the server isn't decoding audio for nobody.
+	// Cheap, and it means the next arrival gets a fresh start rather than
+	// walking into a track that has been running for an hour.
+	// NOTE: PlayerRemote.destroy() emits 'leave' BEFORE entities.remove(), so at
+	// this moment the leaver is STILL in getPlayers() — exclude them by id or the
+	// last player out never registers as "nobody left".
+	world.on('leave', data => {
+		const others = world.getPlayers().filter(p => p.id !== data?.playerId)
+		if (others.length > 0) return
+		if (!isPlaying) return
+		console.warn('[djbooth] last player left — stopping rig')
+		stopRig()
+	})
 
 	function stopRig() {
 		emitCommand({ action: 'stop' })
+		emitCommand({ action: 'stop' }, VIDEO_EVENT)
 		isPlaying = false
 		app.send('booth:status', { playing: false })
 		broadcastState()
@@ -426,6 +653,7 @@ if (world.isServer) {
 		app.emit(STATE_EVENT, {
 			playing: isPlaying,
 			volume: props.volume ?? 1,
+			autoPlay: props.autoPlay === 'enabled',
 			hasTrack: !!track,
 			playlist: crateOrder.map(c => ({ id: c.id, name: c.name, artist: c.artist })),
 			selectedCrateId,
@@ -435,13 +663,36 @@ if (world.isServer) {
 		})
 	}
 
+	// autoplay is a runtime toggle, not a build-time-only prop: the panel
+	// flips it in-world. Same guard rails as the boot timers — if nothing is
+	// selected yet it stays armed and the next player-entered / boot retry wins.
+	app.on('booth:autoplay', on => {
+		props.autoPlay = on ? 'enabled' : 'disabled'
+		debugLog('panel autoplay ->', props.autoPlay)
+		if (on) {
+			// turning autoplay ON is explicit "keep it playing" intent — it must
+			// clear the manual-stop latch, or the button could never work after
+			// anyone had pressed stop once
+			autoStopped = false
+			autoStart('panel toggle')
+		}
+		broadcastState()
+	})
+
 	app.on('booth:toggle', () => {
-		if (isPlaying) stopRig()
-		else startRig()
+		if (isPlaying) {
+			autoStopped = true
+			stopRig()
+		} else {
+			startRig()
+		}
 	})
 
 	app.on('booth:volume', value => {
-		if (isPlaying) emitCommand({ action: 'volume', value })
+		if (isPlaying) {
+			emitCommand({ action: 'volume', value })
+			emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * (value ?? 1) }, VIDEO_EVENT)
+		}
 	})
 
 	// control-plane requests from tablets/remotes (examples/bolt/tablets/).
@@ -452,16 +703,26 @@ if (world.isServer) {
 		if (!req) return
 		debugLog('request:', req.action, req.value ?? '')
 		if (req.action === 'toggle') {
-			if (isPlaying) stopRig()
-			else startRig()
+			if (isPlaying) {
+				autoStopped = true
+				stopRig()
+			} else {
+				startRig()
+			}
 		} else if (req.action === 'play' && !isPlaying) {
 			startRig()
 		} else if (req.action === 'stop' && isPlaying) {
+			autoStopped = true
 			stopRig()
 		} else if (req.action === 'volume') {
 			const v = Math.min(2, Math.max(0, Number(req.value ?? props.volume ?? 1)))
 			props.volume = v // authoritative volume, reused by startRig
-			if (isPlaying) emitCommand({ action: 'volume', value: v })
+			if (isPlaying) {
+				emitCommand({ action: 'volume', value: v })
+				// the screen rides the same fader (its own prop is the trim, so a
+				// silent screen stays silent)
+				emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * v }, VIDEO_EVENT)
+			}
 			broadcastState()
 		} else if (req.action === 'selectCrate') {
 			// tablets/panels pick a crate by id; playing rigs restart on the new
@@ -517,10 +778,32 @@ if (world.isServer) {
 		// track advancement: the LIVE speaker reports natural end (Audio node
 		// onended; rig plays loop=false). Booth advances to the next crate, or
 		// restarts/stops per the On Track End prop.
-		world.on(TRACKEND_EVENT, () => {
+		world.on(TRACKEND_EVENT, data => {
 			if (!isPlaying) return
-			if (endedToken === rigToken) return
-			endedToken = rigToken
+			// Only the track the rig is ACTUALLY live on may advance the playlist.
+			// Three speakers report the same end, so this must be a per-playback
+			// dedupe, not a "did something end" flag.
+			// The playback token is the exact key: speakers echo the token of the
+			// play command they applied, and the rig re-mints it on every advance.
+			// Reporter One's token matches and advances; the others still hold the
+			// OLD token and are rejected. (URL alone can't do this — a 1-track
+			// playlist, or a wrap-around, makes the old and new track the same url.)
+			// Speakers from an older build send no token; fall back to url for them.
+			// This replaces `endedToken === rigToken`, which could never dedupe:
+			// rigToken is re-minted by the very advance it was meant to guard.
+			if (data?.token) {
+				if (data.token !== rigToken) return
+			} else {
+				const live = getSelectedTrack()
+				if (!data?.url || !live || data.url !== proxied(live.url)) return
+				// url alone can't tell a stale echo from a real end when the
+				// playlist replays the same url (single crate). A track cannot
+				// legitimately finish two seconds after it started, and echoes
+				// of a just-advanced track arrive within milliseconds — so age
+				// separates them. Speakers from a current build skip this: their
+				// token above is exact.
+				if (world.getTime() - rigT0 < 2) return
+			}
 			debugLog('track ended naturally')
 			if (props.loopPlaylist === 'stop') {
 				stopRig()
@@ -556,6 +839,10 @@ if (world.isServer) {
 			})
 		}
 	})
+
+	// screen apps whois the live video on this SAME client bus (see the client
+	// block below) — only a client-side holder can answer, so there is nothing
+	// to do here on the server.
 }
 
 // ---------- client: embed screen for music-service links ----------
@@ -572,30 +859,20 @@ if (world.isClient && embedUrl) {
 	app.add(webview)
 }
 
-// ---------- client: control panel + action ----------
+// ---------- client: control panel ----------
 if (world.isClient) {
 	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}`)
 
 	// mirror of rig state (arrives via server relay from the state bus)
-	let view = { playing: false, volume: 1, hasTrack: false, playlist: [], selectedCrateId: null, nowPlaying: null }
-
-	const playAction = app.create('action', {
-		label: 'Drop the Beat',
-		distance: 5,
-		duration: 1,
-		onTrigger: () => {
-			console.warn('[djbooth] action triggered -> booth:toggle')
-			app.send('booth:toggle', true)
-		},
-	})
-	app.add(playAction)
+	let view = { playing: false, volume: 1, autoPlay: false, hasTrack: false, playlist: [], selectedCrateId: null, nowPlaying: null }
 
 	// Yoga flexbox layout (children are NOT positioned with 3D vectors —
 	// only the root ui node gets a position; everything inside flows)
 	const ui = app.create('ui', {
 		width: 320,
 		height: 300,
-		position: [0, 2.2, 0],
+		size: props.panelSize ?? 0.004,
+		position: [0, 1.4, -1],
 		pivot: 'center',
 		space: 'world',
 		billboard: 'y',
@@ -606,8 +883,10 @@ if (world.isClient) {
 	const panel = app.create('uiview', {
 		width: 320,
 		height: 300,
-		backgroundColor: 'rgba(10, 10, 18, 0.85)',
+		backgroundColor: '#0a0a12',
 		borderRadius: 12,
+		borderWidth: 2,
+		borderColor: 'rgba(255, 102, 255, 0.5)',
 		flexDirection: 'column',
 		alignItems: 'center',
 		paddingTop: 14,
@@ -618,6 +897,12 @@ if (world.isClient) {
 		fontSize: 17,
 		color: '#ff66ff',
 		fontWeight: 'bold',
+		backgroundColor: 'rgba(255, 102, 255, 0.12)',
+		borderRadius: 8,
+		paddingLeft: 12,
+		paddingRight: 12,
+		paddingTop: 3,
+		paddingBottom: 3,
 		marginBottom: 8,
 	})
 	panel.add(title)
@@ -634,6 +919,12 @@ if (world.isClient) {
 		value: embedUrl ? 'embed mode — play on the screen' : 'ready',
 		fontSize: 11,
 		color: '#aaaacc',
+		backgroundColor: 'rgba(102, 255, 204, 0.08)',
+		borderRadius: 6,
+		paddingLeft: 8,
+		paddingRight: 8,
+		paddingTop: 2,
+		paddingBottom: 2,
 		marginBottom: 12,
 	})
 	panel.add(statusText)
@@ -651,6 +942,14 @@ if (world.isClient) {
 			marginRight: marginRight ?? 0,
 		})
 		btn.add(app.create('uitext', { value: label, fontSize: 13, color: '#ffffff' }))
+		btn.onPointerOver = () => {
+			btn.borderWidth = 1
+			btn.borderColor = 'rgba(255, 255, 255, 0.8)'
+		}
+		btn.onPointerOut = () => {
+			btn.borderWidth = 0
+			btn.borderColor = null
+		}
 		return btn
 	}
 
@@ -663,6 +962,14 @@ if (world.isClient) {
 	transportRow.add(nextBtn)
 	panel.add(transportRow)
 
+	const autoRow = app.create('uiview', { flexDirection: 'row', marginTop: 8 })
+	const autoBtn = makeButton('auto off', 'rgba(60, 60, 90, 0.95)')
+	autoBtn.onPointerDown = () => {
+		app.send('booth:autoplay', view.autoPlay !== 'enabled')
+	}
+	autoRow.add(autoBtn)
+	panel.add(autoRow)
+
 	// ----- playlist (top 5 rows, rebuilt on state change) -----
 	let listRoot = null
 	function rebuildList() {
@@ -670,8 +977,37 @@ if (world.isClient) {
 			panel.remove(listRoot)
 			listRoot = null
 		}
-		const items = (view.playlist || []).slice(0, 5)
-		if (items.length === 0) return
+		const all = view.playlist || []
+		let start = 0
+		if (all.length > 5) {
+			const sel = Math.max(0, all.findIndex(c => c.id === view.selectedCrateId))
+			start = Math.max(0, Math.min(sel - 2, all.length - 5))
+		}
+		const items = all.slice(start, start + 5)
+		if (hint) {
+			hint.value = all.length > 5
+				? `◀ prev / next ▶   ${start + 1}–${start + items.length} of ${all.length}`
+				: 'click rows / press esc to free cursor'
+		}
+		if (items.length === 0) {
+			// no crates on the bus — say so, a blank panel is indistinguishable from a dead rig
+			listRoot = app.create('uiview', {
+				width: 292,
+				marginTop: 12,
+				alignItems: 'center',
+				backgroundColor: 'rgba(0, 0, 0, 0.3)',
+				borderRadius: 8,
+				paddingTop: 8,
+				paddingBottom: 8,
+			})
+			listRoot.add(app.create('uitext', {
+				value: 'no crates yet — drop a boltVinyl in the world',
+				fontSize: 10,
+				color: '#666688',
+			}))
+			panel.add(listRoot)
+			return
+		}
 		listRoot = app.create('uiview', {
 			width: 292,
 			marginTop: 12,
@@ -683,15 +1019,23 @@ if (world.isClient) {
 		})
 		items.forEach(item => {
 			const isSelected = item.id === view.selectedCrateId
+			const rowBase = isSelected ? 'rgba(102, 255, 204, 0.16)' : 'transparent'
 			const row = app.create('uiview', {
 				width: 284,
 				height: 24,
 				flexDirection: 'row',
 				alignItems: 'center',
 				paddingLeft: 10,
-				backgroundColor: isSelected ? 'rgba(102, 255, 204, 0.16)' : 'transparent',
+				backgroundColor: rowBase,
+				borderRadius: 6,
 				cursor: 'pointer',
 			})
+			row.onPointerOver = () => {
+				row.backgroundColor = isSelected ? 'rgba(102, 255, 204, 0.28)' : 'rgba(255, 255, 255, 0.06)'
+			}
+			row.onPointerOut = () => {
+				row.backgroundColor = rowBase
+			}
 			row.add(app.create('uitext', {
 				value: `${isSelected ? '▶ ' : '   '}${item.name}${item.artist ? ' — ' + item.artist : ''}`,
 				fontSize: 11,
@@ -714,6 +1058,16 @@ if (world.isClient) {
 	})
 	panel.add(hint)
 
+	const mark = app.create('uitext', {
+		value: '⚡ BOLT',
+		fontSize: 8,
+		color: '#55556c',
+		absolute: true,
+		bottom: 5,
+		right: 9,
+	})
+	panel.add(mark)
+
 	ui.add(panel)
 
 	// ----- interactions -----
@@ -730,6 +1084,8 @@ if (world.isClient) {
 	}
 
 	// server relay delivers rig state (state bus -> our server -> app.send)
+	app.send('booth:hello', true)
+
 	app.on(RENDER_EVENT, state => {
 		if (!state) return
 		view = state
@@ -740,8 +1096,8 @@ if (world.isClient) {
 				? `■ ${np.name}`
 				: '· · ·'
 		statusText.value = state.playing ? 'rig live — all speakers synced' : embedUrl ? 'embed mode — play on the screen' : 'ready'
-		playAction.label = state.playing ? 'Stop the Rig' : 'Drop the Beat'
 		playBtn.children?.[0] && (playBtn.children[0].value = state.playing ? '■ stop' : '▶ play')
+		autoBtn.children?.[0] && (autoBtn.children[0].value = state.autoPlay ? 'auto on' : 'auto off')
 		rebuildList()
 	})
 }

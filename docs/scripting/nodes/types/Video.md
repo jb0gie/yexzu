@@ -8,7 +8,7 @@ Renders a video into the world, either on a simple plane or onto geometry.
 
 A url to a video file, or an asset url from a video prop.
 
-Currently only `mp4` and `m3u8` (HLS streams) are supported.
+Currently only `mp4` and `m3u8` (HLS streams) are supported. HLS detection matches `.m3u8` anywhere in the url, so token-signed links (`.../playlist.m3u8?token=...`) work too — they are loaded through hls.js, which requires CORS on the playlist and its segments.
 
 ### `.linked`: Number|String
 

@@ -34,6 +34,8 @@ const defaults = {
   color: 'black',
   lit: false,
   doubleside: false,
+  flipX: false,
+  flipY: false,
   castShadow: false,
   receiveShadow: false,
 
@@ -72,6 +74,8 @@ export class Video extends Node {
     this.color = data.color
     this.lit = data.lit
     this.doubleside = data.doubleside
+    this.flipX = data.flipX
+    this.flipY = data.flipY
     this.castShadow = data.castShadow
     this.receiveShadow = data.receiveShadow
 
@@ -143,6 +147,8 @@ export class Video extends Node {
         uFit: { value: this._fit === 'cover' ? 1 : this._fit === 'contain' ? 2 : 0 }, // 0 = none, 1 = cover, 2 = contain
         uColor: { value: new THREE.Color(this._color) },
         uOffset: { value: new THREE.Vector2(0, 0) },
+        uFlipX: { value: this._flipX ? 1 : 0 },
+        uFlipY: { value: this._flipY ? 1 : 0 },
       }
       // const color = this.instance?.ready ? 'white' : this._color
       material = new CustomShaderMaterial({
@@ -165,6 +171,8 @@ export class Video extends Node {
           uniform float uFit; // 0 = none, 1 = cover, 2 = contain
           uniform vec3 uColor; 
           uniform vec2 uOffset;
+          uniform float uFlipX;
+          uniform float uFlipY;
           
           varying vec2 vUv;
 
@@ -181,6 +189,12 @@ export class Video extends Node {
             float aspect = uGeoAspect / uVidAspect;
 
             vec2 uv = vUv;
+
+            // texture-space mirror: flips the SAMPLED image, so neither the
+            // mesh's authored transform nor its winding can fight it —
+            // a screen built mirrored in blender renders correct content
+            if (uFlipX > 0.5) uv.x = 1.0 - uv.x;
+            if (uFlipY > 0.5) uv.y = 1.0 - uv.y;
 
             // Apply UV offset
             uv = uv + uOffset;
@@ -360,6 +374,8 @@ export class Video extends Node {
       material.uniforms.uGeoAspect.value = geoAspect
       material.uniforms.uMap.value = this.instance.texture
       material.uniforms.uHasMap.value = 1
+      material.uniforms.uFlipX.value = this._flipX ? 1 : 0
+      material.uniforms.uFlipY.value = this._flipY ? 1 : 0
       material.needsUpdate = true
 
       this._loading = false
@@ -455,6 +471,8 @@ export class Video extends Node {
     this._color = source._color
     this._lit = source._lit
     this._doubleside = source._doubleside
+    this._flipX = source._flipX
+    this._flipY = source._flipY
     this._castShadow = source._castShadow
     this._receiveShadow = source._receiveShadow
 
@@ -596,6 +614,36 @@ export class Video extends Node {
     if (this.mesh) {
       this.mesh.material.side = value ? THREE.DoubleSide : THREE.FrontSide
       this.mesh.material.needsUpdate = true
+    }
+  }
+
+  get flipX() {
+    return this._flipX
+  }
+
+  set flipX(value = defaults.flipX) {
+    if (!isBoolean(value)) {
+      throw new Error('[video] flipX not a boolean')
+    }
+    if (this._flipX === value) return
+    this._flipX = value
+    if (this.mesh) {
+      this.mesh.material.uniforms.uFlipX.value = value ? 1 : 0
+    }
+  }
+
+  get flipY() {
+    return this._flipY
+  }
+
+  set flipY(value = defaults.flipY) {
+    if (!isBoolean(value)) {
+      throw new Error('[video] flipY not a boolean')
+    }
+    if (this._flipY === value) return
+    this._flipY = value
+    if (this.mesh) {
+      this.mesh.material.uniforms.uFlipY.value = value ? 1 : 0
     }
   }
 
@@ -971,6 +1019,18 @@ export class Video extends Node {
         },
         set doubleside(value) {
           self.doubleside = value
+        },
+        get flipX() {
+          return self.flipX
+        },
+        set flipX(value) {
+          self.flipX = value
+        },
+        get flipY() {
+          return self.flipY
+        },
+        set flipY(value) {
+          self.flipY = value
         },
         get castShadow() {
           return self.castShadow

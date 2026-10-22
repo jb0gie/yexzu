@@ -391,7 +391,11 @@ function getQueryParams(url) {
 }
 
 function createVideoFactory(world, url) {
-  const isHLS = url?.endsWith('.m3u8')
+  // `.m3u8` anywhere in the url, not just as a bare suffix — token-signed HLS
+  // links (.../playlist.m3u8?token=...) used to fall through to the plain
+  // element, which cannot play HLS in Chrome. hls.js gets the whole url, query
+  // included, so nothing else needs to know.
+  const isHLS = url?.includes('.m3u8')
   const sources = {}
   let width
   let height
