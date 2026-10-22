@@ -961,10 +961,12 @@ if (world.isClient && embedUrl) {
 }
 
 // ---------- client: control panel ----------
-// BOLT rig console — "terminal": monospace, one accent, data density.
+// BOLT rig console — "terminal" skin, AIRY layout. Style stays (mono type, one
+// accent, thin rules); the panel got 80px taller and real gutters so nothing
+// touches: 18px sides, 14-18px between sections, 7-10px inside rows.
 // Engine truth (UIText vs UIView): text has NO width/height/pointer handlers,
-// so every clickable thing is a uiview wrapper and every column is a sized
-// uiview. Type sizes are calibrated to the 340x560 panel (13px data, 24px brand).
+// so every column is a sized uiview and every clickable is a uiview chip.
+// Calibrated at 340x640 (13px data, 24px brand, 34px clearance to the footer).
 if (world.isClient) {
 	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}, source=${props.audioSource || 'library'}`)
 
@@ -994,6 +996,9 @@ if (world.isClient) {
 	const RED = '#ff2b55'
 	const HOT = 'rgba(41, 231, 255, 0.06)'
 	const MONO = 'monospace'
+	const W = 340
+	const PAD = 18
+	const INNER = W - PAD * 2 - 2 // border 1px each side
 
 	const clip = (s, n) => {
 		const t = String(s == null ? '' : s)
@@ -1001,8 +1006,8 @@ if (world.isClient) {
 	}
 
 	const ui = app.create('ui', {
-		width: 340,
-		height: 560,
+		width: W,
+		height: 640,
 		size: props.panelSize ?? 0.004,
 		position: [0, 1.4, -1],
 		pivot: 'center',
@@ -1013,19 +1018,20 @@ if (world.isClient) {
 	app.add(ui)
 
 	const panel = app.create('uiview', {
-		width: 340,
-		height: 560,
+		width: W,
+		height: 640,
 		backgroundColor: BG,
 		borderWidth: 1,
 		borderColor: LINE,
 		flexDirection: 'column',
+		paddingBottom: 16,
 	})
 
 	const text = (value, size, color, opts) =>
 		app.create('uitext', Object.assign({ value, fontSize: size, color, fontFamily: MONO }, opts || {}))
 	const row = opts => app.create('uiview', Object.assign({ flexDirection: 'row', alignItems: 'center' }, opts || {}))
 	const col = opts => app.create('uiview', Object.assign({ flexDirection: 'column' }, opts || {}))
-	const divider = (color, width) => app.create('uiview', { width: width ?? 308, height: 1, backgroundColor: color })
+	const divider = (color, width) => app.create('uiview', { width: width ?? W, height: 1, backgroundColor: color })
 
 	// clickable chip: uiview wrapper (text can't take pointer events) + label
 	const chip = (label, w, h, fontSize) => {
@@ -1053,14 +1059,14 @@ if (world.isClient) {
 
 	// ----- header -----
 	const head = app.create('uiview', {
-		width: 340,
-		paddingLeft: 16,
-		paddingRight: 16,
-		paddingTop: 14,
-		paddingBottom: 10,
+		width: W,
+		paddingLeft: PAD,
+		paddingRight: PAD,
+		paddingTop: 18,
+		paddingBottom: 14,
 		flexDirection: 'column',
 	})
-	const hrow = row({ width: 308, justifyContent: 'space-between' })
+	const hrow = row({ width: INNER, justifyContent: 'space-between' })
 	const brandRow = row({})
 	brandRow.add(text('BOLT', 24, CYAN, { fontWeight: 'bold' }))
 	brandRow.add(text('://rig', 24, INK))
@@ -1068,15 +1074,15 @@ if (world.isClient) {
 	const liveTxt = text('● LIVE', 11, RED)
 	hrow.add(liveTxt)
 	head.add(hrow)
-	head.add(text('console · channel=' + CHANNEL, 11, MUTE, { marginTop: 5 }))
+	head.add(text('console · channel=' + CHANNEL, 11, MUTE, { marginTop: 7 }))
 	panel.add(head)
-	panel.add(divider(LINE, 340))
+	panel.add(divider(LINE, W))
 
-	// ----- state rows (the old now-playing card, flattened) -----
-	const kv = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 10 })
+	// ----- state rows (now_playing / source — mode lives in the tabs) -----
+	const kv = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 14 })
 	const kvRow = key => {
-		const r = row({ width: 308, paddingTop: 4, paddingBottom: 4 })
-		const keyCol = app.create('uiview', { width: 104 })
+		const r = row({ width: INNER, paddingTop: 7, paddingBottom: 7 })
+		const keyCol = app.create('uiview', { width: 112 })
 		keyCol.add(text(key, 11, MUTE))
 		r.add(keyCol)
 		const val = text('—', 13, INK)
@@ -1085,17 +1091,15 @@ if (world.isClient) {
 	}
 	const rNow = kvRow('now_playing')
 	const rSrc = kvRow('source')
-	const rMode = kvRow('mode')
 	kv.add(rNow.view)
 	kv.add(rSrc.view)
-	kv.add(rMode.view)
 	panel.add(kv)
-	panel.add(divider(LINE, 340))
+	panel.add(divider(LINE, W))
 
 	// ----- audio source tabs -----
-	const srcRow = row({ paddingLeft: 16, paddingRight: 16, paddingTop: 12, gap: 10 })
-	const libTab = chip('[ library ]', 106, 30)
-	const streamTab = chip('[ stream ]', 106, 30)
+	const srcRow = row({ paddingLeft: PAD, paddingRight: PAD, paddingTop: 16, gap: 10 })
+	const libTab = chip('[ library ]', 108, 32)
+	const streamTab = chip('[ stream ]', 108, 32)
 	srcRow.add(libTab.view)
 	srcRow.add(streamTab.view)
 	panel.add(srcRow)
@@ -1117,10 +1121,10 @@ if (world.isClient) {
 	streamTab.view.onPointerOut = () => styleTabs(view.audioSource || 'library')
 
 	// ----- transport -----
-	const trans = row({ paddingLeft: 16, paddingRight: 16, paddingTop: 12, gap: 8 })
-	const prevB = chip('«', 42, 36, 16)
-	const playB = chip('▶ PLAY', 186, 36, 12)
-	const nextB = chip('»', 42, 36, 16)
+	const trans = row({ paddingLeft: PAD, paddingRight: PAD, paddingTop: 16, gap: 10 })
+	const prevB = chip('«', 46, 38, 16)
+	const playB = chip('▶ PLAY', 190, 38, 12)
+	const nextB = chip('»', 46, 38, 16)
 	playB.view.flexGrow = 1
 	trans.add(prevB.view)
 	trans.add(playB.view)
@@ -1137,13 +1141,13 @@ if (world.isClient) {
 	playB.view.onPointerDown = () => app.send('booth:toggle', true)
 
 	// ----- master (the tick strip is the fader) -----
-	const meter = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 12 })
-	const mh = row({ width: 308, justifyContent: 'space-between' })
+	const meter = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 18 })
+	const mh = row({ width: INNER, justifyContent: 'space-between' })
 	mh.add(text('MASTER', 11, MUTE))
-	const mhRight = row({ gap: 8 })
-	const volDown = chip('[-]', 30, 22, 12)
+	const mhRight = row({ gap: 10 })
+	const volDown = chip('[-]', 32, 24)
 	const volValue = text('0.80 / 2.00', 11, INK)
-	const volUp = chip('[+]', 30, 22, 12)
+	const volUp = chip('[+]', 32, 24)
 	mhRight.add(volDown.view)
 	mhRight.add(volValue)
 	mhRight.add(volUp.view)
@@ -1151,10 +1155,10 @@ if (world.isClient) {
 	meter.add(mh)
 
 	const TICKS = 14
-	const tickRow = row({ width: 308, gap: 2, marginTop: 7 })
+	const tickRow = row({ width: INNER, gap: 2, marginTop: 10 })
 	const ticks = []
 	for (let i = 0; i < TICKS; i++) {
-		const t = app.create('uiview', { height: 10, flexGrow: 1, backgroundColor: FAINTLINE, cursor: 'pointer' })
+		const t = app.create('uiview', { height: 12, flexGrow: 1, backgroundColor: FAINTLINE, cursor: 'pointer' })
 		// clicking a tick sets the level it represents — the strip IS the fader
 		t.onPointerDown = () => {
 			const v = Math.round(((i + 1) / TICKS) * 2 * 10) / 10
@@ -1183,17 +1187,17 @@ if (world.isClient) {
 	}
 
 	// ----- crate table -----
-	const tbl = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 12 })
-	const th = row({ width: 308, paddingBottom: 5 })
-	const thNum = app.create('uiview', { width: 26 })
+	const tbl = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 16 })
+	const th = row({ width: INNER, paddingBottom: 8 })
+	const thNum = app.create('uiview', { width: 30 })
 	thNum.add(text('#', 10, FAINT))
 	th.add(thNum)
 	th.add(text('CRATE', 10, FAINT, { flexGrow: 1 }))
-	const thSrc = app.create('uiview', { width: 46, alignItems: 'flex-end' })
+	const thSrc = app.create('uiview', { width: 52, alignItems: 'flex-end' })
 	thSrc.add(text('SRC', 10, FAINT, { textAlign: 'right' }))
 	th.add(thSrc)
 	tbl.add(th)
-	tbl.add(divider(FAINTLINE, 308))
+	tbl.add(divider(FAINTLINE, INNER))
 
 	let tableRows = null
 	function rebuildTable() {
@@ -1201,7 +1205,7 @@ if (world.isClient) {
 			tbl.remove(tableRows)
 			tableRows = null
 		}
-		tableRows = col({ width: 308 })
+		tableRows = col({ width: INNER })
 		const all = view.playlist || []
 		const isStream = view.audioSource === 'stream'
 		const rows = []
@@ -1233,12 +1237,12 @@ if (world.isClient) {
 			rows.push({ key: '--', title: 'no crates yet — drop a boltVinyl in the world', src: '', hot: false, id: null })
 		}
 		rows.forEach(r => {
-			const line = row({ width: 308, paddingTop: 7, paddingBottom: 7, cursor: r.id ? 'pointer' : 'default' })
-			const numCol = app.create('uiview', { width: 26 })
+			const line = row({ width: INNER, paddingTop: 10, paddingBottom: 10, cursor: r.id ? 'pointer' : 'default' })
+			const numCol = app.create('uiview', { width: 30 })
 			numCol.add(text(r.key, 13, r.hot ? MAGENTA : FAINT))
 			line.add(numCol)
-			line.add(text(clip(r.title, 30), 13, r.hot ? '#ffffff' : '#8aa8b8', { flexGrow: 1 }))
-			const srcCol = app.create('uiview', { width: 46, alignItems: 'flex-end' })
+			line.add(text(clip(r.title, 27), 13, r.hot ? '#ffffff' : '#8aa8b8', { flexGrow: 1 }))
+			const srcCol = app.create('uiview', { width: 52, alignItems: 'flex-end' })
 			srcCol.add(text(r.src, 13, r.src === 'strm' ? MAGENTA : MUTE, { textAlign: 'right' }))
 			line.add(srcCol)
 			if (r.id) {
@@ -1254,15 +1258,15 @@ if (world.isClient) {
 				}
 			}
 			tableRows.add(line)
-			tableRows.add(divider(FAINTLINE, 308))
+			tableRows.add(divider(FAINTLINE, INNER))
 		})
 		tbl.add(tableRows)
 	}
 	panel.add(tbl)
 
 	// ----- footer -----
-	const foot = row({ width: 340, paddingLeft: 16, paddingRight: 16, justifyContent: 'space-between', marginTop: 12 })
-	const autoB = chip('autoplay:on', 92, 20, 10)
+	const foot = row({ width: W, paddingLeft: PAD, paddingRight: PAD, justifyContent: 'space-between', marginTop: 16 })
+	const autoB = chip('autoplay:on', 96, 24, 10)
 	const statusTxt = text('ready', 10, FAINT)
 	foot.add(autoB.view)
 	foot.add(statusTxt)
@@ -1296,12 +1300,10 @@ if (world.isClient) {
 		view = Object.assign({}, state)
 		const np = state.nowPlaying
 		const isStream = state.audioSource === 'stream'
-		rNow.val.value = clip(isStream ? 'LIVE STREAM' : np ? np.name : '—', 26)
+		rNow.val.value = clip(isStream ? 'LIVE STREAM' : np ? np.name : '—', 24)
 		rNow.val.color = isStream || np ? INK : FAINT
-		rSrc.val.value = clip(isStream ? (state.hasScreen ? state.screenHost || 'screen video' : 'no video url') : 'library', 26)
+		rSrc.val.value = clip(isStream ? (state.hasScreen ? state.screenHost || 'screen video' : 'no video url') : 'library', 24)
 		rSrc.val.color = isStream ? (state.hasScreen ? CYAN : RED) : MUTE
-		rMode.val.value = isStream ? 'stream' : 'library'
-		rMode.val.color = isStream ? MAGENTA : CYAN
 		liveTxt.value = state.playing ? '● LIVE' : '● idle'
 		if (!state.playing) liveTxt.color = FAINT
 		styleTabs(state.audioSource || 'library')
