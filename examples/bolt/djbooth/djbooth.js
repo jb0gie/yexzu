@@ -181,6 +181,17 @@ app.configure([
 		hint: '0 = silent screen (the rig track IS the music). Raise only if the video has its own mix',
 	},
 	{
+		key: 'audioSource',
+		type: 'switch',
+		label: 'Audio Source',
+		options: [
+			{ label: 'Music Library (crates / track)', value: 'library' },
+			{ label: 'Live Stream (the screen video)', value: 'stream' },
+		],
+		initial: 'library',
+		hint: 'what the ROOM hears: the crate/track playlist, or the screen video’s own audio. Stream mode stops the speakers, makes the stream the room mix (master volume drives it) and points the lights at its audio node. The panel flips this live.',
+	},
+	{
 		key: 'streamFetch',
 		type: 'switch',
 		label: 'Stream Fetch',
@@ -397,6 +408,9 @@ if (world.isServer) {
 	let rigVideo = null // the live video command, replayed to (re)building screens
 	let autoStopped = false // a human pressed stop — auto play must never restart behind them
 	let selectedCrateId = null // which crate (or null = static props track)
+	// what the room HEARS: the crate/track library, or the screen video's own
+	// audio (a livestream's mix). Runtime-flippable from the panel.
+	let audioSource = props.audioSource === 'stream' ? 'stream' : 'library'
 
 	// rig video relay, server leg: the booth decides the video (its clock and
 	// track selection live here), then hands the ONE command to its own client
@@ -546,7 +560,45 @@ if (world.isServer) {
 		debugLog('emit', event, cmd.action, 'token', cmd.token)
 	}
 
+	// STREAM source: the screen video's own audio IS the room's music. Speakers
+	// stop FIRST (they announce playing:false, which unlinks the reactive
+	// meshes), then the video plays with real volume — the screens announce the
+	// stream's audio node on the same bus, so last-announcement-wins lands the
+	// lights on the livestream. Ordering is the whole trick; do not reorder.
+	function startStream() {
+		const screen = screenUrl()
+		if (!screen) {
+			console.warn('[djbooth] STREAM source is selected but no Screen Video / Direct Video URL is set — nothing to play')
+			broadcastState()
+			return
+		}
+		emitCommand({ action: 'stop' }) // speakers + their reactive announcement go down first
+		const t0 = world.getTime()
+		rigToken = `stream-${Date.now()}-${++tokenCounter}`
+		rigT0 = t0
+		const sv = screenCommandUrl(screen)
+		emitCommand(
+			{
+				action: 'play',
+				token: rigToken,
+				kind: sv.kind,
+				url: sv.url,
+				t0,
+				// the master fader drives the stream: one volume control whether
+				// the room is on the library or the livestream
+				volume: props.volume ?? 1,
+			},
+			VIDEO_EVENT,
+		)
+		isPlaying = true
+		autoStopped = false
+		app.send('booth:status', { playing: true, url: screen, source: 'stream' })
+		broadcastState()
+		console.warn(`[djbooth] STREAM source live — ${sv.kind}: ${sv.url.slice(0, 96)}`)
+	}
+
 	function startRig() {
+		if (audioSource === 'stream') return startStream()
 		const track = getSelectedTrack()
 		if (!track) {
 			console.warn('[djbooth] NO TRACK — drop a boltVinyl crate in the world or set the Track prop')
@@ -603,6 +655,12 @@ if (world.isServer) {
 			debugLog('auto play skipped — nobody in the world', `(${why})`)
 			return
 		}
+		// stream source: the room resumes whatever source it was left on
+		if (audioSource === 'stream') {
+			console.warn(`[djbooth] auto play (${why}) — starting the STREAM source`)
+			startStream()
+			return
+		}
 		if (!getSelectedTrack()) return // crates still offering — a later trigger catches up
 		console.warn(`[djbooth] auto play (${why}) — starting rig`)
 		startRig()
@@ -654,6 +712,16 @@ if (world.isServer) {
 			playing: isPlaying,
 			volume: props.volume ?? 1,
 			autoPlay: props.autoPlay === 'enabled',
+			audioSource,
+			hasScreen: !!screenUrl(),
+			// short label for the panel — the sandbox has no URL constructor, so
+			// strip the scheme and keep the host
+			screenHost: (function () {
+				const s = screenUrl()
+				if (!s) return null
+				const noProto = String(s).replace(/^https?:\/\//, '')
+				return noProto.split('/')[0].slice(0, 40)
+			})(),
 			hasTrack: !!track,
 			playlist: crateOrder.map(c => ({ id: c.id, name: c.name, artist: c.artist })),
 			selectedCrateId,
@@ -689,10 +757,32 @@ if (world.isServer) {
 	})
 
 	app.on('booth:volume', value => {
-		if (isPlaying) {
-			emitCommand({ action: 'volume', value })
-			emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * (value ?? 1) }, VIDEO_EVENT)
+		if (!isPlaying) return
+		if (audioSource === 'stream') {
+			// the stream is the room mix — the master fader IS its volume
+			emitCommand({ action: 'volume', value: value ?? 1 }, VIDEO_EVENT)
+			return
 		}
+		emitCommand({ action: 'volume', value })
+		emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * (value ?? 1) }, VIDEO_EVENT)
+	})
+
+	// the panel (or a tablet) flips which source the room hears. Deliberate
+	// switch = intent to play: clear both buses, then start the new source.
+	app.on('booth:source', mode => {
+		const next = mode === 'stream' ? 'stream' : 'library'
+		if (next === audioSource) {
+			broadcastState()
+			return
+		}
+		audioSource = next
+		props.audioSource = next
+		stopRig() // both buses go down (video stop announces the screen silent)
+		autoStopped = false
+		if (next === 'stream') startStream()
+		else if (props.autoPlay === 'enabled' || getSelectedTrack()) startRig()
+		broadcastState()
+		console.warn('[djbooth] audio source ->', next)
 	})
 
 	// control-plane requests from tablets/remotes (examples/bolt/tablets/).
@@ -718,10 +808,15 @@ if (world.isServer) {
 			const v = Math.min(2, Math.max(0, Number(req.value ?? props.volume ?? 1)))
 			props.volume = v // authoritative volume, reused by startRig
 			if (isPlaying) {
-				emitCommand({ action: 'volume', value: v })
-				// the screen rides the same fader (its own prop is the trim, so a
-				// silent screen stays silent)
-				emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * v }, VIDEO_EVENT)
+				if (audioSource === 'stream') {
+					// the stream owns the room — the fader drives the video
+					emitCommand({ action: 'volume', value: v }, VIDEO_EVENT)
+				} else {
+					emitCommand({ action: 'volume', value: v })
+					// the screen rides the same fader (its own prop is the trim, so a
+					// silent screen stays silent)
+					emitCommand({ action: 'volume', value: (props.screenVolume ?? 0) * v }, VIDEO_EVENT)
+				}
 			}
 			broadcastState()
 		} else if (req.action === 'selectCrate') {
@@ -780,6 +875,9 @@ if (world.isServer) {
 		// restarts/stops per the On Track End prop.
 		world.on(TRACKEND_EVENT, data => {
 			if (!isPlaying) return
+			// no tracks exist in stream mode — a late speaker report must never
+			// advance a playlist nobody is playing
+			if (audioSource === 'stream') return
 			// Only the track the rig is ACTUALLY live on may advance the playlist.
 			// Three speakers report the same end, so this must be a per-playback
 			// dedupe, not a "did something end" flag.
@@ -828,6 +926,9 @@ if (world.isServer) {
 	// glitch on every query.
 	world.on(QUERY_EVENT, () => {
 		debugLog('speaker queried rig state')
+		// stream mode: speakers must stay silent — replaying an audio play here
+		// would put the library track back under the livestream
+		if (audioSource === 'stream') return
 		const track = getSelectedTrack()
 		if (isPlaying && track) {
 			emitCommand({
@@ -860,17 +961,40 @@ if (world.isClient && embedUrl) {
 }
 
 // ---------- client: control panel ----------
+// BOLT rig console. Brand rules: near-black glass, magenta signature, electric
+// cyan for values — the panel should read like hardware, not a form.
 if (world.isClient) {
-	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}`)
+	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}, source=${props.audioSource || 'library'}`)
 
 	// mirror of rig state (arrives via server relay from the state bus)
-	let view = { playing: false, volume: 1, autoPlay: false, hasTrack: false, playlist: [], selectedCrateId: null, nowPlaying: null }
+	let view = {
+		playing: false,
+		volume: 1,
+		autoPlay: false,
+		audioSource: 'library',
+		hasScreen: false,
+		screenHost: null,
+		hasTrack: false,
+		playlist: [],
+		selectedCrateId: null,
+		nowPlaying: null,
+	}
 
-	// Yoga flexbox layout (children are NOT positioned with 3D vectors —
-	// only the root ui node gets a position; everything inside flows)
+	// palette — BOLT brand
+	const INK = '#05060f'
+	const CARD = '#0b0d1c'
+	const MAGENTA = '#ff2bd6'
+	const CYAN = '#29e7ff'
+	const TEXT = '#eef0ff'
+	const MUTED = '#6a6a8a'
+	const DIM = '#8a8aa8'
+	const GHOST = 'rgba(255, 255, 255, 0.05)'
+
+	// Yoga flexbox layout (children are NOT positioned with 3D vectors — only
+	// the root ui node gets a position; everything inside flows)
 	const ui = app.create('ui', {
-		width: 320,
-		height: 300,
+		width: 340,
+		height: 560,
 		size: props.panelSize ?? 0.004,
 		position: [0, 1.4, -1],
 		pivot: 'center',
@@ -881,96 +1005,211 @@ if (world.isClient) {
 	app.add(ui)
 
 	const panel = app.create('uiview', {
-		width: 320,
-		height: 300,
-		backgroundColor: '#0a0a12',
-		borderRadius: 12,
+		width: 340,
+		height: 560,
+		backgroundColor: INK,
+		borderRadius: 18,
 		borderWidth: 2,
-		borderColor: 'rgba(255, 102, 255, 0.5)',
+		borderColor: 'rgba(255, 43, 214, 0.55)',
 		flexDirection: 'column',
 		alignItems: 'center',
 		paddingTop: 14,
 	})
 
-	const title = app.create('uitext', {
-		value: `🎧 BOLT RIG — ${CHANNEL}`,
-		fontSize: 17,
-		color: '#ff66ff',
-		fontWeight: 'bold',
-		backgroundColor: 'rgba(255, 102, 255, 0.12)',
-		borderRadius: 8,
-		paddingLeft: 12,
-		paddingRight: 12,
-		paddingTop: 3,
-		paddingBottom: 3,
-		marginBottom: 8,
-	})
-	panel.add(title)
-
-	const nowText = app.create('uitext', {
-		value: '· · ·',
-		fontSize: 13,
-		color: '#66ffcc',
-		marginBottom: 2,
-	})
-	panel.add(nowText)
-
-	const statusText = app.create('uitext', {
-		value: embedUrl ? 'embed mode — play on the screen' : 'ready',
-		fontSize: 11,
-		color: '#aaaacc',
-		backgroundColor: 'rgba(102, 255, 204, 0.08)',
-		borderRadius: 6,
-		paddingLeft: 8,
-		paddingRight: 8,
-		paddingTop: 2,
-		paddingBottom: 2,
-		marginBottom: 12,
-	})
-	panel.add(statusText)
-
-	// ----- transport row -----
-	function makeButton(label, color, marginRight) {
+	const mkText = (value, size, color, opts) => app.create('uitext', Object.assign({ value, fontSize: size, color }, opts || {}))
+	const mkBtn = (label, w, h, bg, color, size) => {
 		const btn = app.create('uiview', {
-			width: 86,
-			height: 36,
-			backgroundColor: color,
-			borderRadius: 9,
+			width: w,
+			height: h,
+			borderRadius: Math.max(8, Math.round(h / 4)),
+			backgroundColor: bg,
 			justifyContent: 'center',
 			alignItems: 'center',
 			cursor: 'pointer',
-			marginRight: marginRight ?? 0,
 		})
-		btn.add(app.create('uitext', { value: label, fontSize: 13, color: '#ffffff' }))
+		const t = mkText(label, size || 11, color || TEXT, { fontWeight: 'bold' })
+		btn.add(t)
 		btn.onPointerOver = () => {
 			btn.borderWidth = 1
-			btn.borderColor = 'rgba(255, 255, 255, 0.8)'
+			btn.borderColor = 'rgba(255, 255, 255, 0.7)'
 		}
 		btn.onPointerOut = () => {
 			btn.borderWidth = 0
 			btn.borderColor = null
 		}
-		return btn
+		return { btn, t }
+	}
+	const label = (text, topMargin) => {
+		const row = app.create('uiview', { width: 312, flexDirection: 'row', alignItems: 'center' })
+		if (topMargin) row.marginTop = topMargin
+		row.add(mkText(text, 8, MUTED))
+		return row
 	}
 
-	const transportRow = app.create('uiview', { flexDirection: 'row' })
-	const prevBtn = makeButton('◀ prev', 'rgba(60, 60, 90, 0.95)', 10)
-	const playBtn = makeButton('▶ play', 'rgba(40, 160, 90, 0.95)', 10)
-	const nextBtn = makeButton('next ▶', 'rgba(60, 60, 90, 0.95)')
-	transportRow.add(prevBtn)
-	transportRow.add(playBtn)
-	transportRow.add(nextBtn)
-	panel.add(transportRow)
+	// ----- header: brand block + channel + live pill -----
+	const header = app.create('uiview', {
+		width: 312,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+	})
+	const brandCol = app.create('uiview', { flexDirection: 'column', alignItems: 'flex-start' })
+	brandCol.add(mkText('⚡ BOLT', 26, MAGENTA, { fontWeight: 'bold' }))
+	brandCol.add(mkText('RIG CONSOLE', 9, CYAN))
+	header.add(brandCol)
 
-	const autoRow = app.create('uiview', { flexDirection: 'row', marginTop: 8 })
-	const autoBtn = makeButton('auto off', 'rgba(60, 60, 90, 0.95)')
-	autoBtn.onPointerDown = () => {
-		app.send('booth:autoplay', view.autoPlay !== 'enabled')
+	const headRight = app.create('uiview', { flexDirection: 'column', alignItems: 'flex-end' })
+	const chanChip = app.create('uiview', {
+		height: 20,
+		paddingLeft: 9,
+		paddingRight: 9,
+		borderRadius: 10,
+		backgroundColor: 'rgba(41, 231, 255, 0.12)',
+		justifyContent: 'center',
+		alignItems: 'center',
+	})
+	chanChip.add(mkText('#' + CHANNEL, 9, CYAN))
+	headRight.add(chanChip)
+	const livePill = app.create('uiview', {
+		width: 78,
+		height: 20,
+		borderRadius: 10,
+		marginTop: 6,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: 'rgba(255, 255, 255, 0.06)',
+	})
+	const liveTxt = mkText('IDLE', 9, DIM, { fontWeight: 'bold' })
+	livePill.add(liveTxt)
+	headRight.add(livePill)
+	header.add(headRight)
+	panel.add(header)
+
+	// ----- now playing card -----
+	const npCard = app.create('uiview', {
+		width: 312,
+		marginTop: 14,
+		backgroundColor: CARD,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: 'rgba(255, 43, 214, 0.25)',
+		flexDirection: 'column',
+		alignItems: 'flex-start',
+		paddingLeft: 14,
+		paddingRight: 14,
+		paddingTop: 10,
+		paddingBottom: 12,
+	})
+	npCard.add(mkText('NOW PLAYING', 8, MUTED))
+	const npTitle = mkText('· · ·', 17, TEXT, { fontWeight: 'bold', marginTop: 3 })
+	npCard.add(npTitle)
+	const npArtist = mkText('waiting for the rig', 10, CYAN, { marginTop: 2 })
+	npCard.add(npArtist)
+	const npSource = app.create('uiview', {
+		height: 18,
+		paddingLeft: 9,
+		paddingRight: 9,
+		borderRadius: 9,
+		marginTop: 9,
+		backgroundColor: 'rgba(255, 43, 214, 0.16)',
+		justifyContent: 'center',
+		alignItems: 'center',
+	})
+	const npSourceTxt = mkText('▦ LIBRARY', 8, MAGENTA, { fontWeight: 'bold' })
+	npSource.add(npSourceTxt)
+	npCard.add(npSource)
+	panel.add(npCard)
+
+	// ----- audio source switch (library music vs the stream) -----
+	panel.add(label('AUDIO SOURCE', 14))
+	const srcRow = app.create('uiview', { width: 312, flexDirection: 'row', marginTop: 6 })
+	const libSeg = mkBtn('▦  LIBRARY', 152, 34, GHOST, DIM, 11)
+	libSeg.btn.marginRight = 8
+	const streamSeg = mkBtn('◉  LIVE STREAM', 152, 34, GHOST, DIM, 11)
+	srcRow.add(libSeg.btn)
+	srcRow.add(streamSeg.btn)
+	panel.add(srcRow)
+
+	function styleSource(active) {
+		const seg = (o, isOn) => {
+			o.btn.backgroundColor = isOn ? 'rgba(255, 43, 214, 0.2)' : GHOST
+			o.btn.borderWidth = isOn ? 1 : 0
+			o.btn.borderColor = isOn ? MAGENTA : null
+			o.t.color = isOn ? TEXT : DIM
+		}
+		seg(libSeg, active === 'library')
+		seg(streamSeg, active === 'stream')
 	}
-	autoRow.add(autoBtn)
-	panel.add(autoRow)
+	styleSource('library')
+	libSeg.btn.onPointerDown = () => app.send('booth:source', 'library')
+	streamSeg.btn.onPointerDown = () => app.send('booth:source', 'stream')
 
-	// ----- playlist (top 5 rows, rebuilt on state change) -----
+	// ----- transport -----
+	const transport = app.create('uiview', {
+		width: 312,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 16,
+	})
+	const prevB = mkBtn('⏮', 56, 44, GHOST, TEXT, 16)
+	const playB = mkBtn('▶ PLAY', 168, 44, MAGENTA, INK, 15)
+	const nextB = mkBtn('⏭', 56, 44, GHOST, TEXT, 16)
+	transport.add(prevB.btn)
+	transport.add(playB.btn)
+	transport.add(nextB.btn)
+	panel.add(transport)
+
+	// ----- master volume (stream mode: this fader IS the stream's volume) -----
+	panel.add(label('MASTER', 14))
+	const volRow = app.create('uiview', { width: 312, flexDirection: 'row', alignItems: 'center', marginTop: 6 })
+	const volDown = mkBtn('−', 28, 28, GHOST, TEXT, 16)
+	const volBar = app.create('uiview', { flexDirection: 'row', alignItems: 'center', marginLeft: 8, marginRight: 8 })
+	const volSegs = []
+	for (let i = 0; i < 10; i++) {
+		const seg = app.create('uiview', {
+			width: 12,
+			height: 10,
+			borderRadius: 3,
+			marginRight: i === 9 ? 0 : 3,
+			backgroundColor: 'rgba(255, 255, 255, 0.08)',
+		})
+		volSegs.push(seg)
+		volBar.add(seg)
+	}
+	const volUp = mkBtn('+', 28, 28, GHOST, TEXT, 16)
+	volRow.add(volDown.btn)
+	volRow.add(volBar)
+	volRow.add(volUp.btn)
+	panel.add(volRow)
+
+	function renderVolume(v) {
+		// props.volume runs 0..2; the bar spans the whole range
+		const filled = Math.round((Math.min(2, Math.max(0, v)) / 2) * 10)
+		for (let i = 0; i < volSegs.length; i++) {
+			volSegs[i].backgroundColor = i < filled ? CYAN : 'rgba(255, 255, 255, 0.08)'
+		}
+	}
+	const nudgeVolume = delta => {
+		const next = Math.round(Math.min(2, Math.max(0, (view.volume ?? 1) + delta)) * 10) / 10
+		app.send('booth:request', { action: 'volume', value: next })
+	}
+	volDown.btn.onPointerDown = () => nudgeVolume(-0.1)
+	volUp.btn.onPointerDown = () => nudgeVolume(0.1)
+
+	// ----- crates -----
+	const crateHead = app.create('uiview', {
+		width: 312,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 16,
+	})
+	crateHead.add(mkText('CRATES', 8, MUTED))
+	const crateCount = mkText('0', 8, MUTED)
+	crateHead.add(crateCount)
+	panel.add(crateHead)
+
 	let listRoot = null
 	function rebuildList() {
 		if (listRoot) {
@@ -984,63 +1223,53 @@ if (world.isClient) {
 			start = Math.max(0, Math.min(sel - 2, all.length - 5))
 		}
 		const items = all.slice(start, start + 5)
-		if (hint) {
-			hint.value = all.length > 5
-				? `◀ prev / next ▶   ${start + 1}–${start + items.length} of ${all.length}`
-				: 'click rows / press esc to free cursor'
-		}
+		crateCount.value = all.length ? `${start + 1}–${start + items.length} of ${all.length}` : 'empty'
 		if (items.length === 0) {
-			// no crates on the bus — say so, a blank panel is indistinguishable from a dead rig
 			listRoot = app.create('uiview', {
-				width: 292,
-				marginTop: 12,
+				width: 312,
+				marginTop: 8,
 				alignItems: 'center',
-				backgroundColor: 'rgba(0, 0, 0, 0.3)',
-				borderRadius: 8,
-				paddingTop: 8,
-				paddingBottom: 8,
+				backgroundColor: 'rgba(0, 0, 0, 0.35)',
+				borderRadius: 10,
+				paddingTop: 10,
+				paddingBottom: 10,
 			})
-			listRoot.add(app.create('uitext', {
-				value: 'no crates yet — drop a boltVinyl in the world',
-				fontSize: 10,
-				color: '#666688',
-			}))
+			listRoot.add(mkText('no crates yet — drop a boltVinyl in the world', 10, MUTED))
 			panel.add(listRoot)
 			return
 		}
 		listRoot = app.create('uiview', {
-			width: 292,
-			marginTop: 12,
+			width: 312,
+			marginTop: 8,
 			flexDirection: 'column',
-			backgroundColor: 'rgba(0, 0, 0, 0.3)',
-			borderRadius: 8,
-			paddingTop: 4,
-			paddingBottom: 4,
+			backgroundColor: 'rgba(0, 0, 0, 0.35)',
+			borderRadius: 10,
+			paddingTop: 5,
+			paddingBottom: 5,
 		})
-		items.forEach(item => {
+		items.forEach((item, n) => {
 			const isSelected = item.id === view.selectedCrateId
-			const rowBase = isSelected ? 'rgba(102, 255, 204, 0.16)' : 'transparent'
+			const base = isSelected ? 'rgba(255, 43, 214, 0.16)' : 'transparent'
 			const row = app.create('uiview', {
-				width: 284,
-				height: 24,
+				width: 302,
+				height: 26,
 				flexDirection: 'row',
 				alignItems: 'center',
-				paddingLeft: 10,
-				backgroundColor: rowBase,
-				borderRadius: 6,
+				paddingLeft: 8,
+				borderRadius: 8,
+				backgroundColor: base,
 				cursor: 'pointer',
 			})
+			const idx = mkText(String(start + n + 1).padStart(2, '0'), 9, MUTED, { width: 24 })
+			row.add(idx)
+			const nameT = mkText(`${isSelected ? '▶ ' : ''}${item.name}${item.artist ? ' — ' + item.artist : ''}`, 11, isSelected ? TEXT : DIM)
+			row.add(nameT)
 			row.onPointerOver = () => {
-				row.backgroundColor = isSelected ? 'rgba(102, 255, 204, 0.28)' : 'rgba(255, 255, 255, 0.06)'
+				row.backgroundColor = isSelected ? 'rgba(255, 43, 214, 0.28)' : 'rgba(255, 255, 255, 0.06)'
 			}
 			row.onPointerOut = () => {
-				row.backgroundColor = rowBase
+				row.backgroundColor = base
 			}
-			row.add(app.create('uitext', {
-				value: `${isSelected ? '▶ ' : '   '}${item.name}${item.artist ? ' — ' + item.artist : ''}`,
-				fontSize: 11,
-				color: isSelected ? '#66ffcc' : '#aaaacc',
-			}))
 			row.onPointerDown = () => {
 				console.warn('[djbooth] playlist select:', item.name)
 				app.send('booth:request', { action: 'selectCrate', crateId: item.id })
@@ -1050,54 +1279,84 @@ if (world.isClient) {
 		panel.add(listRoot)
 	}
 
-	const hint = app.create('uitext', {
-		value: 'click rows / press esc to free cursor',
-		fontSize: 9,
-		color: '#55556c',
-		marginTop: 10,
+	// ----- footer: autoplay + status -----
+	const footer = app.create('uiview', {
+		width: 312,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginTop: 12,
 	})
-	panel.add(hint)
-
-	const mark = app.create('uitext', {
-		value: '⚡ BOLT',
-		fontSize: 8,
-		color: '#55556c',
-		absolute: true,
-		bottom: 5,
-		right: 9,
-	})
-	panel.add(mark)
+	const autoB = mkBtn('AUTOPLAY OFF', 124, 28, GHOST, DIM, 9)
+	const statusText = mkText('ready', 8, '#55556c')
+	footer.add(autoB.btn)
+	footer.add(statusText)
+	panel.add(footer)
 
 	ui.add(panel)
 
 	// ----- interactions -----
-	prevBtn.onPointerDown = () => {
+	prevB.btn.onPointerDown = () => {
 		console.warn('[djbooth] prev crate')
 		app.send('booth:request', { action: 'prevCrate' })
 	}
-	nextBtn.onPointerDown = () => {
+	nextB.btn.onPointerDown = () => {
 		console.warn('[djbooth] next crate')
 		app.send('booth:request', { action: 'nextCrate' })
 	}
-	playBtn.onPointerDown = () => {
+	playB.btn.onPointerDown = () => {
 		app.send('booth:toggle', true)
 	}
+	autoB.btn.onPointerDown = () => {
+		app.send('booth:autoplay', view.autoPlay !== 'enabled')
+	}
+
+	// live pulse — one restyle every half second, not per frame
+	let pulseAt = 0
+	let pulseOn = false
+	app.on('update', () => {
+		const now = world.getTime()
+		if (now - pulseAt < 0.5) return
+		pulseAt = now
+		if (!view.playing) return
+		pulseOn = !pulseOn
+		livePill.backgroundColor = pulseOn ? 'rgba(255, 43, 85, 0.95)' : 'rgba(255, 43, 85, 0.45)'
+	})
 
 	// server relay delivers rig state (state bus -> our server -> app.send)
 	app.send('booth:hello', true)
 
 	app.on(RENDER_EVENT, state => {
 		if (!state) return
-		view = state
+		view = Object.assign({}, state)
 		const np = state.nowPlaying
-		nowText.value = state.playing && np
-			? `▶ ${np.name}${np.artist ? ' — ' + np.artist : ''}`
-			: np
-				? `■ ${np.name}`
-				: '· · ·'
-		statusText.value = state.playing ? 'rig live — all speakers synced' : embedUrl ? 'embed mode — play on the screen' : 'ready'
-		playBtn.children?.[0] && (playBtn.children[0].value = state.playing ? '■ stop' : '▶ play')
-		autoBtn.children?.[0] && (autoBtn.children[0].value = state.autoPlay ? 'auto on' : 'auto off')
+		const isStream = state.audioSource === 'stream'
+		if (isStream) {
+			npTitle.value = 'LIVE STREAM'
+			npArtist.value = state.hasScreen ? state.screenHost || 'screen video' : 'set a Screen Video / Direct Video URL'
+		} else {
+			npTitle.value = np ? np.name : '· · ·'
+			npArtist.value = np ? np.artist || 'from the crates' : 'waiting for a crate'
+		}
+		npSourceTxt.value = isStream ? '◉ LIVE STREAM' : '▦ LIBRARY'
+		npSource.backgroundColor = isStream ? 'rgba(255, 43, 85, 0.2)' : 'rgba(255, 43, 214, 0.16)'
+		npSourceTxt.color = isStream ? '#ff5c7a' : MAGENTA
+		styleSource(state.audioSource || 'library')
+		liveTxt.value = state.playing ? 'LIVE' : 'IDLE'
+		liveTxt.color = state.playing ? '#ffffff' : DIM
+		if (!state.playing) livePill.backgroundColor = 'rgba(255, 255, 255, 0.06)'
+		playB.t.value = state.playing ? '⏸ STOP' : '▶ PLAY'
+		autoB.t.value = state.autoPlay ? 'AUTOPLAY ON' : 'AUTOPLAY OFF'
+		autoB.t.color = state.autoPlay ? CYAN : DIM
+		autoB.btn.backgroundColor = state.autoPlay ? 'rgba(41, 231, 255, 0.12)' : GHOST
+		statusText.value = state.playing
+			? isStream
+				? 'stream owns the room'
+				: 'rig live — speakers synced'
+			: embedUrl
+				? 'embed mode'
+				: 'ready'
+		renderVolume(state.volume ?? 1)
 		rebuildList()
 	})
 }

@@ -108,6 +108,7 @@ const CHANNEL = props.channel || 'bolt'
 const VIDEO_EVENT = `${CHANNEL}:video:command`
 const VIDEO_WHOIS = `${CHANNEL}:video:whois`
 const EMBED_EVENT = `${CHANNEL}:embed:audio`
+const AUDIO_EVENT = `${CHANNEL}:speaker:audio`
 const DEFAULT_PARENTS = 'boltevm.com,localhost,127.0.0.1,255242621.xyz'
 
 // ---------- link helpers ----------
@@ -259,6 +260,10 @@ if (world.isClient) {
 		let t0 = 0 // world.getTime() the rig video started at (0 = not rig-driven)
 		let lastPlayAsk = 0
 		let streamSrc = false // current rig video is a livestream (m3u8) — never clock-seek it
+		let lastStreamUrl = null
+		// reactivity id of this screen's video element audio node once announced
+		// LIVE (null = silent / not announced)
+		let screenAudioId = null
 		// a screen drifts (tab throttle, a cold load, a long frame). Correct past
 		// DRIFT — small enough to read as locked, large enough not to fight the
 		// element every frame.
@@ -365,6 +370,12 @@ if (world.isClient) {
 			embedSrc = url
 			video.pause() // the iframe owns the screen now — silence the rig video
 			t0 = 0
+			if (screenAudioId) {
+				// the video just went silent — release the reactive meshes; the
+				// embed's own audio election owns sound from here
+				app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+				screenAudioId = null
+			}
 			if ((props.embedAudio || 'auto') !== 'off') announceEmbed(url)
 			applyEmbedAudio(url)
 			console.warn(`[bolt-screen] embed on screen: ${url.slice(0, 80)}`)
@@ -378,6 +389,26 @@ if (world.isClient) {
 		}
 
 		app.on('update', () => {
+			// ---------- stream audio → the rig's reactive bus ----------
+			// The engine registers each video element's audio node
+			// (Video.audioId). When this screen's stream is AUDIBLE, announce
+			// that id on the speaker bus so every reactive mesh follows the
+			// livestream instead of the library track. Reconciled here because
+			// the element mounts async and every src change makes a new one.
+			if (!video.loading && !embedSrc) {
+				const id = video.audioId
+				const audible = video.playing && video.volume > 0 && !!id
+				if (audible) {
+					if (id !== screenAudioId) {
+						screenAudioId = id
+						app.emit(AUDIO_EVENT, { role: 'screen', audioId: id, url: lastStreamUrl, playing: true })
+						console.warn(`[bolt-screen] screen audio LIVE — ${String(lastStreamUrl).slice(0, 56)}`)
+					}
+				} else if (screenAudioId) {
+					app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+					screenAudioId = null
+				}
+			}
 			if (!t0 || video.loading || isShared() || embedSrc) return
 			const want = world.getTime() - t0
 			if (!video.playing) {
@@ -414,6 +445,10 @@ if (world.isClient) {
 				// into a window that has already scrolled past
 				if (!streamSrc) video.time = 0
 				streamSrc = false
+				if (screenAudioId) {
+					app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+					screenAudioId = null
+				}
 				return
 			}
 			if (cmd.action === 'volume') {
@@ -435,6 +470,7 @@ if (world.isClient) {
 			}
 			clearEmbed()
 			streamSrc = isStreamUrl(url)
+			lastStreamUrl = url
 			if (video.src !== url) video.src = url
 			video.loop = true // the booth re-anchors this on every track change
 			video.volume = cmd.volume ?? 0 // 0 by default — the rig track IS the music

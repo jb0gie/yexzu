@@ -909,6 +909,14 @@ export class Video extends Node {
     return this.instance ? this.instance.isPlaying : false
   }
 
+  // the reactivity id of this video's audio node (ClientLoader registers the
+  // element's MediaElementSource under it). Announce it on the speaker bus and
+  // every reactive mesh follows THIS video's audio — the rig's stream mode
+  // leans on it so the lights dance to the livestream, not the library.
+  get audioId() {
+    return this.instance?.audioId || null
+  }
+
   get time() {
     return this.instance ? this.instance.currentTime : 0
   }
@@ -1148,6 +1156,9 @@ export class Video extends Node {
         },
         get playing() {
           return self.playing
+        },
+        get audioId() {
+          return self.audioId
         },
         get isPlaying() {
           // deprecated (use .playing)

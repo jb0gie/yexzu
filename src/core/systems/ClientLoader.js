@@ -424,6 +424,14 @@ function createVideoFactory(world, url) {
       elem.src = url
     }
     const audio = world.audio.ctx.createMediaElementSource(elem)
+    // The element's audio node is the ONLY handle on a stream's sound. Register
+    // that node (not the element — a second createMediaElementSource throws) so
+    // apps can point the rig's reactivity at a video: announce this id on the
+    // speaker bus and every reactive mesh follows the stream instead of the
+    // music library. The id mirrors the element sharing rule above: linked
+    // videos of one url share one element → one id.
+    const audioId = `video:${key === 'default' ? 'linked' : key}:${url}`
+    world.audioReactivity?.registerAudioNode?.(audioId, audio)
     let n = 0
     let dead
     world.audio.ready(() => {
@@ -500,6 +508,9 @@ function createVideoFactory(world, url) {
     function release() {
       n--
       if (n === 0) {
+        // the element is going away — drop its reactivity source or the
+        // registry keeps a dead analyser (and later links resolve to silence)
+        world.audioReactivity?.unregister?.(audioId)
         stop()
         audio.disconnect()
         texture.dispose()
@@ -515,6 +526,7 @@ function createVideoFactory(world, url) {
       elem,
       audio,
       texture,
+      audioId,
       prepare,
       get ready() {
         return ready

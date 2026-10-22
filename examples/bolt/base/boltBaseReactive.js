@@ -1194,12 +1194,17 @@ if (src) {
   const RIG_VIDEO_EVENT = `${props.channel || 'bolt'}:video:command`
   const RIG_VIDEO_WHOIS = `${props.channel || 'bolt'}:video:whois`
   const EMBED_EVENT = `${props.channel || 'bolt'}:embed:audio`
+  const AUDIO_EVENT = `${props.channel || 'bolt'}:speaker:audio`
   const DEFAULT_PARENTS = 'boltevm.com,localhost,127.0.0.1,255242621.xyz'
   const SCREEN_ID = app.instanceId
   const DRIFT = 0.25 // seconds off the shared clock before a screen re-seeks
   let t0 = 0 // world.getTime() the rig video started at (0 = not rig-driven)
   let lastPlayAsk = 0
   let streamSrc = false // current rig video is a livestream (m3u8) — never clock-seek it
+  let lastStreamUrl = null
+  // reactivity id of the panel element's audio node, once announced LIVE (null =
+  // silent / not announced). The engine registers it per element (Video.audioId).
+  let screenAudioId = null
 
   // ---- link helpers (same contract as bolt-screen; the booth's `kind` wins) ----
 
@@ -1368,6 +1373,12 @@ if (src) {
     embedSrc = url
     panel?.pause() // the iframe owns the screen now — silence the rig video
     t0 = 0
+    if (screenAudioId) {
+      // the video just went silent — release the reactive meshes, the embed's
+      // own audio election owns sound from here
+      app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+      screenAudioId = null
+    }
     if ((props.embedAudio || 'auto') !== 'off') announceEmbed(url)
     applyEmbedAudio(url)
     console.warn(`[BoltBase] embed on screen: ${url.slice(0, 80)}`)
@@ -1387,6 +1398,28 @@ if (src) {
   // created without a screenId, so the engine never registers it as a share
   // target and it can only ever show the rig video.
   app.on('update', () => {
+    // ---------- stream audio → the rig's reactive bus ----------
+    // The engine registers each video element's audio node (Video.audioId).
+    // When the stream is AUDIBLE, announce that id on the speaker bus: every
+    // reactive mesh (this app's materials included) links to the livestream
+    // instead of the library track. Announcing is reconciled here rather than
+    // in the play handler because the element mounts ASYNC and every src change
+    // makes a new element with a new id.
+    if (panel && !panel.loading && !embedSrc) {
+      const id = panel.audioId
+      const audible = panel.playing && panel.volume > 0 && !!id
+      if (audible) {
+        if (id !== screenAudioId) {
+          screenAudioId = id
+          app.emit(AUDIO_EVENT, { role: 'screen', audioId: id, url: lastStreamUrl, playing: true })
+          console.warn(`[BoltBase] screen audio LIVE — ${String(lastStreamUrl).slice(0, 56)} (lights follow the stream)`)
+        }
+      } else if (screenAudioId) {
+        app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+        console.warn('[BoltBase] screen audio silent — reactivity returns to the rig track')
+        screenAudioId = null
+      }
+    }
     if (!panel || !t0 || panel.loading || embedSrc) return
     const want = world.getTime() - t0
     if (!panel.playing) {
@@ -1416,6 +1449,10 @@ if (src) {
       clearEmbed()
       panel?.pause()
       streamSrc = false
+      if (screenAudioId) {
+        app.emit(AUDIO_EVENT, { role: 'screen', audioId: screenAudioId, url: lastStreamUrl, playing: false })
+        screenAudioId = null
+      }
       return
     }
     if (cmd.action === 'volume') {
@@ -1436,6 +1473,7 @@ if (src) {
     }
     clearEmbed()
     streamSrc = isStreamUrl(url)
+    lastStreamUrl = url
     const node = ensurePanel(url)
     if (!node) return
     node.loop = true // the booth re-anchors this on every track change

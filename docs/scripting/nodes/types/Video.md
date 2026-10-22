@@ -3,7 +3,6 @@
 Renders a video into the world, either on a simple plane or onto geometry.
 
 ## Properties
-
 ### `.src`: String
 
 A url to a video file, or an asset url from a video prop.
@@ -114,7 +113,15 @@ When spatial is enabled, the cone inner angle to use. Defaults to `360`.
 
 ### `.coneOuterGain`: Number
 
-When spatial is enabled, the cone inner angle to use. Defaults to `0`.
+When spatial is enabled, the cone outer gain to use. Defaults to `0`.
+
+### `.flipX` / `.flipY`: Boolean
+
+Mirrors the SAMPLED texture on that axis — the shader flips `uv.x` / `uv.y` before the aspect-fit math. Unlike scaling the mesh by -1, an authored transform or a mirrored UV layout cannot fight it, which makes it the reliable fix for a screen modelled "back to front". Defaults to `false`.
+
+### `.audioId`: String|null
+
+The AudioReactivity id of this video's audio node. Each element's MediaElementSource is registered under a stable id, so announcing it on a reactive bus (eg a rig's `speaker:audio` event) points every linked material at THIS video's audio — a livestream can drive the lights instead of a music track. `null` until the element mounts. Read-only.
 
 ### `.isPlaying`: Boolean
 
