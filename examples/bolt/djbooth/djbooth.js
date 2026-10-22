@@ -961,12 +961,17 @@ if (world.isClient && embedUrl) {
 }
 
 // ---------- client: control panel ----------
-// BOLT rig console — "terminal" skin, AIRY layout. Style stays (mono type, one
-// accent, thin rules); the panel got 80px taller and real gutters so nothing
-// touches: 18px sides, 14-18px between sections, 7-10px inside rows.
-// Engine truth (UIText vs UIView): text has NO width/height/pointer handlers,
-// so every column is a sized uiview and every clickable is a uiview chip.
-// Calibrated at 340x640 (13px data, 24px brand, 34px clearance to the footer).
+// BOLT rig console — terminal stance, built ONLY from primitives that exist.
+//
+// Engine truth (hyperfy-ui skill + UIView.js:23-47):
+//   uiview: width/height/backgroundColor/borderWidth/borderColor/borderRadius/
+//           gap/flexDirection/justifyContent/alignItems/flexGrow/flexShrink/
+//           flexBasis/absolute+top/right/bottom/left. NO per-side padding or
+//           margin — every "paddingLeft" style is silently ignored.
+//   uitext: value/color/fontSize/fontWeight/fontFamily/lineHeight/textAlign/
+//           flexGrow. NO width/height, NO pointer handlers, NO cursor.
+// So: spacing = explicit heights + gap + centred inner columns; every column a
+// sized uiview; every clickable a uiview chip. Locked spec: 340×560 @ 0.004.
 if (world.isClient) {
 	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}, source=${props.audioSource || 'library'}`)
 
@@ -984,7 +989,7 @@ if (world.isClient) {
 		nowPlaying: null,
 	}
 
-	// palette — BOLT terminal
+	// palette — BOLT terminal (colour is STATE, not decoration)
 	const BG = '#020406'
 	const LINE = '#1b2733'
 	const FAINTLINE = '#0b1620'
@@ -996,9 +1001,13 @@ if (world.isClient) {
 	const RED = '#ff2b55'
 	const HOT = 'rgba(41, 231, 255, 0.06)'
 	const MONO = 'monospace'
+
+	// locked geometry — 340 wide, 18px gutters => 304 content column
 	const W = 340
-	const PAD = 18
-	const INNER = W - PAD * 2 - 2 // border 1px each side
+	const H = 560
+	const GUT = 18
+	const INNER = W - GUT * 2
+	const SECTION_GAP = 8
 
 	const clip = (s, n) => {
 		const t = String(s == null ? '' : s)
@@ -1007,7 +1016,7 @@ if (world.isClient) {
 
 	const ui = app.create('ui', {
 		width: W,
-		height: 640,
+		height: H,
 		size: props.panelSize ?? 0.004,
 		position: [0, 1.4, -1],
 		pivot: 'center',
@@ -1019,21 +1028,23 @@ if (world.isClient) {
 
 	const panel = app.create('uiview', {
 		width: W,
-		height: 640,
+		height: H,
 		backgroundColor: BG,
 		borderWidth: 1,
 		borderColor: LINE,
 		flexDirection: 'column',
-		paddingBottom: 16,
+		alignItems: 'center', // horizontal gutters = (W - INNER) / 2
 	})
 
 	const text = (value, size, color, opts) =>
 		app.create('uitext', Object.assign({ value, fontSize: size, color, fontFamily: MONO }, opts || {}))
 	const row = opts => app.create('uiview', Object.assign({ flexDirection: 'row', alignItems: 'center' }, opts || {}))
 	const col = opts => app.create('uiview', Object.assign({ flexDirection: 'column' }, opts || {}))
-	const divider = (color, width) => app.create('uiview', { width: width ?? W, height: 1, backgroundColor: color })
+	const spacer = h => app.create('uiview', { width: INNER, height: h })
+	const rule = () => app.create('uiview', { width: INNER, height: 1, backgroundColor: LINE })
+	const hairline = () => app.create('uiview', { width: INNER, height: 1, backgroundColor: FAINTLINE })
 
-	// clickable chip: uiview wrapper (text can't take pointer events) + label
+	// clickable chip: uiview wrapper (text can't take pointers) + label
 	const chip = (label, w, h, fontSize) => {
 		const b = app.create('uiview', {
 			width: w,
@@ -1057,32 +1068,31 @@ if (world.isClient) {
 		return { view: b, label: t }
 	}
 
-	// ----- header -----
-	const head = app.create('uiview', {
-		width: W,
-		paddingLeft: PAD,
-		paddingRight: PAD,
-		paddingTop: 18,
-		paddingBottom: 14,
-		flexDirection: 'column',
-	})
-	const hrow = row({ width: INNER, justifyContent: 'space-between' })
-	const brandRow = row({})
+	// the single content column: explicit heights + gap do ALL the spacing
+	const content = col({ width: INNER, gap: SECTION_GAP })
+	panel.add(content)
+
+	// ----- header: brand line + channel crumb -----
+	const head = col({ width: INNER, gap: 4 })
+	const hrow = row({ width: INNER, height: 30, justifyContent: 'space-between' })
+	const brandRow = row({ gap: 0 })
 	brandRow.add(text('BOLT', 24, CYAN, { fontWeight: 'bold' }))
 	brandRow.add(text('://rig', 24, INK))
 	hrow.add(brandRow)
 	const liveTxt = text('● LIVE', 11, RED)
 	hrow.add(liveTxt)
 	head.add(hrow)
-	head.add(text('console · channel=' + CHANNEL, 11, MUTE, { marginTop: 7 }))
-	panel.add(head)
-	panel.add(divider(LINE, W))
+	const crumbRow = row({ width: INNER, height: 14 })
+	crumbRow.add(text('console · channel=' + CHANNEL, 11, MUTE))
+	head.add(crumbRow)
+	content.add(head)
+	content.add(rule())
 
-	// ----- state rows (now_playing / source — mode lives in the tabs) -----
-	const kv = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 14 })
-	const kvRow = key => {
-		const r = row({ width: INNER, paddingTop: 7, paddingBottom: 7 })
-		const keyCol = app.create('uiview', { width: 112 })
+	// ----- state rows (now_playing / source; mode lives in the tabs) -----
+	const kv = col({ width: INNER, gap: 0 })
+	const kvRow = (key, h) => {
+		const r = row({ width: INNER, height: h || 32 })
+		const keyCol = app.create('uiview', { width: 112, height: 32, justifyContent: 'center' })
 		keyCol.add(text(key, 11, MUTE))
 		r.add(keyCol)
 		const val = text('—', 13, INK)
@@ -1093,16 +1103,16 @@ if (world.isClient) {
 	const rSrc = kvRow('source')
 	kv.add(rNow.view)
 	kv.add(rSrc.view)
-	panel.add(kv)
-	panel.add(divider(LINE, W))
+	content.add(kv)
+	content.add(rule())
 
 	// ----- audio source tabs -----
-	const srcRow = row({ paddingLeft: PAD, paddingRight: PAD, paddingTop: 16, gap: 10 })
+	const srcRow = row({ width: INNER, height: 32, gap: 10 })
 	const libTab = chip('[ library ]', 108, 32)
 	const streamTab = chip('[ stream ]', 108, 32)
 	srcRow.add(libTab.view)
 	srcRow.add(streamTab.view)
-	panel.add(srcRow)
+	content.add(srcRow)
 	libTab.view.onPointerDown = () => app.send('booth:source', 'library')
 	streamTab.view.onPointerDown = () => app.send('booth:source', 'stream')
 
@@ -1116,12 +1126,12 @@ if (world.isClient) {
 		seg(streamTab, active === 'stream')
 	}
 	styleTabs('library')
-	// hover-out of a tab must restore the ACTIVE styling, not the idle one
+	// hover-out repaints from CURRENT state, never from a hardcoded idle style
 	libTab.view.onPointerOut = () => styleTabs(view.audioSource || 'library')
 	streamTab.view.onPointerOut = () => styleTabs(view.audioSource || 'library')
 
 	// ----- transport -----
-	const trans = row({ paddingLeft: PAD, paddingRight: PAD, paddingTop: 16, gap: 10 })
+	const trans = row({ width: INNER, height: 38, gap: 10 })
 	const prevB = chip('«', 46, 38, 16)
 	const playB = chip('▶ PLAY', 190, 38, 12)
 	const nextB = chip('»', 46, 38, 16)
@@ -1129,7 +1139,7 @@ if (world.isClient) {
 	trans.add(prevB.view)
 	trans.add(playB.view)
 	trans.add(nextB.view)
-	panel.add(trans)
+	content.add(trans)
 	prevB.view.onPointerDown = () => {
 		console.warn('[djbooth] prev crate')
 		app.send('booth:request', { action: 'prevCrate' })
@@ -1140,11 +1150,11 @@ if (world.isClient) {
 	}
 	playB.view.onPointerDown = () => app.send('booth:toggle', true)
 
-	// ----- master (the tick strip is the fader) -----
-	const meter = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 18 })
-	const mh = row({ width: INNER, justifyContent: 'space-between' })
+	// ----- master: label + nudge chips + value, then the tick strip -----
+	const meter = col({ width: INNER, gap: 10 })
+	const mh = row({ width: INNER, height: 24, justifyContent: 'space-between' })
 	mh.add(text('MASTER', 11, MUTE))
-	const mhRight = row({ gap: 10 })
+	const mhRight = row({ height: 24, gap: 10 })
 	const volDown = chip('[-]', 32, 24)
 	const volValue = text('0.80 / 2.00', 11, INK)
 	const volUp = chip('[+]', 32, 24)
@@ -1155,7 +1165,7 @@ if (world.isClient) {
 	meter.add(mh)
 
 	const TICKS = 14
-	const tickRow = row({ width: INNER, gap: 2, marginTop: 10 })
+	const tickRow = row({ width: INNER, height: 12, gap: 2 })
 	const ticks = []
 	for (let i = 0; i < TICKS; i++) {
 		const t = app.create('uiview', { height: 12, flexGrow: 1, backgroundColor: FAINTLINE, cursor: 'pointer' })
@@ -1168,7 +1178,7 @@ if (world.isClient) {
 		tickRow.add(t)
 	}
 	meter.add(tickRow)
-	panel.add(meter)
+	content.add(meter)
 
 	const nudgeVolume = delta => {
 		const next = Math.round(Math.min(2, Math.max(0, (view.volume ?? 1) + delta)) * 10) / 10
@@ -1186,18 +1196,18 @@ if (world.isClient) {
 		volValue.value = vv.toFixed(2) + ' / 2.00'
 	}
 
-	// ----- crate table -----
-	const tbl = col({ width: W, paddingLeft: PAD, paddingRight: PAD, paddingTop: 16 })
-	const th = row({ width: INNER, paddingBottom: 8 })
-	const thNum = app.create('uiview', { width: 30 })
+	// ----- crate table (fixed index / grow title / fixed SRC) -----
+	const tbl = col({ width: INNER, gap: 0 })
+	const th = row({ width: INNER, height: 22 })
+	const thNum = app.create('uiview', { width: 30, height: 22, justifyContent: 'center' })
 	thNum.add(text('#', 10, FAINT))
 	th.add(thNum)
 	th.add(text('CRATE', 10, FAINT, { flexGrow: 1 }))
-	const thSrc = app.create('uiview', { width: 52, alignItems: 'flex-end' })
-	thSrc.add(text('SRC', 10, FAINT, { textAlign: 'right' }))
+	const thSrc = app.create('uiview', { width: 52, height: 22, justifyContent: 'center', alignItems: 'flex-end' })
+	thSrc.add(text('SRC', 10, FAINT))
 	th.add(thSrc)
 	tbl.add(th)
-	tbl.add(divider(FAINTLINE, INNER))
+	tbl.add(hairline())
 
 	let tableRows = null
 	function rebuildTable() {
@@ -1205,7 +1215,7 @@ if (world.isClient) {
 			tbl.remove(tableRows)
 			tableRows = null
 		}
-		tableRows = col({ width: INNER })
+		tableRows = col({ width: INNER, gap: 0 })
 		const all = view.playlist || []
 		const isStream = view.audioSource === 'stream'
 		const rows = []
@@ -1236,14 +1246,14 @@ if (world.isClient) {
 		if (rows.length === 0) {
 			rows.push({ key: '--', title: 'no crates yet — drop a boltVinyl in the world', src: '', hot: false, id: null })
 		}
-		rows.forEach(r => {
-			const line = row({ width: INNER, paddingTop: 10, paddingBottom: 10, cursor: r.id ? 'pointer' : 'default' })
-			const numCol = app.create('uiview', { width: 30 })
+		rows.forEach((r, i) => {
+			const line = row({ width: INNER, height: 34, cursor: r.id ? 'pointer' : 'default' })
+			const numCol = app.create('uiview', { width: 30, height: 34, justifyContent: 'center' })
 			numCol.add(text(r.key, 13, r.hot ? MAGENTA : FAINT))
 			line.add(numCol)
 			line.add(text(clip(r.title, 27), 13, r.hot ? '#ffffff' : '#8aa8b8', { flexGrow: 1 }))
-			const srcCol = app.create('uiview', { width: 52, alignItems: 'flex-end' })
-			srcCol.add(text(r.src, 13, r.src === 'strm' ? MAGENTA : MUTE, { textAlign: 'right' }))
+			const srcCol = app.create('uiview', { width: 52, height: 34, justifyContent: 'center', alignItems: 'flex-end' })
+			srcCol.add(text(r.src, 13, r.src === 'strm' ? MAGENTA : MUTE))
 			line.add(srcCol)
 			if (r.id) {
 				line.onPointerOver = () => {
@@ -1258,14 +1268,14 @@ if (world.isClient) {
 				}
 			}
 			tableRows.add(line)
-			tableRows.add(divider(FAINTLINE, INNER))
+			if (i < rows.length - 1) tableRows.add(hairline())
 		})
 		tbl.add(tableRows)
 	}
-	panel.add(tbl)
+	content.add(tbl)
 
-	// ----- footer -----
-	const foot = row({ width: W, paddingLeft: PAD, paddingRight: PAD, justifyContent: 'space-between', marginTop: 16 })
+	// ----- footer (absolute: the one place absolute is right) -----
+	const foot = row({ width: INNER, height: 24, justifyContent: 'space-between', absolute: true, left: GUT, bottom: 14 })
 	const autoB = chip('autoplay:on', 96, 24, 10)
 	const statusTxt = text('ready', 10, FAINT)
 	foot.add(autoB.view)
@@ -1277,7 +1287,7 @@ if (world.isClient) {
 
 	ui.add(panel)
 
-	// live pulse — the one animation, two states, twice a second
+	// live pulse — the one animation, two states, twice a second (throttled)
 	let pulseAt = 0
 	let pulseOn = false
 	app.on('update', () => {
