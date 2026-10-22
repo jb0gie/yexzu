@@ -961,8 +961,10 @@ if (world.isClient && embedUrl) {
 }
 
 // ---------- client: control panel ----------
-// BOLT rig console. Brand rules: near-black glass, magenta signature, electric
-// cyan for values — the panel should read like hardware, not a form.
+// BOLT rig console — "terminal": monospace, one accent, data density.
+// Engine truth (UIText vs UIView): text has NO width/height/pointer handlers,
+// so every clickable thing is a uiview wrapper and every column is a sized
+// uiview. Type sizes are calibrated to the 340x560 panel (13px data, 24px brand).
 if (world.isClient) {
 	console.warn(`[djbooth] booted — channel=${CHANNEL}, track=${trackUrl ? 'set' : 'via crates'}, source=${props.audioSource || 'library'}`)
 
@@ -980,18 +982,24 @@ if (world.isClient) {
 		nowPlaying: null,
 	}
 
-	// palette — BOLT brand
-	const INK = '#05060f'
-	const CARD = '#0b0d1c'
-	const MAGENTA = '#ff2bd6'
+	// palette — BOLT terminal
+	const BG = '#020406'
+	const LINE = '#1b2733'
+	const FAINTLINE = '#0b1620'
+	const INK = '#d8e6f0'
+	const MUTE = '#4a6272'
+	const FAINT = '#33505f'
 	const CYAN = '#29e7ff'
-	const TEXT = '#eef0ff'
-	const MUTED = '#6a6a8a'
-	const DIM = '#8a8aa8'
-	const GHOST = 'rgba(255, 255, 255, 0.05)'
+	const MAGENTA = '#ff2bd6'
+	const RED = '#ff2b55'
+	const HOT = 'rgba(41, 231, 255, 0.06)'
+	const MONO = 'monospace'
 
-	// Yoga flexbox layout (children are NOT positioned with 3D vectors — only
-	// the root ui node gets a position; everything inside flows)
+	const clip = (s, n) => {
+		const t = String(s == null ? '' : s)
+		return t.length > n ? t.slice(0, n - 1) + '…' : t
+	}
+
 	const ui = app.create('ui', {
 		width: 340,
 		height: 560,
@@ -1007,320 +1015,277 @@ if (world.isClient) {
 	const panel = app.create('uiview', {
 		width: 340,
 		height: 560,
-		backgroundColor: INK,
-		borderRadius: 18,
-		borderWidth: 2,
-		borderColor: 'rgba(255, 43, 214, 0.55)',
+		backgroundColor: BG,
+		borderWidth: 1,
+		borderColor: LINE,
 		flexDirection: 'column',
-		alignItems: 'center',
-		paddingTop: 14,
 	})
 
-	const mkText = (value, size, color, opts) => app.create('uitext', Object.assign({ value, fontSize: size, color }, opts || {}))
-	const mkBtn = (label, w, h, bg, color, size) => {
-		const btn = app.create('uiview', {
+	const text = (value, size, color, opts) =>
+		app.create('uitext', Object.assign({ value, fontSize: size, color, fontFamily: MONO }, opts || {}))
+	const row = opts => app.create('uiview', Object.assign({ flexDirection: 'row', alignItems: 'center' }, opts || {}))
+	const col = opts => app.create('uiview', Object.assign({ flexDirection: 'column' }, opts || {}))
+	const divider = (color, width) => app.create('uiview', { width: width ?? 308, height: 1, backgroundColor: color })
+
+	// clickable chip: uiview wrapper (text can't take pointer events) + label
+	const chip = (label, w, h, fontSize) => {
+		const b = app.create('uiview', {
 			width: w,
 			height: h,
-			borderRadius: Math.max(8, Math.round(h / 4)),
-			backgroundColor: bg,
+			borderWidth: 1,
+			borderColor: LINE,
 			justifyContent: 'center',
 			alignItems: 'center',
 			cursor: 'pointer',
 		})
-		const t = mkText(label, size || 11, color || TEXT, { fontWeight: 'bold' })
-		btn.add(t)
-		btn.onPointerOver = () => {
-			btn.borderWidth = 1
-			btn.borderColor = 'rgba(255, 255, 255, 0.7)'
+		const t = text(label, fontSize || 12, MUTE)
+		b.add(t)
+		b.onPointerOver = () => {
+			b.borderColor = CYAN
+			t.color = CYAN
 		}
-		btn.onPointerOut = () => {
-			btn.borderWidth = 0
-			btn.borderColor = null
+		b.onPointerOut = () => {
+			b.borderColor = LINE
+			t.color = MUTE
 		}
-		return { btn, t }
-	}
-	const label = (text, topMargin) => {
-		const row = app.create('uiview', { width: 312, flexDirection: 'row', alignItems: 'center' })
-		if (topMargin) row.marginTop = topMargin
-		row.add(mkText(text, 8, MUTED))
-		return row
+		return { view: b, label: t }
 	}
 
-	// ----- header: brand block + channel + live pill -----
-	const header = app.create('uiview', {
-		width: 312,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-	})
-	const brandCol = app.create('uiview', { flexDirection: 'column', alignItems: 'flex-start' })
-	brandCol.add(mkText('⚡ BOLT', 26, MAGENTA, { fontWeight: 'bold' }))
-	brandCol.add(mkText('RIG CONSOLE', 9, CYAN))
-	header.add(brandCol)
-
-	const headRight = app.create('uiview', { flexDirection: 'column', alignItems: 'flex-end' })
-	const chanChip = app.create('uiview', {
-		height: 20,
-		paddingLeft: 9,
-		paddingRight: 9,
-		borderRadius: 10,
-		backgroundColor: 'rgba(41, 231, 255, 0.12)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	})
-	chanChip.add(mkText('#' + CHANNEL, 9, CYAN))
-	headRight.add(chanChip)
-	const livePill = app.create('uiview', {
-		width: 78,
-		height: 20,
-		borderRadius: 10,
-		marginTop: 6,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: 'rgba(255, 255, 255, 0.06)',
-	})
-	const liveTxt = mkText('IDLE', 9, DIM, { fontWeight: 'bold' })
-	livePill.add(liveTxt)
-	headRight.add(livePill)
-	header.add(headRight)
-	panel.add(header)
-
-	// ----- now playing card -----
-	const npCard = app.create('uiview', {
-		width: 312,
-		marginTop: 14,
-		backgroundColor: CARD,
-		borderRadius: 14,
-		borderWidth: 1,
-		borderColor: 'rgba(255, 43, 214, 0.25)',
+	// ----- header -----
+	const head = app.create('uiview', {
+		width: 340,
+		paddingLeft: 16,
+		paddingRight: 16,
+		paddingTop: 14,
+		paddingBottom: 10,
 		flexDirection: 'column',
-		alignItems: 'flex-start',
-		paddingLeft: 14,
-		paddingRight: 14,
-		paddingTop: 10,
-		paddingBottom: 12,
 	})
-	npCard.add(mkText('NOW PLAYING', 8, MUTED))
-	const npTitle = mkText('· · ·', 17, TEXT, { fontWeight: 'bold', marginTop: 3 })
-	npCard.add(npTitle)
-	const npArtist = mkText('waiting for the rig', 10, CYAN, { marginTop: 2 })
-	npCard.add(npArtist)
-	const npSource = app.create('uiview', {
-		height: 18,
-		paddingLeft: 9,
-		paddingRight: 9,
-		borderRadius: 9,
-		marginTop: 9,
-		backgroundColor: 'rgba(255, 43, 214, 0.16)',
-		justifyContent: 'center',
-		alignItems: 'center',
-	})
-	const npSourceTxt = mkText('▦ LIBRARY', 8, MAGENTA, { fontWeight: 'bold' })
-	npSource.add(npSourceTxt)
-	npCard.add(npSource)
-	panel.add(npCard)
+	const hrow = row({ width: 308, justifyContent: 'space-between' })
+	const brandRow = row({})
+	brandRow.add(text('BOLT', 24, CYAN, { fontWeight: 'bold' }))
+	brandRow.add(text('://rig', 24, INK))
+	hrow.add(brandRow)
+	const liveTxt = text('● LIVE', 11, RED)
+	hrow.add(liveTxt)
+	head.add(hrow)
+	head.add(text('console · channel=' + CHANNEL, 11, MUTE, { marginTop: 5 }))
+	panel.add(head)
+	panel.add(divider(LINE, 340))
 
-	// ----- audio source switch (library music vs the stream) -----
-	panel.add(label('AUDIO SOURCE', 14))
-	const srcRow = app.create('uiview', { width: 312, flexDirection: 'row', marginTop: 6 })
-	const libSeg = mkBtn('▦  LIBRARY', 152, 34, GHOST, DIM, 11)
-	libSeg.btn.marginRight = 8
-	const streamSeg = mkBtn('◉  LIVE STREAM', 152, 34, GHOST, DIM, 11)
-	srcRow.add(libSeg.btn)
-	srcRow.add(streamSeg.btn)
-	panel.add(srcRow)
-
-	function styleSource(active) {
-		const seg = (o, isOn) => {
-			o.btn.backgroundColor = isOn ? 'rgba(255, 43, 214, 0.2)' : GHOST
-			o.btn.borderWidth = isOn ? 1 : 0
-			o.btn.borderColor = isOn ? MAGENTA : null
-			o.t.color = isOn ? TEXT : DIM
-		}
-		seg(libSeg, active === 'library')
-		seg(streamSeg, active === 'stream')
+	// ----- state rows (the old now-playing card, flattened) -----
+	const kv = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 10 })
+	const kvRow = key => {
+		const r = row({ width: 308, paddingTop: 4, paddingBottom: 4 })
+		const keyCol = app.create('uiview', { width: 104 })
+		keyCol.add(text(key, 11, MUTE))
+		r.add(keyCol)
+		const val = text('—', 13, INK)
+		r.add(val)
+		return { view: r, val }
 	}
-	styleSource('library')
-	libSeg.btn.onPointerDown = () => app.send('booth:source', 'library')
-	streamSeg.btn.onPointerDown = () => app.send('booth:source', 'stream')
+	const rNow = kvRow('now_playing')
+	const rSrc = kvRow('source')
+	const rMode = kvRow('mode')
+	kv.add(rNow.view)
+	kv.add(rSrc.view)
+	kv.add(rMode.view)
+	panel.add(kv)
+	panel.add(divider(LINE, 340))
+
+	// ----- audio source tabs -----
+	const srcRow = row({ paddingLeft: 16, paddingRight: 16, paddingTop: 12, gap: 10 })
+	const libTab = chip('[ library ]', 106, 30)
+	const streamTab = chip('[ stream ]', 106, 30)
+	srcRow.add(libTab.view)
+	srcRow.add(streamTab.view)
+	panel.add(srcRow)
+	libTab.view.onPointerDown = () => app.send('booth:source', 'library')
+	streamTab.view.onPointerDown = () => app.send('booth:source', 'stream')
+
+	function styleTabs(active) {
+		const seg = (o, on) => {
+			o.view.borderColor = on ? MAGENTA : LINE
+			o.view.backgroundColor = on ? 'rgba(255, 43, 214, 0.10)' : null
+			o.label.color = on ? MAGENTA : MUTE
+		}
+		seg(libTab, active === 'library')
+		seg(streamTab, active === 'stream')
+	}
+	styleTabs('library')
+	// hover-out of a tab must restore the ACTIVE styling, not the idle one
+	libTab.view.onPointerOut = () => styleTabs(view.audioSource || 'library')
+	streamTab.view.onPointerOut = () => styleTabs(view.audioSource || 'library')
 
 	// ----- transport -----
-	const transport = app.create('uiview', {
-		width: 312,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 16,
-	})
-	const prevB = mkBtn('⏮', 56, 44, GHOST, TEXT, 16)
-	const playB = mkBtn('▶ PLAY', 168, 44, MAGENTA, INK, 15)
-	const nextB = mkBtn('⏭', 56, 44, GHOST, TEXT, 16)
-	transport.add(prevB.btn)
-	transport.add(playB.btn)
-	transport.add(nextB.btn)
-	panel.add(transport)
-
-	// ----- master volume (stream mode: this fader IS the stream's volume) -----
-	panel.add(label('MASTER', 14))
-	const volRow = app.create('uiview', { width: 312, flexDirection: 'row', alignItems: 'center', marginTop: 6 })
-	const volDown = mkBtn('−', 28, 28, GHOST, TEXT, 16)
-	const volBar = app.create('uiview', { flexDirection: 'row', alignItems: 'center', marginLeft: 8, marginRight: 8 })
-	const volSegs = []
-	for (let i = 0; i < 10; i++) {
-		const seg = app.create('uiview', {
-			width: 12,
-			height: 10,
-			borderRadius: 3,
-			marginRight: i === 9 ? 0 : 3,
-			backgroundColor: 'rgba(255, 255, 255, 0.08)',
-		})
-		volSegs.push(seg)
-		volBar.add(seg)
+	const trans = row({ paddingLeft: 16, paddingRight: 16, paddingTop: 12, gap: 8 })
+	const prevB = chip('«', 42, 36, 16)
+	const playB = chip('▶ PLAY', 186, 36, 12)
+	const nextB = chip('»', 42, 36, 16)
+	playB.view.flexGrow = 1
+	trans.add(prevB.view)
+	trans.add(playB.view)
+	trans.add(nextB.view)
+	panel.add(trans)
+	prevB.view.onPointerDown = () => {
+		console.warn('[djbooth] prev crate')
+		app.send('booth:request', { action: 'prevCrate' })
 	}
-	const volUp = mkBtn('+', 28, 28, GHOST, TEXT, 16)
-	volRow.add(volDown.btn)
-	volRow.add(volBar)
-	volRow.add(volUp.btn)
-	panel.add(volRow)
+	nextB.view.onPointerDown = () => {
+		console.warn('[djbooth] next crate')
+		app.send('booth:request', { action: 'nextCrate' })
+	}
+	playB.view.onPointerDown = () => app.send('booth:toggle', true)
 
-	function renderVolume(v) {
-		// props.volume runs 0..2; the bar spans the whole range
-		const filled = Math.round((Math.min(2, Math.max(0, v)) / 2) * 10)
-		for (let i = 0; i < volSegs.length; i++) {
-			volSegs[i].backgroundColor = i < filled ? CYAN : 'rgba(255, 255, 255, 0.08)'
+	// ----- master (the tick strip is the fader) -----
+	const meter = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 12 })
+	const mh = row({ width: 308, justifyContent: 'space-between' })
+	mh.add(text('MASTER', 11, MUTE))
+	const mhRight = row({ gap: 8 })
+	const volDown = chip('[-]', 30, 22, 12)
+	const volValue = text('0.80 / 2.00', 11, INK)
+	const volUp = chip('[+]', 30, 22, 12)
+	mhRight.add(volDown.view)
+	mhRight.add(volValue)
+	mhRight.add(volUp.view)
+	mh.add(mhRight)
+	meter.add(mh)
+
+	const TICKS = 14
+	const tickRow = row({ width: 308, gap: 2, marginTop: 7 })
+	const ticks = []
+	for (let i = 0; i < TICKS; i++) {
+		const t = app.create('uiview', { height: 10, flexGrow: 1, backgroundColor: FAINTLINE, cursor: 'pointer' })
+		// clicking a tick sets the level it represents — the strip IS the fader
+		t.onPointerDown = () => {
+			const v = Math.round(((i + 1) / TICKS) * 2 * 10) / 10
+			app.send('booth:request', { action: 'volume', value: v })
 		}
+		ticks.push(t)
+		tickRow.add(t)
 	}
+	meter.add(tickRow)
+	panel.add(meter)
+
 	const nudgeVolume = delta => {
 		const next = Math.round(Math.min(2, Math.max(0, (view.volume ?? 1) + delta)) * 10) / 10
 		app.send('booth:request', { action: 'volume', value: next })
 	}
-	volDown.btn.onPointerDown = () => nudgeVolume(-0.1)
-	volUp.btn.onPointerDown = () => nudgeVolume(0.1)
+	volDown.view.onPointerDown = () => nudgeVolume(-0.1)
+	volUp.view.onPointerDown = () => nudgeVolume(0.1)
 
-	// ----- crates -----
-	const crateHead = app.create('uiview', {
-		width: 312,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 16,
-	})
-	crateHead.add(mkText('CRATES', 8, MUTED))
-	const crateCount = mkText('0', 8, MUTED)
-	crateHead.add(crateCount)
-	panel.add(crateHead)
-
-	let listRoot = null
-	function rebuildList() {
-		if (listRoot) {
-			panel.remove(listRoot)
-			listRoot = null
+	function renderVolume(v) {
+		const vv = Math.min(2, Math.max(0, v))
+		const filled = Math.round((vv / 2) * TICKS)
+		for (let i = 0; i < ticks.length; i++) {
+			ticks[i].backgroundColor = i < filled ? CYAN : FAINTLINE
 		}
+		volValue.value = vv.toFixed(2) + ' / 2.00'
+	}
+
+	// ----- crate table -----
+	const tbl = col({ width: 340, paddingLeft: 16, paddingRight: 16, paddingTop: 12 })
+	const th = row({ width: 308, paddingBottom: 5 })
+	const thNum = app.create('uiview', { width: 26 })
+	thNum.add(text('#', 10, FAINT))
+	th.add(thNum)
+	th.add(text('CRATE', 10, FAINT, { flexGrow: 1 }))
+	const thSrc = app.create('uiview', { width: 46, alignItems: 'flex-end' })
+	thSrc.add(text('SRC', 10, FAINT, { textAlign: 'right' }))
+	th.add(thSrc)
+	tbl.add(th)
+	tbl.add(divider(FAINTLINE, 308))
+
+	let tableRows = null
+	function rebuildTable() {
+		if (tableRows) {
+			tbl.remove(tableRows)
+			tableRows = null
+		}
+		tableRows = col({ width: 308 })
 		const all = view.playlist || []
+		const isStream = view.audioSource === 'stream'
+		const rows = []
+		if (isStream) {
+			rows.push({
+				key: 'live',
+				title: view.hasScreen ? view.screenHost || 'screen video' : 'no video url',
+				src: 'strm',
+				hot: true,
+				id: null,
+			})
+		}
+		const room = isStream ? 4 : 5
 		let start = 0
-		if (all.length > 5) {
+		if (all.length > room) {
 			const sel = Math.max(0, all.findIndex(c => c.id === view.selectedCrateId))
-			start = Math.max(0, Math.min(sel - 2, all.length - 5))
+			start = Math.max(0, Math.min(sel - 1, all.length - room))
 		}
-		const items = all.slice(start, start + 5)
-		crateCount.value = all.length ? `${start + 1}–${start + items.length} of ${all.length}` : 'empty'
-		if (items.length === 0) {
-			listRoot = app.create('uiview', {
-				width: 312,
-				marginTop: 8,
-				alignItems: 'center',
-				backgroundColor: 'rgba(0, 0, 0, 0.35)',
-				borderRadius: 10,
-				paddingTop: 10,
-				paddingBottom: 10,
+		all.slice(start, start + room).forEach((c, n) => {
+			rows.push({
+				key: String(start + n + 1).padStart(2, '0'),
+				title: c.name + (c.artist ? ' — ' + c.artist : ''),
+				src: 'lib',
+				hot: c.id === view.selectedCrateId,
+				id: c.id,
 			})
-			listRoot.add(mkText('no crates yet — drop a boltVinyl in the world', 10, MUTED))
-			panel.add(listRoot)
-			return
+		})
+		if (rows.length === 0) {
+			rows.push({ key: '--', title: 'no crates yet — drop a boltVinyl in the world', src: '', hot: false, id: null })
 		}
-		listRoot = app.create('uiview', {
-			width: 312,
-			marginTop: 8,
-			flexDirection: 'column',
-			backgroundColor: 'rgba(0, 0, 0, 0.35)',
-			borderRadius: 10,
-			paddingTop: 5,
-			paddingBottom: 5,
+		rows.forEach(r => {
+			const line = row({ width: 308, paddingTop: 7, paddingBottom: 7, cursor: r.id ? 'pointer' : 'default' })
+			const numCol = app.create('uiview', { width: 26 })
+			numCol.add(text(r.key, 13, r.hot ? MAGENTA : FAINT))
+			line.add(numCol)
+			line.add(text(clip(r.title, 30), 13, r.hot ? '#ffffff' : '#8aa8b8', { flexGrow: 1 }))
+			const srcCol = app.create('uiview', { width: 46, alignItems: 'flex-end' })
+			srcCol.add(text(r.src, 13, r.src === 'strm' ? MAGENTA : MUTE, { textAlign: 'right' }))
+			line.add(srcCol)
+			if (r.id) {
+				line.onPointerOver = () => {
+					line.backgroundColor = HOT
+				}
+				line.onPointerOut = () => {
+					line.backgroundColor = null
+				}
+				line.onPointerDown = () => {
+					console.warn('[djbooth] playlist select:', r.title)
+					app.send('booth:request', { action: 'selectCrate', crateId: r.id })
+				}
+			}
+			tableRows.add(line)
+			tableRows.add(divider(FAINTLINE, 308))
 		})
-		items.forEach((item, n) => {
-			const isSelected = item.id === view.selectedCrateId
-			const base = isSelected ? 'rgba(255, 43, 214, 0.16)' : 'transparent'
-			const row = app.create('uiview', {
-				width: 302,
-				height: 26,
-				flexDirection: 'row',
-				alignItems: 'center',
-				paddingLeft: 8,
-				borderRadius: 8,
-				backgroundColor: base,
-				cursor: 'pointer',
-			})
-			const idx = mkText(String(start + n + 1).padStart(2, '0'), 9, MUTED, { width: 24 })
-			row.add(idx)
-			const nameT = mkText(`${isSelected ? '▶ ' : ''}${item.name}${item.artist ? ' — ' + item.artist : ''}`, 11, isSelected ? TEXT : DIM)
-			row.add(nameT)
-			row.onPointerOver = () => {
-				row.backgroundColor = isSelected ? 'rgba(255, 43, 214, 0.28)' : 'rgba(255, 255, 255, 0.06)'
-			}
-			row.onPointerOut = () => {
-				row.backgroundColor = base
-			}
-			row.onPointerDown = () => {
-				console.warn('[djbooth] playlist select:', item.name)
-				app.send('booth:request', { action: 'selectCrate', crateId: item.id })
-			}
-			listRoot.add(row)
-		})
-		panel.add(listRoot)
+		tbl.add(tableRows)
 	}
+	panel.add(tbl)
 
-	// ----- footer: autoplay + status -----
-	const footer = app.create('uiview', {
-		width: 312,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: 12,
-	})
-	const autoB = mkBtn('AUTOPLAY OFF', 124, 28, GHOST, DIM, 9)
-	const statusText = mkText('ready', 8, '#55556c')
-	footer.add(autoB.btn)
-	footer.add(statusText)
-	panel.add(footer)
-
-	ui.add(panel)
-
-	// ----- interactions -----
-	prevB.btn.onPointerDown = () => {
-		console.warn('[djbooth] prev crate')
-		app.send('booth:request', { action: 'prevCrate' })
-	}
-	nextB.btn.onPointerDown = () => {
-		console.warn('[djbooth] next crate')
-		app.send('booth:request', { action: 'nextCrate' })
-	}
-	playB.btn.onPointerDown = () => {
-		app.send('booth:toggle', true)
-	}
-	autoB.btn.onPointerDown = () => {
+	// ----- footer -----
+	const foot = row({ width: 340, paddingLeft: 16, paddingRight: 16, justifyContent: 'space-between', marginTop: 12 })
+	const autoB = chip('autoplay:on', 92, 20, 10)
+	const statusTxt = text('ready', 10, FAINT)
+	foot.add(autoB.view)
+	foot.add(statusTxt)
+	panel.add(foot)
+	autoB.view.onPointerDown = () => {
 		app.send('booth:autoplay', view.autoPlay !== 'enabled')
 	}
 
-	// live pulse — one restyle every half second, not per frame
+	ui.add(panel)
+
+	// live pulse — the one animation, two states, twice a second
 	let pulseAt = 0
 	let pulseOn = false
 	app.on('update', () => {
 		const now = world.getTime()
 		if (now - pulseAt < 0.5) return
 		pulseAt = now
-		if (!view.playing) return
+		if (!view.playing) {
+			liveTxt.color = FAINT
+			return
+		}
 		pulseOn = !pulseOn
-		livePill.backgroundColor = pulseOn ? 'rgba(255, 43, 85, 0.95)' : 'rgba(255, 43, 85, 0.45)'
+		liveTxt.color = pulseOn ? RED : '#7a2038'
 	})
 
 	// server relay delivers rig state (state bus -> our server -> app.send)
@@ -1331,32 +1296,26 @@ if (world.isClient) {
 		view = Object.assign({}, state)
 		const np = state.nowPlaying
 		const isStream = state.audioSource === 'stream'
-		if (isStream) {
-			npTitle.value = 'LIVE STREAM'
-			npArtist.value = state.hasScreen ? state.screenHost || 'screen video' : 'set a Screen Video / Direct Video URL'
-		} else {
-			npTitle.value = np ? np.name : '· · ·'
-			npArtist.value = np ? np.artist || 'from the crates' : 'waiting for a crate'
-		}
-		npSourceTxt.value = isStream ? '◉ LIVE STREAM' : '▦ LIBRARY'
-		npSource.backgroundColor = isStream ? 'rgba(255, 43, 85, 0.2)' : 'rgba(255, 43, 214, 0.16)'
-		npSourceTxt.color = isStream ? '#ff5c7a' : MAGENTA
-		styleSource(state.audioSource || 'library')
-		liveTxt.value = state.playing ? 'LIVE' : 'IDLE'
-		liveTxt.color = state.playing ? '#ffffff' : DIM
-		if (!state.playing) livePill.backgroundColor = 'rgba(255, 255, 255, 0.06)'
-		playB.t.value = state.playing ? '⏸ STOP' : '▶ PLAY'
-		autoB.t.value = state.autoPlay ? 'AUTOPLAY ON' : 'AUTOPLAY OFF'
-		autoB.t.color = state.autoPlay ? CYAN : DIM
-		autoB.btn.backgroundColor = state.autoPlay ? 'rgba(41, 231, 255, 0.12)' : GHOST
-		statusText.value = state.playing
+		rNow.val.value = clip(isStream ? 'LIVE STREAM' : np ? np.name : '—', 26)
+		rNow.val.color = isStream || np ? INK : FAINT
+		rSrc.val.value = clip(isStream ? (state.hasScreen ? state.screenHost || 'screen video' : 'no video url') : 'library', 26)
+		rSrc.val.color = isStream ? (state.hasScreen ? CYAN : RED) : MUTE
+		rMode.val.value = isStream ? 'stream' : 'library'
+		rMode.val.color = isStream ? MAGENTA : CYAN
+		liveTxt.value = state.playing ? '● LIVE' : '● idle'
+		if (!state.playing) liveTxt.color = FAINT
+		styleTabs(state.audioSource || 'library')
+		playB.label.value = state.playing ? '■ STOP' : '▶ PLAY'
+		autoB.label.value = state.autoPlay ? 'autoplay:on' : 'autoplay:off'
+		autoB.label.color = state.autoPlay ? CYAN : MUTE
+		statusTxt.value = state.playing
 			? isStream
 				? 'stream owns the room'
-				: 'rig live — speakers synced'
+				: 'speakers synced'
 			: embedUrl
 				? 'embed mode'
 				: 'ready'
 		renderVolume(state.volume ?? 1)
-		rebuildList()
+		rebuildTable()
 	})
 }
